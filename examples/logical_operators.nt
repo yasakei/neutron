@@ -1,0 +1,12 @@
+// Logical operators
+print true and false; // false
+print true or false; // true
+print nil or "hello"; // "hello"
+print false or "world"; // "world"
+print 5 and 10; // 10
+print nil and 10; // nil
+
+var a = 5;
+var b = 10;
+print a > 3 and b < 15; // true
+print a < 3 or b > 15; // false

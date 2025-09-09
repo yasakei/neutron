@@ -1,0 +1,83 @@
+// comprehensive_example.nt - Comprehensive example showing all implemented features
+
+// Import statement (syntax only, functionality under development)
+import math;
+
+// Variable declarations with different types
+var name = "Neutron";
+var version = 1.0;
+var isFast = true;
+var nothing = nil;
+
+// Print statements
+print("Welcome to " + name + " v" + version);
+print("Is it fast? " + isFast);
+print("Nothing is " + nothing);
+
+// Arithmetic expressions
+var x = 10;
+var y = 3;
+var sum = x + y;
+var diff = x - y;
+var prod = x * y;
+var quot = x / y;
+
+print("x = " + x);
+print("y = " + y);
+print("x + y = " + sum);
+print("x - y = " + diff);
+print("x * y = " + prod);
+print("x / y = " + quot);
+
+// Comparison expressions
+var isEqual = x == y;
+var isNotEqual = x != y;
+var isGreater = x > y;
+var isLess = x < y;
+var isGreaterEqual = x >= y;
+var isLessEqual = x <= y;
+
+print("x == y: " + isEqual);
+print("x != y: " + isNotEqual);
+print("x > y: " + isGreater);
+print("x < y: " + isLess);
+print("x >= y: " + isGreaterEqual);
+print("x <= y: " + isLessEqual);
+
+// Control flow with if-else
+if (x > y) {
+    print("x is greater than y");
+} else {
+    print("x is not greater than y");
+}
+
+// Nested if statements
+if (isFast) {
+    if (x > 5) {
+        print(name + " is fast and x is greater than 5");
+    } else {
+        print(name + " is fast but x is not greater than 5");
+    }
+} else {
+    print(name + " is not fast");
+}
+
+// If-else chain
+if (x == 10) {
+    print("x is exactly 10");
+} else if (x == 20) {
+    print("x is exactly 20");
+} else {
+    print("x is neither 10 nor 20");
+}
+
+// Block statements
+{
+    var local = "I'm local to this block";
+    print(local);
+    // local is not accessible outside this block
+}
+
+// Attempt to use dot notation (under development)
+var result = math.add(x, y);
+print("Result from math library: " + result);

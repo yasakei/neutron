@@ -1,0 +1,28 @@
+# Build directories
+build/
+bin/
+
+# Compiled binaries
+neutronc
+neutron
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+*.o
+*.a
+*.so
+*.dll
+*.swp
+*~
+
+# Environment files
+.env

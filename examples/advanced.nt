@@ -1,0 +1,49 @@
+// example.nt - Example Neutron program with libraries and control flow
+
+// Import the math library
+import n.math;
+
+// Print a welcome message
+print("Welcome to Neutron!");
+
+// Declare some variables
+var x = 10;
+var y = 5;
+var name = "Neutron";
+
+// Basic arithmetic using the math library
+var sum = n.math.add(x, y);
+var product = n.math.multiply(x, y);
+
+print("Sum: " + sum);
+print("Product: " + product);
+
+// Control flow with if-else
+if (x > y) {
+    print("x is greater than y");
+} else {
+    print("x is not greater than y");
+}
+
+// Another if statement
+if (name == "Neutron") {
+    print("Hello, Neutron!");
+} else {
+    print("You are not Neutron!");
+}
+
+// Using math constants
+print("PI is approximately: " + n.math.PI);
+print("E is approximately: " + n.math.E);
+
+// Function with conditional logic
+fun max(a, b) {
+    if (a > b) {
+        return a;
+    } else {
+        return b;
+    }
+}
+
+var result = max(15, 7);
+print("Max of 15 and 7 is: " + result);
