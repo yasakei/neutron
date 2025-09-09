@@ -1,0 +1,9 @@
+// JSON library implementation
+// This file defines the JSON functions that can be imported
+
+// The actual implementation is in the native C++ code
+// This file just makes the functions available for import
+
+var stringify = json.stringify;
+var parse = json.parse;
+var get = json.get;

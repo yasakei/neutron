@@ -1,0 +1,37 @@
+// HTTP library example
+import http;
+import json;
+
+print("Testing HTTP GET request...");
+
+// Make a GET request to a test API
+var response = http.get("https://httpbin.org/get");
+
+print("Response status: " + json.get(response, "status"));
+print("Response body: " + json.get(response, "body"));
+
+print("\nTesting HTTP POST request...");
+
+// Make a POST request
+var post_data = '{"name": "Neutron", "type": "Programming Language"}';
+var post_response = http.post("https://httpbin.org/post", post_data);
+
+print("POST Response status: " + json.get(post_response, "status"));
+print("POST Response body: " + json.get(post_response, "body"));
+
+print("\nTesting HTTP PUT request...");
+
+// Make a PUT request
+var put_data = '{"id": 1, "name": "Updated Neutron"}';
+var put_response = http.put("https://httpbin.org/put", put_data);
+
+print("PUT Response status: " + json.get(put_response, "status"));
+print("PUT Response body: " + json.get(put_response, "body"));
+
+print("\nTesting HTTP DELETE request...");
+
+// Make a DELETE request
+var delete_response = http.delete("https://httpbin.org/delete");
+
+print("DELETE Response status: " + json.get(delete_response, "status"));
+print("DELETE Response body: " + json.get(delete_response, "body"));

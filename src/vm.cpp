@@ -9,6 +9,9 @@
 #include <bitset>
 #include "libs/math/native.h"
 #include "libs/convert/native.h"
+#include "libs/json/native.h"
+#include "libs/http/native.h"
+#include "libs/time/native.h"
 
 namespace neutron {
 
@@ -50,6 +53,10 @@ Value::Value(const std::string& value) : type(ValueType::STRING) {
     as.string = new std::string(value);
 }
 
+Value::Value(Object* object) : type(ValueType::OBJECT) {
+    as.object = object;
+}
+
 Value::Value(Callable* function) : type(ValueType::FUNCTION) {
     as.function = function;
 }
@@ -73,7 +80,7 @@ std::string Value::toString() const {
         case ValueType::STRING:
             return *as.string;
         case ValueType::OBJECT:
-            return "<object>";
+            return as.object->toString();
         case ValueType::FUNCTION:
             return as.function->toString();
         case ValueType::MODULE:
@@ -158,37 +165,27 @@ std::string NativeFn::toString() {
     return "<native fn>";
 }
 
-Module::Module(std::string name, std::shared_ptr<Environment> environment)
-    : name(name), environment(environment) {}
+Module::Module(std::string name, std::shared_ptr<Environment> environment, std::vector<std::unique_ptr<Stmt>> statements)
+    : name(name), environment(environment), statements(std::move(statements)) {}
 
 Value Module::get(const std::string& name) {
     return environment->get(name);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 VM::VM() : environment(std::make_shared<Environment>()) {
     auto math_env = std::make_shared<Environment>();
     register_math_functions(math_env);
 
-    auto math_module = new Module("math", math_env);
+    auto math_module = new Module("math", math_env, {});
     environment->define("math", Value(math_module));
 
     register_convert_functions(environment);
+    
+    // Register HTTP library
+    register_http_lib(environment);
+    
+    // Register Time library
+    register_time_lib(environment);
 }
 
 void VM::interpret(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> env) {
@@ -472,11 +469,37 @@ void VM::visitImportStmt(const ImportStmt* stmt) {
         return;
     }
 
-    std::string filePath = "lib/" + moduleName + ".nt";
+    // Handle native modules that don't have .nt files
+    if (moduleName == "http") {
+        // HTTP module is already registered in VM constructor
+        // We just need to find it and add it to the environment
+        Value httpModule = environment->get("http");
+        environment->define(moduleName, httpModule);
+        std::cout << "DEBUG: HTTP module added to environment" << std::endl;
+        return;
+    }
 
-    std::ifstream file(filePath);
+    std::string filePath;
+    std::ifstream file;
+
+    // Try lib/moduleName.nt
+    filePath = "lib/" + moduleName + ".nt";
+    file.open(filePath);
+
+    // Try box/moduleName.nt
     if (!file.is_open()) {
-        throw std::runtime_error("Could not open library file: " + filePath);
+        filePath = "box/" + moduleName + ".nt";
+        file.open(filePath);
+    }
+
+    // Try box/moduleName/moduleName.nt
+    if (!file.is_open()) {
+        filePath = "box/" + moduleName + "/" + moduleName + ".nt";
+        file.open(filePath);
+    }
+
+    if (!file.is_open()) {
+        throw std::runtime_error("Could not open library file: " + moduleName);
     }
 
     std::stringstream buffer;
@@ -503,6 +526,12 @@ void VM::visitImportStmt(const ImportStmt* stmt) {
         libraryEnv->define("string_get_char_at", Value(new NativeFn(native_string_get_char_at, 2)));
         libraryEnv->define("string_length", Value(new NativeFn(native_string_length, 1)));
     }
+    
+    // If this is the json module, register the native functions
+    if (moduleName == "json") {
+        std::cout << "DEBUG: Registering native functions for json module" << std::endl;
+        register_json_lib(libraryEnv);
+    }
 
     VM libraryVM;
     libraryVM.environment = libraryEnv;
@@ -510,7 +539,7 @@ void VM::visitImportStmt(const ImportStmt* stmt) {
     
     std::cout << "DEBUG: After interpreting, libraryEnv has " << libraryEnv->values.size() << " values" << std::endl;
 
-    auto module = new Module(moduleName, libraryEnv);
+    auto module = new Module(moduleName, libraryEnv, std::move(statements));
     environment->define(moduleName, Value(module));
     
     std::cout << "DEBUG: Module " << moduleName << " imported successfully" << std::endl;

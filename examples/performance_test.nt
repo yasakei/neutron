@@ -1,0 +1,85 @@
+import time;
+import http;
+import json;
+
+var ITERATIONS = 10000;
+
+fun run_test(name, func) {
+    var start_time = time.now();
+    func();
+    var end_time = time.now();
+    print("Test " + name + ": " + (end_time - start_time) + " nanoseconds\n");
+}
+
+fun test_arithmetic() {
+    var a = 0;
+    for (var i = 0; i < ITERATIONS; i = i + 1) {
+        a = a + i - (i / 2) * 3;
+    }
+}
+
+fun test_string_concat() {
+    var s = "";
+    for (var i = 0; i < ITERATIONS; i = i + 1) {
+        s = s + "a";
+    }
+}
+
+fun test_function_calls() {
+    for (var i = 0; i < ITERATIONS; i = i + 1) {
+        empty_func();
+    }
+}
+
+fun empty_func() {
+    // Do nothing
+}
+
+fun test_loops() {
+    for (var i = 0; i < ITERATIONS; i = i + 1) {
+        // Do nothing
+    }
+}
+
+fun test_conditionals() {
+    for (var i = 0; i < ITERATIONS; i = i + 1) {
+        if (i / 2 * 2 == i) {
+            var x = 1;
+        } else {
+            var y = 2;
+        }
+    }
+}
+
+fun test_native_function_call() {
+    for (var i = 0; i < ITERATIONS; i = i + 1) {
+        time.now();
+    }
+}
+
+fun test_http_get() {
+    // This will make an actual HTTP request, so it will be slow
+    // and should not be in a loop with many iterations.
+    var response = http.get("https://httpbin.org/get");
+    // print("HTTP GET Status: " + json.get(response, "status") + "\n");
+}
+
+fun test_json_parse_stringify() {
+    var obj_str = '{"name": "test", "value": 123}';
+    for (var i = 0; i < ITERATIONS; i = i + 1) {
+        var obj = json.parse(obj_str);
+        var str = json.stringify(obj);
+    }
+}
+
+// Run all tests
+run_test("Arithmetic", test_arithmetic);
+run_test("String Concatenation", test_string_concat);
+run_test("Function Calls", test_function_calls);
+run_test("Loops", test_loops);
+run_test("Conditionals", test_conditionals);
+run_test("Native Function Call (time.now)", test_native_function_call);
+run_test("JSON Parse/Stringify", test_json_parse_stringify);
+
+// HTTP GET is slow, so run it only once
+run_test("HTTP GET (single request)", test_http_get);

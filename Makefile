@@ -2,12 +2,15 @@ CXX = g++
 SRCDIR = src
 INCDIR = include
 BUILDDIR = build
+BOXDIR = box
 TARGET = neutron
 SRCS = $(shell find src -type f -name "*.cpp")
 LIBSRCS = $(shell find libs -type f -name "*.cpp")
+BOXSRCS = $(shell find $(BOXDIR) -type f -name "*.cpp")
 OBJS = $(SRCS:src/%.cpp=build/%.o)
 LIBOBJS = $(LIBSRCS:libs/%.cpp=build/%.o)
-DEPENDENCIES = -I$(INCDIR) -I.
+BOXOBJS = $(BOXSRCS:$(BOXDIR)/%.cpp=build/box/%.o)
+DEPENDENCIES = -I$(INCDIR) -I. -Ilibs/json -Ilibs/http -Ilibs/time -I$(BOXDIR)
 
 # Default to release build
 DEBUG ?= 0
@@ -30,9 +33,13 @@ release:
 directories:
 	@mkdir -p $(BUILDDIR)
 	@mkdir -p $(BUILDDIR)/core
+	@mkdir -p $(BUILDDIR)/json
+	@mkdir -p $(BUILDDIR)/http
+	@mkdir -p $(BUILDDIR)/time
+	@mkdir -p $(BUILDDIR)/box
 
-$(TARGET): $(OBJS) $(LIBOBJS)
-	$(CXX) $(CXXFLAGS) $(OBJS) $(LIBOBJS) -o $(TARGET)
+$(TARGET): $(OBJS) $(LIBOBJS) $(BOXOBJS)
+	$(CXX) $(CXXFLAGS) $(OBJS) $(LIBOBJS) $(BOXOBJS) -lcurl -o $(TARGET)
 	@echo "Compilation complete. Binary located at ./$(TARGET)"
 
 build/%.o: src/%.cpp
@@ -40,6 +47,10 @@ build/%.o: src/%.cpp
 	$(CXX) $(CXXFLAGS) $(DEPENDENCIES) -c $< -o $@
 
 build/%.o: libs/%.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) $(DEPENDENCIES) -c $< -o $@
+
+build/box/%.o: $(BOXDIR)/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) $(DEPENDENCIES) -c $< -o $@
 

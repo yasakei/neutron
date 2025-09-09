@@ -13,6 +13,7 @@ namespace neutron {
 class VM;
 class Callable;
 class Module;
+class Object;
 
 enum class ValueType {
     NIL,
@@ -31,7 +32,7 @@ struct Value {
         bool boolean;
         double number;
         std::string* string;
-        void* object;
+        Object* object;
         Callable* function;
         Module* module;
     } as;
@@ -41,10 +42,33 @@ struct Value {
     Value(bool value);
     Value(double value);
     Value(const std::string& value);
+    Value(Object* object);
     Value(Callable* function);
     Value(Module* module);
     
     std::string toString() const;
+};
+
+class Object {
+public:
+    virtual ~Object() = default;
+    virtual std::string toString() const = 0;
+};
+
+class JsonObject : public Object {
+public:
+    std::unordered_map<std::string, Value> properties;
+    std::string toString() const override {
+        return "<json object>";
+    }
+};
+
+class JsonArray : public Object {
+public:
+    std::vector<Value> elements;
+    std::string toString() const override {
+        return "<json array>";
+    }
 };
 
 // Native primitive functions for string/char manipulation
@@ -70,8 +94,9 @@ class Module {
 public:
     std::string name;
     std::shared_ptr<Environment> environment;
+    std::vector<std::unique_ptr<Stmt>> statements;
 
-    Module(std::string name, std::shared_ptr<Environment> environment);
+    Module(std::string name, std::shared_ptr<Environment> environment, std::vector<std::unique_ptr<Stmt>> statements);
     Value get(const std::string& name);
 };
 
