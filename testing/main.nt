@@ -1,8 +1,0 @@
-import math;
-import convert;
-
-var x = 'This is a string';
-print(x);
-
-var y = 10 / 5;
-print(y);
