@@ -22,7 +22,8 @@ enum class ExprType {
     GROUPING,
     MEMBER,
     CALL,
-    ASSIGN
+    ASSIGN,
+    OBJECT
 };
 
 // Literal types
@@ -36,12 +37,12 @@ enum class LiteralValueType {
 // Statement types
 enum class StmtType {
     EXPRESSION,
-    PRINT,
+    SAY,
     VAR,
     BLOCK,
     IF,
     WHILE,
-    IMPORT,
+    USE,
     FUNCTION,
     RETURN,
     CLASS
@@ -149,13 +150,13 @@ public:
         : Stmt(StmtType::EXPRESSION), expression(std::move(expression)) {}
 };
 
-// Print statement
-class PrintStmt : public Stmt {
+// Say statement
+class SayStmt : public Stmt {
 public:
     std::unique_ptr<Expr> expression;
     
-    PrintStmt(std::unique_ptr<Expr> expression)
-        : Stmt(StmtType::PRINT), expression(std::move(expression)) {}
+    SayStmt(std::unique_ptr<Expr> expression)
+        : Stmt(StmtType::SAY), expression(std::move(expression)) {}
 };
 
 // Variable declaration statement
@@ -215,13 +216,13 @@ public:
           body(std::move(body)) {}
 };
 
-// Import statement
-class ImportStmt : public Stmt {
+// Use statement
+class UseStmt : public Stmt {
 public:
     Token library;
     
-    ImportStmt(Token library) 
-        : Stmt(StmtType::IMPORT), library(library) {}
+    UseStmt(Token library) 
+        : Stmt(StmtType::USE), library(library) {}
 };
 
 // Function declaration statement
@@ -272,6 +273,15 @@ public:
     
     AssignExpr(Token name, std::unique_ptr<Expr> value)
         : Expr(ExprType::ASSIGN), name(name), value(std::move(value)) {}
+};
+
+// Object literal expression
+class ObjectExpr : public Expr {
+public:
+    std::vector<std::pair<std::string, std::unique_ptr<Expr>>> properties;
+    
+    ObjectExpr(std::vector<std::pair<std::string, std::unique_ptr<Expr>>> properties)
+        : Expr(ExprType::OBJECT), properties(std::move(properties)) {}
 };
 
 } // namespace neutron

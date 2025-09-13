@@ -1,12 +1,14 @@
-fun sayHi(first, last) {
-    print "Hi, " + first + " " + last + "!";
+// Functions example
+fun greet(name) {
+    return "Hello, " + name + "!";
 }
 
-sayHi("Dear", "User");
-
-fun fib(n) {
-    if (n <= 1) return n;
-    return fib(n - 2) + fib(n - 1);
+fun add(a, b) {
+    return a + b;
 }
 
-print fib(10);
+var message = greet("Neutron");
+say(message);
+
+var sum = add(5, 3);
+say("5 + 3 = " + sum);

@@ -1,0 +1,210 @@
+use sys;
+use json;
+
+// Quiz Game - Test your knowledge!
+// Author: Neutron Developer
+// Description: A fun quiz game to test your general knowledge
+
+say "===========================================";
+say "           WELCOME TO QUIZ GAME!";
+say "===========================================";
+say "";
+
+var player_name = sys.input("Enter your name: ");
+say "";
+say "Hello, " + player_name + "! Let's test your knowledge.";
+say "";
+
+// Define quiz questions using object literals
+
+var q1 = {
+  "question": "What is the capital of France?",
+  "option1": "London",
+  "option2": "Berlin",
+  "option3": "Paris",
+  "option4": "Madrid",
+  "correct": 3,
+  "explanation": "Paris is the capital and most populous city of France."
+};
+
+var q2 = {
+  "question": "Which planet is known as the Red Planet?",
+  "option1": "Venus",
+  "option2": "Mars",
+  "option3": "Jupiter",
+  "option4": "Saturn",
+  "correct": 2,
+  "explanation": "Mars is often called the 'Red Planet' because of its reddish appearance."
+};
+
+// Game variables
+var score = 0;
+
+say "INSTRUCTIONS:";
+say "- You will be asked 2 multiple choice questions.";
+say "- Choose the correct answer by entering the number (1-4).";
+say "- Each correct answer gives you 1 point.";
+say "";
+say "Press Enter to start the quiz...";
+sys.input();
+say "";
+
+// Question 1
+say "Question 1 of 2:";
+say json.get(q1, "question");
+say "";
+say "1. " + json.get(q1, "option1");
+say "2. " + json.get(q1, "option2");
+say "3. " + json.get(q1, "option3");
+say "4. " + json.get(q1, "option4");
+say "";
+
+var answer_str = sys.input("Your answer (1-4): ");
+// Handle empty input
+if (answer_str == "") {
+  answer_str = "1";
+}
+var answer = int(answer_str);
+
+// Validate input without using 'or' operator
+var valid_answer = true;
+if (answer < 1) {
+  valid_answer = false;
+}
+if (answer > 4) {
+  valid_answer = false;
+}
+
+if (valid_answer == false) {
+  answer = 1; // Default to first option if invalid
+}
+
+say "";
+
+// Check answer
+if (answer == json.get(q1, "correct")) {
+  say "✓ Correct!";
+  score = score + 1;
+} else {
+  say "✗ Wrong!";
+  var correct_option = "";
+  if (json.get(q1, "correct") == 1) {
+    correct_option = json.get(q1, "option1");
+  } else if (json.get(q1, "correct") == 2) {
+    correct_option = json.get(q1, "option2");
+  } else if (json.get(q1, "correct") == 3) {
+    correct_option = json.get(q1, "option3");
+  } else if (json.get(q1, "correct") == 4) {
+    correct_option = json.get(q1, "option4");
+  }
+  say "The correct answer was: " + correct_option;
+}
+
+// Show explanation
+say "Explanation: " + json.get(q1, "explanation");
+say "";
+say "Press Enter for the next question...";
+sys.input();
+say "";
+
+// Question 2
+say "Question 2 of 2:";
+say json.get(q2, "question");
+say "";
+say "1. " + json.get(q2, "option1");
+say "2. " + json.get(q2, "option2");
+say "3. " + json.get(q2, "option3");
+say "4. " + json.get(q2, "option4");
+say "";
+
+answer_str = sys.input("Your answer (1-4): ");
+// Handle empty input
+if (answer_str == "") {
+  answer_str = "1";
+}
+answer = int(answer_str);
+
+// Validate input without using 'or' operator
+valid_answer = true;
+if (answer < 1) {
+  valid_answer = false;
+}
+if (answer > 4) {
+  valid_answer = false;
+}
+
+if (valid_answer == false) {
+  answer = 1; // Default to first option if invalid
+}
+
+say "";
+
+// Check answer
+if (answer == json.get(q2, "correct")) {
+  say "✓ Correct!";
+  score = score + 1;
+} else {
+  say "✗ Wrong!";
+  var correct_option = "";
+  if (json.get(q2, "correct") == 1) {
+    correct_option = json.get(q2, "option1");
+  } else if (json.get(q2, "correct") == 2) {
+    correct_option = json.get(q2, "option2");
+  } else if (json.get(q2, "correct") == 3) {
+    correct_option = json.get(q2, "option3");
+  } else if (json.get(q2, "correct") == 4) {
+    correct_option = json.get(q2, "option4");
+  }
+  say "The correct answer was: " + correct_option;
+}
+
+// Show explanation
+say "Explanation: " + json.get(q2, "explanation");
+say "";
+
+// Display final results
+say "===========================================";
+say "           QUIZ COMPLETE!";
+say "===========================================";
+say "";
+say player_name + ", your final score is: " + str(score) + "/2";
+say "";
+
+// Calculate percentage
+var percentage = (score * 100) / 2;
+
+// Give feedback based on score
+var feedback_done = false;
+if (percentage >= 90) {
+  say "Outstanding! You're a genius! 🌟";
+  feedback_done = true;
+}
+
+if (feedback_done == false) {
+  if (percentage >= 75) {
+    say "Great job! You know your stuff! 👍";
+    feedback_done = true;
+  }
+}
+
+if (feedback_done == false) {
+  if (percentage >= 60) {
+    say "Good effort! Keep learning! 👌";
+    feedback_done = true;
+  }
+}
+
+if (feedback_done == false) {
+  if (percentage >= 40) {
+    say "Not bad! But there's room for improvement! 📚";
+    feedback_done = true;
+  }
+}
+
+if (feedback_done == false) {
+  say "Better luck next time! Keep studying! 💪";
+}
+
+say "";
+say "Thanks for playing the Quiz Game!";
+say "===========================================";

@@ -20,8 +20,8 @@ std::vector<std::unique_ptr<Stmt>> Parser::parse() {
 }
 
 std::unique_ptr<Stmt> Parser::statement() {
-    if (match({TokenType::PRINT})) {
-        return printStatement();
+    if (match({TokenType::SAY})) {
+        return sayStatement();
     }
     
     if (match({TokenType::VAR})) {
@@ -44,8 +44,8 @@ std::unique_ptr<Stmt> Parser::statement() {
         return classDeclaration();
     }
     
-    if (match({TokenType::IMPORT})) {
-        return importStatement();
+    if (match({TokenType::USE})) {
+        return useStatement();
     }
     
     if (match({TokenType::FUN})) {
@@ -63,10 +63,10 @@ std::unique_ptr<Stmt> Parser::statement() {
     return expressionStatement();
 }
 
-std::unique_ptr<Stmt> Parser::printStatement() {
+std::unique_ptr<Stmt> Parser::sayStatement() {
     std::unique_ptr<Expr> value = expression();
     consume(TokenType::SEMICOLON, "Expect ';' after value.");
-    return std::make_unique<PrintStmt>(std::move(value));
+    return std::make_unique<SayStmt>(std::move(value));
 }
 
 std::unique_ptr<Stmt> Parser::expressionStatement() {
@@ -174,10 +174,10 @@ std::unique_ptr<Stmt> Parser::classDeclaration() {
     return std::make_unique<ClassStmt>(name, std::move(methods));
 }
 
-std::unique_ptr<Stmt> Parser::importStatement() {
+std::unique_ptr<Stmt> Parser::useStatement() {
     Token moduleName = consume(TokenType::IDENTIFIER, "Expect module name.");
-    consume(TokenType::SEMICOLON, "Expect ';' after import statement.");
-    return std::make_unique<ImportStmt>(moduleName);
+    consume(TokenType::SEMICOLON, "Expect ';' after use statement.");
+    return std::make_unique<UseStmt>(moduleName);
 }
 
 std::unique_ptr<Stmt> Parser::block() {
@@ -363,8 +363,39 @@ std::unique_ptr<Expr> Parser::primary() {
         return std::make_unique<GroupingExpr>(std::move(expr));
     }
     
+    // Handle object literals
+    if (match({TokenType::LEFT_BRACE})) {
+        return objectLiteral();
+    }
+    
     error(peek(), "Expect expression.");
     return nullptr; // This line should never be reached
+}
+
+std::unique_ptr<Expr> Parser::objectLiteral() {
+    std::vector<std::pair<std::string, std::unique_ptr<Expr>>> properties;
+    
+    // Handle empty object
+    if (!check(TokenType::RIGHT_BRACE)) {
+        do {
+            // Expect a string key
+            Token key = consume(TokenType::STRING, "Expect property key as string.");
+            
+            // For STRING tokens, lexeme already contains the unquoted string
+            std::string keyStr = key.lexeme;
+            
+            consume(TokenType::COLON, "Expect ':' after property key.");
+            
+            // Parse the value
+            std::unique_ptr<Expr> value = expression();
+            
+            properties.push_back({keyStr, std::move(value)});
+        } while (match({TokenType::COMMA}));
+    }
+    
+    consume(TokenType::RIGHT_BRACE, "Expect '}' after object literal.");
+    
+    return std::make_unique<ObjectExpr>(std::move(properties));
 }
 
 bool Parser::isAtEnd() {
@@ -431,7 +462,7 @@ void Parser::synchronize() {
             case TokenType::FOR:
             case TokenType::IF:
             case TokenType::WHILE:
-            case TokenType::PRINT:
+            case TokenType::SAY:
             case TokenType::RETURN:
                 return;
             default:

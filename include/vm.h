@@ -155,15 +155,16 @@ public:
     Value visitMemberExpr(const MemberExpr* expr);
     Value visitCallExpr(const CallExpr* expr);
     Value visitAssignExpr(const AssignExpr* expr);
+    Value visitObjectExpr(const ObjectExpr* expr);
     
     // Statement execution methods
     void visitExpressionStmt(const ExpressionStmt* stmt);
-    void visitPrintStmt(const PrintStmt* stmt);
+    void visitSayStmt(const SayStmt* stmt);
     void visitVarStmt(const VarStmt* stmt);
     void visitBlockStmt(const BlockStmt* stmt);
     void visitIfStmt(const IfStmt* stmt);
     void visitWhileStmt(const WhileStmt* stmt);
-    void visitImportStmt(const ImportStmt* stmt);
+    void visitUseStmt(const UseStmt* stmt);
     void visitFunctionStmt(const FunctionStmt* stmt);
     void visitReturnStmt(const ReturnStmt* stmt);
     

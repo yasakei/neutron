@@ -10,7 +10,7 @@ BOXSRCS = $(shell find $(BOXDIR) -type f -name "*.cpp")
 OBJS = $(SRCS:src/%.cpp=build/%.o)
 LIBOBJS = $(LIBSRCS:libs/%.cpp=build/%.o)
 BOXOBJS = $(BOXSRCS:$(BOXDIR)/%.cpp=build/box/%.o)
-DEPENDENCIES = -I$(INCDIR) -I. -Ilibs/json -Ilibs/http -Ilibs/time -I$(BOXDIR)
+DEPENDENCIES = -I$(INCDIR) -I. -Ilibs/json -Ilibs/http -Ilibs/time -Ilibs/sys -I$(BOXDIR)
 
 # Default to release build
 DEBUG ?= 0
@@ -36,6 +36,7 @@ directories:
 	@mkdir -p $(BUILDDIR)/json
 	@mkdir -p $(BUILDDIR)/http
 	@mkdir -p $(BUILDDIR)/time
+	@mkdir -p $(BUILDDIR)/sys
 	@mkdir -p $(BUILDDIR)/box
 
 $(TARGET): $(OBJS) $(LIBOBJS) $(BOXOBJS)

@@ -12,6 +12,7 @@
 #include "libs/json/native.h"
 #include "libs/http/native.h"
 #include "libs/time/native.h"
+#include "libs/sys/native.h"
 
 namespace neutron {
 
@@ -182,10 +183,13 @@ VM::VM() : environment(std::make_shared<Environment>()) {
     register_convert_functions(environment);
     
     // Register HTTP library
-    register_http_lib(environment);
+    register_http_functions(environment);
     
     // Register Time library
-    register_time_lib(environment);
+    register_time_functions(environment);
+    
+    // Register Sys library
+    register_sys_functions(environment);
 }
 
 void VM::interpret(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> env) {
@@ -210,8 +214,8 @@ void VM::execute(const Stmt* stmt) {
         case StmtType::EXPRESSION:
             visitExpressionStmt(static_cast<const ExpressionStmt*>(stmt));
             break;
-        case StmtType::PRINT:
-            visitPrintStmt(static_cast<const PrintStmt*>(stmt));
+        case StmtType::SAY:
+            visitSayStmt(static_cast<const SayStmt*>(stmt));
             break;
         case StmtType::VAR:
             visitVarStmt(static_cast<const VarStmt*>(stmt));
@@ -225,8 +229,8 @@ void VM::execute(const Stmt* stmt) {
         case StmtType::WHILE:
             visitWhileStmt(static_cast<const WhileStmt*>(stmt));
             break;
-        case StmtType::IMPORT:
-            visitImportStmt(static_cast<const ImportStmt*>(stmt));
+        case StmtType::USE:
+            visitUseStmt(static_cast<const UseStmt*>(stmt));
             break;
         case StmtType::FUNCTION:
             visitFunctionStmt(static_cast<const FunctionStmt*>(stmt));
@@ -268,6 +272,8 @@ Value VM::evaluate(const Expr* expr) {
             return visitCallExpr(static_cast<const CallExpr*>(expr));
         case ExprType::ASSIGN:
             return visitAssignExpr(static_cast<const AssignExpr*>(expr));
+        case ExprType::OBJECT:
+            return visitObjectExpr(static_cast<const ObjectExpr*>(expr));
     }
     return Value(nullptr);
 }
@@ -425,7 +431,7 @@ void VM::visitExpressionStmt(const ExpressionStmt* stmt) {
     evaluate(stmt->expression.get());
 }
 
-void VM::visitPrintStmt(const PrintStmt* stmt) {
+void VM::visitSayStmt(const SayStmt* stmt) {
     Value value = evaluate(stmt->expression.get());
     std::cout << value.toString() << std::endl;
 }
@@ -460,8 +466,8 @@ void VM::visitWhileStmt(const WhileStmt* stmt) {
     }
 }
 
-void VM::visitImportStmt(const ImportStmt* stmt) {
-    std::cout << "DEBUG: Importing module: " << stmt->library.lexeme << std::endl;
+void VM::visitUseStmt(const UseStmt* stmt) {
+    std::cout << "DEBUG: Using module: " << stmt->library.lexeme << std::endl;
     
     std::string moduleName = stmt->library.lexeme;
     if (environment->values.find(moduleName) != environment->values.end()) {
@@ -499,7 +505,7 @@ void VM::visitImportStmt(const ImportStmt* stmt) {
     }
 
     if (!file.is_open()) {
-        throw std::runtime_error("Could not open library file: " + moduleName);
+        throw std::runtime_error("Could not open library file: " + filePath);
     }
 
     std::stringstream buffer;
@@ -530,7 +536,7 @@ void VM::visitImportStmt(const ImportStmt* stmt) {
     // If this is the json module, register the native functions
     if (moduleName == "json") {
         std::cout << "DEBUG: Registering native functions for json module" << std::endl;
-        register_json_lib(libraryEnv);
+        register_json_functions(libraryEnv);
     }
 
     VM libraryVM;
@@ -542,7 +548,7 @@ void VM::visitImportStmt(const ImportStmt* stmt) {
     auto module = new Module(moduleName, libraryEnv, std::move(statements));
     environment->define(moduleName, Value(module));
     
-    std::cout << "DEBUG: Module " << moduleName << " imported successfully" << std::endl;
+    std::cout << "DEBUG: Module " << moduleName << " used successfully" << std::endl;
 }
 
 void VM::visitFunctionStmt(const FunctionStmt* stmt) {
@@ -571,11 +577,20 @@ Value VM::visitCallExpr(const CallExpr* expr) {
     }
 
     Callable* function = callee.as.function;
-    if (arguments.size() != (size_t)function->arity()) {
+    if (function->arity() != -1 && arguments.size() != (size_t)function->arity()) {
         throw std::runtime_error("Expected " + std::to_string(function->arity()) + " arguments but got " + std::to_string(arguments.size()) + ".");
     }
 
     return function->call(*this, arguments);
+}
+
+Value VM::visitObjectExpr(const ObjectExpr* expr) {
+    auto obj = new JsonObject();
+    for (const auto& property : expr->properties) {
+        Value value = evaluate(property.second.get());
+        obj->properties[property.first] = value;
+    }
+    return Value(obj);
 }
 
 Value VM::visitAssignExpr(const AssignExpr* expr) {

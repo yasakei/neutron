@@ -15,14 +15,14 @@ Scanner::Scanner(const std::string& source)
     keywords["if"] = TokenType::IF;
     keywords["nil"] = TokenType::NIL;
     keywords["or"] = TokenType::OR;
-    keywords["print"] = TokenType::PRINT;
+    keywords["say"] = TokenType::SAY;
     keywords["return"] = TokenType::RETURN;
     keywords["super"] = TokenType::SUPER;
     keywords["this"] = TokenType::THIS;
     keywords["true"] = TokenType::TRUE;
     keywords["var"] = TokenType::VAR;
     keywords["while"] = TokenType::WHILE;
-    keywords["import"] = TokenType::IMPORT;
+    keywords["use"] = TokenType::USE;
 }
 
 std::vector<Token> Scanner::scanTokens() {
@@ -51,6 +51,7 @@ void Scanner::scanToken() {
         case '-': addToken(TokenType::MINUS); break;
         case '+': addToken(TokenType::PLUS); break;
         case ';': addToken(TokenType::SEMICOLON); break;
+        case ':': addToken(TokenType::COLON); break;
         case '*': addToken(TokenType::STAR); break;
         case '!': addToken(match('=') ? TokenType::BANG_EQUAL : TokenType::BANG); break;
         case '=': addToken(match('=') ? TokenType::EQUAL_EQUAL : TokenType::EQUAL); break;
@@ -121,18 +122,36 @@ char Scanner::peekNext() {
 }
 
 void Scanner::string(char quote) {
+    std::string value;
+    
     while (peek() != quote && !isAtEnd()) {
         if (peek() == '\n') line++;
-        advance();
+        if (peek() == '\\') {
+            // Handle escape sequences
+            advance(); // Skip the backslash
+            if (!isAtEnd()) {
+                char escaped = advance();
+                switch (escaped) {
+                    case 'n': value += '\n'; break;
+                    case 't': value += '\t'; break;
+                    case 'r': value += '\r'; break;
+                    case '\\': value += '\\'; break;
+                    case '"': value += '"'; break;
+                    case '\'': value += '\''; break;
+                    default: value += escaped; break;
+                }
+            }
+        } else {
+            value += advance();
+        }
     }
 
     if (isAtEnd()) {
         throw std::runtime_error("Unterminated string.");
     }
 
-    advance();
+    advance(); // Skip the closing quote
 
-    std::string value = source.substr(start + 1, current - start - 2);
     addToken(TokenType::STRING, value);
 }
 

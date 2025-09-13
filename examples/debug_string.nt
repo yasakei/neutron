@@ -1,2 +1,1 @@
-var a = "Hello";
-print(a);
+say("Hello \"World\"");

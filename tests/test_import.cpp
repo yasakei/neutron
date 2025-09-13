@@ -2,7 +2,7 @@
 #include "scanner.h"
 
 int main() {
-    std::string source = "import n.math;";
+    std::string source = "use n.math;";
     
     neutron::Scanner scanner(source);
     std::vector<neutron::Token> tokens = scanner.scanTokens();

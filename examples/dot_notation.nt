@@ -1,5 +1,0 @@
-var x = 10;
-var y = 5;
-var sum = x + y;
-var result = n.math.add(x, y);
-print(result);

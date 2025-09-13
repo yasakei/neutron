@@ -1,12 +1,12 @@
-#ifndef native_time_h
-#define native_time_h
+#ifndef NEUTRON_LIBS_TIME_NATIVE_H
+#define NEUTRON_LIBS_TIME_NATIVE_H
 
-#include <memory>
+#include "vm.h"
 
 namespace neutron {
-    class Environment;
+
+void register_time_functions(std::shared_ptr<Environment> env);
+
 }
 
-void register_time_lib(std::shared_ptr<neutron::Environment> env);
-
-#endif
+#endif // NEUTRON_LIBS_TIME_NATIVE_H

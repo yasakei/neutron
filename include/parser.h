@@ -36,16 +36,17 @@ private:
     std::unique_ptr<Expr> unary();
     std::unique_ptr<Expr> call();
     std::unique_ptr<Expr> primary();
+    std::unique_ptr<Expr> objectLiteral();
     
     std::unique_ptr<Stmt> statement();
-    std::unique_ptr<Stmt> printStatement();
+    std::unique_ptr<Stmt> sayStatement();
     std::unique_ptr<Stmt> expressionStatement();
     std::unique_ptr<Stmt> varDeclaration();
     std::unique_ptr<Stmt> ifStatement();
     std::unique_ptr<Stmt> whileStatement();
     std::unique_ptr<Stmt> forStatement();
     std::unique_ptr<Stmt> classDeclaration();
-    std::unique_ptr<Stmt> importStatement();
+    std::unique_ptr<Stmt> useStatement();
     std::unique_ptr<Stmt> functionDeclaration();
     std::unique_ptr<Stmt> returnStatement();
     

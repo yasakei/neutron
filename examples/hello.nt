@@ -1,13 +1,2 @@
-// Hello World in Neutron
-print("Hello, Neutron!");
-
-// Simple variable declaration
-var name = "World";
-print("Hello, " + name + "!");
-
-// Simple function
-fun greet(name) {
-    print("Greetings, " + name + "!");
-}
-
-greet("Neutron");
+// Hello World example
+say("Hello, World!");

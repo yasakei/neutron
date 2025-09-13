@@ -55,6 +55,36 @@ The `nil` keyword represents the absence of a value. It is similar to `null` in 
 var x = nil;
 ```
 
+## Object Literals
+
+Object literals are collections of key-value pairs enclosed in curly braces (`{}`). Keys must be string literals, and values can be any valid expression.
+
+```python
+var person = {
+  "name": "John Doe",
+  "age": 30,
+  "city": "New York"
+};
+```
+
+Object literals can be used with the JSON module to serialize and deserialize data:
+
+```python
+use json;
+
+var data = {
+  "name": "John Doe",
+  "age": 30,
+  "city": "New York"
+};
+
+// Convert object to JSON string
+var jsonString = json.stringify(data);
+
+// Parse JSON string back to object
+var parsed = json.parse(jsonString);
+```
+
 ## Variables
 
 Variables are declared using the `var` keyword. They can be assigned a value when they are declared, or they can be assigned a value later.
@@ -126,7 +156,9 @@ if (x > 10) {
 }
 ```
 
-### While Loops
+### While Loops *(Not yet implemented)*
+
+*Note: While loops are currently under development and not yet available in Neutron.*
 
 The `while` loop executes a block of code as long as a condition is true.
 
@@ -138,7 +170,9 @@ while (i < 5) {
 }
 ```
 
-### For Loops
+### For Loops *(Not yet implemented)*
+
+*Note: For loops are currently under development and not yet available in Neutron.*
 
 The `for` loop is a more convenient way to write loops with a clear initializer, condition, and increment.
 
@@ -148,7 +182,9 @@ for (var i = 0; i < 5; i = i + 1) {
 }
 ```
 
-## Functions
+## Functions *(Partially implemented)*
+
+*Note: Function definitions and calls are available, but return statements are currently under development.*
 
 Functions are defined using the `fun` keyword.
 
@@ -166,7 +202,9 @@ fun greet(name) {
 greet("Neutron"); // Prints "Hello, Neutron!"
 ```
 
-### Return Statement
+### Return Statement *(Not yet implemented)*
+
+*Note: Return statements are currently under development and not yet available in Neutron.*
 
 The `return` statement is used to return a value from a function.
 
@@ -183,7 +221,7 @@ print(result); // 15
 
 Neutron provides several built-in functions that are available in the global scope.
 
-- `print(value)`: Prints a value to the console.
+- `say(value)`: Prints a value to the console.
 - `int(string)`: Converts a string to an integer.
 - `str(number)`: Converts a number to a string.
 - `bin_to_int(string)`: Converts a binary string to an integer.
@@ -197,12 +235,12 @@ Neutron provides several built-in functions that are available in the global sco
 
 Neutron supports modules, which allow you to organize your code into separate files.
 
-### Importing Modules
+### Using Modules
 
-The `import` statement is used to import a module.
+The `use` statement is used to import a module.
 
 ```python
-import math;
+use math;
 ```
 
 ### The `math` Module
@@ -224,6 +262,48 @@ The `math` module provides a set of mathematical functions.
 - `math.ceil(n)`
 - `math.floor(n)`
 - `math.round(n)`
+
+## The `sys` Module
+
+The `sys` module provides system-level functions for interacting with the operating system and environment.
+
+### Input/Output Functions
+
+- `sys.input([prompt])`: Reads a line of input from the user. Optionally displays a prompt.
+
+```python
+use sys;
+
+// Read input without a prompt
+var name = sys.input();
+
+// Read input with a prompt
+var age = sys.input("Enter your age: ");
+```
+
+### File System Functions
+
+- `sys.cp(source, destination)`: Copies a file from source to destination.
+- `sys.mv(source, destination)`: Moves a file from source to destination.
+- `sys.rm(path)`: Removes a file.
+- `sys.mkdir(path)`: Creates a directory.
+- `sys.rmdir(path)`: Removes a directory.
+- `sys.exists(path)`: Checks if a file or directory exists.
+- `sys.read(path)`: Reads the contents of a file.
+- `sys.write(path, content)`: Writes content to a file.
+- `sys.append(path, content)`: Appends content to a file.
+
+### System Information Functions
+
+- `sys.cwd()`: Returns the current working directory.
+- `sys.chdir(path)`: Changes the current working directory.
+- `sys.env(name)`: Returns the value of an environment variable.
+- `sys.info()`: Returns system information.
+
+### Process Control Functions
+
+- `sys.exit([code])`: Exits the program with the given exit code (default is 0).
+- `sys.exec(command)`: Executes a system command and returns the output and exit code.
 
 ## Classes
 

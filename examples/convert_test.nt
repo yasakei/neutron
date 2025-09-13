@@ -1,9 +1,0 @@
-print("--- int() tests ---");
-print(int("123") == 123);
-print(int("-456") == -456);
-print(int("0") == 0);
-
-print("--- str() tests ---");
-print(str(123) == "123");
-print(str(-456) == "-456");
-print(str(0) == "0");

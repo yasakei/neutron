@@ -27,3 +27,8 @@ Thumbs.db
 # Environment files
 .env
 testing.env
+
+
+# Examples
+examples/
+external/
