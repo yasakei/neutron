@@ -32,3 +32,5 @@ testing.env
 # Examples
 examples/
 external/
+#  Gemini
+GEMINI.md

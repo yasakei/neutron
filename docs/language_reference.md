@@ -156,9 +156,7 @@ if (x > 10) {
 }
 ```
 
-### While Loops *(Not yet implemented)*
-
-*Note: While loops are currently under development and not yet available in Neutron.*
+### While Loops
 
 The `while` loop executes a block of code as long as a condition is true.
 

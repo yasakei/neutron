@@ -1,390 +1,166 @@
 #include "libs/sys/native.h"
-#include <filesystem>
-#include <fstream>
-#include <cstdlib>
-#include <iostream>
-#include <sstream>
-#include <unistd.h>
-#include <sys/wait.h>
-
-namespace fs = std::filesystem;
+#include "libs/sys/sys_ops.h"
+#include <string>
+#include <vector>
 
 namespace neutron {
 
 // File operations
-
-// Copy file
 Value sys_cp(std::vector<Value> arguments) {
-    if (arguments.size() != 2) {
-        throw std::runtime_error("Expected 2 arguments for sys.cp().");
+    if (arguments.size() != 2 || arguments[0].type != ValueType::STRING || arguments[1].type != ValueType::STRING) {
+        throw std::runtime_error("Expected 2 string arguments for sys.cp().");
     }
-    
-    if (arguments[0].type != ValueType::STRING || arguments[1].type != ValueType::STRING) {
-        throw std::runtime_error("Arguments for sys.cp() must be strings.");
-    }
-    
-    std::string source = *arguments[0].as.string;
-    std::string destination = *arguments[1].as.string;
-    
-    try {
-        fs::copy_file(source, destination, fs::copy_options::overwrite_existing);
-        return Value(true);
-    } catch (const fs::filesystem_error& ex) {
-        throw std::runtime_error("Failed to copy file: " + std::string(ex.what()));
-    }
+    return Value(sys_cp_c(arguments[0].as.string->c_str(), arguments[1].as.string->c_str()));
 }
 
-// Move file
 Value sys_mv(std::vector<Value> arguments) {
-    if (arguments.size() != 2) {
-        throw std::runtime_error("Expected 2 arguments for sys.mv().");
+    if (arguments.size() != 2 || arguments[0].type != ValueType::STRING || arguments[1].type != ValueType::STRING) {
+        throw std::runtime_error("Expected 2 string arguments for sys.mv().");
     }
-    
-    if (arguments[0].type != ValueType::STRING || arguments[1].type != ValueType::STRING) {
-        throw std::runtime_error("Arguments for sys.mv() must be strings.");
-    }
-    
-    std::string source = *arguments[0].as.string;
-    std::string destination = *arguments[1].as.string;
-    
-    try {
-        fs::rename(source, destination);
-        return Value(true);
-    } catch (const fs::filesystem_error& ex) {
-        throw std::runtime_error("Failed to move file: " + std::string(ex.what()));
-    }
+    return Value(sys_mv_c(arguments[0].as.string->c_str(), arguments[1].as.string->c_str()));
 }
 
-// Remove file
 Value sys_rm(std::vector<Value> arguments) {
-    if (arguments.size() != 1) {
-        throw std::runtime_error("Expected 1 argument for sys.rm().");
+    if (arguments.size() != 1 || arguments[0].type != ValueType::STRING) {
+        throw std::runtime_error("Expected 1 string argument for sys.rm().");
     }
-    
-    if (arguments[0].type != ValueType::STRING) {
-        throw std::runtime_error("Argument for sys.rm() must be a string.");
-    }
-    
-    std::string path = *arguments[0].as.string;
-    
-    try {
-        bool result = fs::remove(path);
-        return Value(result);
-    } catch (const fs::filesystem_error& ex) {
-        throw std::runtime_error("Failed to remove file: " + std::string(ex.what()));
-    }
+    return Value(sys_rm_c(arguments[0].as.string->c_str()));
 }
 
-// Create directory
 Value sys_mkdir(std::vector<Value> arguments) {
-    if (arguments.size() != 1) {
-        throw std::runtime_error("Expected 1 argument for sys.mkdir().");
+    if (arguments.size() != 1 || arguments[0].type != ValueType::STRING) {
+        throw std::runtime_error("Expected 1 string argument for sys.mkdir().");
     }
-    
-    if (arguments[0].type != ValueType::STRING) {
-        throw std::runtime_error("Argument for sys.mkdir() must be a string.");
-    }
-    
-    std::string path = *arguments[0].as.string;
-    
-    try {
-        bool result = fs::create_directory(path);
-        return Value(result);
-    } catch (const fs::filesystem_error& ex) {
-        throw std::runtime_error("Failed to create directory: " + std::string(ex.what()));
-    }
+    return Value(sys_mkdir_c(arguments[0].as.string->c_str()));
 }
 
-// Remove directory
 Value sys_rmdir(std::vector<Value> arguments) {
-    if (arguments.size() != 1) {
-        throw std::runtime_error("Expected 1 argument for sys.rmdir().");
+    if (arguments.size() != 1 || arguments[0].type != ValueType::STRING) {
+        throw std::runtime_error("Expected 1 string argument for sys.rmdir().");
     }
-    
-    if (arguments[0].type != ValueType::STRING) {
-        throw std::runtime_error("Argument for sys.rmdir() must be a string.");
-    }
-    
-    std::string path = *arguments[0].as.string;
-    
-    try {
-        bool result = fs::remove(path);
-        return Value(result);
-    } catch (const fs::filesystem_error& ex) {
-        throw std::runtime_error("Failed to remove directory: " + std::string(ex.what()));
-    }
+    return Value(sys_rmdir_c(arguments[0].as.string->c_str()));
 }
 
-// Check if file/directory exists
 Value sys_exists(std::vector<Value> arguments) {
-    if (arguments.size() != 1) {
-        throw std::runtime_error("Expected 1 argument for sys.exists().");
+    if (arguments.size() != 1 || arguments[0].type != ValueType::STRING) {
+        throw std::runtime_error("Expected 1 string argument for sys.exists().");
     }
-    
-    if (arguments[0].type != ValueType::STRING) {
-        throw std::runtime_error("Argument for sys.exists() must be a string.");
-    }
-    
-    std::string path = *arguments[0].as.string;
-    
-    try {
-        bool result = fs::exists(path);
-        return Value(result);
-    } catch (const fs::filesystem_error& ex) {
-        return Value(false);
-    }
+    return Value(sys_exists_c(arguments[0].as.string->c_str()));
 }
 
-// Read file
 Value sys_read(std::vector<Value> arguments) {
-    if (arguments.size() != 1) {
-        throw std::runtime_error("Expected 1 argument for sys.read().");
+    if (arguments.size() != 1 || arguments[0].type != ValueType::STRING) {
+        throw std::runtime_error("Expected 1 string argument for sys.read().");
     }
-    
-    if (arguments[0].type != ValueType::STRING) {
-        throw std::runtime_error("Argument for sys.read() must be a string.");
+    char* content = sys_read_c(arguments[0].as.string->c_str());
+    if (content) {
+        Value result = Value(std::string(content));
+        free(content);
+        return result;
     }
-    
-    std::string path = *arguments[0].as.string;
-    
-    try {
-        std::ifstream file(path);
-        if (!file.is_open()) {
-            throw std::runtime_error("Failed to open file for reading.");
-        }
-        
-        std::ostringstream buffer;
-        buffer << file.rdbuf();
-        return Value(buffer.str());
-    } catch (const std::exception& ex) {
-        throw std::runtime_error("Failed to read file: " + std::string(ex.what()));
-    }
+    return Value(nullptr);
 }
 
-// Write file
 Value sys_write(std::vector<Value> arguments) {
-    if (arguments.size() != 2) {
-        throw std::runtime_error("Expected 2 arguments for sys.write().");
+    if (arguments.size() != 2 || arguments[0].type != ValueType::STRING || arguments[1].type != ValueType::STRING) {
+        throw std::runtime_error("Expected 2 string arguments for sys.write().");
     }
-    
-    if (arguments[0].type != ValueType::STRING || arguments[1].type != ValueType::STRING) {
-        throw std::runtime_error("Arguments for sys.write() must be strings.");
-    }
-    
-    std::string path = *arguments[0].as.string;
-    std::string content = *arguments[1].as.string;
-    
-    try {
-        std::ofstream file(path);
-        if (!file.is_open()) {
-            throw std::runtime_error("Failed to open file for writing.");
-        }
-        
-        file << content;
-        return Value(true);
-    } catch (const std::exception& ex) {
-        throw std::runtime_error("Failed to write file: " + std::string(ex.what()));
-    }
+    return Value(sys_write_c(arguments[0].as.string->c_str(), arguments[1].as.string->c_str()));
 }
 
-// Append to file
 Value sys_append(std::vector<Value> arguments) {
-    if (arguments.size() != 2) {
-        throw std::runtime_error("Expected 2 arguments for sys.append().");
+    if (arguments.size() != 2 || arguments[0].type != ValueType::STRING || arguments[1].type != ValueType::STRING) {
+        throw std::runtime_error("Expected 2 string arguments for sys.append().");
     }
-    
-    if (arguments[0].type != ValueType::STRING || arguments[1].type != ValueType::STRING) {
-        throw std::runtime_error("Arguments for sys.append() must be strings.");
-    }
-    
-    std::string path = *arguments[0].as.string;
-    std::string content = *arguments[1].as.string;
-    
-    try {
-        std::ofstream file(path, std::ios::app);
-        if (!file.is_open()) {
-            throw std::runtime_error("Failed to open file for appending.");
-        }
-        
-        file << content;
-        return Value(true);
-    } catch (const std::exception& ex) {
-        throw std::runtime_error("Failed to append to file: " + std::string(ex.what()));
-    }
+    return Value(sys_append_c(arguments[0].as.string->c_str(), arguments[1].as.string->c_str()));
 }
 
 // System info
-
-// Get current working directory
 Value sys_cwd(std::vector<Value> arguments) {
     if (arguments.size() != 0) {
         throw std::runtime_error("Expected 0 arguments for sys.cwd().");
     }
-    
-    try {
-        std::string cwd = fs::current_path().string();
-        return Value(cwd);
-    } catch (const fs::filesystem_error& ex) {
-        throw std::runtime_error("Failed to get current working directory: " + std::string(ex.what()));
+    char* cwd = sys_cwd_c();
+    if (cwd) {
+        Value result = Value(std::string(cwd));
+        free(cwd);
+        return result;
     }
+    return Value(nullptr);
 }
 
-// Change directory
 Value sys_chdir(std::vector<Value> arguments) {
-    if (arguments.size() != 1) {
-        throw std::runtime_error("Expected 1 argument for sys.chdir().");
+    if (arguments.size() != 1 || arguments[0].type != ValueType::STRING) {
+        throw std::runtime_error("Expected 1 string argument for sys.chdir().");
     }
-    
-    if (arguments[0].type != ValueType::STRING) {
-        throw std::runtime_error("Argument for sys.chdir() must be a string.");
-    }
-    
-    std::string path = *arguments[0].as.string;
-    
-    try {
-        fs::current_path(path);
-        return Value(true);
-    } catch (const fs::filesystem_error& ex) {
-        throw std::runtime_error("Failed to change directory: " + std::string(ex.what()));
-    }
+    return Value(sys_chdir_c(arguments[0].as.string->c_str()));
 }
 
-// Get environment variable
 Value sys_env(std::vector<Value> arguments) {
-    if (arguments.size() != 1) {
-        throw std::runtime_error("Expected 1 argument for sys.env().");
+    if (arguments.size() != 1 || arguments[0].type != ValueType::STRING) {
+        throw std::runtime_error("Expected 1 string argument for sys.env().");
     }
-    
-    if (arguments[0].type != ValueType::STRING) {
-        throw std::runtime_error("Argument for sys.env() must be a string.");
-    }
-    
-    std::string name = *arguments[0].as.string;
-    
-    const char* value = std::getenv(name.c_str());
+    char* value = sys_env_c(arguments[0].as.string->c_str());
     if (value) {
         return Value(std::string(value));
-    } else {
-        return Value(nullptr);
     }
+    return Value(nullptr);
 }
 
-// Get command line arguments (stub implementation)
-Value sys_args(std::vector<Value> arguments) {
-    if (arguments.size() != 0) {
-        throw std::runtime_error("Expected 0 arguments for sys.args().");
-    }
-    
-    // In a real implementation, this would return the actual command line arguments
-    // For now, we'll return an empty array
-    auto arr = new JsonArray();
-    return Value(arr);
-}
-
-// Read input from stdin
-Value sys_input(std::vector<Value> arguments) {
-    std::string prompt = "";
-    
-    if (arguments.size() == 1) {
-        if (arguments[0].type != ValueType::STRING) {
-            throw std::runtime_error("Argument for sys.input() must be a string.");
-        }
-        prompt = *arguments[0].as.string;
-    } else if (arguments.size() != 0) {
-        throw std::runtime_error("Expected 0 or 1 arguments for sys.input().");
-    }
-    
-    // Display the prompt
-    std::cout << prompt;
-    std::cout.flush();
-    
-    // Read the input
-    std::string input;
-    if (!std::getline(std::cin, input)) {
-        // Return empty string instead of throwing error
-        return Value("");
-    }
-    
-    return Value(input);
-}
-
-// Get system info
 Value sys_info(std::vector<Value> arguments) {
     if (arguments.size() != 0) {
         throw std::runtime_error("Expected 0 arguments for sys.info().");
     }
-    
-    auto info = new JsonObject();
-    
-    // Get some basic system info
-    info->properties["cwd"] = Value(fs::current_path().string());
-    
-    // Get some basic system info
-    info->properties["platform"] = Value(std::string("linux")); // Simplified implementation
-    info->properties["arch"] = Value(std::string("x86_64"));    // Simplified implementation
-    
-    return Value(info);
+    char* info = sys_info_c();
+    if (info) {
+        Value result = Value(std::string(info));
+        free(info);
+        return result;
+    }
+    return Value(nullptr);
+}
+
+Value sys_input(std::vector<Value> arguments) {
+    if (arguments.size() > 1 || (arguments.size() == 1 && arguments[0].type != ValueType::STRING)) {
+        throw std::runtime_error("Expected 0 or 1 string argument for sys.input().");
+    }
+    const char* prompt = arguments.size() == 1 ? arguments[0].as.string->c_str() : "";
+    char* line = sys_input_c(prompt);
+    if (line) {
+        Value result = Value(std::string(line));
+        free(line);
+        return result;
+    }
+    return Value(std::string(""));
 }
 
 // Process control
-
-// Exit the program
 Value sys_exit(std::vector<Value> arguments) {
-    int code = 0;
-    
-    if (arguments.size() == 1) {
-        if (arguments[0].type != ValueType::NUMBER) {
-            throw std::runtime_error("Argument for sys.exit() must be a number.");
-        }
-        code = static_cast<int>(arguments[0].as.number);
-    } else if (arguments.size() != 0) {
-        throw std::runtime_error("Expected 0 or 1 arguments for sys.exit().");
+    if (arguments.size() > 1 || (arguments.size() == 1 && arguments[0].type != ValueType::NUMBER)) {
+        throw std::runtime_error("Expected 0 or 1 numeric argument for sys.exit().");
     }
-    
-    std::exit(code);
+    int code = arguments.size() == 1 ? (int)arguments[0].as.number : 0;
+    sys_exit_c(code);
+    return Value(nullptr); // Should not be reached
 }
 
-// Execute a command
 Value sys_exec(std::vector<Value> arguments) {
-    if (arguments.size() != 1) {
-        throw std::runtime_error("Expected 1 argument for sys.exec().");
+    if (arguments.size() != 1 || arguments[0].type != ValueType::STRING) {
+        throw std::runtime_error("Expected 1 string argument for sys.exec().");
     }
-    
-    if (arguments[0].type != ValueType::STRING) {
-        throw std::runtime_error("Argument for sys.exec() must be a string.");
+    ExecResult* c_result = sys_exec_c(arguments[0].as.string->c_str());
+    if (c_result) {
+        auto obj = new JsonObject();
+        obj->properties["output"] = Value(std::string(c_result->output));
+        obj->properties["exit_code"] = Value((double)c_result->exit_code);
+        free_exec_result(c_result);
+        return Value(obj);
     }
-    
-    std::string command = *arguments[0].as.string;
-    
-    // Use popen to execute the command
-    FILE* pipe = popen(command.c_str(), "r");
-    if (!pipe) {
-        throw std::runtime_error("Failed to execute command.");
-    }
-    
-    std::ostringstream result;
-    char buffer[128];
-    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-        result << buffer;
-    }
-    
-    int status = pclose(pipe);
-    int exit_code = WEXITSTATUS(status);
-    
-    // Return an object with the result and exit code
-    auto obj = new JsonObject();
-    obj->properties["output"] = Value(result.str());
-    obj->properties["exit_code"] = Value(static_cast<double>(exit_code));
-    
-    return Value(obj);
+    return Value(nullptr);
 }
 
-// Register sys functions in the environment
 void register_sys_functions(std::shared_ptr<Environment> env) {
-    // Create a sys module
     auto sysEnv = std::make_shared<Environment>();
-    
-    // File operations
     sysEnv->define("cp", Value(new NativeFn(sys_cp, 2)));
     sysEnv->define("mv", Value(new NativeFn(sys_mv, 2)));
     sysEnv->define("rm", Value(new NativeFn(sys_rm, 1)));
@@ -394,20 +170,14 @@ void register_sys_functions(std::shared_ptr<Environment> env) {
     sysEnv->define("read", Value(new NativeFn(sys_read, 1)));
     sysEnv->define("write", Value(new NativeFn(sys_write, 2)));
     sysEnv->define("append", Value(new NativeFn(sys_append, 2)));
-    
-    // System info
     sysEnv->define("cwd", Value(new NativeFn(sys_cwd, 0)));
     sysEnv->define("chdir", Value(new NativeFn(sys_chdir, 1)));
     sysEnv->define("env", Value(new NativeFn(sys_env, 1)));
-    sysEnv->define("args", Value(new NativeFn(sys_args, 0)));
     sysEnv->define("info", Value(new NativeFn(sys_info, 0)));
-    sysEnv->define("input", Value(new NativeFn(sys_input, -1))); // 0 or 1 arguments
-    
-    // Process control
-    sysEnv->define("exit", Value(new NativeFn(sys_exit, -1))); // 0 or 1 arguments
+    sysEnv->define("input", Value(new NativeFn(sys_input, -1)));
+    sysEnv->define("exit", Value(new NativeFn(sys_exit, -1)));
     sysEnv->define("exec", Value(new NativeFn(sys_exec, 1)));
-    
-    auto sysModule = new Module("sys", sysEnv, std::vector<std::unique_ptr<Stmt>>());
+    auto sysModule = new Module("sys", sysEnv, {});
     env->define("sys", Value(sysModule));
 }
 

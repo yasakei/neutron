@@ -1,4 +1,5 @@
 #include "libs/json/native.h"
+#include "libs/json/json_ops.h"
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -23,7 +24,10 @@ Value json_stringify(std::vector<Value> arguments) {
         pretty = arguments[1].as.boolean;
     }
     
-    std::string result = valueToJsonString(arguments[0], pretty);
+    char* c_str = json_stringify_c(&arguments[0], pretty);
+    std::string result(c_str);
+    free(c_str);
+    
     return Value(result);
 }
 

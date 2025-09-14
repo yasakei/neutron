@@ -1,23 +1,26 @@
 #include "libs/http/native.h"
+#include "libs/http/http_ops.h"
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace neutron {
 
 // Helper function to create a response object
-Value createResponse(double status, const std::string& body, const std::unordered_map<std::string, std::string>& headers = {}) {
-    auto responseObject = new JsonObject();
-    responseObject->properties["status"] = Value(status);
-    responseObject->properties["body"] = Value(body);
-    
-    // Create headers object
-    auto headersObject = new JsonObject();
-    for (const auto& header : headers) {
-        headersObject->properties[header.first] = Value(header.second);
+Value createResponse(long status, const char* body, const struct HttpHeader* headers, size_t num_headers) {
+    auto responseEnv = std::make_shared<Environment>();
+    responseEnv->define("status", Value((double)status));
+    responseEnv->define("body", Value(std::string(body)));
+
+    auto headersEnv = std::make_shared<Environment>();
+    for (size_t i = 0; i < num_headers; i++) {
+        headersEnv->define(headers[i].key, Value(std::string(headers[i].value)));
     }
-    responseObject->properties["headers"] = Value(headersObject);
-    
-    return Value(responseObject);
+    auto headersModule = new Module("headers", headersEnv, {});
+    responseEnv->define("headers", Value(headersModule));
+
+    auto responseModule = new Module("response", responseEnv, {});
+    return Value(responseModule);
 }
 
 // HTTP GET request
@@ -33,18 +36,23 @@ Value http_get(std::vector<Value> arguments) {
     std::string url = *arguments[0].as.string;
     
     // Handle headers if provided
-    std::unordered_map<std::string, std::string> headers;
+    std::vector<HttpHeader> c_headers;
     if (arguments.size() == 2) {
-        // In a real implementation, we would process headers here
-        // For now, we'll just acknowledge they were provided
-        headers["X-Neutron-Client"] = "1.0";
+        if (arguments[1].type == ValueType::OBJECT) {
+            JsonObject* headers_obj = static_cast<JsonObject*>(arguments[1].as.object);
+            for (const auto& pair : headers_obj->properties) {
+                if (pair.second.type == ValueType::STRING) {
+                    c_headers.push_back({(char*)pair.first.c_str(), (char*)pair.second.as.string->c_str()});
+                }
+            }
+        }
     }
     
-    // In a real implementation, you would make an HTTP GET request here
-    // For now, we'll just return a mock response
-    std::string responseBody = "Mock GET response for " + url;
-    
-    return createResponse(200.0, responseBody, headers);
+    HttpResponse* c_response = http_get_c(url.c_str(), c_headers.data(), c_headers.size());
+    Value response = createResponse(c_response->status, c_response->body, c_response->headers, c_response->num_headers);
+    free_http_response(c_response);
+
+    return response;
 }
 
 // HTTP POST request
@@ -68,23 +76,23 @@ Value http_post(std::vector<Value> arguments) {
     }
     
     // Handle headers if provided
-    std::unordered_map<std::string, std::string> headers;
+    std::vector<HttpHeader> c_headers;
     if (arguments.size() == 3) {
-        // In a real implementation, we would process headers here
-        headers["X-Neutron-Client"] = "1.0";
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
-    } else if (!data.empty()) {
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        if (arguments[2].type == ValueType::OBJECT) {
+            JsonObject* headers_obj = static_cast<JsonObject*>(arguments[2].as.object);
+            for (const auto& pair : headers_obj->properties) {
+                if (pair.second.type == ValueType::STRING) {
+                    c_headers.push_back({(char*)pair.first.c_str(), (char*)pair.second.as.string->c_str()});
+                }
+            }
+        }
     }
     
-    // In a real implementation, you would make an HTTP POST request here
-    // For now, we'll just return a mock response
-    std::string responseBody = "Mock POST response for " + url;
-    if (!data.empty()) {
-        responseBody += " with data: " + data;
-    }
-    
-    return createResponse(201.0, responseBody, headers);
+    HttpResponse* c_response = http_post_c(url.c_str(), data.c_str(), c_headers.data(), c_headers.size());
+    Value response = createResponse(c_response->status, c_response->body, c_response->headers, c_response->num_headers);
+    free_http_response(c_response);
+
+    return response;
 }
 
 // HTTP PUT request
@@ -108,23 +116,23 @@ Value http_put(std::vector<Value> arguments) {
     }
     
     // Handle headers if provided
-    std::unordered_map<std::string, std::string> headers;
+    std::vector<HttpHeader> c_headers;
     if (arguments.size() == 3) {
-        // In a real implementation, we would process headers here
-        headers["X-Neutron-Client"] = "1.0";
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
-    } else if (!data.empty()) {
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        if (arguments[2].type == ValueType::OBJECT) {
+            JsonObject* headers_obj = static_cast<JsonObject*>(arguments[2].as.object);
+            for (const auto& pair : headers_obj->properties) {
+                if (pair.second.type == ValueType::STRING) {
+                    c_headers.push_back({(char*)pair.first.c_str(), (char*)pair.second.as.string->c_str()});
+                }
+            }
+        }
     }
     
-    // In a real implementation, you would make an HTTP PUT request here
-    // For now, we'll just return a mock response
-    std::string responseBody = "Mock PUT response for " + url;
-    if (!data.empty()) {
-        responseBody += " with data: " + data;
-    }
-    
-    return createResponse(200.0, responseBody, headers);
+    HttpResponse* c_response = http_put_c(url.c_str(), data.c_str(), c_headers.data(), c_headers.size());
+    Value response = createResponse(c_response->status, c_response->body, c_response->headers, c_response->num_headers);
+    free_http_response(c_response);
+
+    return response;
 }
 
 // HTTP DELETE request
@@ -140,17 +148,23 @@ Value http_delete(std::vector<Value> arguments) {
     std::string url = *arguments[0].as.string;
     
     // Handle headers if provided
-    std::unordered_map<std::string, std::string> headers;
+    std::vector<HttpHeader> c_headers;
     if (arguments.size() == 2) {
-        // In a real implementation, we would process headers here
-        headers["X-Neutron-Client"] = "1.0";
+        if (arguments[1].type == ValueType::OBJECT) {
+            JsonObject* headers_obj = static_cast<JsonObject*>(arguments[1].as.object);
+            for (const auto& pair : headers_obj->properties) {
+                if (pair.second.type == ValueType::STRING) {
+                    c_headers.push_back({(char*)pair.first.c_str(), (char*)pair.second.as.string->c_str()});
+                }
+            }
+        }
     }
     
-    // In a real implementation, you would make an HTTP DELETE request here
-    // For now, we'll just return a mock response
-    std::string responseBody = "Mock DELETE response for " + url;
-    
-    return createResponse(200.0, responseBody, headers);
+    HttpResponse* c_response = http_delete_c(url.c_str(), c_headers.data(), c_headers.size());
+    Value response = createResponse(c_response->status, c_response->body, c_response->headers, c_response->num_headers);
+    free_http_response(c_response);
+
+    return response;
 }
 
 // HTTP HEAD request
@@ -166,22 +180,23 @@ Value http_head(std::vector<Value> arguments) {
     std::string url = *arguments[0].as.string;
     
     // Handle headers if provided
-    std::unordered_map<std::string, std::string> headers;
+    std::vector<HttpHeader> c_headers;
     if (arguments.size() == 2) {
-        // In a real implementation, we would process headers here
-        headers["X-Neutron-Client"] = "1.0";
+        if (arguments[1].type == ValueType::OBJECT) {
+            JsonObject* headers_obj = static_cast<JsonObject*>(arguments[1].as.object);
+            for (const auto& pair : headers_obj->properties) {
+                if (pair.second.type == ValueType::STRING) {
+                    c_headers.push_back({(char*)pair.first.c_str(), (char*)pair.second.as.string->c_str()});
+                }
+            }
+        }
     }
     
-    // In a real implementation, you would make an HTTP HEAD request here
-    // For now, we'll just return a mock response with headers but no body
-    std::string responseBody = "";
-    
-    // Add some mock headers
-    headers["Content-Type"] = "application/json";
-    headers["Content-Length"] = "1024";
-    headers["Server"] = "Neutron-Mock-Server";
-    
-    return createResponse(200.0, responseBody, headers);
+    HttpResponse* c_response = http_head_c(url.c_str(), c_headers.data(), c_headers.size());
+    Value response = createResponse(c_response->status, c_response->body, c_response->headers, c_response->num_headers);
+    free_http_response(c_response);
+
+    return response;
 }
 
 // HTTP PATCH request
@@ -205,23 +220,23 @@ Value http_patch(std::vector<Value> arguments) {
     }
     
     // Handle headers if provided
-    std::unordered_map<std::string, std::string> headers;
+    std::vector<HttpHeader> c_headers;
     if (arguments.size() == 3) {
-        // In a real implementation, we would process headers here
-        headers["X-Neutron-Client"] = "1.0";
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
-    } else if (!data.empty()) {
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
+        if (arguments[2].type == ValueType::OBJECT) {
+            JsonObject* headers_obj = static_cast<JsonObject*>(arguments[2].as.object);
+            for (const auto& pair : headers_obj->properties) {
+                if (pair.second.type == ValueType::STRING) {
+                    c_headers.push_back({(char*)pair.first.c_str(), (char*)pair.second.as.string->c_str()});
+                }
+            }
+        }
     }
     
-    // In a real implementation, you would make an HTTP PATCH request here
-    // For now, we'll just return a mock response
-    std::string responseBody = "Mock PATCH response for " + url;
-    if (!data.empty()) {
-        responseBody += " with data: " + data;
-    }
-    
-    return createResponse(200.0, responseBody, headers);
+    HttpResponse* c_response = http_patch_c(url.c_str(), data.c_str(), c_headers.data(), c_headers.size());
+    Value response = createResponse(c_response->status, c_response->body, c_response->headers, c_response->num_headers);
+    free_http_response(c_response);
+
+    return response;
 }
 
 // Register HTTP functions in the environment
