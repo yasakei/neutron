@@ -9,6 +9,7 @@
 #include "libs/sys/native.h"
 #include "libs/json/native.h"
 #include "libs/convert/native.h"
+#include "libs/time/native.h"
 
 namespace neutron {
 
@@ -32,6 +33,7 @@ VM::VM() : chunk(nullptr), ip(nullptr) {
     register_sys_functions(globalEnv);
     register_json_functions(globalEnv);
     register_convert_functions(globalEnv);
+    register_time_functions(globalEnv);
     
     // Copy registered functions to globals
     for (const auto& pair : globalEnv->values) {

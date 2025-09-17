@@ -1,0 +1,67 @@
+use time;
+
+// Variable Assignments Benchmark
+// Tests the speed of variable creation and assignment
+
+say("===========================================");
+say("         VARIABLE ASSIGNMENTS BENCHMARK");
+say("===========================================");
+say("");
+
+// Test variable assignment performance
+say("Testing variable assignment performance...");
+var startTime = time.now();
+
+var i = 0;
+var a = 0;
+var b = 0;
+var c = 0;
+var d = 0;
+var e = 0;
+
+// Perform 100,000 variable assignments
+while (i < 100000) {
+    a = i;
+    b = i + 1;
+    c = i + 2;
+    d = i + 3;
+    e = i + 4;
+    i = i + 1;
+}
+
+var endTime = time.now();
+var duration = endTime - startTime;
+
+say("Performed 100,000 cycles of 5 variable assignments each");
+say("Total assignments: " + str(100000 * 5));
+say("Final values: a=" + str(a) + ", b=" + str(b) + ", c=" + str(c) + ", d=" + str(d) + ", e=" + str(e));
+say("Duration: " + duration + " milliseconds");
+say("Average time per cycle: " + (duration / 100000) + " milliseconds");
+say("");
+
+// Test variable access performance
+say("Testing variable access performance...");
+startTime = time.now();
+
+i = 0;
+var sum = 0;
+
+// Perform 100,000 variable accesses
+while (i < 100000) {
+    sum = a + b + c + d + e;
+    i = i + 1;
+}
+
+endTime = time.now();
+duration = endTime - startTime;
+
+say("Performed 100,000 cycles of 5 variable accesses each");
+say("Total accesses: " + str(100000 * 5));
+say("Final sum: " + str(sum));
+say("Duration: " + duration + " milliseconds");
+say("Average time per cycle: " + (duration / 100000) + " milliseconds");
+say("");
+
+say("===========================================");
+say("         BENCHMARK COMPLETE");
+say("===========================================");

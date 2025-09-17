@@ -1,0 +1,56 @@
+use time;
+
+// Function Calls Benchmark (Simplified)
+// Tests the speed of built-in function calls
+
+say("===========================================");
+say("         FUNCTION CALLS BENCHMARK");
+say("===========================================");
+say("");
+
+// Test say function call performance
+say("Testing say function call performance...");
+var startTime = time.now();
+
+var i = 0;
+var result = 0;
+
+// Perform 100,000 say function calls (with same string to avoid string creation overhead)
+while (i < 100000) {
+    say("");  // Empty say call
+    i = i + 1;
+}
+
+var endTime = time.now();
+var duration = endTime - startTime;
+
+say("Performed 100,000 say function calls");
+say("Duration: " + duration + " milliseconds");
+say("Average time per call: " + (duration / 100000) + " milliseconds");
+say("");
+
+// Test str function call performance
+say("Testing str function call performance...");
+startTime = time.now();
+
+i = 0;
+var strResult = "";
+
+// Perform 100,000 str function calls
+while (i < 100000) {
+    strResult = str(i);
+    i = i + 1;
+}
+
+endTime = time.now();
+duration = endTime - startTime;
+
+say("Performed 100,000 str function calls");
+say("Final result: " + strResult);
+say("Duration: " + duration + " milliseconds");
+say("Average time per call: " + (duration / 100000) + " milliseconds");
+say("");
+
+say("===========================================");
+say("         BENCHMARK COMPLETE");
+say("===========================================");

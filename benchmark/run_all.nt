@@ -3,49 +3,49 @@ use sys;
 // Run All Benchmarks
 // Executes all benchmark scripts in sequence
 
-say "===========================================";
-say "         NEUTRON LANGUAGE BENCHMARK SUITE";
-say "===========================================";
-say "";
-say "This script will run all benchmark tests in sequence.";
-say "Please be patient as some tests may take a moment to complete.";
-say "";
-say "Press Enter to begin...";
+say("===========================================");
+say("         NEUTRON LANGUAGE BENCHMARK SUITE");
+say("===========================================");
+say("");
+say("This script will run all benchmark tests in sequence.");
+say("Please be patient as some tests may take a moment to complete.");
+say("");
+say("Press Enter to begin...");
 sys.input();
-say "";
+say("");
 
 // Run arithmetic benchmark
-say "1. Running Arithmetic Operations Benchmark...";
+say("1. Running Arithmetic Operations Benchmark...");
 sys.exec("./neutron benchmark/arithmetic.nt");
-say "";
+say("");
 
 // Run string benchmark
-say "2. Running String Operations Benchmark...";
+say("2. Running String Operations Benchmark...");
 sys.exec("./neutron benchmark/string.nt");
-say "";
+say("");
 
 // Run variables benchmark
-say "3. Running Variable Assignments Benchmark...";
+say("3. Running Variable Assignments Benchmark...");
 sys.exec("./neutron benchmark/variables.nt");
-say "";
+say("");
 
 // Run functions benchmark
-say "4. Running Function Calls Benchmark...";
+say("4. Running Function Calls Benchmark...");
 sys.exec("./neutron benchmark/functions.nt");
-say "";
+say("");
 
 // Run conditionals benchmark
-say "5. Running Conditional Statements Benchmark...";
+say("5. Running Conditional Statements Benchmark...");
 sys.exec("./neutron benchmark/conditionals.nt");
-say "";
+say("");
 
 // Run time benchmark
-say "6. Running Time Module Benchmark...";
+say("6. Running Time Module Benchmark...");
 sys.exec("./neutron benchmark/time.nt");
-say "";
+say("");
 
-say "===========================================";
-say "         ALL BENCHMARKS COMPLETE";
-say "===========================================";
-say "";
-say "Thank you for running the Neutron benchmark suite!";
+say("===========================================");
+say("         ALL BENCHMARKS COMPLETE");
+say("===========================================");
+say("");
+say("Thank you for running the Neutron benchmark suite!");

@@ -4,13 +4,13 @@ use time;
 // Time Module Benchmark
 // Tests the performance of time module functions
 
-say "===========================================";
-say "         TIME MODULE BENCHMARK";
-say "===========================================";
-say "";
+say("===========================================");
+say("         TIME MODULE BENCHMARK");
+say("===========================================");
+say("");
 
 // Test time.now() performance
-say "Testing time.now() performance...";
+say("Testing time.now() performance...");
 var startTime = time.now();
 
 var i = 0;
@@ -25,13 +25,13 @@ while (i < 1000) {
 var endTime = time.now();
 var duration = endTime - startTime;
 
-say "Called time.now() 1000 times";
-say "Duration: " + duration + " milliseconds";
-say "Average time per call: " + (duration / 1000) + " milliseconds";
-say "";
+say("Called time.now() 1000 times");
+say("Duration: " + duration + " milliseconds");
+say("Average time per call: " + (duration / 1000) + " milliseconds");
+say("");
 
 // Test time.format() performance
-say "Testing time.format() performance...";
+say("Testing time.format() performance...");
 startTime = time.now();
 
 i = 0;
@@ -46,13 +46,13 @@ while (i < 1000) {
 endTime = time.now();
 duration = endTime - startTime;
 
-say "Called time.format() 1000 times";
-say "Duration: " + duration + " milliseconds";
-say "Average time per call: " + (duration / 1000) + " milliseconds";
-say "";
+say("Called time.format() 1000 times");
+say("Duration: " + duration + " milliseconds");
+say("Average time per call: " + (duration / 1000) + " milliseconds");
+say("");
 
 // Test time.format() with custom format performance
-say "Testing time.format() with custom format performance...";
+say("Testing time.format() with custom format performance...");
 startTime = time.now();
 
 i = 0;
@@ -67,13 +67,13 @@ while (i < 1000) {
 endTime = time.now();
 duration = endTime - startTime;
 
-say "Called time.format() with custom format 1000 times";
-say "Duration: " + duration + " milliseconds";
-say "Average time per call: " + (duration / 1000) + " milliseconds";
-say "";
+say("Called time.format() with custom format 1000 times");
+say("Duration: " + duration + " milliseconds");
+say("Average time per call: " + (duration / 1000) + " milliseconds");
+say("");
 
 // Test time.sleep() performance (with minimal sleep)
-say "Testing time.sleep() performance (1ms sleep)...";
+say("Testing time.sleep() performance (1ms sleep)...");
 startTime = time.now();
 
 i = 0;
@@ -87,11 +87,11 @@ while (i < 100) {
 endTime = time.now();
 duration = endTime - startTime;
 
-say "Called time.sleep(1) 100 times";
-say "Duration: " + duration + " milliseconds";
-say "Average time per call: " + (duration / 100) + " milliseconds";
-say "";
+say("Called time.sleep(1) 100 times");
+say("Duration: " + duration + " milliseconds");
+say("Average time per call: " + (duration / 100) + " milliseconds");
+say("");
 
-say "===========================================";
-say "         BENCHMARK COMPLETE";
-say "===========================================";
+say("===========================================");
+say("         BENCHMARK COMPLETE");
+say("===========================================");

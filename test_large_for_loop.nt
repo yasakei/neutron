@@ -1,9 +1,0 @@
-// Test large for loop with proper scoping
-say("Testing large for loop");
-
-var final_i = 0;
-for (var i = 0; i < 100000; i = i + 1) {
-    final_i = i;
-}
-
-say("Loop finished, final_i = " + str(final_i));
