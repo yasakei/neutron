@@ -329,6 +329,18 @@ Neutron supports various operators for mathematical, comparison, and logical ope
 - `<=` Less than or equal to
 - `>=` Greater than or equal to
 
+## Loops
+
+Neutron supports `while` loops for repetitive execution.
+
+```neutron
+var i = 0;
+while (i < 10) {
+    print(i);
+    i = i + 1;
+}
+```
+
 ## Classes
 
 Neutron supports object-oriented programming with classes.

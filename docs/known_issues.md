@@ -33,6 +33,78 @@ if (valid == false) {
 **Description:** The `&&` (logical AND) operator may have similar parsing issues as the `||` operator.
 **Workaround:** Use separate `if` statements when combining multiple conditions.
 
+### 3. Else-If Chain Stack Overflow
+**Status:** Open
+**Description:** Complex else-if chains can cause stack overflow errors in the interpreter.
+**Workaround:** Use nested if-else statements instead of else-if chains:
+
+```neutron
+// Instead of this (which may cause stack overflow):
+if (percentage >= 90) {
+  say("Outstanding!");
+} else if (percentage >= 75) {
+  say("Great job!");
+} else if (percentage >= 60) {
+  say("Good effort!");
+} else {
+  say("Keep trying!");
+}
+
+// Use this:
+if (percentage >= 90) {
+  say("Outstanding!");
+} else {
+  if (percentage >= 75) {
+    say("Great job!");
+  } else {
+    if (percentage >= 60) {
+      say("Good effort!");
+    } else {
+      say("Keep trying!");
+    }
+  }
+}
+```
+
+### 4. While Loop Stack Overflow (FIXED)
+**Status:** Fixed
+**Description:** While loops with many iterations previously caused stack overflow errors due to improper stack management in the interpreter. This has been fixed in the latest version.
+**Fix:** The interpreter now properly manages the value stack during while loop execution, allowing unlimited iterations without stack overflow.
+
+```neutron
+// This now works with any number of iterations:
+var i = 0;
+while (i < 1000000) {
+    // do something
+    i = i + 1;
+}
+say("Success! Completed " + str(i) + " iterations.");
+```
+
+### 5. Logical AND Operator (`&&`) in Loop Conditions
+**Status:** Open
+**Description:** Using `&&` operator in while loop conditions causes parsing errors.
+**Workaround:** Use separate conditions or avoid complex conditions in while loops:
+
+```neutron
+// Instead of this (which causes parsing errors):
+while (i < 10 && j > 0) {
+    // do something
+    i = i + 1;
+    j = j - 1;
+}
+
+// Use this:
+while (i < 10) {
+    if (j <= 0) {
+        break;
+    }
+    // do something
+    i = i + 1;
+    j = j - 1;
+}
+```
+
 ### 3. Empty String to Integer Conversion
 **Status:** Open
 **Description:** Converting an empty string to an integer with `int()` causes a runtime error.

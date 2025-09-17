@@ -169,16 +169,23 @@ say("");
 // Calculate percentage and give feedback
 var percentage = (score * 100) / 2;
 
+// Simplified feedback without else-if chain
 if (percentage >= 90) {
   say("Outstanding! You're a genius! 🌟");
-} else if (percentage >= 75) {
-  say("Great job! You know your stuff! 👍");
-} else if (percentage >= 60) {
-  say("Good effort! Keep learning! 👌");
-} else if (percentage >= 40) {
-  say("Not bad! But there's room for improvement! 📚");
 } else {
-  say("Better luck next time! Keep studying! 💪");
+  if (percentage >= 75) {
+    say("Great job! You know your stuff! 👍");
+  } else {
+    if (percentage >= 60) {
+      say("Good effort! Keep learning! 👌");
+    } else {
+      if (percentage >= 40) {
+        say("Not bad! But there's room for improvement! 📚");
+      } else {
+        say("Better luck next time! Keep studying! 💪");
+      }
+    }
+  }
 }
 
 say("");

@@ -252,7 +252,8 @@ void VM::run() {
             case OpCode::OP_JUMP_IF_FALSE: {
                 uint16_t offset = (uint16_t)(ip[0] << 8) | ip[1];
                 ip += 2; // Skip the offset
-                if (stack.back().type == ValueType::NIL || (stack.back().type == ValueType::BOOLEAN && !std::get<bool>(stack.back().as))) {
+                Value condition = pop(); // Pop the condition value
+                if (condition.type == ValueType::NIL || (condition.type == ValueType::BOOLEAN && !std::get<bool>(condition.as))) {
                     ip += offset;
                 }
                 break;
