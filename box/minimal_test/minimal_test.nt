@@ -1,0 +1,23 @@
+// Minimal Nexus module for testing
+
+class TestClass {
+    var value;
+    
+    fun init() {
+        this.value = 0;
+    }
+    
+    fun set_value(v) {
+        this.value = v;
+    }
+    
+    fun get_value() {
+        return this.value;
+    }
+}
+
+fun create_test() {
+    var test = TestClass();
+    test.init();
+    return test;
+}

@@ -1,602 +1,303 @@
 #include "vm.h"
+#include "compiler.h"
+#include "bytecode.h"
+#include "debug.h"
 #include <iostream>
 #include <stdexcept>
-#include <fstream>
-#include <sstream>
-#include "scanner.h"
-#include "parser.h"
-#include <cmath>
-#include <bitset>
-#include "libs/math/native.h"
-#include "libs/convert/native.h"
-#include "libs/json/native.h"
-#include "libs/http/native.h"
-#include "libs/time/native.h"
+
+// Include module registration functions
 #include "libs/sys/native.h"
+#include "libs/json/native.h"
+#include "libs/convert/native.h"
 
 namespace neutron {
 
-// RAII class to restore the environment
-class EnvironmentGuard {
-public:
-    EnvironmentGuard(VM& vm, std::shared_ptr<Environment> previous)
-        : vm(vm), previous(previous) {}
+// Forward declaration of isTruthy function
+bool isTruthy(const Value& value);
 
-    ~EnvironmentGuard() {
-        vm.environment = previous;
-    }
-
-private:
-    VM& vm;
-    std::shared_ptr<Environment> previous;
-};
-
-// Helper to check if a value is "truthy"
-bool isTruthy(const Value& value) {
-    if (value.type == ValueType::NIL) return false;
-    if (value.type == ValueType::BOOLEAN) return value.as.boolean;
-    return true; // All other types are truthy
+// Helper function for error reporting
+void runtimeError(const std::string& message) {
+    std::cerr << "Runtime error: " << message << std::endl;
+    // In a real implementation, we might want to unwind the call stack here
+    exit(1);
 }
 
-Value::Value() : type(ValueType::NIL) { as.function = nullptr; }
-
-Value::Value(std::nullptr_t) : type(ValueType::NIL) { as.function = nullptr; }
-
-Value::Value(bool value) : type(ValueType::BOOLEAN) {
-    as.boolean = value;
-}
-
-Value::Value(double value) : type(ValueType::NUMBER) {
-    as.number = value;
-}
-
-Value::Value(const std::string& value) : type(ValueType::STRING) {
-    as.string = new std::string(value);
-}
-
-Value::Value(Object* object) : type(ValueType::OBJECT) {
-    as.object = object;
-}
-
-Value::Value(Callable* function) : type(ValueType::FUNCTION) {
-    as.function = function;
-}
-
-Value::Value(Module* module) : type(ValueType::MODULE) {
-    as.module = module;
-}
-
-std::string Value::toString() const {
-    switch (type) {
-        case ValueType::NIL:
-            return "nil";
-        case ValueType::BOOLEAN:
-            return as.boolean ? "true" : "false";
-        case ValueType::NUMBER: {
-            // Convert double to string, removing trailing zeros
-            char buffer[32];
-            snprintf(buffer, sizeof(buffer), "%.15g", as.number);
-            return std::string(buffer);
-        }
-        case ValueType::STRING:
-            return *as.string;
-        case ValueType::OBJECT:
-            return as.object->toString();
-        case ValueType::FUNCTION:
-            return as.function->toString();
-        case ValueType::MODULE:
-            return "<module>";
-    }
-    return "";
-}
-
-Environment::Environment() : enclosing(nullptr) {}
-
-Environment::Environment(std::shared_ptr<Environment> enclosing) : enclosing(enclosing) {}
-
-void Environment::define(const std::string& name, const Value& value) {
-    values[name] = value;
-}
-
-Value Environment::get(const std::string& name) {
-    auto it = values.find(name);
-    if (it != values.end()) {
-        return it->second;
-    }
-
-    if (enclosing != nullptr) {
-        return enclosing->get(name);
-    }
-
-    throw std::runtime_error("Undefined variable '" + name + "'.");
-}
-
-void Environment::assign(const std::string& name, const Value& value) {
-    auto it = values.find(name);
-    if (it != values.end()) {
-        values[name] = value;
-        return;
-    }
-
-    if (enclosing != nullptr) {
-        enclosing->assign(name, value);
-        return;
-    }
-
-    throw std::runtime_error("Undefined variable '" + name + "'.");
-}
-
-Function::Function(const FunctionStmt* declaration, std::shared_ptr<Environment> closure)
-    : declaration(declaration), closure(closure) {}
-
-int Function::arity() {
-    return declaration->params.size();
-}
-
-Value Function::call(VM& vm, std::vector<Value> arguments) {
-    auto environment = std::make_shared<Environment>(closure);
-    for (size_t i = 0; i < declaration->params.size(); ++i) {
-        environment->define(declaration->params[i].lexeme, arguments[i]);
-    }
-
-    try {
-        vm.executeBlock(declaration->body, environment);
-    } catch (Return& returnValue) {
-        return returnValue.value;
-    }
-
-    return Value(nullptr);
-}
-
-std::string Function::toString() {
-    return "<fn " + declaration->name.lexeme + ">";
-}
-
-NativeFn::NativeFn(NativeFnPtr function, int arity) : function(function), _arity(arity) {}
-
-int NativeFn::arity() {
-    return _arity;
-}
-
-Value NativeFn::call(VM& /*vm*/, std::vector<Value> arguments) {
-    return function(arguments);
-}
-
-std::string NativeFn::toString() {
-    return "<native fn>";
-}
-
-Module::Module(std::string name, std::shared_ptr<Environment> environment, std::vector<std::unique_ptr<Stmt>> statements)
-    : name(name), environment(environment), statements(std::move(statements)) {}
-
-Value Module::get(const std::string& name) {
-    return environment->get(name);
-}
-
-VM::VM() : environment(std::make_shared<Environment>()) {
-    auto math_env = std::make_shared<Environment>();
-    register_math_functions(math_env);
-
-    auto math_module = new Module("math", math_env, {});
-    environment->define("math", Value(math_module));
-
-    register_convert_functions(environment);
+VM::VM() : chunk(nullptr), ip(nullptr) {
+    globals["say"] = Value(new NativeFn(native_say, 1));
     
-    // Register HTTP library
-    register_http_functions(environment);
+    // Create a shared environment for global functions
+    auto globalEnv = std::make_shared<Environment>();
     
-    // Register Time library
-    register_time_functions(environment);
+    // Register module functions
+    register_sys_functions(globalEnv);
+    register_json_functions(globalEnv);
+    register_convert_functions(globalEnv);
     
-    // Register Sys library
-    register_sys_functions(environment);
-}
-
-void VM::interpret(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> env) {
-    std::shared_ptr<Environment> previous = this->environment;
-    EnvironmentGuard guard(*this, previous);
-    this->environment = env;
-
-    try {
-        for (const auto& stmt : statements) {
-            execute(stmt.get());
-        }
-    } catch (Return& e) {
-        std::cerr << "Runtime error: Cannot return from top-level code." << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "Runtime error: " << e.what() << std::endl;
+    // Copy registered functions to globals
+    for (const auto& pair : globalEnv->values) {
+        globals[pair.first] = pair.second;
     }
 }
 
-void VM::execute(const Stmt* stmt) {
-    // std::cout << "Executing statement type: " << static_cast<int>(stmt->type) << std::endl;
-    switch (stmt->type) {
-        case StmtType::EXPRESSION:
-            visitExpressionStmt(static_cast<const ExpressionStmt*>(stmt));
-            break;
-        case StmtType::SAY:
-            visitSayStmt(static_cast<const SayStmt*>(stmt));
-            break;
-        case StmtType::VAR:
-            visitVarStmt(static_cast<const VarStmt*>(stmt));
-            break;
-        case StmtType::BLOCK:
-            visitBlockStmt(static_cast<const BlockStmt*>(stmt));
-            break;
-        case StmtType::IF:
-            visitIfStmt(static_cast<const IfStmt*>(stmt));
-            break;
-        case StmtType::WHILE:
-            visitWhileStmt(static_cast<const WhileStmt*>(stmt));
-            break;
-        case StmtType::USE:
-            visitUseStmt(static_cast<const UseStmt*>(stmt));
-            break;
-        case StmtType::FUNCTION:
-            visitFunctionStmt(static_cast<const FunctionStmt*>(stmt));
-            break;
-        case StmtType::RETURN:
-            visitReturnStmt(static_cast<const ReturnStmt*>(stmt));
-            break;
-        case StmtType::CLASS:
-            // TODO: Implement class statement visitation
-            break;
-    }
+void VM::interpret(Function* function) {
+    std::cout << "interpret" << std::endl;
+    this->chunk = function->chunk;
+    this->ip = &this->chunk->code[0];
+    run();
 }
 
-void VM::executeBlock(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> environment) {
-    std::shared_ptr<Environment> previous = this->environment;
-    EnvironmentGuard guard(*this, previous);
-    this->environment = environment;
-
-    for (const auto& statement : statements) {
-        execute(statement.get());
+void VM::push(const Value& value) {
+    if (stack.size() >= 256) {
+        runtimeError("Stack overflow.");
     }
+    stack.push_back(value);
 }
 
-Value VM::evaluate(const Expr* expr) {
-    switch (expr->type) {
-        case ExprType::LITERAL:
-            return visitLiteralExpr(static_cast<const LiteralExpr*>(expr));
-        case ExprType::VARIABLE:
-            return visitVariableExpr(static_cast<const VariableExpr*>(expr));
-        case ExprType::BINARY:
-            return visitBinaryExpr(static_cast<const BinaryExpr*>(expr));
-        case ExprType::UNARY:
-            return visitUnaryExpr(static_cast<const UnaryExpr*>(expr));
-        case ExprType::GROUPING:
-            return visitGroupingExpr(static_cast<const GroupingExpr*>(expr));
-        case ExprType::MEMBER:
-            return visitMemberExpr(static_cast<const MemberExpr*>(expr));
-        case ExprType::CALL:
-            return visitCallExpr(static_cast<const CallExpr*>(expr));
-        case ExprType::ASSIGN:
-            return visitAssignExpr(static_cast<const AssignExpr*>(expr));
-        case ExprType::OBJECT:
-            return visitObjectExpr(static_cast<const ObjectExpr*>(expr));
+Value VM::pop() {
+    if (stack.empty()) {
+        runtimeError("Stack underflow.");
     }
-    return Value(nullptr);
-}
-
-Value VM::visitLiteralExpr(const LiteralExpr* expr) {
-    switch (expr->valueType) {
-        case LiteralValueType::NIL:
-            return Value(nullptr);
-        case LiteralValueType::BOOLEAN: {
-            auto boolPtr = std::static_pointer_cast<bool>(expr->value);
-            return Value(*boolPtr);
-        }
-        case LiteralValueType::NUMBER: {
-            auto numPtr = std::static_pointer_cast<double>(expr->value);
-            return Value(*numPtr);
-        }
-        case LiteralValueType::STRING: {
-            auto strPtr = std::static_pointer_cast<std::string>(expr->value);
-            return Value(*strPtr);
-        }
-    }
-    return Value(nullptr);
-}
-
-Value VM::visitVariableExpr(const VariableExpr* expr) {
-    return environment->get(expr->name.lexeme);
-}
-
-Value VM::visitBinaryExpr(const BinaryExpr* expr) {
-    Value left = evaluate(expr->left.get());
-    Value right = evaluate(expr->right.get());
-
-    switch (expr->op.type) {
-        case TokenType::PLUS:
-            if (left.type == ValueType::STRING) {
-                return Value(*left.as.string + right.toString());
-            } else if (left.type == ValueType::NUMBER && right.type == ValueType::NUMBER) {
-                return Value(left.as.number + right.as.number);
-            }
-            throw std::runtime_error("Operands must be two numbers or two strings.");
-
-        case TokenType::MINUS:
-            if (left.type == ValueType::NUMBER && right.type == ValueType::NUMBER) {
-                return Value(left.as.number - right.as.number);
-            }
-            throw std::runtime_error("Operands must be numbers.");
-
-        case TokenType::STAR:
-            if (left.type == ValueType::NUMBER && right.type == ValueType::NUMBER) {
-                return Value(left.as.number * right.as.number);
-            }
-            throw std::runtime_error("Operands must be numbers.");
-
-        case TokenType::SLASH:
-            if (left.type == ValueType::NUMBER && right.type == ValueType::NUMBER) {
-                if (right.as.number == 0) {
-                    throw std::runtime_error("Division by zero.");
-                }
-                return Value(left.as.number / right.as.number);
-            }
-            throw std::runtime_error("Operands must be numbers.");
-
-        case TokenType::EQUAL_EQUAL:
-            if (left.type == ValueType::NIL && right.type == ValueType::NIL) {
-                return Value(true);
-            } else if (left.type == ValueType::NIL || right.type == ValueType::NIL) {
-                return Value(false);
-            } else if (left.type == ValueType::BOOLEAN && right.type == ValueType::BOOLEAN) {
-                return Value(left.as.boolean == right.as.boolean);
-            } else if (left.type == ValueType::NUMBER && right.type == ValueType::NUMBER) {
-                return Value(left.as.number == right.as.number);
-            } else if (left.type == ValueType::STRING && right.type == ValueType::STRING) {
-                return Value(*left.as.string == *right.as.string);
-            }
-            return Value(false);
-
-        case TokenType::BANG_EQUAL:
-            if (left.type == ValueType::NIL && right.type == ValueType::NIL) {
-                return Value(false);
-            } else if (left.type == ValueType::NIL || right.type == ValueType::NIL) {
-                return Value(true);
-            } else if (left.type == ValueType::BOOLEAN && right.type == ValueType::BOOLEAN) {
-                return Value(left.as.boolean != right.as.boolean);
-            } else if (left.type == ValueType::NUMBER && right.type == ValueType::NUMBER) {
-                return Value(left.as.number != right.as.number);
-            } else if (left.type == ValueType::STRING && right.type == ValueType::STRING) {
-                return Value(*left.as.string != *right.as.string);
-            }
-            return Value(true);
-
-        case TokenType::GREATER:
-            if (left.type == ValueType::NUMBER && right.type == ValueType::NUMBER) {
-                return Value(left.as.number > right.as.number);
-            }
-            throw std::runtime_error("Operands must be numbers.");
-
-        case TokenType::GREATER_EQUAL:
-            if (left.type == ValueType::NUMBER && right.type == ValueType::NUMBER) {
-                return Value(left.as.number >= right.as.number);
-            }
-            throw std::runtime_error("Operands must be numbers.");
-
-        case TokenType::LESS:
-            if (left.type == ValueType::NUMBER && right.type == ValueType::NUMBER) {
-                return Value(left.as.number < right.as.number);
-            }
-            throw std::runtime_error("Operands must be numbers.");
-
-        case TokenType::LESS_EQUAL:
-            if (left.type == ValueType::NUMBER && right.type == ValueType::NUMBER) {
-                return Value(left.as.number <= right.as.number);
-            }
-            throw std::runtime_error("Operands must be numbers.");
-
-        default:
-            throw std::runtime_error("Unknown operator.");
-    }
-}
-
-Value VM::visitUnaryExpr(const UnaryExpr* expr) {
-    Value right = evaluate(expr->right.get());
-    
-    switch (expr->op.type) {
-        case TokenType::MINUS:
-            if (right.type == ValueType::NUMBER) {
-                return Value(-right.as.number);
-            }
-            throw std::runtime_error("Operand must be a number.");
-            
-        case TokenType::BANG:
-            return Value(!isTruthy(right));
-            
-        default:
-            throw std::runtime_error("Unknown operator.");
-    }
-}
-
-Value VM::visitGroupingExpr(const GroupingExpr* expr) {
-    return evaluate(expr->expression.get());
-}
-
-Value VM::visitMemberExpr(const MemberExpr* expr) {
-    if (expr->object->type == ExprType::VARIABLE) {
-        const VariableExpr* varExpr = static_cast<const VariableExpr*>(expr->object.get());
-        Value module = environment->get(varExpr->name.lexeme);
-        if (module.type == ValueType::MODULE) {
-            return module.as.module->get(expr->property.lexeme);
-        }
-    }
-
-    throw std::runtime_error("Only modules support member access.");
-}
-
-void VM::visitExpressionStmt(const ExpressionStmt* stmt) {
-    evaluate(stmt->expression.get());
-}
-
-void VM::visitSayStmt(const SayStmt* stmt) {
-    Value value = evaluate(stmt->expression.get());
-    std::cout << value.toString() << std::endl;
-}
-
-void VM::visitVarStmt(const VarStmt* stmt) {
-    Value value;
-    if (stmt->initializer) {
-        value = evaluate(stmt->initializer.get());
-    } else {
-        value = Value(nullptr);
-    }
-    environment->define(stmt->name.lexeme, value);
-}
-
-void VM::visitBlockStmt(const BlockStmt* stmt) {
-    executeBlock(stmt->statements, std::make_shared<Environment>(environment));
-}
-
-void VM::visitIfStmt(const IfStmt* stmt) {
-    Value condition = evaluate(stmt->condition.get());
-    
-    if (isTruthy(condition)) {
-        execute(stmt->thenBranch.get());
-    } else if (stmt->elseBranch) {
-        execute(stmt->elseBranch.get());
-    }
-}
-
-void VM::visitWhileStmt(const WhileStmt* stmt) {
-    while (isTruthy(evaluate(stmt->condition.get()))) {
-        execute(stmt->body.get());
-    }
-}
-
-void VM::visitUseStmt(const UseStmt* stmt) {
-    std::cout << "DEBUG: Using module: " << stmt->library.lexeme << std::endl;
-    
-    std::string moduleName = stmt->library.lexeme;
-    if (environment->values.find(moduleName) != environment->values.end()) {
-        std::cout << "DEBUG: Module already exists in environment" << std::endl;
-        return;
-    }
-
-    // Handle native modules that don't have .nt files
-    if (moduleName == "http") {
-        // HTTP module is already registered in VM constructor
-        // We just need to find it and add it to the environment
-        Value httpModule = environment->get("http");
-        environment->define(moduleName, httpModule);
-        std::cout << "DEBUG: HTTP module added to environment" << std::endl;
-        return;
-    }
-
-    std::string filePath;
-    std::ifstream file;
-
-    // Try lib/moduleName.nt
-    filePath = "lib/" + moduleName + ".nt";
-    file.open(filePath);
-
-    // Try box/moduleName.nt
-    if (!file.is_open()) {
-        filePath = "box/" + moduleName + ".nt";
-        file.open(filePath);
-    }
-
-    // Try box/moduleName/moduleName.nt
-    if (!file.is_open()) {
-        filePath = "box/" + moduleName + "/" + moduleName + ".nt";
-        file.open(filePath);
-    }
-
-    if (!file.is_open()) {
-        throw std::runtime_error("Could not open library file: " + filePath);
-    }
-
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string source = buffer.str();
-    
-    std::cout << "DEBUG: Reading module file: " << filePath << ", source length: " << source.length() << std::endl;
-
-    Scanner scanner(source);
-    std::vector<Token> tokens = scanner.scanTokens();
-
-    Parser parser(tokens);
-    std::vector<std::unique_ptr<Stmt>> statements = parser.parse();
-    
-    std::cout << "DEBUG: Parsed " << statements.size() << " statements" << std::endl;
-
-    auto libraryEnv = std::make_shared<Environment>();
-    
-    // If this is the convert module, add the native functions to the environment
-    if (moduleName == "convert") {
-        std::cout << "DEBUG: Adding native functions to convert module" << std::endl;
-        libraryEnv->define("char_to_int", Value(new NativeFn(native_char_to_int, 1)));
-        libraryEnv->define("int_to_char", Value(new NativeFn(native_int_to_char, 1)));
-        libraryEnv->define("string_get_char_at", Value(new NativeFn(native_string_get_char_at, 2)));
-        libraryEnv->define("string_length", Value(new NativeFn(native_string_length, 1)));
-    }
-    
-    // If this is the json module, register the native functions
-    if (moduleName == "json") {
-        std::cout << "DEBUG: Registering native functions for json module" << std::endl;
-        register_json_functions(libraryEnv);
-    }
-
-    VM libraryVM;
-    libraryVM.environment = libraryEnv;
-    libraryVM.interpret(statements, libraryEnv);
-    
-    std::cout << "DEBUG: After interpreting, libraryEnv has " << libraryEnv->values.size() << " values" << std::endl;
-
-    auto module = new Module(moduleName, libraryEnv, std::move(statements));
-    environment->define(moduleName, Value(module));
-    
-    std::cout << "DEBUG: Module " << moduleName << " used successfully" << std::endl;
-}
-
-void VM::visitFunctionStmt(const FunctionStmt* stmt) {
-    auto function = new Function(stmt, environment);
-    environment->define(stmt->name.lexeme, Value(function));
-}
-
-void VM::visitReturnStmt(const ReturnStmt* stmt) {
-    Value value = nullptr;
-    if (stmt->value) {
-        value = evaluate(stmt->value.get());
-    }
-    throw Return(value);
-}
-
-Value VM::visitCallExpr(const CallExpr* expr) {
-    Value callee = evaluate(expr->callee.get());
-
-    std::vector<Value> arguments;
-    for (const auto& arg : expr->arguments) {
-        arguments.push_back(evaluate(arg.get()));
-    }
-
-    if (callee.type != ValueType::FUNCTION) {
-        throw std::runtime_error("Can only call functions and classes.");
-    }
-
-    Callable* function = callee.as.function;
-    if (function->arity() != -1 && arguments.size() != (size_t)function->arity()) {
-        throw std::runtime_error("Expected " + std::to_string(function->arity()) + " arguments but got " + std::to_string(arguments.size()) + ".");
-    }
-
-    return function->call(*this, arguments);
-}
-
-Value VM::visitObjectExpr(const ObjectExpr* expr) {
-    auto obj = new JsonObject();
-    for (const auto& property : expr->properties) {
-        Value value = evaluate(property.second.get());
-        obj->properties[property.first] = value;
-    }
-    return Value(obj);
-}
-
-Value VM::visitAssignExpr(const AssignExpr* expr) {
-    Value value = evaluate(expr->value.get());
-    environment->assign(expr->name.lexeme, value);
+    Value value = stack.back();
+    stack.pop_back();
     return value;
+}
+
+void VM::run() {
+    for (;;) {
+#ifdef DEBUG_TRACE_EXECUTION
+        printf("ip: %p, stack size: %zu\n", ip, stack.size());
+        std::cout << "          ";
+        for (const auto& value : stack) {
+            printf("[ ");
+            std::cout << value.toString();
+            printf(" ]");
+        }
+        std::cout << std::endl;
+        disassembleInstruction(chunk, (int)(ip - &chunk->code[0]));
+#endif
+        switch ((OpCode)*ip++) {
+            case OpCode::OP_RETURN: {
+                // For now, we'll just return
+                // A complete implementation would handle return values properly
+                return;
+            }
+            case OpCode::OP_CONSTANT: {
+                Value constant = chunk->constants[*ip++];
+                push(constant);
+                break;
+            }
+            case OpCode::OP_NIL: {
+                push(Value());
+                break;
+            }
+            case OpCode::OP_TRUE: {
+                push(Value(true));
+                break;
+            }
+            case OpCode::OP_FALSE: {
+                push(Value(false));
+                break;
+            }
+            case OpCode::OP_POP: {
+                pop();
+                break;
+            }
+            case OpCode::OP_GET_LOCAL: {
+                uint8_t slot = *ip++;
+                push(stack[slot]);
+                break;
+            }
+            case OpCode::OP_SET_LOCAL: {
+                uint8_t slot = *ip++;
+                stack[slot] = stack.back();
+                break;
+            }
+            case OpCode::OP_GET_GLOBAL: {
+                std::string name = std::get<std::string>(chunk->constants[*ip++].as);
+                auto it = globals.find(name);
+                if (it == globals.end()) {
+                    runtimeError("Undefined variable '" + name + "'.");
+                }
+                push(globals[name]);
+                break;
+            }
+            case OpCode::OP_DEFINE_GLOBAL: {
+                std::string name = std::get<std::string>(chunk->constants[*ip++].as);
+                globals[name] = stack.back();
+                pop();
+                break;
+            }
+            case OpCode::OP_SET_GLOBAL: {
+                std::string name = std::get<std::string>(chunk->constants[*ip++].as);
+                auto it = globals.find(name);
+                if (it == globals.end()) {
+                    runtimeError("Undefined variable '" + name + "'.");
+                }
+                globals[name] = stack.back();
+                break;
+            }
+            case OpCode::OP_GET_PROPERTY: {
+                std::string propertyName = std::get<std::string>(chunk->constants[*ip++].as);
+                Value object = stack.back();
+                
+                // Check if the object is a module
+                if (object.type == ValueType::MODULE) {
+                    Module* module = std::get<Module*>(object.as);
+                    try {
+                        Value property = module->get(propertyName);
+                        // Replace the object on the stack with the property
+                        stack.pop_back();
+                        push(property);
+                    } catch (const std::runtime_error& e) {
+                        runtimeError(e.what());
+                    }
+                } else {
+                    runtimeError("Only modules have properties.");
+                }
+                break;
+            }
+            case OpCode::OP_EQUAL: {
+                Value b = pop();
+                Value a = pop();
+                push(Value(a.type == b.type && a.toString() == b.toString()));
+                break;
+            }
+            case OpCode::OP_GREATER: {
+                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+                    runtimeError("Operands must be numbers.");
+                }
+                double b = std::get<double>(pop().as);
+                double a = std::get<double>(pop().as);
+                push(Value(a > b));
+                break;
+            }
+            case OpCode::OP_LESS: {
+                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+                    runtimeError("Operands must be numbers.");
+                }
+                double b = std::get<double>(pop().as);
+                double a = std::get<double>(pop().as);
+                push(Value(a < b));
+                break;
+            }
+            case OpCode::OP_ADD: {
+                Value b = pop();
+                Value a = pop();
+                
+                if (a.type == ValueType::NUMBER && b.type == ValueType::NUMBER) {
+                    double num_a = std::get<double>(a.as);
+                    double num_b = std::get<double>(b.as);
+                    push(Value(num_a + num_b));
+                } else {
+                    // Convert both operands to strings and concatenate
+                    std::string str_a = a.toString();
+                    std::string str_b = b.toString();
+                    push(Value(str_a + str_b));
+                }
+                break;
+            }
+            case OpCode::OP_SUBTRACT: {
+                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+                    runtimeError("Operands must be numbers.");
+                }
+                double b = std::get<double>(pop().as);
+                double a = std::get<double>(pop().as);
+                push(Value(a - b));
+                break;
+            }
+            case OpCode::OP_MULTIPLY: {
+                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+                    runtimeError("Operands must be numbers.");
+                }
+                double b = std::get<double>(pop().as);
+                double a = std::get<double>(pop().as);
+                push(Value(a * b));
+                break;
+            }
+            case OpCode::OP_DIVIDE: {
+                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+                    runtimeError("Operands must be numbers.");
+                }
+                double b = std::get<double>(pop().as);
+                double a = std::get<double>(pop().as);
+                if (b == 0) {
+                    runtimeError("Division by zero.");
+                }
+                push(Value(a / b));
+                break;
+            }
+            case OpCode::OP_NOT: {
+                Value value = pop();
+                push(Value(!isTruthy(value)));
+                break;
+            }
+            case OpCode::OP_NEGATE: {
+                if (stack.back().type != ValueType::NUMBER) {
+                    runtimeError("Operand must be a number.");
+                }
+                double value = std::get<double>(pop().as);
+                push(Value(-value));
+                break;
+            }
+            case OpCode::OP_SAY: {
+                std::cout << pop().toString() << std::endl;
+                break;
+            }
+            case OpCode::OP_JUMP: {
+                uint16_t offset = (uint16_t)(ip[0] << 8) | ip[1];
+                ip += 2; // Skip the offset
+                ip += offset;
+                break;
+            }
+            case OpCode::OP_JUMP_IF_FALSE: {
+                uint16_t offset = (uint16_t)(ip[0] << 8) | ip[1];
+                ip += 2; // Skip the offset
+                if (stack.back().type == ValueType::NIL || (stack.back().type == ValueType::BOOLEAN && !std::get<bool>(stack.back().as))) {
+                    ip += offset;
+                }
+                break;
+            }
+            case OpCode::OP_LOOP: {
+                uint16_t offset = (uint16_t)(ip[0] << 8) | ip[1];
+                ip += 2; // Skip the offset
+                ip -= offset;
+                break;
+            }
+            case OpCode::OP_CALL: {
+                uint8_t argCount = *ip++;
+                // The last value on the stack is the function to call
+                // The values before that are the arguments
+                Value callee = stack[stack.size() - 1 - argCount];
+                
+                if (callee.type != ValueType::FUNCTION) {
+                    runtimeError("Can only call functions and classes.");
+                    break;
+                }
+                
+                Callable* function = std::get<Callable*>(callee.as);
+                if (function->arity() != -1 && function->arity() != argCount) {
+                    runtimeError("Expected " + std::to_string(function->arity()) + " arguments but got " + std::to_string(argCount) + ".");
+                    break;
+                }
+                
+                // Extract arguments
+                std::vector<Value> arguments;
+                for (int i = 0; i < argCount; i++) {
+                    arguments.push_back(stack[stack.size() - argCount + i]);
+                }
+                
+                // Remove the arguments and the function from the stack
+                for (int i = 0; i < argCount + 1; i++) {
+                    pop();
+                }
+                
+                // Call the function and push the result
+                Value result = function->call(*this, arguments);
+                push(result);
+                break;
+            }
+        }
+    }
 }
 
 } // namespace neutron

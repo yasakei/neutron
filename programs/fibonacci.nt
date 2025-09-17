@@ -1,0 +1,435 @@
+use sys;
+
+// Fibonacci Sequence Generator
+// Author: Neutron Developer
+// Description: Generates Fibonacci numbers up to a specified count
+
+say "===========================================";
+say "         FIBONACCI SEQUENCE GENERATOR";
+say "===========================================";
+say "";
+
+var count_str = sys.input("How many Fibonacci numbers would you like to generate? ");
+var count = int(count_str);
+
+// Validate input
+if (count <= 0) {
+    say "Please enter a positive number.";
+    sys.exit(1);
+}
+
+say "Fibonacci sequence:";
+
+// Handle the base cases
+if (count >= 1) {
+    say "0";
+}
+
+if (count >= 2) {
+    say "1";
+}
+
+// Generate remaining Fibonacci numbers using iterative approach
+// Since loops are not yet implemented in Neutron, we use repeated if statements
+// This implementation supports up to 50 Fibonacci numbers
+
+var prev2 = 0;  // F(n-2)
+var prev1 = 1;  // F(n-1)
+var current = 0;
+
+// Generate Fibonacci numbers 3 through 50
+var i = 2;
+
+// Numbers 3-10
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+// Numbers 11-20
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+// Numbers 21-30
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+// Numbers 31-40
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+// Numbers 41-50
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+if (i < count) {
+    current = prev1 + prev2;
+    say str(current);
+    prev2 = prev1;
+    prev1 = current;
+    i = i + 1;
+}
+
+say "";
+say "===========================================";
+say "         SEQUENCE GENERATION COMPLETE";
+say "===========================================";

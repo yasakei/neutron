@@ -16,7 +16,7 @@ DEPENDENCIES = -I$(INCDIR) -I. -Ilibs/json -Ilibs/http -Ilibs/time -Ilibs/sys -I
 DEBUG ?= 0
 
 ifeq ($(DEBUG), 1)
-    CXXFLAGS = -std=c++17 -Wall -Wextra -g -O0
+    CXXFLAGS = -std=c++17 -Wall -Wextra -g -O0 -DDEBUG_TRACE_EXECUTION -DDEBUG_PRINT_CODE
 else
     CXXFLAGS = -std=c++17 -Wall -Wextra -O2
 endif

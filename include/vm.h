@@ -6,6 +6,18 @@
 #include <unordered_map>
 #include <stack>
 #include <memory>
+#include <cstdint>
+#include <variant>
+
+// Forward declarations
+class Environment;
+
+// Forward declarations for module registration functions
+namespace neutron {
+    void register_sys_functions(std::shared_ptr<Environment> env);
+    void register_json_functions(std::shared_ptr<Environment> env);
+    void register_convert_functions(std::shared_ptr<Environment> env);
+}
 
 namespace neutron {
 
@@ -14,6 +26,7 @@ class VM;
 class Callable;
 class Module;
 class Object;
+class Chunk;
 
 enum class ValueType {
     NIL,
@@ -25,18 +38,12 @@ enum class ValueType {
     MODULE
 };
 
+using Literal = std::variant<std::nullptr_t, bool, double, std::string, Object*, Callable*, Module*>;
+
 struct Value {
     ValueType type;
-    
-    union {
-        bool boolean;
-        double number;
-        std::string* string;
-        Object* object;
-        Callable* function;
-        Module* module;
-    } as;
-    
+    Literal as;
+
     Value();
     Value(std::nullptr_t);
     Value(bool value);
@@ -45,7 +52,7 @@ struct Value {
     Value(Object* object);
     Value(Callable* function);
     Value(Module* module);
-    
+
     std::string toString() const;
 };
 
@@ -76,6 +83,7 @@ Value native_char_to_int(std::vector<Value> arguments);
 Value native_int_to_char(std::vector<Value> arguments);
 Value native_string_get_char_at(std::vector<Value> arguments);
 Value native_string_length(std::vector<Value> arguments);
+Value native_say(std::vector<Value> arguments);
 
 class Environment {
 public:
@@ -115,6 +123,7 @@ public:
     Value call(VM& vm, std::vector<Value> arguments) override;
     std::string toString() override;
 
+    Chunk* chunk;
 private:
     const FunctionStmt* declaration;
     std::shared_ptr<Environment> closure;
@@ -142,38 +151,18 @@ public:
 
 class VM {
 public:
-    std::shared_ptr<Environment> environment;
-    
-    Value evaluate(const Expr* expr);
-    
-    // Expression evaluation methods
-    Value visitLiteralExpr(const LiteralExpr* expr);
-    Value visitVariableExpr(const VariableExpr* expr);
-    Value visitBinaryExpr(const BinaryExpr* expr);
-    Value visitUnaryExpr(const UnaryExpr* expr);
-    Value visitGroupingExpr(const GroupingExpr* expr);
-    Value visitMemberExpr(const MemberExpr* expr);
-    Value visitCallExpr(const CallExpr* expr);
-    Value visitAssignExpr(const AssignExpr* expr);
-    Value visitObjectExpr(const ObjectExpr* expr);
-    
-    // Statement execution methods
-    void visitExpressionStmt(const ExpressionStmt* stmt);
-    void visitSayStmt(const SayStmt* stmt);
-    void visitVarStmt(const VarStmt* stmt);
-    void visitBlockStmt(const BlockStmt* stmt);
-    void visitIfStmt(const IfStmt* stmt);
-    void visitWhileStmt(const WhileStmt* stmt);
-    void visitUseStmt(const UseStmt* stmt);
-    void visitFunctionStmt(const FunctionStmt* stmt);
-    void visitReturnStmt(const ReturnStmt* stmt);
-    
-public:
     VM();
-    void interpret(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> env);
-    void executeBlock(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> environment);
-    Environment globals;
-    void execute(const Stmt* stmt);
+    void interpret(Function* function);
+    void push(const Value& value);
+    Value pop();
+
+private:
+    void run();
+
+    Chunk* chunk;
+    uint8_t* ip;
+    std::vector<Value> stack;
+    std::unordered_map<std::string, Value> globals;
 };
 
 } // namespace neutron

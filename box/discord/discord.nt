@@ -1,3 +1,0 @@
-fun send_message(message) {
-    print("Discord message: " + message + "\n");
-}

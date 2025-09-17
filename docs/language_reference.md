@@ -182,9 +182,7 @@ for (var i = 0; i < 5; i = i + 1) {
 }
 ```
 
-## Functions *(Partially implemented)*
-
-*Note: Function definitions and calls are available, but return statements are currently under development.*
+## Functions
 
 Functions are defined using the `fun` keyword.
 
@@ -202,11 +200,9 @@ fun greet(name) {
 greet("Neutron"); // Prints "Hello, Neutron!"
 ```
 
-### Return Statement *(Not yet implemented)*
+### Return Statement
 
-*Note: Return statements are currently under development and not yet available in Neutron.*
-
-The `return` statement is used to return a value from a function.
+The `return` statement is used to return a value from a function. If no value is specified, the function returns `nil`.
 
 ```python
 fun add(a, b) {
@@ -215,6 +211,17 @@ fun add(a, b) {
 
 var result = add(5, 10);
 print(result); // 15
+```
+
+Functions can also return without a value:
+
+```python
+fun print_message(message) {
+    if (message == "") {
+        return; // Returns nil
+    }
+    print(message);
+}
 ```
 
 ## Built-in Functions
@@ -304,6 +311,23 @@ var age = sys.input("Enter your age: ");
 
 - `sys.exit([code])`: Exits the program with the given exit code (default is 0).
 - `sys.exec(command)`: Executes a system command and returns the output and exit code.
+
+## Operators
+
+Neutron supports various operators for mathematical, comparison, and logical operations.
+
+### Logical Operators
+
+**Note:** There are known issues with the `||` (logical OR) and `&&` (logical AND) operators. Using these operators may cause parsing errors. As a workaround, use separate `if` statements for complex conditions. See [Known Issues](known_issues.md) for more details.
+
+### Comparison Operators
+
+- `==` Equal to
+- `!=` Not equal to
+- `<` Less than
+- `>` Greater than
+- `<=` Less than or equal to
+- `>=` Greater than or equal to
 
 ## Classes
 

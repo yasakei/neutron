@@ -4,21 +4,20 @@
 #include "scanner.h"
 #include "parser.h"
 #include "vm.h"
+#include "compiler.h"
 
 void run(const std::string& source, neutron::VM& vm) {
+    std::cout << "run" << std::endl;
     neutron::Scanner scanner(source);
     std::vector<neutron::Token> tokens = scanner.scanTokens();
-    
-    // Print tokens for debugging
-    // for (const auto& token : tokens) {
-    //     std::cout << "Token(" << static_cast<int>(token.type) << ", " << token.lexeme << ", " << token.line << ")" << std::endl;
-    // }
     
     neutron::Parser parser(tokens);
     std::vector<std::unique_ptr<neutron::Stmt>> statements = parser.parse();
     
-    // Instead of printing tokens, we'll interpret the statements
-    vm.interpret(statements, vm.environment);
+    neutron::Compiler compiler(vm);
+    neutron::Function* function = compiler.compile(statements);
+    
+    vm.interpret(function);
 }
 
 void runFile(const std::string& path) {
@@ -56,6 +55,7 @@ void runPrompt() {
 }
 
 int main(int argc, char* argv[]) {
+    std::cout << "main" << std::endl;
     if (argc > 2) {
         std::cout << "Usage: neutron [script]" << std::endl;
         exit(1);

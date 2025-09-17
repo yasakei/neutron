@@ -32,3 +32,4 @@ testing.env
 # Examples
 examples/
 external/
+debug/

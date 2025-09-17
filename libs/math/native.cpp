@@ -10,7 +10,7 @@ Value math_add(std::vector<Value> arguments) {
     if (arguments[0].type != ValueType::NUMBER || arguments[1].type != ValueType::NUMBER) {
         throw std::runtime_error("Arguments for add() must be numbers.");
     }
-    return Value(arguments[0].as.number + arguments[1].as.number);
+    return Value(std::get<double>(arguments[0].as) + std::get<double>(arguments[1].as));
 }
 
 Value math_subtract(std::vector<Value> arguments) {
@@ -20,7 +20,7 @@ Value math_subtract(std::vector<Value> arguments) {
     if (arguments[0].type != ValueType::NUMBER || arguments[1].type != ValueType::NUMBER) {
         throw std::runtime_error("Arguments for subtract() must be numbers.");
     }
-    return Value(arguments[0].as.number - arguments[1].as.number);
+    return Value(std::get<double>(arguments[0].as) - std::get<double>(arguments[1].as));
 }
 
 Value math_multiply(std::vector<Value> arguments) {
@@ -30,7 +30,7 @@ Value math_multiply(std::vector<Value> arguments) {
     if (arguments[0].type != ValueType::NUMBER || arguments[1].type != ValueType::NUMBER) {
         throw std::runtime_error("Arguments for multiply() must be numbers.");
     }
-    return Value(arguments[0].as.number * arguments[1].as.number);
+    return Value(std::get<double>(arguments[0].as) * std::get<double>(arguments[1].as));
 }
 
 Value math_divide(std::vector<Value> arguments) {
@@ -40,10 +40,10 @@ Value math_divide(std::vector<Value> arguments) {
     if (arguments[0].type != ValueType::NUMBER || arguments[1].type != ValueType::NUMBER) {
         throw std::runtime_error("Arguments for divide() must be numbers.");
     }
-    if (arguments[1].as.number == 0) {
+    if (std::get<double>(arguments[1].as) == 0) {
         throw std::runtime_error("Division by zero.");
     }
-    return Value(arguments[0].as.number / arguments[1].as.number);
+    return Value(std::get<double>(arguments[0].as) / std::get<double>(arguments[1].as));
 }
 
 Value math_pow(std::vector<Value> arguments) {
@@ -53,7 +53,7 @@ Value math_pow(std::vector<Value> arguments) {
     if (arguments[0].type != ValueType::NUMBER || arguments[1].type != ValueType::NUMBER) {
         throw std::runtime_error("Arguments for pow() must be numbers.");
     }
-    return Value(pow(arguments[0].as.number, arguments[1].as.number));
+    return Value(pow(std::get<double>(arguments[0].as), std::get<double>(arguments[1].as)));
 }
 
 Value math_sqrt(std::vector<Value> arguments) {
@@ -63,7 +63,7 @@ Value math_sqrt(std::vector<Value> arguments) {
     if (arguments[0].type != ValueType::NUMBER) {
         throw std::runtime_error("Argument for sqrt() must be a number.");
     }
-    return Value(sqrt(arguments[0].as.number));
+    return Value(sqrt(std::get<double>(arguments[0].as)));
 }
 
 Value math_abs(std::vector<Value> arguments) {
@@ -73,7 +73,7 @@ Value math_abs(std::vector<Value> arguments) {
     if (arguments[0].type != ValueType::NUMBER) {
         throw std::runtime_error("Argument for abs() must be a number.");
     }
-    return Value(static_cast<double>(abs(arguments[0].as.number)));
+    return Value(static_cast<double>(abs(static_cast<int>(std::get<double>(arguments[0].as)))));
 }
 
 void register_math_functions(std::shared_ptr<Environment> env) {

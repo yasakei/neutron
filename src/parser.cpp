@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <memory>
+#include "compiler.h"
 
 namespace neutron {
 
@@ -64,7 +65,9 @@ std::unique_ptr<Stmt> Parser::statement() {
 }
 
 std::unique_ptr<Stmt> Parser::sayStatement() {
+    consume(TokenType::LEFT_PAREN, "Expect '(' after 'say'.");
     std::unique_ptr<Expr> value = expression();
+    consume(TokenType::RIGHT_PAREN, "Expect ')' after value.");
     consume(TokenType::SEMICOLON, "Expect ';' after value.");
     return std::make_unique<SayStmt>(std::move(value));
 }
@@ -509,6 +512,91 @@ std::unique_ptr<Stmt> Parser::returnStatement() {
     }
     consume(TokenType::SEMICOLON, "Expect ';' after return value.");
     return std::make_unique<ReturnStmt>(std::move(value));
+}
+
+void LiteralExpr::accept(Compiler* compiler) const {
+    compiler->visitLiteralExpr(this);
+}
+
+void VariableExpr::accept(Compiler* compiler) const {
+    compiler->visitVariableExpr(this);
+}
+
+void BinaryExpr::accept(Compiler* compiler) const {
+    compiler->visitBinaryExpr(this);
+}
+
+void UnaryExpr::accept(Compiler* compiler) const {
+    compiler->visitUnaryExpr(this);
+}
+
+void GroupingExpr::accept(Compiler* compiler) const {
+    compiler->visitGroupingExpr(this);
+}
+
+void MemberExpr::accept(Compiler* compiler) const {
+    compiler->visitMemberExpr(this);
+}
+
+void CallExpr::accept(Compiler* compiler) const {
+    compiler->visitCallExpr(this);
+}
+
+void AssignExpr::accept(Compiler* compiler) const {
+    compiler->visitAssignExpr(this);
+}
+
+void ObjectExpr::accept(Compiler* compiler) const {
+    compiler->visitObjectExpr(this);
+}
+
+void ExpressionStmt::accept(Compiler* compiler) const {
+    compiler->visitExpressionStmt(this);
+}
+
+void SayStmt::accept(Compiler* compiler) const {
+    compiler->visitSayStmt(this);
+}
+
+void VarStmt::accept(Compiler* compiler) const {
+    compiler->visitVarStmt(this);
+}
+
+void AssignStmt::accept(Compiler* compiler) const {
+    // Note: There is no visitAssignStmt in the compiler,
+    // because assignment is handled as an expression.
+    // This is a bit of a hack, but it works for now.
+    // A better solution would be to have a separate
+    // AssignStmt and AssignExpr.
+}
+
+
+void BlockStmt::accept(Compiler* compiler) const {
+    compiler->visitBlockStmt(this);
+}
+
+void IfStmt::accept(Compiler* compiler) const {
+    compiler->visitIfStmt(this);
+}
+
+void WhileStmt::accept(Compiler* compiler) const {
+    compiler->visitWhileStmt(this);
+}
+
+void UseStmt::accept(Compiler* compiler) const {
+    compiler->visitUseStmt(this);
+}
+
+void FunctionStmt::accept(Compiler* compiler) const {
+    compiler->visitFunctionStmt(this);
+}
+
+void ReturnStmt::accept(Compiler* compiler) const {
+    compiler->visitReturnStmt(this);
+}
+
+void ClassStmt::accept(Compiler* compiler) const {
+    // TODO: Implement class compilation
 }
 
 } // namespace neutron

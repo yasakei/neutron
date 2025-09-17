@@ -23,8 +23,8 @@ Value sys_cp(std::vector<Value> arguments) {
         throw std::runtime_error("Arguments for sys.cp() must be strings.");
     }
     
-    std::string source = *arguments[0].as.string;
-    std::string destination = *arguments[1].as.string;
+    std::string source = std::get<std::string>(arguments[0].as);
+    std::string destination = std::get<std::string>(arguments[1].as);
     
     try {
         fs::copy_file(source, destination, fs::copy_options::overwrite_existing);
@@ -44,8 +44,8 @@ Value sys_mv(std::vector<Value> arguments) {
         throw std::runtime_error("Arguments for sys.mv() must be strings.");
     }
     
-    std::string source = *arguments[0].as.string;
-    std::string destination = *arguments[1].as.string;
+    std::string source = std::get<std::string>(arguments[0].as);
+    std::string destination = std::get<std::string>(arguments[1].as);
     
     try {
         fs::rename(source, destination);
@@ -65,7 +65,7 @@ Value sys_rm(std::vector<Value> arguments) {
         throw std::runtime_error("Argument for sys.rm() must be a string.");
     }
     
-    std::string path = *arguments[0].as.string;
+    std::string path = std::get<std::string>(arguments[0].as);
     
     try {
         bool result = fs::remove(path);
@@ -85,7 +85,7 @@ Value sys_mkdir(std::vector<Value> arguments) {
         throw std::runtime_error("Argument for sys.mkdir() must be a string.");
     }
     
-    std::string path = *arguments[0].as.string;
+    std::string path = std::get<std::string>(arguments[0].as);
     
     try {
         bool result = fs::create_directory(path);
@@ -105,7 +105,7 @@ Value sys_rmdir(std::vector<Value> arguments) {
         throw std::runtime_error("Argument for sys.rmdir() must be a string.");
     }
     
-    std::string path = *arguments[0].as.string;
+    std::string path = std::get<std::string>(arguments[0].as);
     
     try {
         bool result = fs::remove(path);
@@ -125,7 +125,7 @@ Value sys_exists(std::vector<Value> arguments) {
         throw std::runtime_error("Argument for sys.exists() must be a string.");
     }
     
-    std::string path = *arguments[0].as.string;
+    std::string path = std::get<std::string>(arguments[0].as);
     
     try {
         bool result = fs::exists(path);
@@ -145,7 +145,7 @@ Value sys_read(std::vector<Value> arguments) {
         throw std::runtime_error("Argument for sys.read() must be a string.");
     }
     
-    std::string path = *arguments[0].as.string;
+    std::string path = std::get<std::string>(arguments[0].as);
     
     try {
         std::ifstream file(path);
@@ -153,7 +153,7 @@ Value sys_read(std::vector<Value> arguments) {
             throw std::runtime_error("Failed to open file for reading.");
         }
         
-        std::ostringstream buffer;
+        std::stringstream buffer;
         buffer << file.rdbuf();
         return Value(buffer.str());
     } catch (const std::exception& ex) {
@@ -171,8 +171,8 @@ Value sys_write(std::vector<Value> arguments) {
         throw std::runtime_error("Arguments for sys.write() must be strings.");
     }
     
-    std::string path = *arguments[0].as.string;
-    std::string content = *arguments[1].as.string;
+    std::string path = std::get<std::string>(arguments[0].as);
+    std::string content = std::get<std::string>(arguments[1].as);
     
     try {
         std::ofstream file(path);
@@ -197,8 +197,8 @@ Value sys_append(std::vector<Value> arguments) {
         throw std::runtime_error("Arguments for sys.append() must be strings.");
     }
     
-    std::string path = *arguments[0].as.string;
-    std::string content = *arguments[1].as.string;
+    std::string path = std::get<std::string>(arguments[0].as);
+    std::string content = std::get<std::string>(arguments[1].as);
     
     try {
         std::ofstream file(path, std::ios::app);
@@ -239,7 +239,7 @@ Value sys_chdir(std::vector<Value> arguments) {
         throw std::runtime_error("Argument for sys.chdir() must be a string.");
     }
     
-    std::string path = *arguments[0].as.string;
+    std::string path = std::get<std::string>(arguments[0].as);
     
     try {
         fs::current_path(path);
@@ -259,14 +259,13 @@ Value sys_env(std::vector<Value> arguments) {
         throw std::runtime_error("Argument for sys.env() must be a string.");
     }
     
-    std::string name = *arguments[0].as.string;
+    std::string name = std::get<std::string>(arguments[0].as);
     
     const char* value = std::getenv(name.c_str());
     if (value) {
         return Value(std::string(value));
-    } else {
-        return Value(nullptr);
     }
+    return Value(nullptr);
 }
 
 // Get command line arguments (stub implementation)
@@ -289,7 +288,7 @@ Value sys_input(std::vector<Value> arguments) {
         if (arguments[0].type != ValueType::STRING) {
             throw std::runtime_error("Argument for sys.input() must be a string.");
         }
-        prompt = *arguments[0].as.string;
+        prompt = std::get<std::string>(arguments[0].as);
     } else if (arguments.size() != 0) {
         throw std::runtime_error("Expected 0 or 1 arguments for sys.input().");
     }
@@ -300,10 +299,7 @@ Value sys_input(std::vector<Value> arguments) {
     
     // Read the input
     std::string input;
-    if (!std::getline(std::cin, input)) {
-        // Return empty string instead of throwing error
-        return Value("");
-    }
+    std::getline(std::cin, input);
     
     return Value(input);
 }
@@ -336,12 +332,13 @@ Value sys_exit(std::vector<Value> arguments) {
         if (arguments[0].type != ValueType::NUMBER) {
             throw std::runtime_error("Argument for sys.exit() must be a number.");
         }
-        code = static_cast<int>(arguments[0].as.number);
+        code = static_cast<int>(std::get<double>(arguments[0].as));
     } else if (arguments.size() != 0) {
         throw std::runtime_error("Expected 0 or 1 arguments for sys.exit().");
     }
     
-    std::exit(code);
+    exit(code);
+    return Value(); // This will never be reached
 }
 
 // Execute a command
@@ -354,7 +351,7 @@ Value sys_exec(std::vector<Value> arguments) {
         throw std::runtime_error("Argument for sys.exec() must be a string.");
     }
     
-    std::string command = *arguments[0].as.string;
+    std::string command = std::get<std::string>(arguments[0].as);
     
     // Use popen to execute the command
     FILE* pipe = popen(command.c_str(), "r");
@@ -362,53 +359,52 @@ Value sys_exec(std::vector<Value> arguments) {
         throw std::runtime_error("Failed to execute command.");
     }
     
-    std::ostringstream result;
     char buffer[128];
-    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-        result << buffer;
+    std::string result = "";
+    while (fgets(buffer, sizeof buffer, pipe) != nullptr) {
+        result += buffer;
     }
     
     int status = pclose(pipe);
-    int exit_code = WEXITSTATUS(status);
+    if (status == -1) {
+        throw std::runtime_error("Failed to close pipe.");
+    }
     
-    // Return an object with the result and exit code
-    auto obj = new JsonObject();
-    obj->properties["output"] = Value(result.str());
-    obj->properties["exit_code"] = Value(static_cast<double>(exit_code));
+    // Remove trailing newline if present\n    if (!result.empty() && result.back() == '\n') {\n        result.pop_back();\n    }
     
-    return Value(obj);
+    return Value(result);
 }
 
 // Register sys functions in the environment
-void register_sys_functions(std::shared_ptr<Environment> env) {
+void register_sys_functions(std::shared_ptr<neutron::Environment> env) {
     // Create a sys module
-    auto sysEnv = std::make_shared<Environment>();
+    auto sysEnv = std::make_shared<neutron::Environment>();
     
     // File operations
-    sysEnv->define("cp", Value(new NativeFn(sys_cp, 2)));
-    sysEnv->define("mv", Value(new NativeFn(sys_mv, 2)));
-    sysEnv->define("rm", Value(new NativeFn(sys_rm, 1)));
-    sysEnv->define("mkdir", Value(new NativeFn(sys_mkdir, 1)));
-    sysEnv->define("rmdir", Value(new NativeFn(sys_rmdir, 1)));
-    sysEnv->define("exists", Value(new NativeFn(sys_exists, 1)));
-    sysEnv->define("read", Value(new NativeFn(sys_read, 1)));
-    sysEnv->define("write", Value(new NativeFn(sys_write, 2)));
-    sysEnv->define("append", Value(new NativeFn(sys_append, 2)));
+    sysEnv->define("cp", neutron::Value(new neutron::NativeFn(sys_cp, 2)));
+    sysEnv->define("mv", neutron::Value(new neutron::NativeFn(sys_mv, 2)));
+    sysEnv->define("rm", neutron::Value(new neutron::NativeFn(sys_rm, 1)));
+    sysEnv->define("mkdir", neutron::Value(new neutron::NativeFn(sys_mkdir, 1)));
+    sysEnv->define("rmdir", neutron::Value(new neutron::NativeFn(sys_rmdir, 1)));
+    sysEnv->define("exists", neutron::Value(new neutron::NativeFn(sys_exists, 1)));
+    sysEnv->define("read", neutron::Value(new neutron::NativeFn(sys_read, 1)));
+    sysEnv->define("write", neutron::Value(new neutron::NativeFn(sys_write, 2)));
+    sysEnv->define("append", neutron::Value(new neutron::NativeFn(sys_append, 2)));
     
     // System info
-    sysEnv->define("cwd", Value(new NativeFn(sys_cwd, 0)));
-    sysEnv->define("chdir", Value(new NativeFn(sys_chdir, 1)));
-    sysEnv->define("env", Value(new NativeFn(sys_env, 1)));
-    sysEnv->define("args", Value(new NativeFn(sys_args, 0)));
-    sysEnv->define("info", Value(new NativeFn(sys_info, 0)));
-    sysEnv->define("input", Value(new NativeFn(sys_input, -1))); // 0 or 1 arguments
+    sysEnv->define("cwd", neutron::Value(new neutron::NativeFn(sys_cwd, 0)));
+    sysEnv->define("chdir", neutron::Value(new neutron::NativeFn(sys_chdir, 1)));
+    sysEnv->define("env", neutron::Value(new neutron::NativeFn(sys_env, 1)));
+    sysEnv->define("args", neutron::Value(new neutron::NativeFn(sys_args, 0)));
+    sysEnv->define("info", neutron::Value(new neutron::NativeFn(sys_info, 0)));
+    sysEnv->define("input", neutron::Value(new neutron::NativeFn(sys_input, -1))); // 0 or 1 arguments
     
     // Process control
-    sysEnv->define("exit", Value(new NativeFn(sys_exit, -1))); // 0 or 1 arguments
-    sysEnv->define("exec", Value(new NativeFn(sys_exec, 1)));
+    sysEnv->define("exit", neutron::Value(new neutron::NativeFn(sys_exit, -1))); // 0 or 1 arguments
+    sysEnv->define("exec", neutron::Value(new neutron::NativeFn(sys_exec, 1)));
     
-    auto sysModule = new Module("sys", sysEnv, std::vector<std::unique_ptr<Stmt>>());
-    env->define("sys", Value(sysModule));
+    auto sysModule = new neutron::Module("sys", sysEnv, std::vector<std::unique_ptr<neutron::Stmt>>());
+    env->define("sys", neutron::Value(sysModule));
 }
 
 } // namespace neutron

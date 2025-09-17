@@ -30,7 +30,7 @@ Value time_format(std::vector<Value> arguments) {
     }
     
     // Get the timestamp
-    double timestamp = arguments[0].as.number;
+    double timestamp = std::get<double>(arguments[0].as);
     
     // Default format or custom format
     std::string format = "%Y-%m-%d %H:%M:%S";
@@ -38,7 +38,7 @@ Value time_format(std::vector<Value> arguments) {
         if (arguments[1].type != ValueType::STRING) {
             throw std::runtime_error("Second argument for time.format() must be a string (format).");
         }
-        format = *arguments[1].as.string;
+        format = std::get<std::string>(arguments[1].as);
     }
     
     // Convert timestamp to time_t
@@ -61,7 +61,7 @@ Value time_sleep(std::vector<Value> arguments) {
         throw std::runtime_error("Argument for time.sleep() must be a number (milliseconds).");
     }
     
-    int milliseconds = static_cast<int>(arguments[0].as.number);
+    int milliseconds = static_cast<int>(std::get<double>(arguments[0].as));
     std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
     
     return Value(nullptr);

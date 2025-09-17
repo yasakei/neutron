@@ -30,7 +30,7 @@ Value http_get(std::vector<Value> arguments) {
         throw std::runtime_error("First argument for http.get() must be a string URL.");
     }
     
-    std::string url = *arguments[0].as.string;
+    std::string url = std::get<std::string>(arguments[0].as);
     
     // Handle headers if provided
     std::unordered_map<std::string, std::string> headers;
@@ -57,34 +57,30 @@ Value http_post(std::vector<Value> arguments) {
         throw std::runtime_error("First argument for http.post() must be a string URL.");
     }
     
-    std::string url = *arguments[0].as.string;
+    std::string url = std::get<std::string>(arguments[0].as);
     std::string data = "";
     
     // Handle data if provided
     if (arguments.size() >= 2) {
-        if (arguments[1].type == ValueType::STRING) {
-            data = *arguments[1].as.string;
+        if (arguments[1].type != ValueType::STRING) {
+            throw std::runtime_error("Second argument for http.post() must be a string data.");
         }
+        data = std::get<std::string>(arguments[1].as);
     }
     
     // Handle headers if provided
     std::unordered_map<std::string, std::string> headers;
     if (arguments.size() == 3) {
         // In a real implementation, we would process headers here
+        // For now, we'll just acknowledge they were provided
         headers["X-Neutron-Client"] = "1.0";
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
-    } else if (!data.empty()) {
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
     }
     
     // In a real implementation, you would make an HTTP POST request here
     // For now, we'll just return a mock response
-    std::string responseBody = "Mock POST response for " + url;
-    if (!data.empty()) {
-        responseBody += " with data: " + data;
-    }
+    std::string responseBody = "Mock POST response for " + url + " with data: " + data;
     
-    return createResponse(201.0, responseBody, headers);
+    return createResponse(200.0, responseBody, headers);
 }
 
 // HTTP PUT request
@@ -97,32 +93,28 @@ Value http_put(std::vector<Value> arguments) {
         throw std::runtime_error("First argument for http.put() must be a string URL.");
     }
     
-    std::string url = *arguments[0].as.string;
+    std::string url = std::get<std::string>(arguments[0].as);
     std::string data = "";
     
     // Handle data if provided
     if (arguments.size() >= 2) {
-        if (arguments[1].type == ValueType::STRING) {
-            data = *arguments[1].as.string;
+        if (arguments[1].type != ValueType::STRING) {
+            throw std::runtime_error("Second argument for http.put() must be a string data.");
         }
+        data = std::get<std::string>(arguments[1].as);
     }
     
     // Handle headers if provided
     std::unordered_map<std::string, std::string> headers;
     if (arguments.size() == 3) {
         // In a real implementation, we would process headers here
+        // For now, we'll just acknowledge they were provided
         headers["X-Neutron-Client"] = "1.0";
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
-    } else if (!data.empty()) {
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
     }
     
     // In a real implementation, you would make an HTTP PUT request here
     // For now, we'll just return a mock response
-    std::string responseBody = "Mock PUT response for " + url;
-    if (!data.empty()) {
-        responseBody += " with data: " + data;
-    }
+    std::string responseBody = "Mock PUT response for " + url + " with data: " + data;
     
     return createResponse(200.0, responseBody, headers);
 }
@@ -137,12 +129,13 @@ Value http_delete(std::vector<Value> arguments) {
         throw std::runtime_error("First argument for http.delete() must be a string URL.");
     }
     
-    std::string url = *arguments[0].as.string;
+    std::string url = std::get<std::string>(arguments[0].as);
     
     // Handle headers if provided
     std::unordered_map<std::string, std::string> headers;
     if (arguments.size() == 2) {
         // In a real implementation, we would process headers here
+        // For now, we'll just acknowledge they were provided
         headers["X-Neutron-Client"] = "1.0";
     }
     
@@ -163,23 +156,20 @@ Value http_head(std::vector<Value> arguments) {
         throw std::runtime_error("First argument for http.head() must be a string URL.");
     }
     
-    std::string url = *arguments[0].as.string;
+    std::string url = std::get<std::string>(arguments[0].as);
     
     // Handle headers if provided
     std::unordered_map<std::string, std::string> headers;
     if (arguments.size() == 2) {
         // In a real implementation, we would process headers here
+        // For now, we'll just acknowledge they were provided
         headers["X-Neutron-Client"] = "1.0";
     }
     
     // In a real implementation, you would make an HTTP HEAD request here
-    // For now, we'll just return a mock response with headers but no body
+    // For now, we'll just return a mock response
     std::string responseBody = "";
-    
-    // Add some mock headers
-    headers["Content-Type"] = "application/json";
-    headers["Content-Length"] = "1024";
-    headers["Server"] = "Neutron-Mock-Server";
+    headers["Content-Length"] = "0";
     
     return createResponse(200.0, responseBody, headers);
 }
@@ -194,49 +184,39 @@ Value http_patch(std::vector<Value> arguments) {
         throw std::runtime_error("First argument for http.patch() must be a string URL.");
     }
     
-    std::string url = *arguments[0].as.string;
+    std::string url = std::get<std::string>(arguments[0].as);
     std::string data = "";
     
     // Handle data if provided
     if (arguments.size() >= 2) {
-        if (arguments[1].type == ValueType::STRING) {
-            data = *arguments[1].as.string;
+        if (arguments[1].type != ValueType::STRING) {
+            throw std::runtime_error("Second argument for http.patch() must be a string data.");
         }
+        data = std::get<std::string>(arguments[1].as);
     }
     
     // Handle headers if provided
     std::unordered_map<std::string, std::string> headers;
     if (arguments.size() == 3) {
         // In a real implementation, we would process headers here
+        // For now, we'll just acknowledge they were provided
         headers["X-Neutron-Client"] = "1.0";
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
-    } else if (!data.empty()) {
-        headers["Content-Type"] = "application/x-www-form-urlencoded";
     }
     
     // In a real implementation, you would make an HTTP PATCH request here
     // For now, we'll just return a mock response
-    std::string responseBody = "Mock PATCH response for " + url;
-    if (!data.empty()) {
-        responseBody += " with data: " + data;
-    }
+    std::string responseBody = "Mock PATCH response for " + url + " with data: " + data;
     
     return createResponse(200.0, responseBody, headers);
 }
 
-// Register HTTP functions in the environment
 void register_http_functions(std::shared_ptr<Environment> env) {
-    // Create an HTTP module
-    auto httpEnv = std::make_shared<Environment>();
-    httpEnv->define("get", Value(new NativeFn(http_get, -1)));   // 1-2 arguments
-    httpEnv->define("post", Value(new NativeFn(http_post, -1))); // 1-3 arguments
-    httpEnv->define("put", Value(new NativeFn(http_put, -1)));   // 1-3 arguments
-    httpEnv->define("delete", Value(new NativeFn(http_delete, -1))); // 1-2 arguments
-    httpEnv->define("head", Value(new NativeFn(http_head, -1))); // 1-2 arguments
-    httpEnv->define("patch", Value(new NativeFn(http_patch, -1))); // 1-3 arguments
-    
-    auto httpModule = new Module("http", httpEnv, std::vector<std::unique_ptr<Stmt>>());
-    env->define("http", Value(httpModule));
+    env->define("http_get", Value(new NativeFn(http_get, -1))); // 1-2 arguments
+    env->define("http_post", Value(new NativeFn(http_post, -1))); // 1-3 arguments
+    env->define("http_put", Value(new NativeFn(http_put, -1))); // 1-3 arguments
+    env->define("http_delete", Value(new NativeFn(http_delete, -1))); // 1-2 arguments
+    env->define("http_head", Value(new NativeFn(http_head, -1))); // 1-2 arguments
+    env->define("http_patch", Value(new NativeFn(http_patch, -1))); // 1-3 arguments
 }
 
-} // namespace neutron
+}

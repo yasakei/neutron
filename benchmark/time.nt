@@ -1,0 +1,97 @@
+use sys;
+use time;
+
+// Time Module Benchmark
+// Tests the performance of time module functions
+
+say "===========================================";
+say "         TIME MODULE BENCHMARK";
+say "===========================================";
+say "";
+
+// Test time.now() performance
+say "Testing time.now() performance...";
+var startTime = time.now();
+
+var i = 0;
+var timestamp = 0;
+
+// Call time.now() 1000 times
+while (i < 1000) {
+    timestamp = time.now();
+    i = i + 1;
+}
+
+var endTime = time.now();
+var duration = endTime - startTime;
+
+say "Called time.now() 1000 times";
+say "Duration: " + duration + " milliseconds";
+say "Average time per call: " + (duration / 1000) + " milliseconds";
+say "";
+
+// Test time.format() performance
+say "Testing time.format() performance...";
+startTime = time.now();
+
+i = 0;
+var formatted = "";
+
+// Call time.format() 1000 times
+while (i < 1000) {
+    formatted = time.format(timestamp);
+    i = i + 1;
+}
+
+endTime = time.now();
+duration = endTime - startTime;
+
+say "Called time.format() 1000 times";
+say "Duration: " + duration + " milliseconds";
+say "Average time per call: " + (duration / 1000) + " milliseconds";
+say "";
+
+// Test time.format() with custom format performance
+say "Testing time.format() with custom format performance...";
+startTime = time.now();
+
+i = 0;
+formatted = "";
+
+// Call time.format() with custom format 1000 times
+while (i < 1000) {
+    formatted = time.format(timestamp, "%Y-%m-%d %H:%M:%S");
+    i = i + 1;
+}
+
+endTime = time.now();
+duration = endTime - startTime;
+
+say "Called time.format() with custom format 1000 times";
+say "Duration: " + duration + " milliseconds";
+say "Average time per call: " + (duration / 1000) + " milliseconds";
+say "";
+
+// Test time.sleep() performance (with minimal sleep)
+say "Testing time.sleep() performance (1ms sleep)...";
+startTime = time.now();
+
+i = 0;
+
+// Call time.sleep() 100 times with 1ms sleep
+while (i < 100) {
+    time.sleep(1);  // Sleep for 1 millisecond
+    i = i + 1;
+}
+
+endTime = time.now();
+duration = endTime - startTime;
+
+say "Called time.sleep(1) 100 times";
+say "Duration: " + duration + " milliseconds";
+say "Average time per call: " + (duration / 100) + " milliseconds";
+say "";
+
+say "===========================================";
+say "         BENCHMARK COMPLETE";
+say "===========================================";

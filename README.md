@@ -6,10 +6,11 @@ Neutron is a simple, modern, and lightweight interpreted programming language wr
 
 - **Dynamically Typed:** No need to declare the type of a variable.
 - **C-like Syntax:** Familiar syntax for developers who have used C, C++, Java, or JavaScript.
-- **Rich Standard Library:** A growing standard library with modules for math and data conversion.
+- **Rich Standard Library:** A growing standard library with modules for math, data conversion, and web development.
 - **Object-Oriented:** Supports classes, methods, and the `this` keyword.
 - **Built-in Functions:** A set of useful built-in functions for common tasks.
 - **Modular:** Supports modules for organizing code.
+- **REST API Framework:** The Nexus module provides tools for building REST APIs.
 
 ## Getting Started
 
@@ -82,9 +83,43 @@ person.setName("Neutron");
 person.greet();
 ```
 
+## Benchmarks
+
+The project includes a set of benchmark scripts in the `benchmark/` directory to test the performance of various aspects of the language:
+
+- Arithmetic operations
+- String operations
+- Variable assignments
+- Function calls
+- Conditional statements
+- Time module functions
+
+To run all benchmarks:
+
+```sh
+./neutron benchmark/run_all.nt
+```
+
+See [Benchmark Documentation](benchmark/README.md) for more details.
+
 ## Documentation
 
 For a complete reference of the Neutron language, please see the [Language Reference](docs/language_reference.md).
+
+For known issues and limitations, please see the [Known Issues](docs/known_issues.md) documentation.
+
+### Modules
+
+Neutron includes several built-in modules:
+
+- **[Sys Module](docs/sys_module.md)** - File operations and system utilities
+- **[HTTP Module](docs/http_module.md)** - HTTP client functionality
+- **[JSON Module](docs/json_module.md)** - JSON parsing and generation
+- **[Time Module](docs/time_module.md)** - Time and date functions
+- **[Convert Module](docs/convert_module.md)** - Data type conversion utilities
+- **[Nexus Module](docs/nexus_module.md)** - REST API framework for building web services
+
+Examples of module usage can be found in the [examples directory](examples/).
 
 ## Credits
 
