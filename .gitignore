@@ -33,3 +33,6 @@ testing.env
 examples/
 external/
 debug/
+
+#
+benchmark/

@@ -16,32 +16,32 @@ say("");
 
 // Run arithmetic benchmark
 say("1. Running Arithmetic Operations Benchmark...");
-sys.exec("./neutron benchmark/arithmetic.nt");
+sys.exec("../neutron arithmetic.nt");
 say("");
 
 // Run string benchmark
 say("2. Running String Operations Benchmark...");
-sys.exec("./neutron benchmark/string.nt");
+sys.exec("../neutron string.nt");
 say("");
 
 // Run variables benchmark
 say("3. Running Variable Assignments Benchmark...");
-sys.exec("./neutron benchmark/variables.nt");
+sys.exec("../neutron variables.nt");
 say("");
 
 // Run functions benchmark
 say("4. Running Function Calls Benchmark...");
-sys.exec("./neutron benchmark/functions.nt");
+sys.exec("../neutron functions.nt");
 say("");
 
 // Run conditionals benchmark
 say("5. Running Conditional Statements Benchmark...");
-sys.exec("./neutron benchmark/conditionals.nt");
+sys.exec("../neutron conditionals.nt");
 say("");
 
 // Run time benchmark
 say("6. Running Time Module Benchmark...");
-sys.exec("./neutron benchmark/time.nt");
+sys.exec("../neutron time.nt");
 say("");
 
 say("===========================================");
