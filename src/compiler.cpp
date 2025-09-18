@@ -10,7 +10,6 @@ namespace neutron {
 Compiler::Compiler(VM& vm) : vm(vm), chunk(nullptr), scopeDepth(0) {}
 
 Function* Compiler::compile(const std::vector<std::unique_ptr<Stmt>>& statements) {
-    std::cout << "compile" << std::endl;
     Function* function = new Function(nullptr, std::make_shared<Environment>());
     function->chunk = new Chunk();
     this->chunk = function->chunk;
@@ -276,8 +275,7 @@ void Compiler::visitWhileStmt(const WhileStmt* stmt) {
 }
 
 void Compiler::visitUseStmt(const UseStmt* stmt) {
-    // For now, we'll just emit a no-op
-    // A complete implementation would load and register the module
+    vm.load_module(stmt->library.lexeme);
 }
 
 void Compiler::visitFunctionStmt(const FunctionStmt* stmt) {

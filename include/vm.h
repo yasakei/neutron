@@ -8,6 +8,7 @@
 #include <memory>
 #include <cstdint>
 #include <variant>
+#include <functional>
 
 // Forward declarations
 class Environment;
@@ -131,7 +132,7 @@ private:
 
 class NativeFn : public Callable {
 public:
-    using NativeFnPtr = Value (*)(std::vector<Value> arguments);
+    using NativeFnPtr = std::function<Value(std::vector<Value>)>;
 
     NativeFn(NativeFnPtr function, int arity);
     int arity() override;
@@ -155,6 +156,8 @@ public:
     void interpret(Function* function);
     void push(const Value& value);
     Value pop();
+    void define_native(const std::string& name, Callable* function);
+    void load_module(const std::string& name);
 
 private:
     void run();

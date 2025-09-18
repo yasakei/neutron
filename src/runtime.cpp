@@ -115,7 +115,7 @@ std::string Function::toString() {
     return "<script>";
 }
 
-NativeFn::NativeFn(NativeFnPtr function, int arity) : function(function), _arity(arity) {}
+NativeFn::NativeFn(NativeFnPtr function, int arity) : function(std::move(function)), _arity(arity) {}
 
 int NativeFn::arity() {
     return _arity;

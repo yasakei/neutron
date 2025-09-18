@@ -10,6 +10,7 @@
 #include "libs/json/native.h"
 #include "libs/convert/native.h"
 #include "libs/time/native.h"
+#include "module_registry.h"
 
 namespace neutron {
 
@@ -24,7 +25,7 @@ void runtimeError(const std::string& message) {
 }
 
 VM::VM() : chunk(nullptr), ip(nullptr) {
-    globals["say"] = Value(new NativeFn(native_say, 1));
+    globals["say"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_say), 1));
     
     // Create a shared environment for global functions
     auto globalEnv = std::make_shared<Environment>();
@@ -34,6 +35,7 @@ VM::VM() : chunk(nullptr), ip(nullptr) {
     register_json_functions(globalEnv);
     register_convert_functions(globalEnv);
     register_time_functions(globalEnv);
+    run_external_module_initializers(this);
     
     // Copy registered functions to globals
     for (const auto& pair : globalEnv->values) {
@@ -42,7 +44,6 @@ VM::VM() : chunk(nullptr), ip(nullptr) {
 }
 
 void VM::interpret(Function* function) {
-    std::cout << "interpret" << std::endl;
     this->chunk = function->chunk;
     this->ip = &this->chunk->code[0];
     run();
@@ -304,3 +305,39 @@ void VM::run() {
 }
 
 } // namespace neutron
+
+void neutron::VM::define_native(const std::string& name, Callable* function) {
+    globals[name] = Value(function);
+}
+
+#include <dlfcn.h>
+#include <fstream>
+
+void neutron::VM::load_module(const std::string& name) {
+    std::string nt_path = "box/" + name + ".nt";
+    std::string so_path = "box/" + name + "/" + name + ".so";
+
+    std::ifstream nt_file(nt_path);
+    if (nt_file.is_open()) {
+        // It's a Neutron module, we need to execute it.
+        // This part needs to be implemented, for now we'll just print a message.
+        std::cout << "Loading Neutron module: " << nt_path << std::endl;
+        nt_file.close();
+        return;
+    }
+
+    void* handle = dlopen(so_path.c_str(), RTLD_LAZY);
+    if (handle) {
+        void (*init_func)(VM*) = (void (*)(VM*))dlsym(handle, "neutron_module_init");
+        if (init_func) {
+            init_func(this);
+        } else {
+            dlclose(handle);
+            // Handle error: init function not found
+        }
+    } else {
+        // Handle error: module not found
+    }
+}
+
+

@@ -1,13 +1,13 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <cstdlib>
 #include "scanner.h"
 #include "parser.h"
 #include "vm.h"
 #include "compiler.h"
 
 void run(const std::string& source, neutron::VM& vm) {
-    std::cout << "run" << std::endl;
     neutron::Scanner scanner(source);
     std::vector<neutron::Token> tokens = scanner.scanTokens();
     
@@ -20,7 +20,7 @@ void run(const std::string& source, neutron::VM& vm) {
     vm.interpret(function);
 }
 
-void runFile(const std::string& path) {
+void runFile(const std::string& path, neutron::VM& vm) {
     std::ifstream file(path);
     if (!file.is_open()) {
         std::cerr << "Could not open file: " << path << std::endl;
@@ -36,15 +36,13 @@ void runFile(const std::string& path) {
     
     file.close();
     
-    neutron::VM vm;
     run(source, vm);
 }
 
-void runPrompt() {
+void runPrompt(neutron::VM& vm) {
     std::string line;
     std::cout << "Neutron REPL (Press Ctrl+C to exit)" << std::endl;
     
-    neutron::VM vm;
     while (true) {
         std::cout << "> ";
         if (!std::getline(std::cin, line)) {
@@ -55,14 +53,28 @@ void runPrompt() {
 }
 
 int main(int argc, char* argv[]) {
-    std::cout << "main" << std::endl;
+    if (argc > 1) {
+        std::string arg = argv[1];
+        if (arg == "--version") {
+            std::cout << "Neutron 0.1(Alpha)" << std::endl;
+            return 0;
+        } else if (arg == "--build-box" && argc > 2) {
+            std::string module_name = argv[2];
+            std::string command = "make box/" + module_name + "/" + module_name + ".so";
+            std::cout << "Building module: " << module_name << std::endl;
+            int result = system(command.c_str());
+            return result;
+        }
+    }
+
+    neutron::VM vm;
     if (argc > 2) {
         std::cout << "Usage: neutron [script]" << std::endl;
         exit(1);
     } else if (argc == 2) {
-        runFile(argv[1]);
+        runFile(argv[1], vm);
     } else {
-        runPrompt();
+        runPrompt(vm);
     }
     
     return 0;

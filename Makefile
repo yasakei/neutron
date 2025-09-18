@@ -23,7 +23,7 @@ endif
 
 .PHONY: all clean directories release
 
-all: directories $(TARGET)
+all: directories shared_libs $(TARGET)
 
 release:
 	$(MAKE) all DEBUG=0
@@ -40,7 +40,7 @@ directories:
 	@mkdir -p $(BUILDDIR)/box
 
 $(TARGET): $(OBJS) $(LIBOBJS) $(BOXOBJS)
-	$(CXX) $(CXXFLAGS) $(OBJS) $(LIBOBJS) $(BOXOBJS) -lcurl -o $(TARGET)
+	$(CXX) $(CXXFLAGS) -rdynamic $(OBJS) $(LIBOBJS) $(BOXOBJS) -lcurl -o $(TARGET)
 	@echo "Compilation complete. Binary located at ./$(TARGET)"
 
 build/%.o: src/%.cpp
@@ -55,10 +55,20 @@ build/box/%.o: $(BOXDIR)/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) $(DEPENDENCIES) -c $< -o $@
 
+.PHONY: shared_libs
+shared_libs:
+	@for dir in $(wildcard $(BOXDIR)/*); do \
+		if [ -f "$$dir/native.cpp" ]; then \
+			module_name=$$(basename $$dir); \
+			$(CXX) $(CXXFLAGS) -shared -fPIC $(DEPENDENCIES) $$dir/native.cpp -o $$dir/$$module_name.so; \
+			echo "Created shared library: $$dir/$$module_name.so"; \
+		fi \
+	done
+
 clean:
 	rm -rf $(BUILDDIR) $(TARGET)
 
-install: $(TARGET)
+install:
 	cp $(TARGET) /usr/local/bin/
 
 uninstall:
