@@ -58,10 +58,14 @@ build/box/%.o: $(BOXDIR)/%.cpp
 .PHONY: shared_libs
 shared_libs:
 	@for dir in $(wildcard $(BOXDIR)/*); do \
-		if [ -f "$$dir/native.cpp" ]; then \
-			module_name=$$(basename $$dir); \
-			$(CXX) $(CXXFLAGS) -shared -fPIC $(DEPENDENCIES) $$dir/native.cpp -o $$dir/$$module_name.so; \
-			echo "Created shared library: $$dir/$$module_name.so"; \
+		if [ -f "$dir/native.cpp" ]; then \
+			module_name=$(basename $dir); \
+			$(CXX) $(CXXFLAGS) -shared -fPIC $(DEPENDENCIES) $dir/native.cpp -o $dir/$module_name.so; \
+			echo "Created shared library: $dir/$module_name.so"; \
+		elif [ -f "$dir/native.c" ]; then \
+			module_name=$(basename $dir); \
+			$(CXX) $(CXXFLAGS) -shared -fPIC $(DEPENDENCIES) $dir/native.c -o $dir/$module_name.so; \
+			echo "Created shared library: $dir/$module_name.so"; \
 		fi \
 	done
 

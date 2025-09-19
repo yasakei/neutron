@@ -132,6 +132,9 @@ std::string NativeFn::toString() {
 Module::Module(std::string name, std::shared_ptr<Environment> environment, std::vector<std::unique_ptr<Stmt>> statements)
     : name(name), environment(environment), statements(std::move(statements)) {}
 
+Module::Module(std::string name, std::shared_ptr<Environment> environment)
+    : name(name), environment(environment) {}
+
 Value Module::get(const std::string& name) {
     return environment->get(name);
 }

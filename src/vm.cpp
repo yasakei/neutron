@@ -2,6 +2,8 @@
 #include "compiler.h"
 #include "bytecode.h"
 #include "debug.h"
+#include "scanner.h"
+#include "parser.h"
 #include <iostream>
 #include <stdexcept>
 
@@ -10,6 +12,7 @@
 #include "libs/json/native.h"
 #include "libs/convert/native.h"
 #include "libs/time/native.h"
+#include "libs/math/native.h"
 #include "module_registry.h"
 
 namespace neutron {
@@ -35,6 +38,13 @@ VM::VM() : chunk(nullptr), ip(nullptr) {
     register_json_functions(globalEnv);
     register_convert_functions(globalEnv);
     register_time_functions(globalEnv);
+    
+    // Create math module environment and register math functions
+    auto mathEnv = std::make_shared<Environment>();
+    register_math_functions(mathEnv);
+    auto mathModule = new Module("math", mathEnv);
+    globals["math"] = Value(mathModule);
+    
     run_external_module_initializers(this);
     
     // Copy registered functions to globals
@@ -310,6 +320,10 @@ void neutron::VM::define_native(const std::string& name, Callable* function) {
     globals[name] = Value(function);
 }
 
+void neutron::VM::define_module(const std::string& name, Module* module) {
+    globals[name] = Value(module);
+}
+
 #include <dlfcn.h>
 #include <fstream>
 
@@ -320,9 +334,24 @@ void neutron::VM::load_module(const std::string& name) {
     std::ifstream nt_file(nt_path);
     if (nt_file.is_open()) {
         // It's a Neutron module, we need to execute it.
-        // This part needs to be implemented, for now we'll just print a message.
-        std::cout << "Loading Neutron module: " << nt_path << std::endl;
+        std::string source((std::istreambuf_iterator<char>(nt_file)),
+                            std::istreambuf_iterator<char>());
         nt_file.close();
+        
+        // Parse and execute the module
+        Scanner scanner(source);
+        std::vector<Token> tokens = scanner.scanTokens();
+        Parser parser(tokens);
+        std::vector<std::unique_ptr<Stmt>> statements = parser.parse();
+        
+        // Compile and run the module
+        Compiler compiler(*this);
+        Function* module_function = compiler.compile(statements);
+        if (module_function) {
+            // Execute the module to populate its functions/variables in the global scope
+            interpret(module_function);
+            delete module_function;  // Clean up the allocated function
+        }
         return;
     }
 

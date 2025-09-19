@@ -106,6 +106,7 @@ public:
     std::vector<std::unique_ptr<Stmt>> statements;
 
     Module(std::string name, std::shared_ptr<Environment> environment, std::vector<std::unique_ptr<Stmt>> statements);
+    Module(std::string name, std::shared_ptr<Environment> environment);  // New constructor
     Value get(const std::string& name);
 };
 
@@ -157,6 +158,7 @@ public:
     void push(const Value& value);
     Value pop();
     void define_native(const std::string& name, Callable* function);
+    void define_module(const std::string& name, Module* module);  // New method
     void load_module(const std::string& name);
 
 private:
