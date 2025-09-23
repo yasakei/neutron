@@ -6,6 +6,8 @@
 #include "parser.h"
 #include <iostream>
 #include <stdexcept>
+#include <fstream>
+#include <dlfcn.h>
 
 // Include module registration functions
 #include "libs/sys/native.h"
@@ -324,13 +326,122 @@ void neutron::VM::define_module(const std::string& name, Module* module) {
     globals[name] = Value(module);
 }
 
-#include <dlfcn.h>
-#include <fstream>
+neutron::Value neutron::VM::call(const neutron::Value& callee, const std::vector<neutron::Value>& arguments) {
+    if (callee.type != ValueType::FUNCTION) {
+        throw std::runtime_error("Can only call functions.");
+    }
+    
+    Callable* function = std::get<Callable*>(callee.as);
+    if (function->arity() != -1 && function->arity() != (int)arguments.size()) {
+        throw std::runtime_error("Expected " + std::to_string(function->arity()) + " arguments but got " + std::to_string(arguments.size()) + ".");
+    }
+    
+    // Save current stack state
+    size_t stack_size = stack.size();
+    
+    // Push arguments onto the stack
+    for (const auto& arg : arguments) {
+        push(arg);
+    }
+    
+    // Call the function
+    Value result = function->call(*this, arguments);
+    
+    // Restore stack state (in case the function didn't clean up properly)
+    while (stack.size() > stack_size) {
+        pop();
+    }
+    
+    return result;
+}
+
+neutron::Value neutron::VM::execute_string(const std::string& source) {
+    // Parse and execute the Neutron code string
+    Scanner scanner(source);
+    std::vector<Token> tokens = scanner.scanTokens();
+    
+    Parser parser(tokens);
+    std::vector<std::unique_ptr<Stmt>> statements = parser.parse();
+    
+    // Compile and run the code
+    Compiler compiler(*this);
+    Function* function = compiler.compile(statements);
+    
+    if (function) {
+        // Save current state
+        size_t stack_size = stack.size();
+        
+        // Execute the function
+        interpret(function);
+        
+        // Get the return value (if any)
+        Value result;
+        if (stack.size() > stack_size) {
+            result = pop();
+        }
+        
+        // Clean up
+        delete function;
+        
+        return result;
+    }
+    
+    return Value(); // Return nil if compilation failed
+}
 
 void neutron::VM::load_module(const std::string& name) {
     std::string nt_path = "box/" + name + ".nt";
     std::string so_path = "box/" + name + "/" + name + ".so";
+    std::string module_nt_path = "box/" + name + "/" + name + ".nt";
 
+    // First, check for a module-specific .nt file
+    std::ifstream module_nt_file(module_nt_path);
+    if (module_nt_file.is_open()) {
+        // It's a Neutron module, we need to execute it.
+        std::string source((std::istreambuf_iterator<char>(module_nt_file)),
+                            std::istreambuf_iterator<char>());
+        module_nt_file.close();
+        
+        // Parse the module
+        Scanner scanner(source);
+        std::vector<Token> tokens = scanner.scanTokens();
+        Parser parser(tokens);
+        std::vector<std::unique_ptr<Stmt>> statements = parser.parse();
+        
+        // Create a module environment
+        auto module_env = std::make_shared<Environment>();
+        
+        // Save current globals
+        auto saved_globals = globals;
+        
+        // Create a temporary VM with the module environment as globals
+        // This is a hack to make the compiler use the module environment
+        globals.clear();
+        
+        // Create a temporary compiler and execute the module code
+        Compiler compiler(*this);
+        Function* module_function = compiler.compile(statements);
+        if (module_function) {
+            // Execute the module to populate its functions/variables in the module environment
+            interpret(module_function);
+            delete module_function;  // Clean up the allocated function
+        }
+        
+        // Copy the defined values from globals to the module environment
+        for (const auto& pair : globals) {
+            module_env->define(pair.first, pair.second);
+        }
+        
+        // Restore globals
+        globals = saved_globals;
+        
+        // Create the module with the populated environment
+        auto module = new Module(name, module_env);
+        define_module(name, module);
+        return;
+    }
+
+    // Check for a standalone .nt file
     std::ifstream nt_file(nt_path);
     if (nt_file.is_open()) {
         // It's a Neutron module, we need to execute it.
@@ -338,20 +449,42 @@ void neutron::VM::load_module(const std::string& name) {
                             std::istreambuf_iterator<char>());
         nt_file.close();
         
-        // Parse and execute the module
+        // Parse the module
         Scanner scanner(source);
         std::vector<Token> tokens = scanner.scanTokens();
         Parser parser(tokens);
         std::vector<std::unique_ptr<Stmt>> statements = parser.parse();
         
-        // Compile and run the module
+        // Create a module environment
+        auto module_env = std::make_shared<Environment>();
+        
+        // Save current globals
+        auto saved_globals = globals;
+        
+        // Create a temporary VM with the module environment as globals
+        // This is a hack to make the compiler use the module environment
+        globals.clear();
+        
+        // Create a temporary compiler and execute the module code
         Compiler compiler(*this);
         Function* module_function = compiler.compile(statements);
         if (module_function) {
-            // Execute the module to populate its functions/variables in the global scope
+            // Execute the module to populate its functions/variables in the module environment
             interpret(module_function);
             delete module_function;  // Clean up the allocated function
         }
+        
+        // Copy the defined values from globals to the module environment
+        for (const auto& pair : globals) {
+            module_env->define(pair.first, pair.second);
+        }
+        
+        // Restore globals
+        globals = saved_globals;
+        
+        // Create the module with the populated environment
+        auto module = new Module(name, module_env);
+        define_module(name, module);
         return;
     }
 

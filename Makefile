@@ -10,7 +10,7 @@ BOXSRCS = $(shell find $(BOXDIR) -type f -name "*.cpp")
 OBJS = $(SRCS:src/%.cpp=build/%.o)
 LIBOBJS = $(LIBSRCS:libs/%.cpp=build/%.o)
 BOXOBJS = $(BOXSRCS:$(BOXDIR)/%.cpp=build/box/%.o)
-DEPENDENCIES = -I$(INCDIR) -I. -Ilibs/json -Ilibs/http -Ilibs/time -Ilibs/sys -I$(BOXDIR)
+DEPENDENCIES = -I$(INCDIR) -I. -Ilibs/json -Ilibs/http -Ilibs/time -Ilibs/sys -I$(BOXDIR) -Ilibs/websocket
 
 # Default to release build
 DEBUG ?= 0
@@ -39,8 +39,8 @@ directories:
 	@mkdir -p $(BUILDDIR)/sys
 	@mkdir -p $(BUILDDIR)/box
 
-$(TARGET): $(OBJS) $(LIBOBJS) $(BOXOBJS)
-	$(CXX) $(CXXFLAGS) -rdynamic $(OBJS) $(LIBOBJS) $(BOXOBJS) -lcurl -o $(TARGET)
+$(TARGET): $(OBJS) $(LIBOBJS)
+	$(CXX) $(CXXFLAGS) -rdynamic $(OBJS) $(LIBOBJS) -lcurl -ljsoncpp -o $(TARGET)
 	@echo "Compilation complete. Binary located at ./$(TARGET)"
 
 build/%.o: src/%.cpp
@@ -60,14 +60,16 @@ shared_libs:
 	@for dir in $(wildcard $(BOXDIR)/*); do \
 		if [ -f "$dir/native.cpp" ]; then \
 			module_name=$(basename $dir); \
-			$(CXX) $(CXXFLAGS) -shared -fPIC $(DEPENDENCIES) $dir/native.cpp -o $dir/$module_name.so; \
+			echo "dir: $dir, module_name: $module_name"; \
+			$(CXX) $(CXXFLAGS) -shared -fPIC $(DEPENDENCIES) $dir/native.cpp $dir/*.cpp -lcurl -ljsoncpp -o $dir/$module_name.so; \
 			echo "Created shared library: $dir/$module_name.so"; \
 		elif [ -f "$dir/native.c" ]; then \
 			module_name=$(basename $dir); \
-			$(CXX) $(CXXFLAGS) -shared -fPIC $(DEPENDENCIES) $dir/native.c -o $dir/$module_name.so; \
+			$(CXX) $(CXXFLAGS) -shared -fPIC $(DEPENDENCIES) $dir/native.c -lcurl -ljsoncpp -o $dir/$module_name.so; \
 			echo "Created shared library: $dir/$module_name.so"; \
 		fi \
 	done
+
 
 clean:
 	rm -rf $(BUILDDIR) $(TARGET)

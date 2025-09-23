@@ -158,11 +158,14 @@ public:
     void push(const Value& value);
     Value pop();
     void define_native(const std::string& name, Callable* function);
-    void define_module(const std::string& name, Module* module);  // New method
+    void define_module(const std::string& name, Module* module);
     void load_module(const std::string& name);
+    Value call(const Value& callee, const std::vector<Value>& arguments);
+    Value execute_string(const std::string& source);
 
 private:
     void run();
+    void interpret_module(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> module_env);
 
     Chunk* chunk;
     uint8_t* ip;

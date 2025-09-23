@@ -1,38 +1,86 @@
 # Build directories
 build/
 bin/
+obj/
+out/
 
-# Compiled binaries
+# Compiled binaries and libraries
 neutronc
 neutron
+*.exe
+*.dll
+*.so
+*.dylib
+*.lib
+*.a
+*.o
+*.obj
 
 # IDE files
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Temporary files
 *.tmp
 *.log
-*.o
-*.a
-*.so
-*.dll
-*.swp
+*.bak
 *~
+*.swp
 
 # Environment files
 .env
+.env.local
+.env.*.local
 testing.env
 
+# Debug files
+debug/
+gdb_history
+*.dSYM/
 
 # Examples
 examples/
-external/
-debug/
 
-#
+# External dependencies
+external/
+libs/
+
+# Benchmark
 benchmark/
+
+# Valgrind
+*.vgcore
+*.memcheck
+
+# CMake
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+Makefile.cmake
+cmake_install.cmake
+
+# Clang
+compile_commands.json
+
+# Tags
+tags
+TAGS
+cscope.*
+
+# Package files
+*.zip
+*.tar.gz
+*.rar
+
+# Coverage
+*.gcda
+*.gcno
+*.gcov
+coverage/
