@@ -123,9 +123,9 @@ var w = 10 / 2;  // 5
 - `>=`: Greater than or equal to
 
 ```python
-print(10 == 10); // true
-print(10 != 5);  // true
-print(5 < 10);   // true
+say(10 == 10); // true
+say(10 != 5);  // true
+say(5 < 10);   // true
 ```
 
 ### Logical Operators
@@ -135,9 +135,9 @@ print(5 < 10);   // true
 - `!`: Logical NOT
 
 ```python
-print(true and false); // false
-print(true or false);  // true
-print(!true);          // false
+say(true and false); // false
+say(true or false);  // true
+say(!true);          // false
 ```
 
 ## Control Flow
@@ -150,35 +150,31 @@ The `if` statement executes a block of code if a condition is true. The `else` s
 
 ```python
 if (x > 10) {
-    print("x is greater than 10");
+    say("x is greater than 10");
 } else {
-    print("x is not greater than 10");
+    say("x is not greater than 10");
 }
 ```
 
-### While Loops *(Not yet implemented)*
-
-*Note: While loops are currently under development and not yet available in Neutron.*
+### While Loops
 
 The `while` loop executes a block of code as long as a condition is true.
 
 ```python
 var i = 0;
 while (i < 5) {
-    print(i);
+    say(i);
     i = i + 1;
 }
 ```
 
-### For Loops *(Not yet implemented)*
-
-*Note: For loops are currently under development and not yet available in Neutron.*
+### For Loops
 
 The `for` loop is a more convenient way to write loops with a clear initializer, condition, and increment.
 
 ```python
 for (var i = 0; i < 5; i = i + 1) {
-    print(i);
+    say(i);
 }
 ```
 
@@ -190,7 +186,7 @@ Functions are defined using the `fun` keyword.
 
 ```python
 fun greet(name) {
-    print("Hello, " + name + "!");
+    say("Hello, " + name + "!");
 }
 ```
 
@@ -210,7 +206,7 @@ fun add(a, b) {
 }
 
 var result = add(5, 10);
-print(result); // 15
+say(result); // 15
 ```
 
 Functions can also return without a value:
@@ -220,7 +216,7 @@ fun print_message(message) {
     if (message == "") {
         return; // Returns nil
     }
-    print(message);
+    say(message);
 }
 ```
 
@@ -336,7 +332,7 @@ Neutron supports `while` loops for repetitive execution.
 ```neutron
 var i = 0;
 while (i < 10) {
-    print(i);
+    say(i);
     i = i + 1;
 }
 ```
@@ -352,7 +348,7 @@ Classes are defined using the `class` keyword.
 ```python
 class Person {
     fun greet() {
-        print("Hello, I am a person.");
+        say("Hello, I am a person.");
     }
 }
 ```
@@ -379,7 +375,7 @@ class Person {
     }
 
     fun greet() {
-        print("Hello, my name is " + this.name);
+        say("Hello, my name is " + this.name);
     }
 }
 

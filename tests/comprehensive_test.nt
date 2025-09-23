@@ -1,0 +1,98 @@
+// Comprehensive test script for Neutron binary conversion
+// This script tests all major features of the language
+
+say("=== Comprehensive Neutron Feature Test ===");
+say("");
+
+// 1. Variables and data types
+say("1. Testing Variables and Data Types");
+var number = 42;
+var text = "Hello, Neutron!";
+var boolean = true;
+var nilValue = nil;
+say("Number: " + number);
+say("Text: " + text);
+say("Boolean: " + boolean);
+say("Nil: " + nilValue);
+say("");
+
+// 2. Arithmetic operations
+say("2. Testing Arithmetic Operations");
+var a = 10;
+var b = 3;
+say("Addition: " + a + " + " + b + " = " + (a + b));
+say("Subtraction: " + a + " - " + b + " = " + (a - b));
+say("Multiplication: " + a + " * " + b + " = " + (a * b));
+say("Division: " + a + " / " + b + " = " + (a / b));
+say("");
+
+// 3. String operations
+say("3. Testing String Operations");
+var str1 = "Hello";
+var str2 = "World";
+say("Concatenation: " + str1 + " " + str2);
+say("Length of '" + str1 + "': " + string_length(str1));
+say("Character at index 1: " + string_get_char_at(str1, 1));
+say("");
+
+// 4. Conditional statements
+say("4. Testing Conditional Statements");
+var x = 5;
+if (x > 0) {
+    say("x is positive");
+} else if (x < 0) {
+    say("x is negative");
+} else {
+    say("x is zero");
+}
+
+var y = 10;
+if (x < y) {
+    say("x is less than y");
+} else {
+    say("x is greater than or equal to y");
+}
+say("");
+
+// 5. Loops
+say("5. Testing Loops");
+say("While loop:");
+var i = 0;
+while (i < 3) {
+    say("i = " + i);
+    i = i + 1;
+}
+say("");
+
+// 6. Functions
+say("6. Testing Functions");
+fun greet(name) {
+    return "Hello, " + name + "!";
+}
+
+fun addNumbers(x, y) {
+    return x + y;
+}
+
+say(greet("Neutron"));
+say("5 + 3 = " + addNumbers(5, 3));
+say("");
+
+// 7. Built-in functions
+say("7. Testing Built-in Functions");
+say("String representation of number: " + str(number));
+say("Integer representation of string: " + int("123"));
+say("Binary representation of 10: " + int_to_bin(10));
+say("Integer from binary '1010': " + bin_to_int("1010"));
+say("");
+
+// 8. Lists (if supported)
+say("8. Testing Lists");
+var fruits = ["apple", "banana", "cherry"];
+say("Fruits: " + fruits);
+say("First fruit: " + fruits[0]);
+fruits[1] = "orange";
+say("Modified fruits: " + fruits);
+say("");
+
+say("=== End of Comprehensive Neutron Feature Test ===");

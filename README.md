@@ -42,6 +42,26 @@ You can also start the REPL (Read-Eval-Print Loop) by running `neutron` without 
 ./neutron
 ```
 
+### Binary Conversion
+
+Neutron supports converting scripts to standalone executables:
+
+```sh
+./neutron -b script.nt [output.out]
+```
+
+This will compile the script and create a standalone executable that can be run directly. If no output file is specified, it will create `script.nt.out`.
+
+To run the generated executable:
+
+```sh
+./script.nt.out
+```
+
+The generated executable contains the Neutron runtime and the embedded source code, making it a fully standalone program that can be distributed and run on any compatible system.
+
+**Note:** See [Binary Conversion Documentation](docs/binary_conversion.md) for detailed information about supported features, limitations, and best practices.
+
 ## Examples
 
 Here are a few examples of what you can do with Neutron:
@@ -119,7 +139,19 @@ Neutron includes several built-in modules:
 - **[Convert Module](docs/convert_module.md)** - Data type conversion utilities
 - **[Nexus Module](docs/nexus_module.md)** - REST API framework for building web services
 
-Examples of module usage can be found in the [examples directory](examples/).
+Examples of module usage can be found in the [examples directory](examples).
+
+### External Modules
+
+Neutron supports external modules that can be built using the `--build-box` command:
+
+```sh
+./neutron --build-box {module_name}
+```
+
+This command will build the specified C++ module from the `box/` directory and create a shared library that can be imported in Neutron code. The module must contain a `native.cpp` file with the appropriate C++ implementation.
+
+Note: Currently, the `--build-box` command requires that the module follows the C++ module structure and that the Makefile is properly configured to build individual modules. For pure Neutron modules (`.nt` files), simply place them in the `box/` directory and they can be imported directly.
 
 ## Credits
 

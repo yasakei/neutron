@@ -138,6 +138,12 @@ var result = my_function_name(arg1, arg2);
 say(result);
 ```
 
+**Note on Binary Conversion:**
+
+Box modules are dynamically loaded at runtime. This means that if you compile a script that uses a box module into a binary using the `-b` flag, the box module will **not** be included in the binary. The binary will fail at runtime when it tries to load the module.
+
+To include module functionality in a standalone binary, the module must be written in Neutron (`.nt` file) and imported using the `use` statement. The source code of the `.nt` module will be embedded in the binary.
+
 ## 5. Creating Modules with C
 
 While Neutron's Box module system is designed to work with C++, you can also implement modules using C with some considerations:

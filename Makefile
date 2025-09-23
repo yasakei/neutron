@@ -4,7 +4,8 @@ INCDIR = include
 BUILDDIR = build
 BOXDIR = box
 TARGET = neutron
-SRCS = $(shell find src -type f -name "*.cpp")
+LIBTARGET = libneutron_runtime.so
+SRCS = $(shell find src -type f -name "*.cpp" ! -name "main.cpp" ! -name "bytecode_runner.cpp")
 LIBSRCS = $(shell find libs -type f -name "*.cpp")
 BOXSRCS = $(shell find $(BOXDIR) -type f -name "*.cpp")
 OBJS = $(SRCS:src/%.cpp=build/%.o)
@@ -16,14 +17,14 @@ DEPENDENCIES = -I$(INCDIR) -I. -Ilibs/json -Ilibs/http -Ilibs/time -Ilibs/sys -I
 DEBUG ?= 0
 
 ifeq ($(DEBUG), 1)
-    CXXFLAGS = -std=c++17 -Wall -Wextra -g -O0 -DDEBUG_TRACE_EXECUTION -DDEBUG_PRINT_CODE
+    CXXFLAGS = -std=c++17 -Wall -Wextra -g -O0 -DDEBUG_TRACE_EXECUTION -DDEBUG_PRINT_CODE -fPIC
 else
-    CXXFLAGS = -std=c++17 -Wall -Wextra -O2
+    CXXFLAGS = -std=c++17 -Wall -Wextra -O2 -fPIC
 endif
 
 .PHONY: all clean directories release
 
-all: directories shared_libs $(TARGET)
+all: directories shared_libs $(TARGET) $(LIBTARGET)
 
 release:
 	$(MAKE) all DEBUG=0
@@ -39,8 +40,12 @@ directories:
 	@mkdir -p $(BUILDDIR)/sys
 	@mkdir -p $(BUILDDIR)/box
 
-$(TARGET): $(OBJS) $(LIBOBJS)
-	$(CXX) $(CXXFLAGS) -rdynamic $(OBJS) $(LIBOBJS) -lcurl -ljsoncpp -o $(TARGET)
+$(LIBTARGET): $(OBJS) $(LIBOBJS)
+	$(CXX) $(CXXFLAGS) -shared -rdynamic $(OBJS) $(LIBOBJS) -lcurl -ljsoncpp -o $(LIBTARGET)
+	@echo "Runtime library created. Located at ./$(LIBTARGET)"
+
+$(TARGET): $(OBJS) $(LIBOBJS) build/main.o
+	$(CXX) $(CXXFLAGS) -rdynamic build/main.o $(OBJS) $(LIBOBJS) -lcurl -ljsoncpp -o $(TARGET)
 	@echo "Compilation complete. Binary located at ./$(TARGET)"
 
 build/%.o: src/%.cpp
@@ -72,7 +77,7 @@ shared_libs:
 
 
 clean:
-	rm -rf $(BUILDDIR) $(TARGET)
+	rm -rf $(BUILDDIR) $(TARGET) $(LIBTARGET)
 
 install:
 	cp $(TARGET) /usr/local/bin/

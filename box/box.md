@@ -4,17 +4,7 @@ This directory contains box modules for the Neutron programming language.
 
 ## Available Modules
 
-1. [base64](base64/) - Base64 encoding and decoding (C++ implementation)
-2. [base64_nt](base64_nt/) - Base64 encoding and decoding (C++ with Neutron patterns)
-
-## Pure Neutron Modules
-
-The following are examples of pure Neutron modules (implemented entirely in Neutron):
-
-1. [simple.nt](simple.nt) - Simple test module
-2. [simple_vars.nt](simple_vars.nt) - Simple module with variables
-3. [math_nt.nt](math_nt.nt) - Math module
-4. [test.nt](test.nt) - Simple test module
+1. [test_module](test_module/) - Simple test module for demonstrating the build process
 
 ## Adding New Modules
 
@@ -27,24 +17,15 @@ To create a new box module:
 
 ## Building C++ Modules
 
-To build all C++ box modules, use the shared_libs target:
+To build a specific C++ box module, use the `--build-box` command:
 
 ```bash
-make shared_libs
+./neutron --build-box {module_name}
 ```
 
-For example:
-```bash
-make shared_libs
-```
+This command will build the specified module from the `box/` directory and create a shared library that can be imported in Neutron code. The module must contain a `native.cpp` file with the appropriate C++ implementation.
 
-This will create shared libraries (.so files) that are automatically loaded when the modules are imported in Neutron code.
-
-Alternatively, you can manually build a specific module:
-
-```bash
-g++ -std=c++17 -Wall -Wextra -O2 -shared -fPIC -Iinclude -I. -Ilibs/json -Ilibs/http -Ilibs/time -Ilibs/sys -Ibox box/module_name/native.cpp -o box/module_name/module_name.so
-```
+Note: Currently, the `--build-box` command requires that the module follows the C++ module structure and that the Makefile is properly configured to build individual modules. For pure Neutron modules (`.nt` files), simply place them in the `box/` directory and they can be imported directly.
 
 ## Module Structure
 
