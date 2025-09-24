@@ -7,13 +7,20 @@
 
 namespace neutron {
 
-Compiler::Compiler(VM& vm) : vm(vm), chunk(nullptr), scopeDepth(0) {}
+Compiler::Compiler(VM& vm) : vm(vm), function(nullptr), chunk(nullptr), scopeDepth(0) {
+    function = new Function(nullptr, std::make_shared<Environment>());
+    function->name = "<script>";
+    function->chunk = new Chunk();
+    chunk = function->chunk;
+}
+
+Compiler::Compiler(Compiler* enclosing) : vm(enclosing->vm), enclosing(enclosing), function(nullptr), scopeDepth(0), chunk(nullptr) {
+    function = new Function(nullptr, std::make_shared<Environment>());
+    function->chunk = new Chunk();
+    chunk = function->chunk;
+}
 
 Function* Compiler::compile(const std::vector<std::unique_ptr<Stmt>>& statements) {
-    Function* function = new Function(nullptr, std::make_shared<Environment>());
-    function->chunk = new Chunk();
-    this->chunk = function->chunk;
-
     for (const auto& statement : statements) {
         compileStatement(statement.get());
     }
@@ -279,7 +286,37 @@ void Compiler::visitUseStmt(const UseStmt* stmt) {
 }
 
 void Compiler::visitFunctionStmt(const FunctionStmt* stmt) {
-    // TODO: Implement function statement compilation
+    // Create a new compiler for this function
+    Compiler compiler(this);
+    
+    // Set the function's name and arity
+    compiler.function->name = stmt->name.lexeme;
+    compiler.function->arity_val = stmt->params.size();
+
+    // Add parameters as local variables
+    compiler.beginScope();
+    for (const auto& param : stmt->params) {
+        compiler.locals.push_back({param, compiler.scopeDepth});
+    }
+
+    // Compile the function body
+    for (const auto& statement : stmt->body) {
+        compiler.compileStatement(statement.get());
+    }
+
+    // Emit return for the function
+    compiler.emitReturn();
+
+#ifdef DEBUG_PRINT_CODE
+    disassembleChunk(compiler.function->chunk, compiler.function->name.c_str());
+#endif
+
+    // Add the compiled function as a constant in the current (enclosing) compiler
+    uint8_t constant = makeConstant(Value(compiler.function));
+    
+    // Define the function as a global variable in the current scope
+    emitBytes((uint8_t)OpCode::OP_CONSTANT, constant);
+    emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(stmt->name.lexeme)));
 }
 
 void Compiler::visitReturnStmt(const ReturnStmt* stmt) {

@@ -29,13 +29,22 @@ class Module;
 class Object;
 class Chunk;
 
+class Value;
+class Function;
+
+struct CallFrame {
+    Function* function;
+    uint8_t* ip;
+    size_t slot_offset;  // Store offset instead of raw pointer
+};
+
 enum class ValueType {
     NIL,
     BOOLEAN,
     NUMBER,
     STRING,
     OBJECT,
-    FUNCTION,
+    CALLABLE,
     MODULE
 };
 
@@ -51,7 +60,7 @@ struct Value {
     Value(double value);
     Value(const std::string& value);
     Value(Object* object);
-    Value(Callable* function);
+    Value(Callable* callable);
     Value(Module* module);
 
     std::string toString() const;
@@ -125,6 +134,8 @@ public:
     Value call(VM& vm, std::vector<Value> arguments) override;
     std::string toString() override;
 
+    std::string name;
+    int arity_val;
     Chunk* chunk;
 private:
     const FunctionStmt* declaration;
@@ -164,9 +175,12 @@ public:
     Value execute_string(const std::string& source);
 
 private:
+    bool call(Function* function, int argCount);
+    bool callValue(Value callee, int argCount);
     void run();
     void interpret_module(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> module_env);
 
+    std::vector<CallFrame> frames;
     Chunk* chunk;
     uint8_t* ip;
     std::vector<Value> stack;

@@ -10,11 +10,7 @@
 namespace neutron {
 
 // Helper to check if a value is "truthy"
-bool isTruthy(const Value& value) {
-    if (value.type == ValueType::NIL) return false;
-    if (value.type == ValueType::BOOLEAN) return std::get<bool>(value.as);
-    return true; // All other types are truthy
-}
+
 
 Value::Value() : type(ValueType::NIL), as(nullptr) {}
 
@@ -28,7 +24,7 @@ Value::Value(const std::string& value) : type(ValueType::STRING), as(value) {}
 
 Value::Value(Object* object) : type(ValueType::OBJECT), as(object) {}
 
-Value::Value(Callable* function) : type(ValueType::FUNCTION), as(function) {}
+
 
 Value::Value(Module* module) : type(ValueType::MODULE), as(module) {}
 
@@ -48,8 +44,13 @@ std::string Value::toString() const {
             return std::get<std::string>(as);
         case ValueType::OBJECT:
             return std::get<Object*>(as)->toString();
-        case ValueType::FUNCTION:
-            return std::get<Callable*>(as)->toString();
+        case ValueType::CALLABLE: {
+            Callable* callable = std::get<Callable*>(as);
+            if (callable == nullptr) {
+                return "<null callable>";
+            }
+            return callable->toString();
+        }
         case ValueType::MODULE:
             return "<module>";
     }
@@ -92,28 +93,7 @@ void Environment::assign(const std::string& name, const Value& value) {
     throw std::runtime_error("Undefined variable '" + name + "'.");
 }
 
-Function::Function(const FunctionStmt* declaration, std::shared_ptr<Environment> closure)
-    : declaration(declaration), closure(closure) {}
 
-int Function::arity() {
-    if (declaration) {
-        return declaration->params.size();
-    }
-    return 0;
-}
-
-Value Function::call(VM& vm, std::vector<Value> arguments) {
-    // For now, we'll just execute the function and return nil
-    // A complete implementation would require more complex changes to handle return values properly
-    return Value(nullptr);
-}
-
-std::string Function::toString() {
-    if (declaration) {
-        return "<fn " + declaration->name.lexeme + ">";
-    }
-    return "<script>";
-}
 
 NativeFn::NativeFn(NativeFnPtr function, int arity) : function(std::move(function)), _arity(arity) {}
 
@@ -141,7 +121,7 @@ Value Module::get(const std::string& name) {
 
 Value native_say(std::vector<Value> arguments) {
     if (arguments.size() != 1) {
-        // error
+        throw std::runtime_error("say expects exactly 1 argument");
     }
     std::cout << arguments[0].toString() << std::endl;
     return Value();

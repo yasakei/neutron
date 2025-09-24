@@ -104,7 +104,7 @@ std::string valueToJsonString(const Value& value, bool pretty, int indent) {
             }
             return "null";
         }
-        case ValueType::FUNCTION:
+        case ValueType::CALLABLE:
             return "null";
         case ValueType::MODULE:
             return "null";

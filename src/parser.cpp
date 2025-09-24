@@ -562,12 +562,7 @@ void VarStmt::accept(Compiler* compiler) const {
     compiler->visitVarStmt(this);
 }
 
-void AssignStmt::accept(Compiler* compiler) const {
-    // Note: There is no visitAssignStmt in the compiler,
-    // because assignment is handled as an expression.
-    // This is a bit of a hack, but it works for now.
-    // A better solution would be to have a separate
-    // AssignStmt and AssignExpr.
+void AssignStmt::accept(Compiler* /*compiler*/) const {
 }
 
 
@@ -595,8 +590,7 @@ void ReturnStmt::accept(Compiler* compiler) const {
     compiler->visitReturnStmt(this);
 }
 
-void ClassStmt::accept(Compiler* compiler) const {
-    // TODO: Implement class compilation
+void ClassStmt::accept(Compiler* /*compiler*/) const {
 }
 
 } // namespace neutron

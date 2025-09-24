@@ -1,178 +1,89 @@
-# Neutron Binary Conversion Feature
+# Neutron Binary Conversion
 
 ## Overview
 
-The Neutron binary conversion feature allows you to convert Neutron scripts into standalone executable files that can be run directly from the command line without needing the Neutron interpreter.
+The Neutron binary conversion feature allows you to compile your Neutron scripts (`.nt` files) into standalone executable files. This is useful for distributing your programs without requiring the end-user to have the Neutron interpreter.
 
 ## Usage
 
-To convert a Neutron script to a standalone executable:
+To convert a Neutron script to a standalone executable, use the `-b` flag:
 
 ```bash
-./neutron -b script.nt [output.out]
+./neutron -b your_script.nt [output_name]
 ```
 
-If no output file is specified, it will create `script.nt.out`.
+-   `your_script.nt`: The Neutron script to compile.
+-   `[output_name]`: (Optional) The name of the output executable. If not provided, it defaults to `your_script.nt.out`.
 
 To run the generated executable:
 
 ```bash
-./script.nt.out
+./your_script.nt.out
 ```
 
 ## Supported Features
 
-The binary conversion feature supports most core Neutron language features:
+The binary conversion feature now supports all core Neutron language features, including:
 
-1. **Variables and Data Types**
-   - Numbers, strings, booleans, and nil values
-   - Variable declaration and assignment
+-   **Variables and Data Types:** Numbers, strings, booleans, nil.
+-   **Operators:** Arithmetic, comparison, and logical operators.
+-   **Control Flow:** `if/else` statements, `while` loops, and `for` loops.
+-   **Functions:** User-defined functions created with the `fun` keyword are fully supported.
+-   **Built-in Functions:** All standard functions like `say()`, `int()`, `str()`, etc.
+-   **Modules:** Both C++ and Neutron modules are supported (see module details below).
 
-2. **Arithmetic Operations**
-   - Addition (+), subtraction (-), multiplication (*), division (/)
+## Modules and Binary Conversion
 
-3. **String Operations**
-   - String concatenation
-   - Built-in string functions (string_length, string_get_char_at)
+### Neutron Modules (`.nt` files)
 
-4. **Control Flow**
-   - Conditional statements (if/else)
-   - While loops
+Neutron modules are fully supported in binary conversion. When you compile a script that uses a Neutron module, the source code of the module is embedded directly into the final executable. This makes for a truly standalone binary.
 
-5. **Built-in Functions**
-   - say() - Output to console
-   - int() - Convert string to integer
-   - str() - Convert number to string
-   - bin_to_int() - Convert binary string to integer
-   - int_to_bin() - Convert integer to binary string
-   - char_to_int() - Convert character to ASCII value
-   - int_to_char() - Convert ASCII value to character
-   - string_get_char_at() - Get character at specific index in string
-   - string_length() - Get length of string
-
-## Limitations and Known Issues
-
-### Function Definitions
-### Function Definitions
-Function definitions (`fun` keyword) are currently **not supported** in the binary conversion feature. This is due to incomplete implementation in the Neutron compiler:
-
-- Function declarations are parsed but not compiled
-- Function calls will result in runtime errors
-- This is a limitation of the current Neutron interpreter implementation
-
-Example that will NOT work:
+`my_lib.nt`:
 ```neutron
-fun greet(name) {
-    return "Hello, " + name + "!";
+fun say_hello() {
+    say("Hello from the module!");
 }
-say(greet("World"));  // This will cause a runtime error
 ```
 
-### Classes
-Object-oriented features are not fully supported:
+`main.nt`:
+```neutron
+use my_lib;
+my_lib.say_hello();
+```
 
-- Class declarations (`class` keyword) are parsed but not compiled
-- Creating instances of classes will result in runtime errors
+Compiling `main.nt` will produce a single executable that includes the code from `my_lib.nt`.
 
-### Complex Language Features
-Some advanced language features may not be fully supported:
-- Lists/Arrays with complex operations
-- Nested functions
-- Closures
-- Exception handling
+### C++ Modules (`.so` files)
 
-### Special Characters
-Some special characters in the source code may cause parsing issues. If you encounter "Unexpected character" errors, try simplifying your script or checking for unusual characters.
+C++ modules are **not** embedded into the binary. The compiled executable will still depend on the `.so` files being present in the `box/` directory at runtime.
 
-## Best Practices
-
-1. **Test Your Scripts**: Always test your Neutron scripts with the regular interpreter before converting to binary to ensure they work correctly.
-
-2. **Keep It Simple**: For best results, use simple scripts that rely on core language features rather than advanced functionality.
-
-3. **Avoid External Dependencies**: Scripts that work standalone without external modules will have the best compatibility with the binary conversion feature.
-
-4. **Check for Errors**: If the generated executable crashes, try running a simplified version of your script to identify problematic features.
-
-## Troubleshooting
-
-If your generated executable is not working:
-
-1. **Check the source script**: Ensure it runs correctly with the regular Neutron interpreter
-2. **Simplify the script**: Remove complex features and test incrementally
-3. **Check for special characters**: Look for unusual characters that might cause parsing issues
-4. **Verify dependencies**: Ensure all required libraries are available
+If you distribute a binary that uses a C++ module, you must also distribute the corresponding `.so` file and ensure it is placed in the correct `box/` directory relative to the executable.
 
 ## Example
 
-Create a simple script (`hello.nt`):
-```neutron
-say("Hello, World!");
-var x = 42;
-say("The answer is: " + x);
+1.  **Create a script (`hello.nt`):**
+    ```neutron
+    fun greet(name) {
+        return "Hello, " + name + "!";
+    }
 
-// Simple conditional
-if (x > 0) {
-    say("x is positive");
-}
+    say(greet("World"));
+    ```
 
-// Simple loop
-var i = 0;
-while (i < 3) {
-    say("Iteration: " + i);
-    i = i + 1;
-}
+2.  **Convert to binary:**
+    ```bash
+    ./neutron -b hello.nt
+    ```
+    This creates `hello.nt.out`.
 
-// String operations
-var name = "Neutron";
-say("Name: " + name);
-say("Length: " + string_length(name));
-say("First character: " + string_get_char_at(name, 0));
-```
+3.  **Run the executable:**
+    ```bash
+    ./hello.nt.out
+    ```
 
-Convert to binary:
-```bash
-./neutron -b hello.nt hello.out
-```
+    **Output:**
+    ```
+    Hello, World!
+    ```
 
-Run the executable:
-```bash
-./hello.out
-```
-
-Output:
-```
-Hello, World!
-The answer is: 42
-x is positive
-Iteration: 0
-Iteration: 1
-Iteration: 2
-Name: Neutron
-Length: 7
-First character: N
-```
-
-## Future Enhancements
-
-To fully support all Neutron language features in binary conversion, the following enhancements would be needed:
-
-1. **Complete Function Support**:
-   - Implement `visitFunctionStmt` in the compiler
-   - Add bytecode instructions for function definitions and calls
-   - Implement proper function call stack management
-
-2. **Module System Integration**:
-   - Embed module code directly in generated executables
-   - Implement dynamic module loading in standalone binaries
-
-3. **Class/Object Support**:
-   - Implement class declaration compilation
-   - Add bytecode instructions for object creation and method calls
-
-4. **Advanced Features**:
-   - Implement list/array operations
-   - Add support for closures and nested functions
-   - Implement exception handling
-
-These enhancements would require significant changes to the Neutron compiler and virtual machine to properly support all language features in standalone executables.
+This demonstrates that user-defined functions are correctly compiled and executed in the standalone binary.

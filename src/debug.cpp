@@ -22,8 +22,8 @@ std::ostream& operator<<(std::ostream& os, ValueType type) {
         case ValueType::OBJECT:
             os << "OBJECT";
             break;
-        case ValueType::FUNCTION:
-            os << "FUNCTION";
+        case ValueType::CALLABLE:
+            os << "CALLABLE";
             break;
         case ValueType::MODULE:
             os << "MODULE";
@@ -113,6 +113,16 @@ int disassembleInstruction(const Chunk* chunk, int offset) {
             return constantInstruction("OP_JUMP_IF_FALSE", chunk, offset);
         case OpCode::OP_LOOP:
             return constantInstruction("OP_LOOP", chunk, offset);
+        case OpCode::OP_CALL:
+            return constantInstruction("OP_CALL", chunk, offset);
+        case OpCode::OP_CLOSURE:
+            return constantInstruction("OP_CLOSURE", chunk, offset);
+        case OpCode::OP_GET_UPVALUE:
+            return constantInstruction("OP_GET_UPVALUE", chunk, offset);
+        case OpCode::OP_SET_UPVALUE:
+            return constantInstruction("OP_SET_UPVALUE", chunk, offset);
+        case OpCode::OP_CLOSE_UPVALUE:
+            return simpleInstruction("OP_CLOSE_UPVALUE", offset);
         default:
             std::cout << "Unknown opcode " << instruction << std::endl;
             return offset + 1;

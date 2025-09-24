@@ -19,8 +19,16 @@
 
 namespace neutron {
 
-// Forward declaration of isTruthy function
-bool isTruthy(const Value& value);
+bool isTruthy(const Value& value) {
+    switch (value.type) {
+        case ValueType::NIL:
+            return false;
+        case ValueType::BOOLEAN:
+            return std::get<bool>(value.as);
+        default:
+            return true;
+    }
+}
 
 // Helper function for error reporting
 void runtimeError(const std::string& message) {
@@ -29,7 +37,7 @@ void runtimeError(const std::string& message) {
     exit(1);
 }
 
-VM::VM() : chunk(nullptr), ip(nullptr) {
+VM::VM() : ip(nullptr) {
     globals["say"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_say), 1));
     
     // Create a shared environment for global functions
@@ -55,9 +63,30 @@ VM::VM() : chunk(nullptr), ip(nullptr) {
     }
 }
 
+Function::Function(const FunctionStmt* declaration, std::shared_ptr<Environment> closure) 
+    : declaration(declaration), closure(closure), arity_val(0), chunk(new Chunk()) {}
+
+Value Function::call(VM& /*vm*/, std::vector<Value> /*arguments*/) {
+    // This is now handled by the VM's call stack
+    return Value();
+}
+
+std::string Function::toString() {
+    if (declaration) {
+        return "<fn " + declaration->name.lexeme + ">";
+    } else if (!name.empty()) {
+        return "<fn " + name + ">";
+    }
+    return "<script>";
+}
+
+int Function::arity() { return arity_val; }
+
+Value::Value(Callable* callable) : type(ValueType::CALLABLE), as(callable) {}
+
 void VM::interpret(Function* function) {
-    this->chunk = function->chunk;
-    this->ip = &this->chunk->code[0];
+    push(Value(function));
+    call(function, 0);
     run();
 }
 
@@ -77,58 +106,114 @@ Value VM::pop() {
     return value;
 }
 
-void VM::run() {
-    for (;;) {
-#ifdef DEBUG_TRACE_EXECUTION
-        printf("ip: %p, stack size: %zu\n", ip, stack.size());
-        std::cout << "          ";
-        for (const auto& value : stack) {
-            printf("[ ");
-            std::cout << value.toString();
-            printf(" ]");
-        }
-        std::cout << std::endl;
-        disassembleInstruction(chunk, (int)(ip - &chunk->code[0]));
-#endif
-        switch ((OpCode)*ip++) {
-            case OpCode::OP_RETURN: {
-                // For now, we'll just return
-                // A complete implementation would handle return values properly
-                return;
+bool VM::call(Function* function, int argCount) {
+    if (argCount != function->arity_val) {
+        runtimeError("Expected " + std::to_string(function->arity_val) + " arguments but got " + std::to_string(argCount) + ".");
+        return false;
+    }
+
+    if (frames.size() == 256) {
+        runtimeError("Stack overflow.");
+        return false;
+    }
+
+    CallFrame* frame = &frames.emplace_back();
+    frame->function = function;
+    if (function->chunk->code.empty()) {
+        frame->ip = nullptr;
+    } else {
+        frame->ip = function->chunk->code.data();
+    }
+    frame->slot_offset = stack.size() - argCount;  // Store offset instead of pointer
+
+    return true;
+}
+
+bool VM::callValue(Value callee, int argCount) {
+    if (callee.type == ValueType::CALLABLE) {
+        Callable* callable = std::get<Callable*>(callee.as);
+        if (Function* function = dynamic_cast<Function*>(callable)) {
+            return call(function, argCount);
+        } else if (NativeFn* native = dynamic_cast<NativeFn*>(callable)) {
+            if (native->arity() != -1 && native->arity() != argCount) {
+                runtimeError("Expected " + std::to_string(native->arity()) + " arguments but got " + std::to_string(argCount) + ".");
+                return false;
             }
-            case OpCode::OP_CONSTANT: {
-                Value constant = chunk->constants[*ip++];
+            std::vector<Value> args;
+            for (int i = 0; i < argCount; i++) {
+                args.push_back(stack[stack.size() - argCount + i]);
+            }
+            Value result = native->call(*this, args);
+            stack.resize(stack.size() - argCount - 1);
+            push(result);
+            return true;
+        }
+    }
+
+    runtimeError("Can only call functions and classes.");
+    return false;
+}
+
+void VM::run() {
+    CallFrame* frame = &frames.back();
+
+#define READ_BYTE() (*frame->ip++)
+#define READ_SHORT() \
+    (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
+#define READ_CONSTANT() (frame->function->chunk->constants[READ_BYTE()])
+#define READ_STRING() (std::get<std::string>(READ_CONSTANT().as))
+
+    for (;;) {
+        uint8_t instruction;
+        switch (instruction = READ_BYTE()) {
+            case (uint8_t)OpCode::OP_RETURN: {
+                Value result = pop();
+                size_t return_slot_offset = frame->slot_offset;  // Save before popping
+                frames.pop_back();
+                if (frames.empty()) {
+                    // We are done executing the main script. The result is on the stack.
+                    // The extra pop is not needed.
+                    return;
+                }
+
+                frame = &frames.back();
+                stack.resize(return_slot_offset);
+                push(result);
+                break;
+            }
+            case (uint8_t)OpCode::OP_CONSTANT: {
+                Value constant = READ_CONSTANT();
                 push(constant);
                 break;
             }
-            case OpCode::OP_NIL: {
+            case (uint8_t)OpCode::OP_NIL: {
                 push(Value());
                 break;
             }
-            case OpCode::OP_TRUE: {
+            case (uint8_t)OpCode::OP_TRUE: {
                 push(Value(true));
                 break;
             }
-            case OpCode::OP_FALSE: {
+            case (uint8_t)OpCode::OP_FALSE: {
                 push(Value(false));
                 break;
             }
-            case OpCode::OP_POP: {
+            case (uint8_t)OpCode::OP_POP: {
                 pop();
                 break;
             }
-            case OpCode::OP_GET_LOCAL: {
-                uint8_t slot = *ip++;
-                push(stack[slot]);
+            case (uint8_t)OpCode::OP_GET_LOCAL: {
+                uint8_t slot = READ_BYTE();
+                push(stack[frame->slot_offset + slot]);
                 break;
             }
-            case OpCode::OP_SET_LOCAL: {
-                uint8_t slot = *ip++;
-                stack[slot] = stack.back();
+            case (uint8_t)OpCode::OP_SET_LOCAL: {
+                uint8_t slot = READ_BYTE();
+                stack[frame->slot_offset + slot] = stack.back();
                 break;
             }
-            case OpCode::OP_GET_GLOBAL: {
-                std::string name = std::get<std::string>(chunk->constants[*ip++].as);
+            case (uint8_t)OpCode::OP_GET_GLOBAL: {
+                std::string name = READ_STRING();
                 auto it = globals.find(name);
                 if (it == globals.end()) {
                     runtimeError("Undefined variable '" + name + "'.");
@@ -136,14 +221,14 @@ void VM::run() {
                 push(globals[name]);
                 break;
             }
-            case OpCode::OP_DEFINE_GLOBAL: {
-                std::string name = std::get<std::string>(chunk->constants[*ip++].as);
+            case (uint8_t)OpCode::OP_DEFINE_GLOBAL: {
+                std::string name = READ_STRING();
                 globals[name] = stack.back();
                 pop();
                 break;
             }
-            case OpCode::OP_SET_GLOBAL: {
-                std::string name = std::get<std::string>(chunk->constants[*ip++].as);
+            case (uint8_t)OpCode::OP_SET_GLOBAL: {
+                std::string name = READ_STRING();
                 auto it = globals.find(name);
                 if (it == globals.end()) {
                     runtimeError("Undefined variable '" + name + "'.");
@@ -151,16 +236,14 @@ void VM::run() {
                 globals[name] = stack.back();
                 break;
             }
-            case OpCode::OP_GET_PROPERTY: {
-                std::string propertyName = std::get<std::string>(chunk->constants[*ip++].as);
+            case (uint8_t)OpCode::OP_GET_PROPERTY: {
+                std::string propertyName = READ_STRING();
                 Value object = stack.back();
                 
-                // Check if the object is a module
                 if (object.type == ValueType::MODULE) {
                     Module* module = std::get<Module*>(object.as);
                     try {
                         Value property = module->get(propertyName);
-                        // Replace the object on the stack with the property
                         stack.pop_back();
                         push(property);
                     } catch (const std::runtime_error& e) {
@@ -171,13 +254,13 @@ void VM::run() {
                 }
                 break;
             }
-            case OpCode::OP_EQUAL: {
+            case (uint8_t)OpCode::OP_EQUAL: {
                 Value b = pop();
                 Value a = pop();
                 push(Value(a.type == b.type && a.toString() == b.toString()));
                 break;
             }
-            case OpCode::OP_GREATER: {
+            case (uint8_t)OpCode::OP_GREATER: {
                 if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
                     runtimeError("Operands must be numbers.");
                 }
@@ -186,7 +269,7 @@ void VM::run() {
                 push(Value(a > b));
                 break;
             }
-            case OpCode::OP_LESS: {
+            case (uint8_t)OpCode::OP_LESS: {
                 if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
                     runtimeError("Operands must be numbers.");
                 }
@@ -195,7 +278,7 @@ void VM::run() {
                 push(Value(a < b));
                 break;
             }
-            case OpCode::OP_ADD: {
+            case (uint8_t)OpCode::OP_ADD: {
                 Value b = pop();
                 Value a = pop();
                 
@@ -204,14 +287,13 @@ void VM::run() {
                     double num_b = std::get<double>(b.as);
                     push(Value(num_a + num_b));
                 } else {
-                    // Convert both operands to strings and concatenate
                     std::string str_a = a.toString();
                     std::string str_b = b.toString();
                     push(Value(str_a + str_b));
                 }
                 break;
             }
-            case OpCode::OP_SUBTRACT: {
+            case (uint8_t)OpCode::OP_SUBTRACT: {
                 if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
                     runtimeError("Operands must be numbers.");
                 }
@@ -220,7 +302,7 @@ void VM::run() {
                 push(Value(a - b));
                 break;
             }
-            case OpCode::OP_MULTIPLY: {
+            case (uint8_t)OpCode::OP_MULTIPLY: {
                 if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
                     runtimeError("Operands must be numbers.");
                 }
@@ -229,7 +311,7 @@ void VM::run() {
                 push(Value(a * b));
                 break;
             }
-            case OpCode::OP_DIVIDE: {
+            case (uint8_t)OpCode::OP_DIVIDE: {
                 if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
                     runtimeError("Operands must be numbers.");
                 }
@@ -241,12 +323,12 @@ void VM::run() {
                 push(Value(a / b));
                 break;
             }
-            case OpCode::OP_NOT: {
+            case (uint8_t)OpCode::OP_NOT: {
                 Value value = pop();
                 push(Value(!isTruthy(value)));
                 break;
             }
-            case OpCode::OP_NEGATE: {
+            case (uint8_t)OpCode::OP_NEGATE: {
                 if (stack.back().type != ValueType::NUMBER) {
                     runtimeError("Operand must be a number.");
                 }
@@ -254,80 +336,53 @@ void VM::run() {
                 push(Value(-value));
                 break;
             }
-            case OpCode::OP_SAY: {
+            case (uint8_t)OpCode::OP_SAY: {
                 std::cout << pop().toString() << std::endl;
                 break;
             }
-            case OpCode::OP_JUMP: {
-                uint16_t offset = (uint16_t)(ip[0] << 8) | ip[1];
-                ip += 2; // Skip the offset
-                ip += offset;
+            case (uint8_t)OpCode::OP_JUMP: {
+                uint16_t offset = READ_SHORT();
+                frame->ip += offset;
                 break;
             }
-            case OpCode::OP_JUMP_IF_FALSE: {
-                uint16_t offset = (uint16_t)(ip[0] << 8) | ip[1];
-                ip += 2; // Skip the offset
-                Value condition = pop(); // Pop the condition value
-                if (condition.type == ValueType::NIL || (condition.type == ValueType::BOOLEAN && !std::get<bool>(condition.as))) {
-                    ip += offset;
+            case (uint8_t)OpCode::OP_JUMP_IF_FALSE: {
+                uint16_t offset = READ_SHORT();
+                if (!isTruthy(stack.back())) {
+                    frame->ip += offset;
                 }
                 break;
             }
-            case OpCode::OP_LOOP: {
-                uint16_t offset = (uint16_t)(ip[0] << 8) | ip[1];
-                ip += 2; // Skip the offset
-                ip -= offset;
+            case (uint8_t)OpCode::OP_LOOP: {
+                uint16_t offset = READ_SHORT();
+                frame->ip -= offset;
                 break;
             }
-            case OpCode::OP_CALL: {
-                uint8_t argCount = *ip++;
-                // The last value on the stack is the function to call
-                // The values before that are the arguments
-                Value callee = stack[stack.size() - 1 - argCount];
-                
-                if (callee.type != ValueType::FUNCTION) {
-                    runtimeError("Can only call functions and classes.");
-                    break;
+            case (uint8_t)OpCode::OP_CALL: {
+                uint8_t argCount = READ_BYTE();
+                if (!callValue(stack[stack.size() - argCount - 1], argCount)) {
+                    return;
                 }
-                
-                Callable* function = std::get<Callable*>(callee.as);
-                if (function->arity() != -1 && function->arity() != argCount) {
-                    runtimeError("Expected " + std::to_string(function->arity()) + " arguments but got " + std::to_string(argCount) + ".");
-                    break;
-                }
-                
-                // Extract arguments
-                std::vector<Value> arguments;
-                for (int i = 0; i < argCount; i++) {
-                    arguments.push_back(stack[stack.size() - argCount + i]);
-                }
-                
-                // Remove the arguments and the function from the stack
-                for (int i = 0; i < argCount + 1; i++) {
-                    pop();
-                }
-                
-                // Call the function and push the result
-                Value result = function->call(*this, arguments);
-                push(result);
+                frame = &frames.back();
                 break;
             }
         }
     }
+#undef READ_BYTE
+#undef READ_SHORT
+#undef READ_CONSTANT
+#undef READ_STRING
 }
 
-} // namespace neutron
-
-void neutron::VM::define_native(const std::string& name, Callable* function) {
+void VM::define_native(const std::string& name, Callable* function) {
     globals[name] = Value(function);
 }
 
-void neutron::VM::define_module(const std::string& name, Module* module) {
+void VM::define_module(const std::string& name, Module* module) {
     globals[name] = Value(module);
 }
 
-neutron::Value neutron::VM::call(const neutron::Value& callee, const std::vector<neutron::Value>& arguments) {
-    if (callee.type != ValueType::FUNCTION) {
+Value VM::call(const Value& callee, const std::vector<Value>& arguments) {
+    if (callee.type != ValueType::CALLABLE) {
         throw std::runtime_error("Can only call functions.");
     }
     
@@ -355,7 +410,7 @@ neutron::Value neutron::VM::call(const neutron::Value& callee, const std::vector
     return result;
 }
 
-neutron::Value neutron::VM::execute_string(const std::string& source) {
+Value VM::execute_string(const std::string& source) {
     // Parse and execute the Neutron code string
     Scanner scanner(source);
     std::vector<Token> tokens = scanner.scanTokens();
@@ -389,7 +444,7 @@ neutron::Value neutron::VM::execute_string(const std::string& source) {
     return Value(); // Return nil if compilation failed
 }
 
-void neutron::VM::load_module(const std::string& name) {
+void VM::load_module(const std::string& name) {
     std::string nt_path = "box/" + name + ".nt";
     std::string so_path = "box/" + name + "/" + name + ".so";
     std::string module_nt_path = "box/" + name + "/" + name + ".nt";
@@ -502,4 +557,4 @@ void neutron::VM::load_module(const std::string& name) {
     }
 }
 
-
+} // namespace neutron

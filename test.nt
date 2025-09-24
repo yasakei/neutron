@@ -1,0 +1,3 @@
+use math;
+var x = math.add(7,8);
+say(x);
