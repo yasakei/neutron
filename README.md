@@ -6,11 +6,11 @@ Neutron is a simple, modern, and lightweight interpreted programming language wr
 
 - **Dynamically Typed:** No need to declare the type of a variable.
 - **C-like Syntax:** Familiar syntax for developers who have used C, C++, Java, or JavaScript.
-- **Rich Standard Library:** A growing standard library with modules for math, data conversion, and web development.
+- **Rich Standard Library:** A comprehensive standard library with modules for math, system operations, HTTP client, JSON processing, time operations, and data conversion.
 - **Object-Oriented:** Supports classes, methods, and the `this` keyword.
-- **Built-in Functions:** A set of useful built-in functions for common tasks.
-- **Modular:** Supports modules for organizing code.
-- **REST API Framework:** The Nexus module provides tools for building REST APIs.
+- **Built-in Functions:** A set of useful built-in functions for string manipulation, type conversion, and console output.
+- **Modular:** Supports both native C++ modules and Neutron language modules for organizing code.
+- **Binary Compilation:** Convert scripts to standalone executables with full module support.
 
 ## Getting Started
 
@@ -69,7 +69,7 @@ Here are a few examples of what you can do with Neutron:
 **Hello, World!**
 
 ```neutron
-print("Hello, world!");
+say("Hello, world!");
 ```
 
 **Variables and Functions**
@@ -80,7 +80,7 @@ fun greet(name) {
 }
 
 var message = greet("Neutron");
-print(message);
+say(message);
 ```
 
 **Classes**
@@ -94,7 +94,7 @@ class Person {
     }
 
     fun greet() {
-        print("Hello, my name is " + this.name);
+        say("Hello, my name is " + this.name);
     }
 }
 
@@ -102,25 +102,6 @@ var person = Person();
 person.setName("Neutron");
 person.greet();
 ```
-
-## Benchmarks
-
-The project includes a set of benchmark scripts in the `benchmark/` directory to test the performance of various aspects of the language:
-
-- Arithmetic operations
-- String operations
-- Variable assignments
-- Function calls
-- Conditional statements
-- Time module functions
-
-To run all benchmarks:
-
-```sh
-./neutron benchmark/run_all.nt
-```
-
-See [Benchmark Documentation](benchmark/README.md) for more details.
 
 ## Documentation
 
@@ -132,12 +113,12 @@ For known issues and limitations, please see the [Known Issues](docs/known_issue
 
 Neutron includes several built-in modules:
 
-- **[Sys Module](docs/sys_module.md)** - File operations and system utilities
-- **[HTTP Module](docs/http_module.md)** - HTTP client functionality
-- **[JSON Module](docs/json_module.md)** - JSON parsing and generation
-- **[Time Module](docs/time_module.md)** - Time and date functions
-- **[Convert Module](docs/convert_module.md)** - Data type conversion utilities
-- **[Nexus Module](docs/nexus_module.md)** - REST API framework for building web services
+- **[Sys Module](docs/modules/sys_module.md)** - File operations and system utilities
+- **[Math Module](docs/modules/math_module.md)** - Mathematical operations and functions  
+- **[HTTP Module](docs/modules/http_module.md)** - HTTP client functionality
+- **[JSON Module](docs/modules/json_module.md)** - JSON parsing and generation
+- **[Time Module](docs/modules/time_module.md)** - Time and date functions
+- **[Convert Module](docs/modules/convert_module.md)** - Data type conversion utilities
 
 Examples of module usage can be found in the [examples directory](examples).
 
