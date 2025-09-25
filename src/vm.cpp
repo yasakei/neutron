@@ -9,7 +9,6 @@
 #include <fstream>
 #include <dlfcn.h>
 
-// Include module registration functions
 #include "sys/native.h"
 #include "json/native.h"
 #include "convert/native.h"
@@ -19,27 +18,6 @@
 
 namespace neutron {
     
-// Stub implementations for module functions
-void register_sys_functions(std::shared_ptr<Environment> /*env*/) {
-    // Stub: no-op
-}
-
-void register_json_functions(std::shared_ptr<Environment> /*env*/) {
-    // Stub: no-op
-}
-
-void register_convert_functions(std::shared_ptr<Environment> /*env*/) {
-    // Stub: no-op
-}
-
-void register_time_functions(std::shared_ptr<Environment> /*env*/) {
-    // Stub: no-op
-}
-
-void register_math_functions(std::shared_ptr<Environment> /*env*/) {
-    // Stub: no-op
-}
-
 // External symbols needed by bytecode_runner
 extern "C" {
     const unsigned char bytecode_data[] = {0};  // Empty bytecode array

@@ -49,8 +49,8 @@ endif
 LIBTARGET = libneutron_runtime$(SHARED_EXT)
 
 SRCS = $(shell find src -type f -name "*.cpp" ! -name "main.cpp" ! -name "bytecode_runner.cpp")
-LIBSRCS = $(shell find libs -type f -name \"*.cpp\")
-BOXSRCS = $(shell find $(BOXDIR) -type f -name \"*.cpp\")
+LIBSRCS = $(shell find libs -type f -name "*.cpp")
+BOXSRCS = $(shell find $(BOXDIR) -type f -name "*.cpp")
 OBJS = $(SRCS:src/%.cpp=build/%.o)
 LIBOBJS = $(LIBSRCS:libs/%.cpp=build/%.o)
 BOXOBJS = $(BOXSRCS:$(BOXDIR)/%.cpp=build/box/%.o)
@@ -83,12 +83,12 @@ directories:
 	@mkdir -p $(BUILDDIR)/sys
 	@mkdir -p $(BUILDDIR)/box
 
-$(LIBTARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) $(OBJS) -lcurl $(JSONLIB) -o $(LIBTARGET)
+$(LIBTARGET): $(OBJS) $(LIBOBJS)
+	$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) $(OBJS) $(LIBOBJS) -lcurl $(JSONLIB) -o $(LIBTARGET)
 	@echo \"Runtime library created. Located at ./$(LIBTARGET)\"
 
-$(TARGET): $(OBJS) build/main.o
-	$(CXX) $(CXXFLAGS) $(RTLDYNAMIC_FLAG) build/main.o $(OBJS) -lcurl $(JSONLIB) -o $(TARGET)
+$(TARGET): $(OBJS) $(LIBOBJS) build/main.o
+	$(CXX) $(CXXFLAGS) $(RTLDYNAMIC_FLAG) build/main.o $(OBJS) $(LIBOBJS) -lcurl $(JSONLIB) -o $(TARGET)
 	@echo "Compilation complete. Binary located at ./$(TARGET)"
 
 build/%.o: src/%.cpp
@@ -109,17 +109,16 @@ build/main.o: src/main.cpp
 
 .PHONY: shared_libs
 shared_libs:
-	@for dir in $(wildcard $(BOXDIR)/*); do \\
-		if [ -f \"$dir/native.cpp\" ]; then \\
-			module_name=`basename $$dir`; \\
-			echo \"Building shared library for $$module_name...\"; \\
-			$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) $$dir/native.cpp -lcurl $(JSONLIB) -o $$dir/$$module_name$(SHARED_EXT); \\
-			echo \"Created shared library: $$dir/$$module_name$(SHARED_EXT)\"; \\
-		elif [ -f \"$dir/native.c\" ]; then \\
-			module_name=`basename $$dir`; \\
-			$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) $$dir/native.c -lcurl $(JSONLIB) -o $$dir/$$module_name$(SHARED_EXT); \\
-			echo \"Created shared library: $$dir/$$module_name$(SHARED_EXT)\"; \\
-		fi \\
+	@for dir in $(wildcard $(BOXDIR)/*); do \
+		if [ -f "$$dir/native.cpp" ]; then \
+			module_name=`basename $$dir`; \
+			echo "Building box module: $$module_name..."; \
+			$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) $$dir/native.cpp -lcurl $(JSONLIB) -o $$dir/$$module_name$(SHARED_EXT); \
+		elif [ -f "$$dir/native.c" ]; then \
+			module_name=`basename $$dir`; \
+			echo "Building box module: $$module_name..."; \
+			$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) $$dir/native.c -lcurl $(JSONLIB) -o $$dir/$$module_name$(SHARED_EXT); \
+		fi \
 	done
 
 
@@ -129,32 +128,32 @@ clean:
 # Rule to build individual box modules
 # Pattern: box/module_name/module_name.dylib
 box/%/%.dylib:
-	@modulename=$*; \\
-	echo \"Building box module: $modulename\"; \\
-	if [ -f \"box/$modulename/native.cpp\" ]; then \\
-		$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) box/$modulename/native.cpp -lcurl $(JSONLIB) -o box/$modulename/$modulename.dylib; \\
-		echo \"Created shared library: box/$modulename/$modulename.dylib\"; \\
-	elif [ -f \"box/$modulename/native.c\" ]; then \\
-		$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) box/$modulename/native.c -lcurl $(JSONLIB) -o box/$modulename/$modulename.dylib; \\
-		echo \"Created shared library: box/$modulename/$modulename.dylib\"; \\
-	else \\
-		echo \"Error: No native.c or native.cpp file found in box/$modulename\"; \\
-		exit 1; \\
+	@modulename=$*;\
+	echo "Building box module: $$modulename"; \
+	if [ -f "box/$$modulename/native.cpp" ]; then \
+		$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) box/$$modulename/native.cpp -lcurl $(JSONLIB) -o box/$$modulename/$$modulename.dylib; \
+		echo "Created shared library: box/$$modulename/$$modulename.dylib"; \
+	elif [ -f "box/$$modulename/native.c" ]; then \
+		$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) box/$$modulename/native.c -lcurl $(JSONLIB) -o box/$$modulename/$$modulename.dylib; \
+		echo "Created shared library: box/$$modulename/$$modulename.dylib"; \
+	else \
+		echo "Error: No native.c or native.cpp file found in box/$$modulename"; \
+		exit 1; \
 	fi
 
 # Rule for Linux modules (if needed)
 box/%/%.so:
-	@modulename=$*; \\
-	echo \"Building box module: $modulename\"; \\
-	if [ -f \"box/$modulename/native.cpp\" ]; then \\
-		$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) box/$modulename/native.cpp -lcurl $(JSONLIB) -o box/$modulename/$modulename.so; \\
-		echo \"Created shared library: box/$modulename/$modulename.so\"; \\
-	elif [ -f \"box/$modulename/native.c\" ]; then \\
-		$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) box/$modulename/native.c -lcurl $(JSONLIB) -o box/$modulename/$modulename.so; \\
-		echo \"Created shared library: box/$modulename/$modulename.so\"; \\
-	else \\
-		echo \"Error: No native.c or native.cpp file found in box/$modulename\"; \\
-		exit 1; \\
+	@modulename=$*;\
+	echo "Building box module: $$modulename"; \
+	if [ -f "box/$$modulename/native.cpp" ]; then \
+		$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) box/$$modulename/native.cpp -lcurl $(JSONLIB) -o box/$$modulename/$$modulename.so; \
+		echo "Created shared library: box/$$modulename/$$modulename.so"; \
+	elif [ -f "box/$$modulename/native.c" ]; then \
+		$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) box/$$modulename/native.c -lcurl $(JSONLIB) -o box/$$modulename/$$modulename.so; \
+		echo "Created shared library: box/$$modulename/$$modulename.so"; \
+	else \
+		echo "Error: No native.c or native.cpp file found in box/$$modulename"; \
+		exit 1; \
 	fi
 
 install:
