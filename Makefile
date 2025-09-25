@@ -32,7 +32,18 @@ else
     SHARED_EXT = .so
     SHARED_FLAGS = -shared -rdynamic
     RTLDYNAMIC_FLAG = -rdynamic
-    JSONLIB = -ljsoncpp
+    # Use pkg-config to find jsoncpp on Linux, if available
+    ifneq ($(shell which pkg-config),)
+        JSONLIB_PKG = $(shell pkg-config --libs jsoncpp)
+        JSON_CFLAGS_PKG = $(shell pkg-config --cflags jsoncpp)
+    endif
+    # If pkg-config found jsoncpp, use it. Otherwise, fallback to default.
+    ifneq ($(JSONLIB_PKG),)
+        JSONLIB = $(JSONLIB_PKG)
+        DEPENDENCIES += $(JSON_CFLAGS_PKG)
+    else
+        JSONLIB = -ljsoncpp
+    endif
 endif
 
 LIBTARGET = libneutron_runtime$(SHARED_EXT)

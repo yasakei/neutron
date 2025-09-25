@@ -397,8 +397,7 @@ void VM::run() {
                                 if (!callValue(stack[stack.size() - argCount - 1], argCount)) {
                                         return;
                 }
-                                frame = frame = &frames.back();
-frames.back();
+                                frame = &frames.back();
                                 break;
             }
                         case (uint8_t)OpCode::OP_ARRAY: {

@@ -155,7 +155,9 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
         std::cout << "Executable created: " << outputPath << std::endl;
         // Make the file executable
         std::string chmodCommand = "chmod +x " + outputPath;
-        system(chmodCommand.c_str());
+        if (system(chmodCommand.c_str()) != 0) {
+            std::cerr << "Failed to make file executable" << std::endl;
+        }
     } else {
         std::cerr << "Failed to create executable" << std::endl;
         exit(1);
