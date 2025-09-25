@@ -39,7 +39,10 @@ enum class OpCode : uint8_t {
     OP_CLOSURE,
     OP_GET_UPVALUE,
     OP_SET_UPVALUE,
-    OP_CLOSE_UPVALUE
+    OP_CLOSE_UPVALUE,
+    OP_ARRAY,
+    OP_INDEX_GET,
+    OP_INDEX_SET
 };
 
 class Chunk {

@@ -22,11 +22,22 @@ Value::Value(double value) : type(ValueType::NUMBER), as(value) {}
 
 Value::Value(const std::string& value) : type(ValueType::STRING), as(value) {}
 
+Value::Value(Array* array) : type(ValueType::ARRAY), as(array) {}
+
 Value::Value(Object* object) : type(ValueType::OBJECT), as(object) {}
 
-
-
 Value::Value(Module* module) : type(ValueType::MODULE), as(module) {}
+
+std::string Array::toString() const {
+    std::ostringstream oss;
+    oss << "[";
+    for (size_t i = 0; i < elements.size(); ++i) {
+        if (i > 0) oss << ", ";
+        oss << elements[i].toString();
+    }
+    oss << "]";
+    return oss.str();
+}
 
 std::string Value::toString() const {
     switch (type) {
@@ -42,6 +53,8 @@ std::string Value::toString() const {
         }
         case ValueType::STRING:
             return std::get<std::string>(as);
+        case ValueType::ARRAY:
+            return std::get<Array*>(as)->toString();
         case ValueType::OBJECT:
             return std::get<Object*>(as)->toString();
         case ValueType::CALLABLE: {
@@ -125,6 +138,103 @@ Value native_say(std::vector<Value> arguments) {
     }
     std::cout << arguments[0].toString() << std::endl;
     return Value();
+}
+
+Value native_array_new(std::vector<Value> /*arguments*/) {
+    return Value(new Array(std::vector<Value>()));
+}
+
+Value native_array_push(std::vector<Value> arguments) {
+    if (arguments.size() != 2) {
+        throw std::runtime_error("array_push expects exactly 2 arguments: array and value");
+    }
+    
+    if (arguments[0].type != ValueType::ARRAY) {
+        throw std::runtime_error("First argument must be an array");
+    }
+    
+    Array* array = std::get<Array*>(arguments[0].as);
+    array->push(arguments[1]);
+    
+    return arguments[1]; // Return the pushed value
+}
+
+Value native_array_pop(std::vector<Value> arguments) {
+    if (arguments.size() != 1) {
+        throw std::runtime_error("array_pop expects exactly 1 argument: array");
+    }
+    
+    if (arguments[0].type != ValueType::ARRAY) {
+        throw std::runtime_error("Argument must be an array");
+    }
+    
+    Array* array = std::get<Array*>(arguments[0].as);
+    if (array->size() == 0) {
+        throw std::runtime_error("Cannot pop from empty array");
+    }
+    
+    return array->pop();
+}
+
+Value native_array_length(std::vector<Value> arguments) {
+    if (arguments.size() != 1) {
+        throw std::runtime_error("array_length expects exactly 1 argument: array");
+    }
+    
+    if (arguments[0].type != ValueType::ARRAY) {
+        throw std::runtime_error("Argument must be an array");
+    }
+    
+    Array* array = std::get<Array*>(arguments[0].as);
+    return Value(static_cast<double>(array->size()));
+}
+
+Value native_array_at(std::vector<Value> arguments) {
+    if (arguments.size() != 2) {
+        throw std::runtime_error("array_at expects exactly 2 arguments: array and index");
+    }
+    
+    if (arguments[0].type != ValueType::ARRAY) {
+        throw std::runtime_error("First argument must be an array");
+    }
+    
+    if (arguments[1].type != ValueType::NUMBER) {
+        throw std::runtime_error("Second argument must be a number (index)");
+    }
+    
+    Array* array = std::get<Array*>(arguments[0].as);
+    int index = static_cast<int>(std::get<double>(arguments[1].as));
+    
+    if (index < 0 || static_cast<size_t>(index) >= array->size()) {
+        throw std::runtime_error("Array index out of bounds");
+    }
+    
+    return array->at(index);
+}
+
+Value native_array_set(std::vector<Value> arguments) {
+    if (arguments.size() != 3) {
+        throw std::runtime_error("array_set expects exactly 3 arguments: array, index, and value");
+    }
+    
+    if (arguments[0].type != ValueType::ARRAY) {
+        throw std::runtime_error("First argument must be an array");
+    }
+    
+    if (arguments[1].type != ValueType::NUMBER) {
+        throw std::runtime_error("Second argument must be a number (index)");
+    }
+    
+    Array* array = std::get<Array*>(arguments[0].as);
+    int index = static_cast<int>(std::get<double>(arguments[1].as));
+    const Value& value = arguments[2];
+    
+    if (index < 0 || static_cast<size_t>(index) >= array->size()) {
+        throw std::runtime_error("Array index out of bounds");
+    }
+    
+    array->set(index, value);
+    return value; // Return the set value
 }
 
 } // namespace neutron

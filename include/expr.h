@@ -24,7 +24,10 @@ enum class ExprType {
     MEMBER,
     CALL,
     ASSIGN,
-    OBJECT
+    OBJECT,
+    ARRAY,
+    INDEX_GET,
+    INDEX_SET
 };
 
 // Literal types
@@ -323,6 +326,42 @@ public:
     
     ObjectExpr(std::vector<std::pair<std::string, std::unique_ptr<Expr>>> properties)
         : Expr(ExprType::OBJECT), properties(std::move(properties)) {}
+
+    void accept(Compiler* compiler) const override;
+};
+
+// Array literal expression
+class ArrayExpr : public Expr {
+public:
+    std::vector<std::unique_ptr<Expr>> elements;
+    
+    ArrayExpr(std::vector<std::unique_ptr<Expr>> elements)
+        : Expr(ExprType::ARRAY), elements(std::move(elements)) {}
+
+    void accept(Compiler* compiler) const override;
+};
+
+// Index get expression (array[index])
+class IndexGetExpr : public Expr {
+public:
+    std::unique_ptr<Expr> array;
+    std::unique_ptr<Expr> index;
+    
+    IndexGetExpr(std::unique_ptr<Expr> array, std::unique_ptr<Expr> index)
+        : Expr(ExprType::INDEX_GET), array(std::move(array)), index(std::move(index)) {}
+
+    void accept(Compiler* compiler) const override;
+};
+
+// Index set expression (array[index] = value)
+class IndexSetExpr : public Expr {
+public:
+    std::unique_ptr<Expr> array;
+    std::unique_ptr<Expr> index;
+    std::unique_ptr<Expr> value;
+    
+    IndexSetExpr(std::unique_ptr<Expr> array, std::unique_ptr<Expr> index, std::unique_ptr<Expr> value)
+        : Expr(ExprType::INDEX_SET), array(std::move(array)), index(std::move(index)), value(std::move(value)) {}
 
     void accept(Compiler* compiler) const override;
 };

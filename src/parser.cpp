@@ -210,6 +210,14 @@ std::unique_ptr<Expr> Parser::assignment() {
         if (expr->type == ExprType::VARIABLE) {
             Token name = static_cast<VariableExpr*>(expr.get())->name;
             return std::make_unique<AssignExpr>(name, std::move(value));
+        } else if (expr->type == ExprType::INDEX_GET) {
+            // Handle assignment to array index: array[index] = value
+            IndexGetExpr* indexGet = static_cast<IndexGetExpr*>(expr.get());
+            return std::make_unique<IndexSetExpr>(
+                std::move(indexGet->array), 
+                std::move(indexGet->index), 
+                std::move(value)
+            );
         }
 
         error(equals, "Invalid assignment target.");
@@ -322,6 +330,10 @@ std::unique_ptr<Expr> Parser::call() {
         } else if (match({TokenType::DOT})) {
             Token name = consume(TokenType::IDENTIFIER, "Expect property name after '.'.");
             expr = std::make_unique<MemberExpr>(std::move(expr), name);
+        } else if (match({TokenType::LEFT_BRACKET})) {
+            std::unique_ptr<Expr> index = expression();
+            consume(TokenType::RIGHT_BRACKET, "Expect ']' after index.");
+            expr = std::make_unique<IndexGetExpr>(std::move(expr), std::move(index));
         } else {
             break;
         }
@@ -366,6 +378,11 @@ std::unique_ptr<Expr> Parser::primary() {
         return std::make_unique<GroupingExpr>(std::move(expr));
     }
     
+    // Handle array literals
+    if (match({TokenType::LEFT_BRACKET})) {
+        return arrayLiteral();
+    }
+    
     // Handle object literals
     if (match({TokenType::LEFT_BRACE})) {
         return objectLiteral();
@@ -373,6 +390,25 @@ std::unique_ptr<Expr> Parser::primary() {
     
     error(peek(), "Expect expression.");
     return nullptr; // This line should never be reached
+}
+
+std::unique_ptr<Expr> Parser::arrayLiteral() {
+    std::vector<std::unique_ptr<Expr>> elements;
+    
+    // Handle empty array
+    if (!check(TokenType::RIGHT_BRACKET)) {
+        do {
+            if (elements.size() >= 255) {
+                error(peek(), "Can't have more than 255 elements in an array.");
+            }
+            
+            elements.push_back(expression());
+        } while (match({TokenType::COMMA}));
+    }
+    
+    consume(TokenType::RIGHT_BRACKET, "Expect ']' after array elements.");
+    
+    return std::make_unique<ArrayExpr>(std::move(elements));
 }
 
 std::unique_ptr<Expr> Parser::objectLiteral() {
@@ -548,6 +584,18 @@ void AssignExpr::accept(Compiler* compiler) const {
 
 void ObjectExpr::accept(Compiler* compiler) const {
     compiler->visitObjectExpr(this);
+}
+
+void ArrayExpr::accept(Compiler* compiler) const {
+    compiler->visitArrayExpr(this);
+}
+
+void IndexGetExpr::accept(Compiler* compiler) const {
+    compiler->visitIndexGetExpr(this);
+}
+
+void IndexSetExpr::accept(Compiler* compiler) const {
+    compiler->visitIndexSetExpr(this);
 }
 
 void ExpressionStmt::accept(Compiler* compiler) const {

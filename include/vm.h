@@ -18,6 +18,8 @@ namespace neutron {
     void register_sys_functions(std::shared_ptr<Environment> env);
     void register_json_functions(std::shared_ptr<Environment> env);
     void register_convert_functions(std::shared_ptr<Environment> env);
+    void register_time_functions(std::shared_ptr<Environment> env);
+    void register_math_functions(std::shared_ptr<Environment> env);
 }
 
 namespace neutron {
@@ -27,6 +29,7 @@ class VM;
 class Callable;
 class Module;
 class Object;
+class Array;
 class Chunk;
 
 struct Value;
@@ -43,12 +46,13 @@ enum class ValueType {
     BOOLEAN,
     NUMBER,
     STRING,
+    ARRAY,
     OBJECT,
     CALLABLE,
     MODULE
 };
 
-using Literal = std::variant<std::nullptr_t, bool, double, std::string, Object*, Callable*, Module*>;
+using Literal = std::variant<std::nullptr_t, bool, double, std::string, Array*, Object*, Callable*, Module*>;
 
 struct Value {
     ValueType type;
@@ -59,6 +63,7 @@ struct Value {
     Value(bool value);
     Value(double value);
     Value(const std::string& value);
+    Value(Array* array);
     Value(Object* object);
     Value(Callable* callable);
     Value(Module* module);
@@ -68,8 +73,11 @@ struct Value {
 
 class Object {
 public:
+    bool is_marked = false;
     virtual ~Object() = default;
     virtual std::string toString() const = 0;
+    virtual void mark() { is_marked = true; }
+    virtual void sweep() {} // Default implementation, can be overridden
 };
 
 class JsonObject : public Object {
@@ -77,6 +85,63 @@ public:
     std::unordered_map<std::string, Value> properties;
     std::string toString() const override {
         return "<json object>";
+    }
+};
+
+class Array : public Object {
+public:
+    std::vector<Value> elements;
+    
+    Array() = default;
+    Array(std::vector<Value> elements) : elements(std::move(elements)) {}
+    
+    std::string toString() const override;
+    
+    size_t size() const { return elements.size(); }
+    void push(const Value& value) { elements.push_back(value); }
+    Value pop() { 
+        if (elements.empty()) {
+            throw std::runtime_error("Cannot pop from empty array");
+        }
+        Value value = elements.back();
+        elements.pop_back();
+        return value;
+    }
+    Value& at(size_t index) { 
+        if (index >= elements.size()) {
+            throw std::runtime_error("Array index out of bounds");
+        }
+        return elements[index]; 
+    }
+    const Value& at(size_t index) const { 
+        if (index >= elements.size()) {
+            throw std::runtime_error("Array index out of bounds");
+        }
+        return elements[index]; 
+    }
+    void set(size_t index, const Value& value) {
+        if (index >= elements.size()) {
+            throw std::runtime_error("Array index out of bounds");
+        }
+        elements[index] = value;
+    }
+    
+    void mark() override {
+        Object::mark(); // Mark this object
+        // Mark all elements in the array
+        for (auto& element : elements) {
+            if (element.type == ValueType::OBJECT) {
+                Object* obj = std::get<Object*>(element.as);
+                if (obj && !obj->is_marked) {
+                    obj->mark();
+                }
+            } else if (element.type == ValueType::ARRAY) {
+                Array* arr = std::get<Array*>(element.as);
+                if (arr && !arr->is_marked) {
+                    arr->mark();
+                }
+            }
+        }
     }
 };
 
@@ -94,6 +159,14 @@ Value native_int_to_char(std::vector<Value> arguments);
 Value native_string_get_char_at(std::vector<Value> arguments);
 Value native_string_length(std::vector<Value> arguments);
 Value native_say(std::vector<Value> arguments);
+
+// Native functions for arrays
+Value native_array_new(std::vector<Value> arguments);
+Value native_array_push(std::vector<Value> arguments);
+Value native_array_pop(std::vector<Value> arguments);
+Value native_array_length(std::vector<Value> arguments);
+Value native_array_at(std::vector<Value> arguments);
+Value native_array_set(std::vector<Value> arguments);
 
 class Environment {
 public:
@@ -173,18 +246,36 @@ public:
     void load_module(const std::string& name);
     Value call(const Value& callee, const std::vector<Value>& arguments);
     Value execute_string(const std::string& source);
+    
+    // Memory management functions
+    template<typename T, typename... Args>
+    T* allocate(Args&&... args) {
+        T* obj = new T(std::forward<Args>(args)...);
+        heap.push_back(obj);
+        return obj;
+    }
 
 private:
     bool call(Function* function, int argCount);
     bool callValue(Value callee, int argCount);
     void run();
     void interpret_module(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> module_env);
+    
+    // Garbage collection methods
+    void markRoots();
+    void markValue(const Value& value);
+    void collectGarbage();
+    void sweep();
 
     std::vector<CallFrame> frames;
     Chunk* chunk;
     uint8_t* ip;
     std::vector<Value> stack;
     std::unordered_map<std::string, Value> globals;
+    
+    // Memory management
+    std::vector<Object*> heap;
+    size_t nextGC;
 };
 
 } // namespace neutron

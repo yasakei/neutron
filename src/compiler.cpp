@@ -349,6 +349,35 @@ void Compiler::visitCallExpr(const CallExpr* expr) {
     emitBytes((uint8_t)OpCode::OP_CALL, expr->arguments.size());
 }
 
+void Compiler::visitArrayExpr(const ArrayExpr* expr) {
+    // Compile all array elements
+    for (const auto& element : expr->elements) {
+        compileExpression(element.get());
+    }
+    
+    // Emit the array instruction with the number of elements
+    emitBytes((uint8_t)OpCode::OP_ARRAY, expr->elements.size());
+}
+
+void Compiler::visitIndexGetExpr(const IndexGetExpr* expr) {
+    // Compile the array and index
+    compileExpression(expr->array.get());
+    compileExpression(expr->index.get());
+    
+    // Emit the index get instruction
+    emitByte((uint8_t)OpCode::OP_INDEX_GET);
+}
+
+void Compiler::visitIndexSetExpr(const IndexSetExpr* expr) {
+    // Compile the array, index, and value
+    compileExpression(expr->array.get());
+    compileExpression(expr->index.get());
+    compileExpression(expr->value.get());
+    
+    // Emit the index set instruction
+    emitByte((uint8_t)OpCode::OP_INDEX_SET);
+}
+
 void Compiler::visitObjectExpr(const ObjectExpr* expr) {
     // Create a new JsonObject
     auto obj = new JsonObject();

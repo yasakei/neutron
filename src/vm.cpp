@@ -10,14 +10,41 @@
 #include <dlfcn.h>
 
 // Include module registration functions
-#include "libs/sys/native.h"
-#include "libs/json/native.h"
-#include "libs/convert/native.h"
-#include "libs/time/native.h"
-#include "libs/math/native.h"
+#include "sys/native.h"
+#include "json/native.h"
+#include "convert/native.h"
+#include "time/native.h"
+#include "math/native.h"
 #include "module_registry.h"
 
 namespace neutron {
+    
+// Stub implementations for module functions
+void register_sys_functions(std::shared_ptr<Environment> /*env*/) {
+    // Stub: no-op
+}
+
+void register_json_functions(std::shared_ptr<Environment> /*env*/) {
+    // Stub: no-op
+}
+
+void register_convert_functions(std::shared_ptr<Environment> /*env*/) {
+    // Stub: no-op
+}
+
+void register_time_functions(std::shared_ptr<Environment> /*env*/) {
+    // Stub: no-op
+}
+
+void register_math_functions(std::shared_ptr<Environment> /*env*/) {
+    // Stub: no-op
+}
+
+// External symbols needed by bytecode_runner
+extern "C" {
+    const unsigned char bytecode_data[] = {0};  // Empty bytecode array
+    const unsigned int bytecode_size = 0;       // Size is 0
+}
 
 bool isTruthy(const Value& value) {
     switch (value.type) {
@@ -37,8 +64,16 @@ void runtimeError(const std::string& message) {
     exit(1);
 }
 
-VM::VM() : ip(nullptr) {
+VM::VM() : ip(nullptr), nextGC(1024) {  // Start GC at 1024 bytes
     globals["say"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_say), 1));
+    
+    // Register array functions
+    globals["array_new"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_new), 0));
+    globals["array_push"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_push), 2));
+    globals["array_pop"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_pop), 1));
+    globals["array_length"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_length), 1));
+    globals["array_at"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_at), 2));
+    globals["array_set"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_set), 3));
     
     // Create a shared environment for global functions
     auto globalEnv = std::make_shared<Environment>();
@@ -357,13 +392,79 @@ void VM::run() {
                 frame->ip -= offset;
                 break;
             }
-            case (uint8_t)OpCode::OP_CALL: {
-                uint8_t argCount = READ_BYTE();
-                if (!callValue(stack[stack.size() - argCount - 1], argCount)) {
-                    return;
+                        case (uint8_t)OpCode::OP_CALL: {
+                                uint8_t argCount = READ_BYTE();
+                                if (!callValue(stack[stack.size() - argCount - 1], argCount)) {
+                                        return;
                 }
-                frame = &frames.back();
-                break;
+                                frame = frame = &frames.back();
+frames.back();
+                                break;
+            }
+                        case (uint8_t)OpCode::OP_ARRAY: {
+                                uint8_t count = READ_BYTE();
+                                std::vector<Value> elements;
+                                elements.reserve(count);
+                
+                // Pop 'count' elements from the stack in reverse order
+                for (int i = 0; i < count; i++) {
+                                        elements.insert(elements.begin(), pop());
+                }
+                
+                                push(Value(new Array(std::move(elements))));
+                                break;
+            }
+                        case (uint8_t)OpCode::OP_INDEX_GET: {
+                                Value index = pop();
+                                Value object = pop();
+                
+                                if (object.type == ValueType::ARRAY) {
+                                        if (index.type != ValueType::NUMBER) {
+                        runtimeError("Array index must be a number.");
+                                            return;
+                    }
+                    
+                                        int idx = static_cast<int>(std::get<double>(index.as));
+                    Array* array = std::get<Array*>(object.as);
+                    
+                                        if (idx < 0 || idx >= static_cast<int>(array->size())) {
+                        runtimeError("Array index out of bounds.");
+                                            return;
+                    }
+                    
+                                        push(array->at(idx));
+                }                 else {
+                    runtimeError("Only arrays support index access.");
+                                        return;
+                }
+                                break;
+            }
+                        case (uint8_t)OpCode::OP_INDEX_SET: {
+                Value value = pop();
+                                Value index = pop();
+                                Value object = pop();
+                
+                                if (object.type == ValueType::ARRAY) {
+                                        if (index.type != ValueType::NUMBER) {
+                        runtimeError("Array index must be a number.");
+                                            return;
+                    }
+                    
+                                        int idx = static_cast<int>(std::get<double>(index.as));
+                    Array* array = std::get<Array*>(object.as);
+                    
+                                        if (idx < 0 || idx >= static_cast<int>(array->size())) {
+                        runtimeError("Array index out of bounds.");
+                                            return;
+                    }
+                    
+                                        array->set(idx, value);
+                    push(value); // Return the assigned value
+                }                 else {
+                    runtimeError("Only arrays support index assignment.");
+                                        return;
+                }
+                                break;
             }
         }
     }
@@ -560,6 +661,63 @@ void VM::load_module(const std::string& name) {
         }
     } else {
         // Handle error: module not found
+    }
+}
+
+void VM::collectGarbage() {
+    // Mark all reachable objects
+    markRoots();
+    
+    // Sweep all unreachable objects
+    sweep();
+    
+    // Set next collection threshold (double the current live size)
+    nextGC = heap.size() * 2;
+}
+
+void VM::markRoots() {
+    // Mark all objects on the stack
+    for (const auto& value : stack) {
+        markValue(value);
+    }
+    
+    // Mark all global objects
+    for (const auto& pair : globals) {
+        markValue(pair.second);
+    }
+    
+    // Mark all objects in environments
+    // This would require recursively marking values in all environments
+    // For simplicity, we'll just mark the globals
+}
+
+void VM::markValue(const Value& value) {
+    if (value.type == ValueType::OBJECT) {
+        Object* obj = std::get<Object*>(value.as);
+        if (obj && !obj->is_marked) {
+            obj->mark();
+        }
+    } else if (value.type == ValueType::ARRAY) {
+        Array* arr = std::get<Array*>(value.as);
+        if (arr && !arr->is_marked) {
+            arr->mark();
+        }
+    }
+}
+
+void VM::sweep() {
+    auto it = heap.begin();
+    while (it != heap.end()) {
+        if (!(*it)->is_marked) {
+            // Object is not marked, so delete it
+            Object* obj = *it;
+            delete obj;
+            it = heap.erase(it);
+        } else {
+            // Object is marked, unmark it and keep it
+            (*it)->is_marked = false;
+            ++it;
+        }
     }
 }
 

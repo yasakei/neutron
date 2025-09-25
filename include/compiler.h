@@ -43,6 +43,9 @@ public:
     void visitCallExpr(const CallExpr* expr);
     void visitAssignExpr(const AssignExpr* expr);
     void visitObjectExpr(const ObjectExpr* expr);
+    void visitArrayExpr(const ArrayExpr* expr);
+    void visitIndexGetExpr(const IndexGetExpr* expr);
+    void visitIndexSetExpr(const IndexSetExpr* expr);
     void visitExpressionStmt(const ExpressionStmt* stmt);
     void visitSayStmt(const SayStmt* stmt);
     void visitVarStmt(const VarStmt* stmt);

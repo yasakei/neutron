@@ -25,6 +25,9 @@ std::ostream& operator<<(std::ostream& os, ValueType type) {
         case ValueType::CALLABLE:
             os << "CALLABLE";
             break;
+        case ValueType::ARRAY:
+            os << "ARRAY";
+            break;
         case ValueType::MODULE:
             os << "MODULE";
             break;

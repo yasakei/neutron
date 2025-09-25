@@ -37,6 +37,7 @@ private:
     std::unique_ptr<Expr> call();
     std::unique_ptr<Expr> primary();
     std::unique_ptr<Expr> objectLiteral();
+    std::unique_ptr<Expr> arrayLiteral();
     
     std::unique_ptr<Stmt> statement();
     std::unique_ptr<Stmt> sayStatement();
