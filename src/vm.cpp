@@ -64,7 +64,7 @@ VM::VM() : ip(nullptr) {
 }
 
 Function::Function(const FunctionStmt* declaration, std::shared_ptr<Environment> closure) 
-    : declaration(declaration), closure(closure), arity_val(0), chunk(new Chunk()) {}
+    : name(), arity_val(0), chunk(new Chunk()), declaration(declaration), closure(closure) {}
 
 Value Function::call(VM& /*vm*/, std::vector<Value> /*arguments*/) {
     // This is now handled by the VM's call stack
@@ -446,7 +446,13 @@ Value VM::execute_string(const std::string& source) {
 
 void VM::load_module(const std::string& name) {
     std::string nt_path = "box/" + name + ".nt";
-    std::string so_path = "box/" + name + "/" + name + ".so";
+    
+#ifdef __APPLE__
+    std::string shared_lib_path = "box/" + name + "/" + name + ".dylib";
+#else
+    std::string shared_lib_path = "box/" + name + "/" + name + ".so";
+#endif
+    
     std::string module_nt_path = "box/" + name + "/" + name + ".nt";
 
     // First, check for a module-specific .nt file
@@ -543,7 +549,7 @@ void VM::load_module(const std::string& name) {
         return;
     }
 
-    void* handle = dlopen(so_path.c_str(), RTLD_LAZY);
+    void* handle = dlopen(shared_lib_path.c_str(), RTLD_LAZY);
     if (handle) {
         void (*init_func)(VM*) = (void (*)(VM*))dlsym(handle, "neutron_module_init");
         if (init_func) {

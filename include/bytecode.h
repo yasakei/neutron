@@ -7,7 +7,7 @@
 namespace neutron {
 
 // Forward declarations
-class Value;
+struct Value;
 
 enum class OpCode : uint8_t {
     OP_RETURN,

@@ -7,14 +7,14 @@
 
 namespace neutron {
 
-Compiler::Compiler(VM& vm) : vm(vm), function(nullptr), chunk(nullptr), scopeDepth(0) {
+Compiler::Compiler(VM& vm) : enclosing(nullptr), function(nullptr), vm(vm), chunk(nullptr), scopeDepth(0) {
     function = new Function(nullptr, std::make_shared<Environment>());
     function->name = "<script>";
     function->chunk = new Chunk();
     chunk = function->chunk;
 }
 
-Compiler::Compiler(Compiler* enclosing) : vm(enclosing->vm), enclosing(enclosing), function(nullptr), scopeDepth(0), chunk(nullptr) {
+Compiler::Compiler(Compiler* enclosing) : enclosing(enclosing), function(nullptr), vm(enclosing->vm), chunk(nullptr), scopeDepth(0) {
     function = new Function(nullptr, std::make_shared<Environment>());
     function->chunk = new Chunk();
     chunk = function->chunk;

@@ -29,7 +29,7 @@ class Module;
 class Object;
 class Chunk;
 
-class Value;
+struct Value;
 class Function;
 
 struct CallFrame {

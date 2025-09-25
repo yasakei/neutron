@@ -171,7 +171,11 @@ int main(int argc, char* argv[]) {
             return 0;
         } else if (arg == "--build-box" && argc > 2) {
             std::string module_name = argv[2];
+#ifdef __APPLE__
+            std::string command = "make box/" + module_name + "/" + module_name + ".dylib";
+#else
             std::string command = "make box/" + module_name + "/" + module_name + ".so";
+#endif
             std::cout << "Building module: " << module_name << std::endl;
             int result = system(command.c_str());
             return result;

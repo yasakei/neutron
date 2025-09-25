@@ -35,7 +35,7 @@ std::ostream& operator<<(std::ostream& os, ValueType type) {
 void disassembleChunk(const Chunk* chunk, const char* name) {
     std::cout << "== " << name << " ==" << std::endl;
 
-    for (int offset = 0; offset < chunk->code.size();) {
+    for (size_t offset = 0; offset < chunk->code.size();) {
         offset = disassembleInstruction(chunk, offset);
     }
 }
@@ -53,7 +53,7 @@ static int constantInstruction(const char* name, const Chunk* chunk, int offset)
     return offset + 2;
 }
 
-int disassembleInstruction(const Chunk* chunk, int offset) {
+size_t disassembleInstruction(const Chunk* chunk, size_t offset) {
     std::cout << offset << " ";
     if (offset > 0 && chunk->lines[offset] == chunk->lines[offset - 1]) {
         std::cout << "   | ";
