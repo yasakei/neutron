@@ -107,30 +107,32 @@ build/main.o: src/main.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) $(DEPENDENCIES) -c $< -o $@
 
-### Box module build rule #################################################
-# Invoked by:   ./neutron --build-box <name>
-# Expects make target: box/<name>/<name>$(SHARED_EXT)
-# We do NOT want to eagerly rebuild the main runtime here; assume user ran `make`.
-# If libneutron_runtime$(SHARED_EXT) exists we link to it, otherwise on macOS we
-# fall back to -Wl,-undefined,dynamic_lookup so symbols resolve at load.
+.PHONY: shared_libs
+	if [ -f "box/$$modulename/native.cpp" ]; then \
+		$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) box/$$modulename/native.cpp -L. -lneutron_runtime -lcurl $(JSONLIB) -o box/$$modulename/$$modulename.dylib; \
+		echo "Created shared library: box/$$modulename/$$modulename.dylib"; \
+	elif [ -f "box/$$modulename/native.c" ]; then \
+		$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) box/$$modulename/native.c -L. -lneutron_runtime -lcurl $(JSONLIB) -o box/$$modulename/$$modulename.dylib; \
+		echo "Created shared library: box/$$modulename/$$modulename.dylib"; \
+	else \
+		echo "Error: No native.c or native.cpp file found in box/$$modulename"; \
+		exit 1; \
+	fi
 
-# Per-platform extra flags for plugin style modules
-ifeq ($(UNAME_S),Darwin)
-PLUGIN_LDFLAGS = -Wl,-undefined,dynamic_lookup -Wl,-rpath,@loader_path/../..
-else
-PLUGIN_LDFLAGS = -Wl,-rpath,'$$ORIGIN/../..' -Wl,--no-undefined -L. -lneutron_runtime
-endif
-
-# Pattern: box/foo/foo.dylib (mac) or box/foo/foo.so (linux)
-box/%/%.$(SHARED_EXT):
-	@moddir=$(dir $@); moddir=$${moddir%/}; module=$${moddir##*/}; \
-	cpp="box/$$module/native.cpp"; csrc="box/$$module/native.c"; \
-	if [ -f "$$cpp" ]; then src="$$cpp"; elif [ -f "$$csrc" ]; then src="$$csrc"; else \
-		echo "Error: No native.c or native.cpp in box/$$module"; exit 1; fi; \
-	echo "Building box module: $$module -> $@"; \
-	if [ -f "$(LIBTARGET)" ]; then LINKRT="-L. -lneutron_runtime"; else LINKRT=""; fi; \
-	$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) $$src $(JSONLIB) -lcurl $$LINKRT $(PLUGIN_LDFLAGS) -o $@ || exit $$?; \
-	[ -f "$@" ] && echo "Created box module: $@"
+# Rule for Linux modules (if needed)
+box/%/%.so:
+	@modulename=$*;\
+	echo "Building box module: $$modulename"; \
+	if [ -f "box/$$modulename/native.cpp" ]; then \
+		$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) box/$$modulename/native.cpp -lcurl $(JSONLIB) -o box/$$modulename/$$modulename.so; \
+		echo "Created shared library: box/$$modulename/$$modulename.so"; \
+	elif [ -f "box/$$modulename/native.c" ]; then \
+		$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) box/$$modulename/native.c -lcurl $(JSONLIB) -o box/$$modulename/$$modulename.so; \
+		echo "Created shared library: box/$$modulename/$$modulename.so"; \
+	else \
+		echo "Error: No native.c or native.cpp file found in box/$$modulename"; \
+		exit 1; \
+	fi
 
 install:
 	cp $(TARGET) /usr/local/bin/
