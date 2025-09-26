@@ -69,6 +69,23 @@ endif
 
 all: directories $(TARGET) $(LIBTARGET)
 
+build-box:
+	@if [ -z \"$(MODULE)\" ]; then \\
+		echo \"Error: MODULE variable not set.\"; exit 1; \\
+	fi
+	@SRCFILE=$(find box/$(MODULE) -name 'native.c' -o -name 'native.cpp' | head -n 1); \\
+	if [ -z \"$SRCFILE\" ]; then \\
+		echo \"Error: No native.c or native.cpp in box/$(MODULE)\"; exit 1; \\
+	fi; \\
+	OUTPUT_DIR=box/$(MODULE); \\
+	OFILE=\"$OUTPUT_DIR/$(MODULE)$(SHARED_EXT)\"; \\
+	echo \"Building box module: $(MODULE) -> $OFILE\"; \\
+	$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) $SRCFILE $(JSONLIB) -lcurl -L. -lneutron_runtime $(PLUGIN_LDFLAGS) -o $OFILE; \\
+	echo \"Created box module: $OFILE\"
+	$(MAKE) all DEBUG=0
+	strip $(TARGET)
+	@echo \"Release build complete. Binary located at ./$(TARGET)\"
+
 release:
 	$(MAKE) all DEBUG=0
 	strip $(TARGET)
@@ -116,9 +133,9 @@ build/main.o: src/main.cpp
 
 # Per-platform extra flags for plugin style modules
 ifeq ($(UNAME_S),Darwin)
-PLUGIN_LDFLAGS = -Wl,-undefined,dynamic_lookup -Wl,-rpath,@loader_path/../..
+PLUGIN_LDFLAGS = -Wl,-rpath,@loader_path/../../ -L. -lneutron_runtime
 else
-PLUGIN_LDFLAGS = -Wl,-rpath,'$$ORIGIN/../..' -Wl,--no-undefined -L. -lneutron_runtime
+PLUGIN_LDFLAGS = -Wl,-rpath,'$ORIGIN/../..' -L. -lneutron_runtime
 endif
 
 # Pattern: box/foo/foo.dylib (mac) or box/foo/foo.so (linux)

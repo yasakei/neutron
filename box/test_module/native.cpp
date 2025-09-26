@@ -19,7 +19,7 @@ NeutronValue* addTwoNumbers(NeutronVM* vm, int argCount, NeutronValue** args) {
 }
 
 // Module initialization function
-extern "C" void initModule(NeutronVM* vm) {
+extern "C" void neutron_module_init(NeutronVM* vm) {
     // Define the module name and function
     neutron_define_native(vm, "addTwoNumbers", addTwoNumbers, 2);
 }

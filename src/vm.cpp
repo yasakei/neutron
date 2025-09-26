@@ -9,6 +9,7 @@
 #include <fstream>
 #include <dlfcn.h>
 
+#include "capi.h"
 #include "sys/native.h"
 #include "json/native.h"
 #include "convert/native.h"
@@ -157,6 +158,19 @@ bool VM::callValue(Value callee, int argCount) {
                 args.push_back(stack[stack.size() - argCount + i]);
             }
             Value result = native->call(*this, args);
+            stack.resize(stack.size() - argCount - 1);
+            push(result);
+            return true;
+        } else if (callable->isCNativeFn()) {
+            if (callable->arity() != -1 && callable->arity() != argCount) {
+                runtimeError("Expected " + std::to_string(callable->arity()) + " arguments but got " + std::to_string(argCount) + ".");
+                return false;
+            }
+            std::vector<Value> args;
+            for (int i = 0; i < argCount; i++) {
+                args.push_back(stack[stack.size() - argCount + i]);
+            }
+            Value result = callable->call(*this, args);
             stack.resize(stack.size() - argCount - 1);
             push(result);
             return true;
@@ -629,6 +643,15 @@ void VM::load_module(const std::string& name) {
 
     void* handle = dlopen(shared_lib_path.c_str(), RTLD_LAZY);
     if (handle) {
+        // It's a native module, we need to load it.
+        auto module_env = std::make_shared<Environment>();
+        
+        // Save current globals
+        auto saved_globals = globals;
+        
+        // Create a temporary VM with the module environment as globals
+        globals.clear();
+        
         void (*init_func)(VM*) = (void (*)(VM*))dlsym(handle, "neutron_module_init");
         if (init_func) {
             init_func(this);
@@ -636,6 +659,19 @@ void VM::load_module(const std::string& name) {
             dlclose(handle);
             // Handle error: init function not found
         }
+        
+        // Copy the defined values from globals to the module environment
+        for (const auto& pair : globals) {
+            module_env->define(pair.first, pair.second);
+        }
+        
+        // Restore globals
+        globals = saved_globals;
+        
+        // Create the module with the populated environment
+        auto module = new Module(name, module_env);
+        define_module(name, module);
+        return;
     } else {
         // Handle error: module not found
     }

@@ -172,15 +172,29 @@ int main(int argc, char* argv[]) {
             std::cout << "Neutron 0.1(Alpha)" << std::endl;
             return 0;
         } else if (arg == "--build-box" && argc > 2) {
-            std::string module_name = argv[2];
-#ifdef __APPLE__
-            std::string command = "make box/" + module_name + "/" + module_name + ".dylib";
-#else
-            std::string command = "make box/" + module_name + "/" + module_name + ".so";
-#endif
-            std::cout << "Building module: " << module_name << std::endl;
-            int result = system(command.c_str());
-            return result;
+                        std::string module_name = argv[2];
+                        std::string module_dir = "box/" + module_name;
+                        std::string src_path = module_dir + "/native.cpp";
+                        if (system(("test -f " + src_path).c_str()) != 0) {
+                            src_path = module_dir + "/native.c";
+                            if (system(("test -f " + src_path).c_str()) != 0) {
+                                std::cerr << "Error: No native.c or native.cpp in " << module_dir << std::endl;
+                                return 1;
+                            }
+                        }
+            
+            #ifdef __APPLE__
+                        std::string output_path = module_dir + "/" + module_name + ".dylib";
+                        std::string compile_command = "clang++ -std=c++17 -Wall -Wextra -O2 -fPIC -dynamiclib -Iinclude -I. -Ilibs -Ibox -o " + output_path + " " + src_path + " -lcurl -L/usr/local/lib -ljsoncpp -L. -lneutron_runtime -Wl,-rpath,@loader_path/../..";
+            #else
+                        std::string output_path = module_dir + "/" + module_name + ".so";
+                        std::string compile_command = "g++ -std=c++17 -Wall -Wextra -O2 -fPIC -shared -Iinclude -I. -Ilibs -Ibox -o " + output_path + " " + src_path + " -lcurl -ljsoncpp -L. -lneutron_runtime -Wl,-rpath,'$ORIGIN/../..'";
+            #endif
+                        int result = system(compile_command.c_str());
+                        if (result == 0) {
+            std::cout << "Created box module: " << output_path << std::endl;
+                        }
+                        return result;
         } else if (arg == "-b" && argc > 2) {
             // Binary conversion mode - create standalone executable
             std::string inputPath = argv[2];

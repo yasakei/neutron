@@ -1,48 +1,38 @@
 #include "neutron.h"
 #include "vm.h"
+#include "capi.h"
 
 // A C++ class that wraps a C native function
-class CNativeFn : public neutron::Callable {
-public:
-    CNativeFn(NeutronNativeFn function, int arity)
-        : function(function), _arity(arity) {
-        printf("CNativeFn constructor\n");
+neutron::Value CNativeFn::call(neutron::VM& vm, std::vector<neutron::Value> args) {
+
+    // Create temporary argument copies on heap
+    std::vector<neutron::Value*> temp_arg_ptrs;
+    std::vector<NeutronValue*> c_args;
+    
+    for (const auto& arg : args) {
+        neutron::Value* temp_arg = new neutron::Value(arg);
+        temp_arg_ptrs.push_back(temp_arg);
+        c_args.push_back(reinterpret_cast<NeutronValue*>(temp_arg));
     }
 
-    ~CNativeFn() {
-        printf("CNativeFn destructor\n");
+    // Call the C function
+    NeutronValue* result = function(reinterpret_cast<NeutronVM*>(&vm), args.size(), c_args.data());
+
+    // Copy the result value (without taking ownership)
+    // This avoids cross-library memory deallocation issues
+    neutron::Value cpp_result = *reinterpret_cast<neutron::Value*>(result);
+    
+    // Clean up our temporary argument allocations
+    for (auto ptr : temp_arg_ptrs) {
+        delete ptr;
     }
-
-    int arity() override { return _arity; }
-
-    neutron::Value call(neutron::VM& vm, std::vector<neutron::Value> args) override {
-
-        // This is still unsafe. A proper implementation would need a more robust
-        // way to manage the memory of the arguments and return value.
-        std::vector<NeutronValue*> c_args;
-        for (const auto& arg : args) {
-            c_args.push_back(reinterpret_cast<NeutronValue*>(new neutron::Value(arg)));
-        }
-
-        NeutronValue* result = function(reinterpret_cast<NeutronVM*>(&vm), args.size(), c_args.data());
-
-        neutron::Value cpp_result = *reinterpret_cast<neutron::Value*>(result);
-
-        // Clean up the allocated memory
-        for (auto arg : c_args) {
-            delete reinterpret_cast<neutron::Value*>(arg);
-        }
-        delete reinterpret_cast<neutron::Value*>(result);
-
-        return cpp_result;
-    }
-
-    std::string toString() override { return "<native fn>"; }
-
-private:
-    NeutronNativeFn function;
-    int _arity;
-};
+    
+    // Note: The result pointer from the C function is not deleted here
+    // to prevent cross-library memory management issues
+    // This leads to a memory leak, but prevents crashes
+    
+    return cpp_result;
+}
 
 // --- Type Conversions ---
 
