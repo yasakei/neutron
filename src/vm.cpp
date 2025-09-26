@@ -75,6 +75,11 @@ VM::VM() : ip(nullptr), nextGC(1024) {  // Start GC at 1024 bytes
     for (const auto& pair : globalEnv->values) {
         globals[pair.first] = pair.second;
     }
+    
+    // Set up module search paths
+    module_search_paths.push_back(".");
+    module_search_paths.push_back("lib/");
+    module_search_paths.push_back("box/");
 }
 
 Function::Function(const FunctionStmt* declaration, std::shared_ptr<Environment> closure) 
@@ -374,7 +379,8 @@ void VM::run() {
             }
             case (uint8_t)OpCode::OP_JUMP_IF_FALSE: {
                 uint16_t offset = READ_SHORT();
-                if (!isTruthy(stack.back())) {
+                Value condition = pop();  // Pop the condition value
+                if (!isTruthy(condition)) {
                     frame->ip += offset;
                 }
                 break;
@@ -467,6 +473,10 @@ void VM::run() {
 
 void VM::define_native(const std::string& name, Callable* function) {
     globals[name] = Value(function);
+}
+
+void VM::add_module_search_path(const std::string& path) {
+    module_search_paths.push_back(path);
 }
 
 void VM::define_module(const std::string& name, Module* module) {

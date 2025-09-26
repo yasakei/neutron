@@ -27,7 +27,9 @@ enum class ExprType {
     OBJECT,
     ARRAY,
     INDEX_GET,
-    INDEX_SET
+    INDEX_SET,
+    MEMBER_SET,
+    THIS
 };
 
 // Literal types
@@ -286,13 +288,13 @@ public:
 // Class declaration statement
 class ClassStmt : public Stmt {
 public:
-    Token name;
-    std::vector<std::unique_ptr<FunctionStmt>> methods;
-
-    ClassStmt(Token name, std::vector<std::unique_ptr<FunctionStmt>> methods)
-        : Stmt(StmtType::CLASS), name(name), methods(std::move(methods)) {}
+    ClassStmt(Token name, std::vector<std::unique_ptr<Stmt>> body)
+        : Stmt(StmtType::CLASS), name(name), body(std::move(body)) {}
 
     void accept(Compiler* compiler) const override;
+
+    Token name;
+    std::vector<std::unique_ptr<Stmt>> body;
 };
 
 // Call expression (function calls)
@@ -362,6 +364,30 @@ public:
     
     IndexSetExpr(std::unique_ptr<Expr> array, std::unique_ptr<Expr> index, std::unique_ptr<Expr> value)
         : Expr(ExprType::INDEX_SET), array(std::move(array)), index(std::move(index)), value(std::move(value)) {}
+
+    void accept(Compiler* compiler) const override;
+};
+
+// Member set expression (obj.property = value)
+class MemberSetExpr : public Expr {
+public:
+    std::unique_ptr<Expr> object;
+    Token property;
+    std::unique_ptr<Expr> value;
+    
+    MemberSetExpr(std::unique_ptr<Expr> object, Token property, std::unique_ptr<Expr> value)
+        : Expr(ExprType::MEMBER_SET), object(std::move(object)), property(property), value(std::move(value)) {}
+
+    void accept(Compiler* compiler) const override;
+};
+
+// This expression
+class ThisExpr : public Expr {
+public:
+    Token keyword;
+    
+    ThisExpr(Token keyword)
+        : Expr(ExprType::THIS), keyword(keyword) {}
 
     void accept(Compiler* compiler) const override;
 };

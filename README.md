@@ -12,6 +12,8 @@ Neutron is a simple, modern, and lightweight interpreted programming language wr
 - **Modular:** Supports both native C++ modules and Neutron language modules for organizing code.
 - **Binary Compilation:** Convert scripts to standalone executables with full module support.
 - **Array Support:** Dynamic arrays with literal syntax, indexing, and built-in functions.
+- **Enhanced Control Flow:** Fixed stack management issues in loops and conditionals for more reliable execution.
+- **Improved Module System:** Robust module loading with proper recursive function support.
 
 ## Getting Started
 

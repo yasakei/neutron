@@ -281,6 +281,40 @@ void Compiler::visitWhileStmt(const WhileStmt* stmt) {
     patchJump(exitJump);
 }
 
+void Compiler::visitClassStmt(const ClassStmt* stmt) {
+    // Create a new class object
+    auto klass = new Class(stmt->name.lexeme);
+
+    // Compile the methods
+    for (const auto& method : stmt->body) {
+        if (auto funcStmt = dynamic_cast<const FunctionStmt*>(method.get())) {
+            Compiler compiler(this);
+            compiler.function->name = funcStmt->name.lexeme;
+            compiler.function->arity_val = funcStmt->params.size();
+
+            compiler.beginScope();
+            for (const auto& param : funcStmt->params) {
+                compiler.locals.push_back({param, compiler.scopeDepth});
+            }
+
+            for (const auto& statement : funcStmt->body) {
+                compiler.compileStatement(statement.get());
+            }
+
+            compiler.emitReturn();
+
+            klass->methods[funcStmt->name.lexeme] = compiler.function;
+        } else if (dynamic_cast<const VarStmt*>(method.get())) {
+            // For now, we only support function declarations in classes
+            // Properties will be handled by the VM at runtime
+        }
+    }
+
+    // Define the class as a global variable
+    emitBytes((uint8_t)OpCode::OP_CONSTANT, makeConstant(Value(klass)));
+    emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(stmt->name.lexeme)));
+}
+
 void Compiler::visitUseStmt(const UseStmt* stmt) {
     vm.load_module(stmt->library.lexeme);
 }
@@ -369,13 +403,22 @@ void Compiler::visitIndexGetExpr(const IndexGetExpr* expr) {
 }
 
 void Compiler::visitIndexSetExpr(const IndexSetExpr* expr) {
-    // Compile the array, index, and value
+    // Compile all three expressions: array, index, and value
     compileExpression(expr->array.get());
     compileExpression(expr->index.get());
     compileExpression(expr->value.get());
     
     // Emit the index set instruction
     emitByte((uint8_t)OpCode::OP_INDEX_SET);
+}
+
+void Compiler::visitMemberSetExpr(const MemberSetExpr* expr) {
+    // Compile the object and value
+    compileExpression(expr->object.get());
+    compileExpression(expr->value.get());
+    
+    // Emit the property name as a constant
+    emitBytes((uint8_t)OpCode::OP_SET_PROPERTY, makeConstant(Value(expr->property.lexeme)));
 }
 
 void Compiler::visitObjectExpr(const ObjectExpr* expr) {
@@ -403,6 +446,12 @@ void Compiler::visitObjectExpr(const ObjectExpr* expr) {
     
     // Push the object onto the stack
     emitConstant(Value(obj));
+}
+
+void Compiler::visitThisExpr(const ThisExpr* expr) {
+    // In class methods, 'this' refers to the current instance
+    // We'll emit an OP_THIS instruction to load the current instance
+    emitByte((uint8_t)OpCode::OP_THIS);
 }
 
 } // namespace neutron

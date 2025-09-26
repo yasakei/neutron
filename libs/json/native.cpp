@@ -104,6 +104,31 @@ std::string valueToJsonString(const Value& value, bool pretty, int indent) {
             }
             return "null";
         }
+        case ValueType::ARRAY: {
+            JsonArray* arr = dynamic_cast<JsonArray*>(std::get<Object*>(value.as));
+            if (arr) {
+                std::ostringstream oss;
+                oss << "[";
+                bool first = true;
+                for (const auto& elem : arr->elements) {
+                    if (!first) {
+                        oss << (pretty ? ",\n" + nextIndentStr : ",");
+                    } else if (pretty) {
+                        oss << "\n" + nextIndentStr;
+                    }
+                    oss << valueToJsonString(elem, pretty, indent + 1);
+                    first = false;
+                }
+                if (pretty && !first) {
+                    oss << "\n" + indentStr;
+                }
+                oss << "]";
+                return oss.str();
+            }
+            return "null";
+        }
+        case ValueType::CLASS:
+        case ValueType::INSTANCE:
         case ValueType::CALLABLE:
             return "null";
         case ValueType::MODULE:
@@ -313,18 +338,9 @@ Value json_get(std::vector<Value> arguments) {
 }
 
 void register_json_functions(std::shared_ptr<Environment> env) {
-    env->define("json_stringify", Value(new NativeFn(json_stringify, -1))); // 1 or 2 arguments
-    env->define("json_parse", Value(new NativeFn(json_parse, 1)));
-    env->define("json_get", Value(new NativeFn(json_get, 2)));
-    
-    // Create a json module
-    auto jsonEnv = std::make_shared<Environment>();
-    jsonEnv->define("stringify", Value(new NativeFn(json_stringify, -1)));
-    jsonEnv->define("parse", Value(new NativeFn(json_parse, 1)));
-    jsonEnv->define("get", Value(new NativeFn(json_get, 2)));
-    
-    auto jsonModule = new Module("json", jsonEnv, std::vector<std::unique_ptr<Stmt>>());
-    env->define("json", Value(jsonModule));
+    env->define("stringify", Value(new NativeFn(json_stringify, -1)));
+    env->define("parse", Value(new NativeFn(json_parse, 1)));
+    env->define("get", Value(new NativeFn(json_get, 2)));
 }
 
 } // namespace neutron

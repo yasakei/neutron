@@ -67,16 +67,10 @@ Value time_sleep(std::vector<Value> arguments) {
     return Value(nullptr);
 }
 
-// Register time functions in the environment
 void register_time_functions(std::shared_ptr<Environment> env) {
-    // Create a time module
-    auto timeEnv = std::make_shared<Environment>();
-    timeEnv->define("now", Value(new NativeFn(time_now, 0)));
-    timeEnv->define("format", Value(new NativeFn(time_format, -1))); // -1 for variable arguments
-    timeEnv->define("sleep", Value(new NativeFn(time_sleep, 1)));
-    
-    auto timeModule = new Module("time", timeEnv, std::vector<std::unique_ptr<Stmt>>());
-    env->define("time", Value(timeModule));
+    env->define("now", Value(new NativeFn(time_now, 0)));
+    env->define("format", Value(new NativeFn(time_format, -1))); // -1 for variable arguments
+    env->define("sleep", Value(new NativeFn(time_sleep, 1)));
 }
 
 } // namespace neutron

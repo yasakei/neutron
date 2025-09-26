@@ -22,6 +22,7 @@ enum class OpCode : uint8_t {
     OP_DEFINE_GLOBAL,
     OP_SET_GLOBAL,
     OP_GET_PROPERTY,
+    OP_SET_PROPERTY,
     OP_EQUAL,
     OP_GREATER,
     OP_LESS,
@@ -42,7 +43,8 @@ enum class OpCode : uint8_t {
     OP_CLOSE_UPVALUE,
     OP_ARRAY,
     OP_INDEX_GET,
-    OP_INDEX_SET
+    OP_INDEX_SET,
+    OP_THIS
 };
 
 class Chunk {

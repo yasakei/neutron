@@ -31,6 +31,14 @@ void run(const std::string& source, neutron::VM& vm) {
 }
 
 void runFile(const std::string& path, neutron::VM& vm) {
+    // Add the script's directory to the module search path
+    std::string directory;
+    const size_t last_slash_idx = path.rfind('/');
+    if (std::string::npos != last_slash_idx) {
+        directory = path.substr(0, last_slash_idx);
+    }
+    vm.add_module_search_path(directory);
+
     std::ifstream file(path);
     if (!file.is_open()) {
         std::cerr << "Could not open file: " << path << std::endl;

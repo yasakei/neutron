@@ -248,6 +248,7 @@ public:
     void load_module(const std::string& name);
     Value call(const Value& callee, const std::vector<Value>& arguments);
     Value execute_string(const std::string& source);
+    void add_module_search_path(const std::string& path);
     
     // Memory management functions
     template<typename T, typename... Args>
@@ -274,6 +275,8 @@ private:
     uint8_t* ip;
     std::vector<Value> stack;
     std::unordered_map<std::string, Value> globals;
+    
+    std::vector<std::string> module_search_paths;
     
     // Memory management
     std::vector<Object*> heap;

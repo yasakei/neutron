@@ -18,17 +18,37 @@ We're excited that you're interested in contributing to Neutron! This document p
 - `src/` - C++ source files
 - `include/` - Header files
 - `examples/` - Example Neutron programs
+- `dev_tests/` - Development tests for core functionality
 - `tests/` - Unit tests
 - `docs/` - Documentation
+- `lib/` - Built-in Neutron modules
+- `box/` - External modules (native and Neutron)
+- `build/` - Build artifacts
 
-## Modular Design
+## Key Improvements
 
-Neutron is designed to be modular, making it easy to add new features. Each major component should be in its own files:
+### Stack Management Fix
+- Fixed issue in `OP_JUMP_IF_FALSE` bytecode operation to properly manage the evaluation stack
+- Resolves function call return value corruption in control flow constructs
+- Affects loops and conditional statements
 
-- Scanner: `scanner.h`/`scanner.cpp`
-- Parser: `parser.h`/`parser.cpp`
-- Code Generator: (to be implemented)
-- Virtual Machine: (to be implemented)
+### Module System Improvements
+- Enhanced module loading with proper recursive function call support
+- Better module search path handling
+- Ensured modules from same file can call each other during execution
+
+### Language Features
+- Proper `this` keyword functionality for class methods
+- Correct string concatenation with `+` operator
+- Enhanced native function integration with dual access patterns (global and module access)
+
+## Architecture Components
+
+- **Scanner**: `scanner.h`/`scanner.cpp` - Tokenizes source code
+- **Parser**: `parser.h`/`parser.cpp` - Creates abstract syntax tree  
+- **Compiler**: `compiler.h`/`compiler.cpp` - Generates bytecode
+- **Virtual Machine**: `vm.h`/`vm.cpp` - Executes bytecode
+- **Runtime**: `runtime.cpp` - Handles values, objects, and native functions
 
 ## Coding Standards
 
@@ -37,13 +57,27 @@ Neutron is designed to be modular, making it easy to add new features. Each majo
 - Comment your code where necessary
 - Write unit tests for new functionality
 
+## Development Tests
+
+The `dev_tests/` directory contains comprehensive tests for core functionality:
+- `feature_test.nt` - Core language features
+- `module_test.nt` - Module system functionality  
+- `class_test.nt` - Object-oriented features
+- `binary_conversion_feature_test.nt` - Full feature test
+
 ## Testing
 
 Run the existing tests to ensure nothing is broken:
 
 ```bash
-cd tests
-make test_scanner
+# Run development tests
+./neutron dev_tests/feature_test.nt
+./neutron dev_tests/module_test.nt
+./neutron dev_tests/class_test.nt
+./neutron dev_tests/binary_conversion_feature_test.nt
+
+# Build and test
+make all
 ```
 
 Add new tests when implementing features.

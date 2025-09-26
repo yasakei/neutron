@@ -167,14 +167,14 @@ std::unique_ptr<Stmt> Parser::classDeclaration() {
     Token name = consume(TokenType::IDENTIFIER, "Expect class name.");
     consume(TokenType::LEFT_BRACE, "Expect '{' before class body.");
 
-    std::vector<std::unique_ptr<FunctionStmt>> methods;
+    std::vector<std::unique_ptr<Stmt>> body;
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
-        methods.push_back(std::unique_ptr<FunctionStmt>(static_cast<FunctionStmt*>(functionDeclaration().release())));
+        body.push_back(statement());
     }
 
     consume(TokenType::RIGHT_BRACE, "Expect '}' after class body.");
 
-    return std::make_unique<ClassStmt>(name, std::move(methods));
+    return std::make_unique<ClassStmt>(name, std::move(body));
 }
 
 std::unique_ptr<Stmt> Parser::useStatement() {
@@ -216,6 +216,14 @@ std::unique_ptr<Expr> Parser::assignment() {
             return std::make_unique<IndexSetExpr>(
                 std::move(indexGet->array), 
                 std::move(indexGet->index), 
+                std::move(value)
+            );
+        } else if (expr->type == ExprType::MEMBER) {
+            // Handle assignment to object property: obj.property = value
+            MemberExpr* memberExpr = static_cast<MemberExpr*>(expr.get());
+            return std::make_unique<MemberSetExpr>(
+                std::move(memberExpr->object), 
+                memberExpr->property, 
                 std::move(value)
             );
         }
@@ -366,6 +374,10 @@ std::unique_ptr<Expr> Parser::primary() {
         std::string str = previous().lexeme;
         auto expr = std::make_unique<LiteralExpr>(str);
         return expr;
+    }
+    
+    if (match({TokenType::THIS})) {
+        return std::make_unique<ThisExpr>(previous());
     }
     
     if (match({TokenType::IDENTIFIER})) {
@@ -638,7 +650,16 @@ void ReturnStmt::accept(Compiler* compiler) const {
     compiler->visitReturnStmt(this);
 }
 
-void ClassStmt::accept(Compiler* /*compiler*/) const {
+void ClassStmt::accept(Compiler* compiler) const {
+    compiler->visitClassStmt(this);
+}
+
+void MemberSetExpr::accept(Compiler* compiler) const {
+    compiler->visitMemberSetExpr(this);
+}
+
+void ThisExpr::accept(Compiler* compiler) const {
+    compiler->visitThisExpr(this);
 }
 
 } // namespace neutron

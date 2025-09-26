@@ -1,0 +1,23 @@
+use math;
+use sys;
+
+var my_var = "Hello from my_utils!";
+
+fun calculate_fibonacci(n) {
+    if (n <= 1) {
+        return n;
+    }
+    return calculate_fibonacci(n - 1) + calculate_fibonacci(n - 2);
+}
+
+fun save_result(filename, value) {
+    sys.write(filename, "Result: " + str(value));
+    return true;
+}
+
+fun load_config(filename) {
+    if (sys.exists(filename)) {
+        return sys.read(filename);
+    }
+    return "default_config";
+}

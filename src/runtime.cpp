@@ -27,6 +27,8 @@ Value::Value(Array* array) : type(ValueType::ARRAY), as(array) {}
 Value::Value(Object* object) : type(ValueType::OBJECT), as(object) {}
 
 Value::Value(Module* module) : type(ValueType::MODULE), as(module) {}
+Value::Value(Class* klass) : type(ValueType::CLASS), as(klass) {}
+Value::Value(Instance* instance) : type(ValueType::INSTANCE), as(instance) {}
 
 std::string Array::toString() const {
     std::ostringstream oss;
@@ -66,6 +68,10 @@ std::string Value::toString() const {
         }
         case ValueType::MODULE:
             return "<module>";
+        case ValueType::CLASS:
+            return std::get<Class*>(as)->toString();
+        case ValueType::INSTANCE:
+            return std::get<Instance*>(as)->toString();
     }
     return "";
 }
@@ -120,6 +126,23 @@ Value NativeFn::call(VM& /*vm*/, std::vector<Value> arguments) {
 
 std::string NativeFn::toString() {
     return "<native fn>";
+}
+
+BoundMethod::BoundMethod(Value receiver, Function* method) 
+    : receiver(receiver), method(method) {}
+
+int BoundMethod::arity() {
+    return method->arity();
+}
+
+Value BoundMethod::call(VM& vm, std::vector<Value> arguments) {
+    // For now, just call the underlying method without 'this' context
+    // Proper 'this' implementation would require more complex changes
+    return method->call(vm, arguments);
+}
+
+std::string BoundMethod::toString() {
+    return "<bound method>";
 }
 
 Module::Module(std::string name, std::shared_ptr<Environment> environment, std::vector<std::unique_ptr<Stmt>> statements)

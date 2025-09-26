@@ -375,36 +375,29 @@ Value sys_exec(std::vector<Value> arguments) {
     return Value(result);
 }
 
-// Register sys functions in the environment
 void register_sys_functions(std::shared_ptr<neutron::Environment> env) {
-    // Create a sys module
-    auto sysEnv = std::make_shared<neutron::Environment>();
-    
     // File operations
-    sysEnv->define("cp", neutron::Value(new neutron::NativeFn(sys_cp, 2)));
-    sysEnv->define("mv", neutron::Value(new neutron::NativeFn(sys_mv, 2)));
-    sysEnv->define("rm", neutron::Value(new neutron::NativeFn(sys_rm, 1)));
-    sysEnv->define("mkdir", neutron::Value(new neutron::NativeFn(sys_mkdir, 1)));
-    sysEnv->define("rmdir", neutron::Value(new neutron::NativeFn(sys_rmdir, 1)));
-    sysEnv->define("exists", neutron::Value(new neutron::NativeFn(sys_exists, 1)));
-    sysEnv->define("read", neutron::Value(new neutron::NativeFn(sys_read, 1)));
-    sysEnv->define("write", neutron::Value(new neutron::NativeFn(sys_write, 2)));
-    sysEnv->define("append", neutron::Value(new neutron::NativeFn(sys_append, 2)));
+    env->define("cp", neutron::Value(new neutron::NativeFn(sys_cp, 2)));
+    env->define("mv", neutron::Value(new neutron::NativeFn(sys_mv, 2)));
+    env->define("rm", neutron::Value(new neutron::NativeFn(sys_rm, 1)));
+    env->define("mkdir", neutron::Value(new neutron::NativeFn(sys_mkdir, 1)));
+    env->define("rmdir", neutron::Value(new neutron::NativeFn(sys_rmdir, 1)));
+    env->define("exists", neutron::Value(new neutron::NativeFn(sys_exists, 1)));
+    env->define("read", neutron::Value(new neutron::NativeFn(sys_read, 1)));
+    env->define("write", neutron::Value(new neutron::NativeFn(sys_write, 2)));
+    env->define("append", neutron::Value(new neutron::NativeFn(sys_append, 2)));
     
     // System info
-    sysEnv->define("cwd", neutron::Value(new neutron::NativeFn(sys_cwd, 0)));
-    sysEnv->define("chdir", neutron::Value(new neutron::NativeFn(sys_chdir, 1)));
-    sysEnv->define("env", neutron::Value(new neutron::NativeFn(sys_env, 1)));
-    sysEnv->define("args", neutron::Value(new neutron::NativeFn(sys_args, 0)));
-    sysEnv->define("info", neutron::Value(new neutron::NativeFn(sys_info, 0)));
-    sysEnv->define("input", neutron::Value(new neutron::NativeFn(sys_input, -1))); // 0 or 1 arguments
+    env->define("cwd", neutron::Value(new neutron::NativeFn(sys_cwd, 0)));
+    env->define("chdir", neutron::Value(new neutron::NativeFn(sys_chdir, 1)));
+    env->define("env", neutron::Value(new neutron::NativeFn(sys_env, 1)));
+    env->define("args", neutron::Value(new neutron::NativeFn(sys_args, 0)));
+    env->define("info", neutron::Value(new neutron::NativeFn(sys_info, 0)));
+    env->define("input", neutron::Value(new neutron::NativeFn(sys_input, -1))); // 0 or 1 arguments
     
     // Process control
-    sysEnv->define("exit", neutron::Value(new neutron::NativeFn(sys_exit, -1))); // 0 or 1 arguments
-    sysEnv->define("exec", neutron::Value(new neutron::NativeFn(sys_exec, 1)));
-    
-    auto sysModule = new neutron::Module("sys", sysEnv, std::vector<std::unique_ptr<neutron::Stmt>>());
-    env->define("sys", neutron::Value(sysModule));
+    env->define("exit", neutron::Value(new neutron::NativeFn(sys_exit, -1))); // 0 or 1 arguments
+    env->define("exec", neutron::Value(new neutron::NativeFn(sys_exec, 1)));
 }
 
 } // namespace neutron

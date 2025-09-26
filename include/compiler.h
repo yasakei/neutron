@@ -46,12 +46,15 @@ public:
     void visitArrayExpr(const ArrayExpr* expr);
     void visitIndexGetExpr(const IndexGetExpr* expr);
     void visitIndexSetExpr(const IndexSetExpr* expr);
+    void visitMemberSetExpr(const MemberSetExpr* expr);
+    void visitThisExpr(const ThisExpr* expr);
     void visitExpressionStmt(const ExpressionStmt* stmt);
     void visitSayStmt(const SayStmt* stmt);
     void visitVarStmt(const VarStmt* stmt);
     void visitBlockStmt(const BlockStmt* stmt);
     void visitIfStmt(const IfStmt* stmt);
     void visitWhileStmt(const WhileStmt* stmt);
+    void visitClassStmt(const ClassStmt* stmt);
     void visitUseStmt(const UseStmt* stmt);
     void visitFunctionStmt(const FunctionStmt* stmt);
     void visitReturnStmt(const ReturnStmt* stmt);

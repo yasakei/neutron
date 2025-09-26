@@ -1,0 +1,3 @@
+use my_utils;
+
+say(my_utils.my_var);
