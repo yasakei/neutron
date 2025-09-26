@@ -473,6 +473,10 @@ void VM::define_module(const std::string& name, Module* module) {
     globals[name] = Value(module);
 }
 
+void VM::define(const std::string& name, const Value& value) {
+    globals[name] = value;
+}
+
 Value VM::call(const Value& callee, const std::vector<Value>& arguments) {
     if (callee.type != ValueType::CALLABLE) {
         throw std::runtime_error("Can only call functions.");
@@ -653,12 +657,11 @@ void VM::load_module(const std::string& name) {
         globals.clear();
         
         void (*init_func)(VM*) = (void (*)(VM*))dlsym(handle, "neutron_module_init");
-        if (init_func) {
-            init_func(this);
-        } else {
+        if (!init_func) {
             dlclose(handle);
-            // Handle error: init function not found
+            runtimeError("Module '" + name + "' is not a valid Neutron module: missing neutron_module_init function.");
         }
+        init_func(this);
         
         // Copy the defined values from globals to the module environment
         for (const auto& pair : globals) {

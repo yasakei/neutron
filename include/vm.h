@@ -244,6 +244,7 @@ public:
     Value pop();
     void define_native(const std::string& name, Callable* function);
     void define_module(const std::string& name, Module* module);
+    void define(const std::string& name, const Value& value);
     void load_module(const std::string& name);
     Value call(const Value& callee, const std::vector<Value>& arguments);
     Value execute_string(const std::string& source);

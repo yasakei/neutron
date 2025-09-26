@@ -70,21 +70,24 @@ endif
 all: directories $(TARGET) $(LIBTARGET)
 
 build-box:
-	@if [ -z \"$(MODULE)\" ]; then \\
-		echo \"Error: MODULE variable not set.\"; exit 1; \\
+	@if [ -z "$(MODULE)" ]; then \
+		echo "Error: MODULE variable not set."; \
+		exit 1; \
 	fi
-	@SRCFILE=$(find box/$(MODULE) -name 'native.c' -o -name 'native.cpp' | head -n 1); \\
-	if [ -z \"$SRCFILE\" ]; then \\
-		echo \"Error: No native.c or native.cpp in box/$(MODULE)\"; exit 1; \\
-	fi; \\
-	OUTPUT_DIR=box/$(MODULE); \\
-	OFILE=\"$OUTPUT_DIR/$(MODULE)$(SHARED_EXT)\"; \\
-	echo \"Building box module: $(MODULE) -> $OFILE\"; \\
-	$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) $SRCFILE $(JSONLIB) -lcurl -L. -lneutron_runtime $(PLUGIN_LDFLAGS) -o $OFILE; \\
-	echo \"Created box module: $OFILE\"
-	$(MAKE) all DEBUG=0
-	strip $(TARGET)
-	@echo \"Release build complete. Binary located at ./$(TARGET)\"
+	@echo "Building box module: $(MODULE)"
+	@if [ -f "box/$(MODULE)/native.cpp" ]; then \
+		SOURCE_FILE="box/$(MODULE)/native.cpp"; \
+		echo "Found source: $$SOURCE_FILE"; \
+		$(CXX) -v $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) $$SOURCE_FILE $(JSONLIB) -lcurl -L. -lneutron_runtime $(PLUGIN_LDFLAGS) -o box/$(MODULE)/$(MODULE)$(SHARED_EXT) || exit $$?; \
+	elif [ -f "box/$(MODULE)/native.c" ]; then \
+		SOURCE_FILE="box/$(MODULE)/native.c"; \
+		echo "Found source: $$SOURCE_FILE"; \
+		$(CXX) -v $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) $$SOURCE_FILE $(JSONLIB) -lcurl -L. -lneutron_runtime $(PLUGIN_LDFLAGS) -o box/$(MODULE)/$(MODULE)$(SHARED_EXT) || exit $$?; \
+	else \
+		echo "Error: No native.c or native.cpp in box/$(MODULE)"; \
+		exit 1; \
+	fi
+	@echo "Created box module: box/$(MODULE)/$(MODULE)$(SHARED_EXT)"
 
 release:
 	$(MAKE) all DEBUG=0
@@ -104,8 +107,8 @@ $(LIBTARGET): $(OBJS) $(LIBOBJS)
 	$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) $(OBJS) $(LIBOBJS) -lcurl $(JSONLIB) -o $(LIBTARGET)
 	@echo \"Runtime library created. Located at ./$(LIBTARGET)\"
 
-$(TARGET): $(OBJS) $(LIBOBJS) build/main.o
-	$(CXX) $(CXXFLAGS) $(RTLDYNAMIC_FLAG) build/main.o $(OBJS) $(LIBOBJS) -lcurl $(JSONLIB) -o $(TARGET)
+$(TARGET): build/main.o $(LIBTARGET)
+	$(CXX) $(CXXFLAGS) $(RTLDYNAMIC_FLAG) build/main.o -L. -lneutron_runtime -o $(TARGET)
 	@echo "Compilation complete. Binary located at ./$(TARGET)"
 
 build/%.o: src/%.cpp
@@ -140,14 +143,20 @@ endif
 
 # Pattern: box/foo/foo.dylib (mac) or box/foo/foo.so (linux)
 box/%/%.$(SHARED_EXT):
-	@moddir=$(dir $@); moddir=$${moddir%/}; module=$${moddir##*/}; \
-	cpp="box/$$module/native.cpp"; csrc="box/$$module/native.c"; \
-	if [ -f "$$cpp" ]; then src="$$cpp"; elif [ -f "$$csrc" ]; then src="$$csrc"; else \
-		echo "Error: No native.c or native.cpp in box/$$module"; exit 1; fi; \
-	echo "Building box module: $$module -> $@"; \
-	if [ -f "$(LIBTARGET)" ]; then LINKRT="-L. -lneutron_runtime"; else LINKRT=""; fi; \
-	$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) $$src $(JSONLIB) -lcurl $$LINKRT $(PLUGIN_LDFLAGS) -o $@ || exit $$?; \
-	[ -f "$@" ] && echo "Created box module: $@"
+	@modulename=$(basename $@ .$(SHARED_EXT)); \
+	dirname=$(dirname $@); \
+	module=$(basename "$dirname"); \
+	if [ -f "box/$module/native.cpp" ]; then \
+		SOURCES=$(find box/$module -name "*.cpp"); \
+		echo "Building box module: $module -> $@"; \
+		for src in $SOURCES; do echo "  -> $src"; done; \
+		$(CXX) -v $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) $SOURCES $(JSONLIB) -lcurl -L. -lneutron_runtime $(PLUGIN_LDFLAGS) -o $@ || exit $?; \
+	elif [ -f "box/$module/native.c" ]; then \
+		$(CXX) $(CXXFLAGS) $(SHARED_FLAGS) -fPIC $(DEPENDENCIES) box/$module/native.c $(JSONLIB) -lcurl -L. -lneutron_runtime $(PLUGIN_LDFLAGS) -o $@; \
+	else \
+		echo "Error: No native.c or native.cpp in box/$module"; exit 1; \
+	fi; \
+	echo "Created box module: $@"
 
 install:
 	cp $(TARGET) /usr/local/bin/
