@@ -1,23 +1,34 @@
 #!/bin/bash
 
 # Script to create a release version of Neutron with all necessary files
-# in a release folder
+# in a platform-specific folder
 
 set -e  # Exit on any error
 
 echo "Creating release version of Neutron..."
 
+# Determine OS and set platform-specific release directory
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    PLATFORM="macos"
+elif [[ "$OSTYPE" == "linux-gnu"* ]] || [[ "$OSTYPE" == "linux-musl"* ]] || [[ "$OSTYPE" == "linux"* ]]; then
+    PLATFORM="linux"
+else
+    PLATFORM="unknown"
+fi
+
+echo "Detected platform: $PLATFORM"
+
 # Define directories
-RELEASE_DIR="release"
+RELEASE_DIR="release/$PLATFORM"
 BINARY_NAME="neutron"
 
-# Clean previous release directory if it exists
+# Clean previous release directory for this platform if it exists
 if [ -d "$RELEASE_DIR" ]; then
-    echo "Removing previous release directory..."
+    echo "Removing previous release directory for $PLATFORM..."
     rm -rf "$RELEASE_DIR"
 fi
 
-# Create release directory
+# Create platform-specific release directory
 mkdir -p "$RELEASE_DIR"
 echo "Created release directory: $RELEASE_DIR"
 
@@ -75,13 +86,13 @@ fi
 
 # Create a sample config or startup script if needed
 cat > "$RELEASE_DIR/README_RELEASE.md" << EOF
-# Neutron Release
+# Neutron Release - $PLATFORM
 
-This directory contains the Neutron runtime and all necessary files to run applications.
+This directory contains the Neutron runtime and all necessary files to run applications on $PLATFORM.
 
 ## Contents:
 - \$(basename neutron) - Main Neutron executable
-- libneutron_runtime.(dylib|so) - Runtime library
+- libneutron_runtime.(dylib|so) - Runtime library for $PLATFORM
 - modules/ - Optional modules (if any)
 
 ## Usage:
@@ -91,8 +102,8 @@ Run the binary directly: ./neutron [options]
 This release may require system libraries like libcurl and libjsoncpp to be installed.
 EOF
 
-echo "Release created in: $RELEASE_DIR/"
+echo "Release for $PLATFORM created in: $RELEASE_DIR/"
 echo "Contents:"
 ls -la "$RELEASE_DIR/"
 
-echo "Release creation completed successfully!"
+echo "Release creation for $PLATFORM completed successfully!"
