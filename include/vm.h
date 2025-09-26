@@ -49,10 +49,12 @@ enum class ValueType {
     ARRAY,
     OBJECT,
     CALLABLE,
-    MODULE
+    MODULE,
+    CLASS,
+    INSTANCE
 };
 
-using Literal = std::variant<std::nullptr_t, bool, double, std::string, Array*, Object*, Callable*, Module*>;
+using Literal = std::variant<std::nullptr_t, bool, double, std::string, Array*, Object*, Callable*, Module*, class Class*, class Instance*>;
 
 struct Value {
     ValueType type;
@@ -67,6 +69,8 @@ struct Value {
     Value(Object* object);
     Value(Callable* callable);
     Value(Module* module);
+    Value(Class* klass);
+    Value(Instance* instance);
 
     std::string toString() const;
 };
@@ -199,6 +203,42 @@ public:
     virtual Value call(VM& vm, std::vector<Value> arguments) = 0;
     virtual std::string toString() = 0;
     virtual bool isCNativeFn() const { return false; }
+};
+
+class Class;
+class Instance;
+
+class BoundMethod : public Callable {
+public:
+    BoundMethod(Value receiver, Function* method);
+    int arity() override;
+    Value call(VM& vm, std::vector<Value> arguments) override;
+    std::string toString() override;
+    
+    Value receiver;
+    Function* method;
+};
+
+class Class : public Callable {
+public:
+    Class(const std::string& name);
+    Class(const std::string& name, std::shared_ptr<Environment> class_env);
+    int arity() override;
+    Value call(VM& vm, std::vector<Value> arguments) override;
+    std::string toString() override;
+    
+    std::string name;
+    std::shared_ptr<Environment> class_env;  // Store the environment for this class
+    std::unordered_map<std::string, Value> methods;  // Store method definitions
+};
+
+class Instance : public Object {
+public:
+    Instance(Class* klass);
+    std::string toString() const override;
+    
+    Class* klass;
+    std::unordered_map<std::string, Value> fields;
 };
 
 class Function : public Callable {

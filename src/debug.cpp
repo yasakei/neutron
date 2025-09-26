@@ -31,6 +31,12 @@ std::ostream& operator<<(std::ostream& os, ValueType type) {
         case ValueType::MODULE:
             os << "MODULE";
             break;
+        case ValueType::CLASS:
+            os << "CLASS";
+            break;
+        case ValueType::INSTANCE:
+            os << "INSTANCE";
+            break;
     }
     return os;
 }

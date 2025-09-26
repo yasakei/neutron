@@ -145,6 +145,34 @@ std::string BoundMethod::toString() {
     return "<bound method>";
 }
 
+Class::Class(const std::string& name)
+    : name(name), class_env(nullptr) {}
+
+Class::Class(const std::string& name, std::shared_ptr<Environment> class_env)
+    : name(name), class_env(class_env) {}
+
+int Class::arity() {
+    // For now, return 0 - the constructor implementation would define this properly
+    return 0;
+}
+
+Value Class::call(VM& vm, std::vector<Value> arguments) {
+    // Create a new instance of this class
+    Instance* instance = new Instance(this);
+    return Value(instance);
+}
+
+std::string Class::toString() {
+    return name;
+}
+
+Instance::Instance(Class* klass)
+    : klass(klass) {}
+
+std::string Instance::toString() const {
+    return "<" + klass->name + " instance>";
+}
+
 Module::Module(std::string name, std::shared_ptr<Environment> environment, std::vector<std::unique_ptr<Stmt>> statements)
     : name(name), environment(environment), statements(std::move(statements)) {}
 
