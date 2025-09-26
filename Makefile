@@ -14,6 +14,7 @@ ifeq ($(UNAME_S),Darwin)
     SHARED_EXT = .dylib
     SHARED_FLAGS = -dynamiclib
     RTLDYNAMIC_FLAG = 
+    RPATH_FLAG =
     # Find jsoncpp library path
     ifeq (,$(wildcard /opt/homebrew/lib/libjsoncpp.dylib))
         ifeq (,$(wildcard /usr/local/lib/libjsoncpp.dylib))
@@ -32,6 +33,7 @@ else
     SHARED_EXT = .so
     SHARED_FLAGS = -shared -rdynamic
     RTLDYNAMIC_FLAG = -rdynamic
+    RPATH_FLAG = -Wl,-rpath,'$$ORIGIN'
     # Use pkg-config to find jsoncpp on Linux, if available
     ifneq ($(shell which pkg-config),)
         JSONLIB_PKG = $(shell pkg-config --libs jsoncpp)
@@ -108,7 +110,7 @@ $(LIBTARGET): $(OBJS) $(LIBOBJS)
 	@echo \"Runtime library created. Located at ./$(LIBTARGET)\"
 
 $(TARGET): build/main.o $(LIBTARGET)
-	$(CXX) $(CXXFLAGS) $(RTLDYNAMIC_FLAG) build/main.o -L. -lneutron_runtime -o $(TARGET)
+	$(CXX) $(CXXFLAGS) $(RTLDYNAMIC_FLAG) build/main.o -L. -lneutron_runtime $(RPATH_FLAG) -o $(TARGET)
 	@echo "Compilation complete. Binary located at ./$(TARGET)"
 
 build/%.o: src/%.cpp
