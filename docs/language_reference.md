@@ -330,17 +330,76 @@ say("Last character: " + lastChar);
 
 ## Modules
 
-Neutron supports modules, which allow you to organize your code into separate files and provide additional functionality. Modules can be written in Neutron (`.nt` files) or as native C++ extensions (`.so` files).
+Neutron supports two types of imports:
 
-### Using Modules
+1. **Module imports** using `use modulename;` - for built-in and native modules
+2. **File imports** using `using 'filename.nt';` - for importing other Neutron source files
 
-The `use` statement is used to import a module.
+### Module Imports
+
+The `use` statement is used to import built-in or native modules. Modules must be imported before they can be used.
 
 ```neutron
 use math;
 use sys;
 use json;
 ```
+
+**Built-in Modules:**
+- `json` - JSON parsing and stringification
+- `convert` - Type conversion utilities
+- `time` - Time and date functions
+- `http` - HTTP client operations
+- `math` - Mathematical operations (auto-loaded)
+- `sys` - System functions (auto-loaded)
+
+**Important:** If you try to use a module without importing it, you'll get a helpful error:
+```
+Runtime error: Undefined variable 'json'. Did you forget to import it? Use 'use json;' at the top of your file.
+```
+
+### File Imports
+
+The `using` statement is used to import other Neutron source files. All functions and variables defined in the imported file become available in the current scope.
+
+```neutron
+using 'utils.nt';
+using 'lib/helpers.nt';
+
+// Use functions from imported files
+say(greet("World"));
+```
+
+**File Search Paths:**
+Files are searched in the following order:
+1. Current directory (`.`)
+2. `lib/` directory
+3. `box/` directory
+
+**Example:**
+
+**utils.nt:**
+```neutron
+fun greet(name) {
+    return "Hello, " + name + "!";
+}
+
+var VERSION = "1.0.0";
+```
+
+**main.nt:**
+```neutron
+using 'utils.nt';
+
+say(greet("Neutron"));  // Output: Hello, Neutron!
+say(VERSION);           // Output: 1.0.0
+```
+
+**Best Practices:**
+- Import modules at the top of your file
+- Use `use` for built-in modules
+- Use `using` for your own `.nt` files
+- Only import what you need
 
 ## Core Modules
 

@@ -23,6 +23,7 @@ Scanner::Scanner(const std::string& source)
     keywords["var"] = TokenType::VAR;
     keywords["while"] = TokenType::WHILE;
     keywords["use"] = TokenType::USE;
+    keywords["using"] = TokenType::USING;
 }
 
 std::vector<Token> Scanner::scanTokens() {

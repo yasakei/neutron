@@ -26,7 +26,7 @@ enum class TokenType {
     SAY, RETURN, SUPER, THIS, TRUE, VAR, WHILE,
     
     // Library features
-    USE,
+    USE, USING,
 
     END_OF_FILE
 };

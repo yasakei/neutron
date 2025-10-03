@@ -316,7 +316,13 @@ void Compiler::visitClassStmt(const ClassStmt* stmt) {
 }
 
 void Compiler::visitUseStmt(const UseStmt* stmt) {
-    vm.load_module(stmt->library.lexeme);
+    if (stmt->isFilePath) {
+        // Import a .nt file
+        vm.load_file(stmt->library.lexeme);
+    } else {
+        // Import a module
+        vm.load_module(stmt->library.lexeme);
+    }
 }
 
 void Compiler::visitFunctionStmt(const FunctionStmt* stmt) {

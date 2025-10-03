@@ -254,6 +254,7 @@ public:
     void define_module(const std::string& name, Module* module);
     void define(const std::string& name, const Value& value);
     void load_module(const std::string& name);
+    void load_file(const std::string& filepath);
     Value call(const Value& callee, const std::vector<Value>& arguments);
     Value execute_string(const std::string& source);
     void add_module_search_path(const std::string& path);

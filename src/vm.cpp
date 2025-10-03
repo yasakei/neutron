@@ -16,6 +16,7 @@
 #include "convert/native.h"
 #include "time/native.h"
 #include "math/native.h"
+#include "http/native.h"
 #include "module_registry.h"
 
 namespace neutron {
@@ -248,7 +249,13 @@ void VM::run() {
                 std::string name = READ_STRING();
                 auto it = globals.find(name);
                 if (it == globals.end()) {
-                    runtimeError("Undefined variable '" + name + "'.");
+                    // Check if it looks like a module name (common module names)
+                    if (name == "json" || name == "math" || name == "sys" || name == "http" || 
+                        name == "time" || name == "convert") {
+                        runtimeError("Undefined variable '" + name + "'. Did you forget to import it? Use 'use " + name + ";' at the top of your file.");
+                    } else {
+                        runtimeError("Undefined variable '" + name + "'.");
+                    }
                 }
                 push(globals[name]);
                 break;
@@ -279,10 +286,10 @@ void VM::run() {
                         stack.pop_back();
                         push(property);
                     } catch (const std::runtime_error& e) {
-                        runtimeError(e.what());
+                        runtimeError(std::string(e.what()) + " Make sure the module is properly imported with 'use' statement.");
                     }
                 } else {
-                    runtimeError("Only modules have properties.");
+                    runtimeError("Only modules have properties. Cannot use dot notation on non-module values.");
                 }
                 break;
             }
@@ -551,6 +558,32 @@ Value VM::execute_string(const std::string& source) {
 }
 
 void VM::load_module(const std::string& name) {
+    // Check if module is already loaded
+    if (globals.find(name) != globals.end()) {
+        return; // Module already loaded
+    }
+
+    // Check for built-in modules first
+    if (name == "json") {
+        neutron_init_json_module(this);
+        return;
+    } else if (name == "convert") {
+        neutron_init_convert_module(this);
+        return;
+    } else if (name == "time") {
+        neutron_init_time_module(this);
+        return;
+    } else if (name == "http") {
+        neutron_init_http_module(this);
+        return;
+    } else if (name == "math") {
+        neutron_init_math_module(this);
+        return;
+    } else if (name == "sys") {
+        neutron_init_sys_module(this);
+        return;
+    }
+
     std::string nt_path = "box/" + name + ".nt";
     
 #ifdef __APPLE__
@@ -687,6 +720,47 @@ void VM::load_module(const std::string& name) {
         return;
     } else {
         // Handle error: module not found
+        runtimeError("Module '" + name + "' not found. Make sure to use 'use " + name + ";' before accessing it.");
+    }
+}
+
+void VM::load_file(const std::string& filepath) {
+    // Try to open the file
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        // Try with module search paths
+        for (const auto& search_path : module_search_paths) {
+            std::string full_path = search_path + filepath;
+            file.open(full_path);
+            if (file.is_open()) {
+                break;
+            }
+        }
+        
+        if (!file.is_open()) {
+            runtimeError("File '" + filepath + "' not found.");
+            return;
+        }
+    }
+    
+    // Read the file content
+    std::string source((std::istreambuf_iterator<char>(file)),
+                       std::istreambuf_iterator<char>());
+    file.close();
+    
+    // Parse the file
+    Scanner scanner(source);
+    std::vector<Token> tokens = scanner.scanTokens();
+    Parser parser(tokens);
+    std::vector<std::unique_ptr<Stmt>> statements = parser.parse();
+    
+    // Compile and execute the file in the current global scope
+    Compiler compiler(*this);
+    Function* file_function = compiler.compile(statements);
+    if (file_function) {
+        // Execute the file to populate globals
+        interpret(file_function);
+        delete file_function;
     }
 }
 

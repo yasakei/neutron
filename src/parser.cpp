@@ -45,7 +45,7 @@ std::unique_ptr<Stmt> Parser::statement() {
         return classDeclaration();
     }
     
-    if (match({TokenType::USE})) {
+    if (match({TokenType::USE, TokenType::USING})) {
         return useStatement();
     }
     
@@ -178,9 +178,16 @@ std::unique_ptr<Stmt> Parser::classDeclaration() {
 }
 
 std::unique_ptr<Stmt> Parser::useStatement() {
+    // Check if this is 'using' syntax for file imports
+    if (previous().type == TokenType::USING) {
+        Token filePath = consume(TokenType::STRING, "Expect file path after 'using'.");
+        consume(TokenType::SEMICOLON, "Expect ';' after using statement.");
+        return std::make_unique<UseStmt>(filePath, true);
+    }
+    // Otherwise it's 'use' syntax for module imports
     Token moduleName = consume(TokenType::IDENTIFIER, "Expect module name.");
     consume(TokenType::SEMICOLON, "Expect ';' after use statement.");
-    return std::make_unique<UseStmt>(moduleName);
+    return std::make_unique<UseStmt>(moduleName, false);
 }
 
 std::unique_ptr<Stmt> Parser::block() {

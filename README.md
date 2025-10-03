@@ -10,10 +10,11 @@ Neutron is a simple, modern, and lightweight interpreted programming language wr
 - **Object-Oriented:** Supports classes, methods, and the `this` keyword.
 - **Built-in Functions:** A set of useful built-in functions for string manipulation, type conversion, and console output.
 - **Modular:** Supports both native C++ modules and Neutron language modules for organizing code.
+- **File Imports:** Import other `.nt` files with the `using 'filename.nt';` syntax.
 - **Binary Compilation:** Convert scripts to standalone executables with full module support.
 - **Array Support:** Dynamic arrays with literal syntax, indexing, and built-in functions.
 - **Enhanced Control Flow:** Fixed stack management issues in loops and conditionals for more reliable execution.
-- **Improved Module System:** Robust module loading with proper recursive function support.
+- **Improved Module System:** Robust module loading with proper recursive function support and helpful error messages.
 
 ## Getting Started
 
@@ -86,6 +87,30 @@ var message = greet("Neutron");
 say(message);
 ```
 
+**Importing Other Files**
+
+```neutron
+// utils.nt
+fun add(a, b) {
+    return a + b;
+}
+
+// main.nt
+using 'utils.nt';
+
+say(add(5, 3));  // 8
+```
+
+**Using Modules**
+
+```neutron
+use json;
+
+var data = {"name": "Neutron", "version": "1.0"};
+var jsonStr = json.stringify(data);
+say(jsonStr);  // {"name":"Neutron","version":"1.0"}
+```
+
 **Classes**
 
 ```neutron
@@ -134,8 +159,15 @@ For known issues and limitations, please see the [Known Issues](docs/known_issue
 
 ### Modules
 
-Neutron includes several built-in modules:
+Neutron includes several built-in modules and supports importing your own Neutron files:
 
+**Module Import Syntax:**
+```neutron
+use json;           // Import built-in module
+using 'utils.nt';   // Import Neutron source file
+```
+
+**Built-in Modules:**
 - **[Sys Module](docs/modules/sys_module.md)** - File operations and system utilities
 - **[Math Module](docs/modules/math_module.md)** - Mathematical operations and functions  
 - **[HTTP Module](docs/modules/http_module.md)** - HTTP client functionality
@@ -143,7 +175,9 @@ Neutron includes several built-in modules:
 - **[Time Module](docs/modules/time_module.md)** - Time and date functions
 - **[Convert Module](docs/modules/convert_module.md)** - Data type conversion utilities
 
-Examples of module usage can be found in the [examples directory](examples).
+For comprehensive module system documentation, see [Module System Guide](docs/module_system.md).
+
+Examples of module usage can be found in the test files: `test_import.nt`, `comprehensive_module_test.nt`.
 
 ### External Modules
 

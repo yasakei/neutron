@@ -124,9 +124,10 @@ public:
 class UseStmt : public Stmt {
 public:
     Token library;
+    bool isFilePath;  // true if importing a .nt file, false if importing a module
     
-    UseStmt(Token library) 
-        : Stmt(StmtType::USE), library(library) {}
+    UseStmt(Token library, bool isFilePath = false) 
+        : Stmt(StmtType::USE), library(library), isFilePath(isFilePath) {}
         
     void accept(Compiler* compiler) const override;
 };
