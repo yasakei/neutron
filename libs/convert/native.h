@@ -2,6 +2,7 @@
 #define NEUTRON_CONVERT_NATIVE_H
 
 #include "vm.h"
+#include "expr.h"
 #include <vector>
 
 namespace neutron {
@@ -16,6 +17,10 @@ namespace neutron {
     Value native_int_to_bin(std::vector<Value> arguments);
 
     void register_convert_functions(std::shared_ptr<Environment> env);
+
+extern "C" {
+    void neutron_init_convert_module(VM* vm);
+}
 
 }
 

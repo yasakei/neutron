@@ -1,4 +1,5 @@
 #include "libs/sys/native.h"
+#include "vm.h"
 #include <filesystem>
 #include <fstream>
 #include <cstdlib>
@@ -9,7 +10,7 @@
 
 namespace fs = std::filesystem;
 
-namespace neutron {
+using namespace neutron;
 
 // File operations
 
@@ -370,34 +371,46 @@ Value sys_exec(std::vector<Value> arguments) {
         throw std::runtime_error("Failed to close pipe.");
     }
     
-    // Remove trailing newline if present\n    if (!result.empty() && result.back() == '\n') {\n        result.pop_back();\n    }
+    // Remove trailing newline if present
+    if (!result.empty() && result.back() == '\n') {
+        result.pop_back();
+    }
     
     return Value(result);
 }
 
-void register_sys_functions(std::shared_ptr<neutron::Environment> env) {
+void register_sys_functions(std::shared_ptr<Environment> env) {
     // File operations
-    env->define("cp", neutron::Value(new neutron::NativeFn(sys_cp, 2)));
-    env->define("mv", neutron::Value(new neutron::NativeFn(sys_mv, 2)));
-    env->define("rm", neutron::Value(new neutron::NativeFn(sys_rm, 1)));
-    env->define("mkdir", neutron::Value(new neutron::NativeFn(sys_mkdir, 1)));
-    env->define("rmdir", neutron::Value(new neutron::NativeFn(sys_rmdir, 1)));
-    env->define("exists", neutron::Value(new neutron::NativeFn(sys_exists, 1)));
-    env->define("read", neutron::Value(new neutron::NativeFn(sys_read, 1)));
-    env->define("write", neutron::Value(new neutron::NativeFn(sys_write, 2)));
-    env->define("append", neutron::Value(new neutron::NativeFn(sys_append, 2)));
+    env->define("cp", Value(new NativeFn(sys_cp, 2)));
+    env->define("mv", Value(new NativeFn(sys_mv, 2)));
+    env->define("rm", Value(new NativeFn(sys_rm, 1)));
+    env->define("mkdir", Value(new NativeFn(sys_mkdir, 1)));
+    env->define("rmdir", Value(new NativeFn(sys_rmdir, 1)));
+    env->define("exists", Value(new NativeFn(sys_exists, 1)));
+    env->define("read", Value(new NativeFn(sys_read, 1)));
+    env->define("write", Value(new NativeFn(sys_write, 2)));
+    env->define("append", Value(new NativeFn(sys_append, 2)));
     
     // System info
-    env->define("cwd", neutron::Value(new neutron::NativeFn(sys_cwd, 0)));
-    env->define("chdir", neutron::Value(new neutron::NativeFn(sys_chdir, 1)));
-    env->define("env", neutron::Value(new neutron::NativeFn(sys_env, 1)));
-    env->define("args", neutron::Value(new neutron::NativeFn(sys_args, 0)));
-    env->define("info", neutron::Value(new neutron::NativeFn(sys_info, 0)));
-    env->define("input", neutron::Value(new neutron::NativeFn(sys_input, -1))); // 0 or 1 arguments
+    env->define("cwd", Value(new NativeFn(sys_cwd, 0)));
+    env->define("chdir", Value(new NativeFn(sys_chdir, 1)));
+    env->define("env", Value(new NativeFn(sys_env, 1)));
+    env->define("args", Value(new NativeFn(sys_args, 0)));
+    env->define("info", Value(new NativeFn(sys_info, 0)));
+    env->define("input", Value(new NativeFn(sys_input, -1))); // 0 or 1 arguments
     
     // Process control
-    env->define("exit", neutron::Value(new neutron::NativeFn(sys_exit, -1))); // 0 or 1 arguments
-    env->define("exec", neutron::Value(new neutron::NativeFn(sys_exec, 1)));
+    env->define("exit", Value(new NativeFn(sys_exit, -1))); // 0 or 1 arguments
+    env->define("exec", Value(new NativeFn(sys_exec, 1)));
 }
+
+extern "C" void neutron_init_sys_module(VM* vm) {
+    auto sys_env = std::make_shared<Environment>();
+    register_sys_functions(sys_env);
+    auto sys_module = new Module("sys", sys_env);
+    vm->define_module("sys", sys_module);
+}
+
+} // namespace neutron
 
 } // namespace neutron

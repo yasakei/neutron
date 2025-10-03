@@ -13,6 +13,8 @@
 // Forward declarations
 class Environment;
 
+class Environment;
+
 // Forward declarations for module registration functions
 namespace neutron {
     void register_sys_functions(std::shared_ptr<Environment> env);
@@ -188,12 +190,18 @@ public:
 class Module {
 public:
     std::string name;
-    std::shared_ptr<Environment> environment;
-    std::vector<std::unique_ptr<Stmt>> statements;
+    std::shared_ptr<Environment> env;
 
-    Module(std::string name, std::shared_ptr<Environment> environment, std::vector<std::unique_ptr<Stmt>> statements);
-    Module(std::string name, std::shared_ptr<Environment> environment);  // New constructor
-    Value get(const std::string& name);
+    Module(const std::string& name, std::shared_ptr<Environment> env)
+        : name(name), env(env) {}
+
+    Value get(const std::string& name) {
+        return env->get(name);
+    }
+
+    void define(const std::string& name, const Value& value) {
+        env->define(name, value);
+    }
 };
 
 class Callable {
@@ -285,6 +293,7 @@ public:
     void define_native(const std::string& name, Callable* function);
     void define_module(const std::string& name, Module* module);
     void define(const std::string& name, const Value& value);
+    void init_module(const std::string& name, std::function<void(Module*)> init_fn);
     void load_module(const std::string& name);
     Value call(const Value& callee, const std::vector<Value>& arguments);
     Value execute_string(const std::string& source);

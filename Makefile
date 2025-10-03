@@ -51,7 +51,7 @@ endif
 LIBTARGET = libneutron_runtime$(SHARED_EXT)
 
 SRCS = $(shell find src -type f -name "*.cpp" ! -name "main.cpp" ! -name "bytecode_runner.cpp")
-LIBSRCS = $(shell find libs -type f -name "*.cpp")
+LIBSRCS = $(shell find libs -type f -name "*.cpp" ! -name "native.cpp")
 BOXSRCS = $(shell find $(BOXDIR) -type f -name "*.cpp")
 OBJS = $(SRCS:src/%.cpp=build/%.o)
 LIBOBJS = $(LIBSRCS:libs/%.cpp=build/%.o)

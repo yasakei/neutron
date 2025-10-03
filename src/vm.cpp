@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <fstream>
 #include <dlfcn.h>
+#include <cmath>
 
 #include "capi.h"
 #include "sys/native.h"
@@ -55,26 +56,39 @@ VM::VM() : ip(nullptr), nextGC(1024) {  // Start GC at 1024 bytes
     globals["array_set"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_set), 3));
     
     // Create a shared environment for global functions
-    auto globalEnv = std::make_shared<Environment>();
+    //auto globalEnv = std::make_shared<Environment>();
     
-    // Register module functions
-    register_sys_functions(globalEnv);
-    register_json_functions(globalEnv);
-    register_convert_functions(globalEnv);
-    register_time_functions(globalEnv);
-    
-    // Create math module environment and register math functions
-    auto mathEnv = std::make_shared<Environment>();
-    register_math_functions(mathEnv);
-    auto mathModule = new Module("math", mathEnv);
-    globals["math"] = Value(mathModule);
-    
+    init_module("sys", [](Module* module) {
+        module->define("input", Value(new NativeFn([](std::vector<Value> args) {
+            if (args.size() != 1) {
+                throw std::runtime_error("input() expects 1 argument.");
+            }
+            std::cout << args[0].toString();
+            std::string line;
+            std::getline(std::cin, line);
+            return Value(line);
+        }, 1)));
+    });
+
+    init_module("math", [](Module* module) {
+        module->define("sqrt", Value(new NativeFn([](std::vector<Value> args) {
+            if (args.size() != 1) {
+                throw std::runtime_error("sqrt() expects 1 argument.");
+            }
+            if (args[0].type != ValueType::NUMBER) {
+                throw std::runtime_error("sqrt() expects a number.");
+            }
+            double num = std::get<double>(args[0].as);
+            return Value(std::sqrt(num));
+        }, 1)));
+    });
+
     run_external_module_initializers(this);
     
     // Copy registered functions to globals
-    for (const auto& pair : globalEnv->values) {
-        globals[pair.first] = pair.second;
-    }
+    //for (const auto& pair : globalEnv->values) {
+    //    globals[pair.first] = pair.second;
+    //}
     
     // Set up module search paths
     module_search_paths.push_back(".");
@@ -102,6 +116,12 @@ std::string Function::toString() {
 int Function::arity() { return arity_val; }
 
 Value::Value(Callable* callable) : type(ValueType::CALLABLE), as(callable) {}
+
+void VM::init_module(const std::string& name, std::function<void(Module*)> init_fn) {
+    auto module = new Module(name, std::make_shared<Environment>());
+    init_fn(module);
+    define_module(name, module);
+}
 
 void VM::interpret(Function* function) {
     push(Value(function));
@@ -162,9 +182,14 @@ bool VM::callValue(Value callee, int argCount) {
             for (int i = 0; i < argCount; i++) {
                 args.push_back(stack[stack.size() - argCount + i]);
             }
-            Value result = native->call(*this, args);
-            stack.resize(stack.size() - argCount - 1);
-            push(result);
+            try {
+                Value result = native->call(*this, args);
+                stack.resize(stack.size() - argCount - 1);
+                push(result);
+            } catch (const std::runtime_error& e) {
+                runtimeError(e.what());
+                return false;
+            }
             return true;
         } else if (callable->isCNativeFn()) {
             if (callable->arity() != -1 && callable->arity() != argCount) {
@@ -175,9 +200,14 @@ bool VM::callValue(Value callee, int argCount) {
             for (int i = 0; i < argCount; i++) {
                 args.push_back(stack[stack.size() - argCount + i]);
             }
-            Value result = callable->call(*this, args);
-            stack.resize(stack.size() - argCount - 1);
-            push(result);
+            try {
+                Value result = callable->call(*this, args);
+                stack.resize(stack.size() - argCount - 1);
+                push(result);
+            } catch (const std::runtime_error& e) {
+                runtimeError(e.what());
+                return false;
+            }
             return true;
         }
     }

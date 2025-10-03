@@ -1,7 +1,8 @@
 #include "libs/convert/native.h"
+#include "vm.h"
 #include <bitset>
 
-namespace neutron {
+using namespace neutron;
 
 Value native_char_to_int(std::vector<Value> arguments) {
     if (arguments.size() != 1 || arguments[0].type != ValueType::STRING || std::get<std::string>(arguments[0].as).length() != 1) {
@@ -89,4 +90,9 @@ void register_convert_functions(std::shared_ptr<Environment> env) {
     env->define("int_to_bin", Value(new NativeFn(native_int_to_bin, 1)));
 }
 
+extern "C" void neutron_init_convert_module(VM* vm) {
+    auto convert_env = std::make_shared<Environment>();
+    register_convert_functions(convert_env);
+    auto convert_module = new Module("convert", convert_env);
+    vm->define_module("convert", convert_module);
 }

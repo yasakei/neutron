@@ -1,9 +1,10 @@
 #include "libs/json/native.h"
+#include "vm.h"
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
 
-namespace neutron {
+using namespace neutron;
 
 // Forward declaration for helper functions
 std::string valueToJsonString(const Value& value, bool pretty = false, int indent = 0);
@@ -341,6 +342,13 @@ void register_json_functions(std::shared_ptr<Environment> env) {
     env->define("stringify", Value(new NativeFn(json_stringify, -1)));
     env->define("parse", Value(new NativeFn(json_parse, 1)));
     env->define("get", Value(new NativeFn(json_get, 2)));
+}
+
+extern "C" void neutron_init_json_module(VM* vm) {
+    auto json_env = std::make_shared<Environment>();
+    register_json_functions(json_env);
+    auto json_module = new Module("json", json_env);
+    vm->define_module("json", json_module);
 }
 
 } // namespace neutron

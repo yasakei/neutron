@@ -93,19 +93,35 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
     // Get used modules
     std::vector<std::string> usedModules = neutron::getUsedModules(sourceCode);
     
-    // Embed module source code
+    // Embed module source code (for Neutron modules only)
     for (const auto& moduleName : usedModules) {
-        std::string modulePath = "lib/" + moduleName + ".nt";
-        std::ifstream moduleFile(modulePath);
-        if (!moduleFile.is_open()) {
-            std::cerr << "Could not open module file: " << modulePath << std::endl;
-            exit(1);
-        }
+        std::string libModulePath = "lib/" + moduleName + ".nt";
+        std::ifstream moduleFile(libModulePath);
         
-        std::string moduleSource((std::istreambuf_iterator<char>(moduleFile)), std::istreambuf_iterator<char>());
-        executableFile << "const char* " << moduleName << "_source = R\"neutron_source(\n";
-        executableFile << moduleSource;
-        executableFile << "\n)neutron_source\";\n\n";
+        if (!moduleFile.is_open()) {
+            // Check if it's a neutron module in the box directory (not native)
+            std::string boxModulePath = "box/" + moduleName + "/" + moduleName + ".nt";
+            std::ifstream boxModuleFile(boxModulePath);
+            
+            if (boxModuleFile.is_open()) {
+                // It's a neutron module in the box directory
+                std::string moduleSource((std::istreambuf_iterator<char>(boxModuleFile)), std::istreambuf_iterator<char>());
+                executableFile << "const char* " << moduleName << "_source = R\"neutron_source(\n";
+                executableFile << moduleSource;
+                executableFile << "\n)neutron_source\";\n\n";
+                boxModuleFile.close();
+            } else {
+                // It might be a native module - we'll handle it differently when compiling
+                continue; // Don't embed native module source
+            }
+        } else {
+            // It's a lib module
+            std::string moduleSource((std::istreambuf_iterator<char>(moduleFile)), std::istreambuf_iterator<char>());
+            executableFile << "const char* " << moduleName << "_source = R\"neutron_source(\n";
+            executableFile << moduleSource;
+            executableFile << "\n)neutron_source\";\n\n";
+            moduleFile.close();
+        }
     }
     
     // Write the source code as a string literal
@@ -118,17 +134,45 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
     executableFile << "    // Initialize the VM\n";
     executableFile << "    neutron::VM vm;\n\n";
     
-    // Load modules
+    // Load Neutron modules (not native ones)
     for (const auto& moduleName : usedModules) {
-        executableFile << "    {\n";
-        executableFile << "        neutron::Scanner scanner(" << moduleName << "_source);\n";
-        executableFile << "        std::vector<neutron::Token> tokens = scanner.scanTokens();\n";
-        executableFile << "        neutron::Parser parser(tokens);\n";
-        executableFile << "        std::vector<std::unique_ptr<neutron::Stmt>> statements = parser.parse();\n";
-        executableFile << "        neutron::Compiler compiler(vm);\n";
-        executableFile << "        neutron::Function* function = compiler.compile(statements);\n";
-        executableFile << "        vm.interpret(function);\n";
-        executableFile << "    }\n";
+        std::string libModulePath = "lib/" + moduleName + ".nt";
+        std::ifstream moduleFile(libModulePath);
+        
+        if (!moduleFile.is_open()) {
+            // Check if it's a neutron module in the box directory
+            std::string boxModulePath = "box/" + moduleName + "/" + moduleName + ".nt";
+            std::ifstream boxModuleFile(boxModulePath);
+            
+            if (boxModuleFile.is_open()) {
+                // It's a neutron module in the box directory
+                executableFile << "    {\n";
+                executableFile << "        neutron::Scanner scanner(" << moduleName << "_source);\n";
+                executableFile << "        std::vector<neutron::Token> tokens = scanner.scanTokens();\n";
+                executableFile << "        neutron::Parser parser(tokens);\n";
+                executableFile << "        std::vector<std::unique_ptr<neutron::Stmt>> statements = parser.parse();\n";
+                executableFile << "        neutron::Compiler compiler(vm);\n";
+                executableFile << "        neutron::Function* function = compiler.compile(statements);\n";
+                executableFile << "        vm.interpret(function);\n";
+                executableFile << "    }\n";
+                boxModuleFile.close();
+            } else {
+                // This is a native module - it will be linked statically, so no need to load here
+                continue;
+            }
+        } else {
+            // It's a lib module
+            executableFile << "    {\n";
+            executableFile << "        neutron::Scanner scanner(" << moduleName << "_source);\n";
+            executableFile << "        std::vector<neutron::Token> tokens = scanner.scanTokens();\n";
+            executableFile << "        neutron::Parser parser(tokens);\n";
+            executableFile << "        std::vector<std::unique_ptr<neutron::Stmt>> statements = parser.parse();\n";
+            executableFile << "        neutron::Compiler compiler(vm);\n";
+            executableFile << "        neutron::Function* function = compiler.compile(statements);\n";
+            executableFile << "        vm.interpret(function);\n";
+            executableFile << "    }\n";
+            moduleFile.close();
+        }
     }
     
     executableFile << "    // Run the embedded source code\n";
@@ -144,14 +188,59 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
     
     executableFile.close();
     
-    // Compile and link to create the final executable
+    // Build native modules if needed and prepare the compilation command
     std::string compileCommand = "g++ -std=c++17 -Wall -Wextra -O2 -Iinclude -I. -Ilibs/json -Ilibs/http -Ilibs/time -Ilibs/sys -Ibox -Ilibs/websocket " +
                                 executableSourcePath + " " +
                                 "build/parser.o build/scanner.o build/capi.o build/runtime.o build/module_utils.o " +
                                 "build/bytecode.o build/debug.o build/compiler.o build/vm.o build/token.o build/module_registry.o " +
                                 "build/sys/native.o build/convert/native.o build/json/native.o build/math/native.o " +
-                                "build/http/native.o build/time/native.o build/module_loader.o " +
-                                "-lcurl -ljsoncpp -o " + outputPath;
+                                "build/http/native.o build/time/native.o build/module_loader.o ";
+    
+    // Check for and compile native modules that are used
+    for (const auto& moduleName : usedModules) {
+        std::string nativeCppPath = "box/" + moduleName + "/native.cpp";
+        std::string nativeCPath = "box/" + moduleName + "/native.c";
+        
+        if (std::ifstream(nativeCppPath).good()) {
+            // Compile native.cpp for this module
+            std::string moduleObj = "build/box/" + moduleName + ".o";
+            
+            // Create the build directory if it doesn't exist
+            system("mkdir -p build/box");
+            
+            // Compile the native module to an object file
+            std::string objCmd = "g++ -std=c++17 -Wall -Wextra -O2 -fPIC -Iinclude -I. -Ilibs -Ibox -c " +
+                                nativeCppPath + " -o " + moduleObj;
+            int objResult = system(objCmd.c_str());
+            if (objResult == 0) {
+                compileCommand += moduleObj + " ";
+                std::cout << "Compiled native module: " << moduleName << std::endl;
+            } else {
+                std::cerr << "Failed to compile native module: " << moduleName << std::endl;
+                exit(1);
+            }
+        } else if (std::ifstream(nativeCPath).good()) {
+            // Compile native.c for this module
+            std::string moduleObj = "build/box/" + moduleName + ".o";
+            
+            // Create the build directory if it doesn't exist
+            system("mkdir -p build/box");
+            
+            // Compile the native module to an object file
+            std::string objCmd = "g++ -std=c++17 -Wall -Wextra -O2 -fPIC -Iinclude -I. -Ilibs -Ibox -c " +
+                                nativeCPath + " -o " + moduleObj;
+            int objResult = system(objCmd.c_str());
+            if (objResult == 0) {
+                compileCommand += moduleObj + " ";
+                std::cout << "Compiled native module: " << moduleName << std::endl;
+            } else {
+                std::cerr << "Failed to compile native module: " << moduleName << std::endl;
+                exit(1);
+            }
+        }
+    }
+    
+    compileCommand += "-lcurl -ljsoncpp -o " + outputPath;
     
     std::cout << "Compiling to executable: " << outputPath << std::endl;
     int result = system(compileCommand.c_str());

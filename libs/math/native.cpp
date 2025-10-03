@@ -1,89 +1,77 @@
-#include "libs/math/native.h"
-#include <cmath>
+#include "math/native.h"
+#include "vm.h"
 
-namespace neutron {
+using namespace neutron;
 
-Value math_add(std::vector<Value> arguments) {
-    if (arguments.size() != 2) {
-        throw std::runtime_error("Expected 2 arguments for add().");
+// Function to add two numbers
+static Value add(const std::vector<Value>& args) {
+    if (args.size() != 2) {
+        // Handle error: incorrect number of arguments
+        return Value();
     }
-    if (arguments[0].type != ValueType::NUMBER || arguments[1].type != ValueType::NUMBER) {
-        throw std::runtime_error("Arguments for add() must be numbers.");
+    if (args[0].type != ValueType::NUMBER || args[1].type != ValueType::NUMBER) {
+        // Handle error: incorrect argument types
+        return Value();
     }
-    return Value(std::get<double>(arguments[0].as) + std::get<double>(arguments[1].as));
+    double a = std::get<double>(args[0].as);
+    double b = std::get<double>(args[1].as);
+    return Value(a + b);
 }
 
-Value math_subtract(std::vector<Value> arguments) {
-    if (arguments.size() != 2) {
-        throw std::runtime_error("Expected 2 arguments for subtract().");
+// Function to subtract two numbers
+static Value subtract(const std::vector<Value>& args) {
+    if (args.size() != 2) {
+        return Value();
     }
-    if (arguments[0].type != ValueType::NUMBER || arguments[1].type != ValueType::NUMBER) {
-        throw std::runtime_error("Arguments for subtract() must be numbers.");
+    if (args[0].type != ValueType::NUMBER || args[1].type != ValueType::NUMBER) {
+        return Value();
     }
-    return Value(std::get<double>(arguments[0].as) - std::get<double>(arguments[1].as));
+    double a = std::get<double>(args[0].as);
+    double b = std::get<double>(args[1].as);
+    return Value(a - b);
 }
 
-Value math_multiply(std::vector<Value> arguments) {
-    if (arguments.size() != 2) {
-        throw std::runtime_error("Expected 2 arguments for multiply().");
+// Function to multiply two numbers
+static Value multiply(const std::vector<Value>& args) {
+    if (args.size() != 2) {
+        return Value();
     }
-    if (arguments[0].type != ValueType::NUMBER || arguments[1].type != ValueType::NUMBER) {
-        throw std::runtime_error("Arguments for multiply() must be numbers.");
+    if (args[0].type != ValueType::NUMBER || args[1].type != ValueType::NUMBER) {
+        return Value();
     }
-    return Value(std::get<double>(arguments[0].as) * std::get<double>(arguments[1].as));
+    double a = std::get<double>(args[0].as);
+    double b = std::get<double>(args[1].as);
+    return Value(a * b);
 }
 
-Value math_divide(std::vector<Value> arguments) {
-    if (arguments.size() != 2) {
-        throw std::runtime_error("Expected 2 arguments for divide().");
+// Function to divide two numbers
+static Value divide(const std::vector<Value>& args) {
+    if (args.size() != 2) {
+        return Value();
     }
-    if (arguments[0].type != ValueType::NUMBER || arguments[1].type != ValueType::NUMBER) {
-        throw std::runtime_error("Arguments for divide() must be numbers.");
+    if (args[0].type != ValueType::NUMBER || args[1].type != ValueType::NUMBER) {
+        return Value();
     }
-    if (std::get<double>(arguments[1].as) == 0) {
-        throw std::runtime_error("Division by zero.");
+    double a = std::get<double>(args[0].as);
+    double b = std::get<double>(args[1].as);
+    if (b == 0) {
+        // Handle error: division by zero
+        return Value();
     }
-    return Value(std::get<double>(arguments[0].as) / std::get<double>(arguments[1].as));
-}
-
-Value math_pow(std::vector<Value> arguments) {
-    if (arguments.size() != 2) {
-        throw std::runtime_error("Expected 2 arguments for pow().");
-    }
-    if (arguments[0].type != ValueType::NUMBER || arguments[1].type != ValueType::NUMBER) {
-        throw std::runtime_error("Arguments for pow() must be numbers.");
-    }
-    return Value(pow(std::get<double>(arguments[0].as), std::get<double>(arguments[1].as)));
-}
-
-Value math_sqrt(std::vector<Value> arguments) {
-    if (arguments.size() != 1) {
-        throw std::runtime_error("Expected 1 argument for sqrt().");
-    }
-    if (arguments[0].type != ValueType::NUMBER) {
-        throw std::runtime_error("Argument for sqrt() must be a number.");
-    }
-    return Value(sqrt(std::get<double>(arguments[0].as)));
-}
-
-Value math_abs(std::vector<Value> arguments) {
-    if (arguments.size() != 1) {
-        throw std::runtime_error("Expected 1 argument for abs().");
-    }
-    if (arguments[0].type != ValueType::NUMBER) {
-        throw std::runtime_error("Argument for abs() must be a number.");
-    }
-    return Value(static_cast<double>(abs(static_cast<int>(std::get<double>(arguments[0].as)))));
+    return Value(a / b);
 }
 
 void register_math_functions(std::shared_ptr<Environment> env) {
-    env->define("add", Value(new NativeFn(math_add, 2)));
-    env->define("subtract", Value(new NativeFn(math_subtract, 2)));
-    env->define("multiply", Value(new NativeFn(math_multiply, 2)));
-    env->define("divide", Value(new NativeFn(math_divide, 2)));
-    env->define("pow", Value(new NativeFn(math_pow, 2)));
-    env->define("sqrt", Value(new NativeFn(math_sqrt, 1)));
-    env->define("abs", Value(new NativeFn(math_abs, 1)));
+    env->define("add", Value(new CNativeFn(add, 2)));
+    env->define("subtract", Value(new CNativeFn(subtract, 2)));
+    env->define("multiply", Value(new CNativeFn(multiply, 2)));
+    env->define("divide", Value(new CNativeFn(divide, 2)));
 }
 
+
+extern "C" void neutron_init_math_module(VM* vm) {
+    auto math_env = std::make_shared<Environment>();
+    register_math_functions(math_env);
+    auto math_module = new Module("math", math_env);
+    vm->define_module("math", math_module);
 }

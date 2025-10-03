@@ -1,11 +1,12 @@
 #include "libs/time/native.h"
+#include "vm.h"
 #include <chrono>
 #include <ctime>
 #include <iomanip>
 #include <sstream>
 #include <thread>
 
-namespace neutron {
+using namespace neutron;
 
 // Get current timestamp
 Value time_now(std::vector<Value> arguments) {
@@ -73,4 +74,9 @@ void register_time_functions(std::shared_ptr<Environment> env) {
     env->define("sleep", Value(new NativeFn(time_sleep, 1)));
 }
 
-} // namespace neutron
+extern "C" void neutron_init_time_module(VM* vm) {
+    auto time_env = std::make_shared<Environment>();
+    register_time_functions(time_env);
+    auto time_module = new Module("time", time_env);
+    vm->define_module("time", time_module);
+}
