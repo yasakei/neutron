@@ -1,4 +1,5 @@
 #include "vm.h"
+#include "sys/native.h"
 #include "compiler.h"
 #include "bytecode.h"
 #include "debug.h"
@@ -11,7 +12,6 @@
 #include <cmath>
 
 #include "capi.h"
-#include "sys/native.h"
 #include "json/native.h"
 #include "convert/native.h"
 #include "time/native.h"
@@ -58,30 +58,8 @@ VM::VM() : ip(nullptr), nextGC(1024) {  // Start GC at 1024 bytes
     // Create a shared environment for global functions
     //auto globalEnv = std::make_shared<Environment>();
     
-    init_module("sys", [](Module* module) {
-        module->define("input", Value(new NativeFn([](std::vector<Value> args) {
-            if (args.size() != 1) {
-                throw std::runtime_error("input() expects 1 argument.");
-            }
-            std::cout << args[0].toString();
-            std::string line;
-            std::getline(std::cin, line);
-            return Value(line);
-        }, 1)));
-    });
-
-    init_module("math", [](Module* module) {
-        module->define("sqrt", Value(new NativeFn([](std::vector<Value> args) {
-            if (args.size() != 1) {
-                throw std::runtime_error("sqrt() expects 1 argument.");
-            }
-            if (args[0].type != ValueType::NUMBER) {
-                throw std::runtime_error("sqrt() expects a number.");
-            }
-            double num = std::get<double>(args[0].as);
-            return Value(std::sqrt(num));
-        }, 1)));
-    });
+    neutron_init_sys_module(this);
+    neutron_init_math_module(this);
 
     run_external_module_initializers(this);
     
@@ -114,14 +92,6 @@ std::string Function::toString() {
 }
 
 int Function::arity() { return arity_val; }
-
-Value::Value(Callable* callable) : type(ValueType::CALLABLE), as(callable) {}
-
-void VM::init_module(const std::string& name, std::function<void(Module*)> init_fn) {
-    auto module = new Module(name, std::make_shared<Environment>());
-    init_fn(module);
-    define_module(name, module);
-}
 
 void VM::interpret(Function* function) {
     push(Value(function));

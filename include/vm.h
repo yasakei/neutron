@@ -2,6 +2,9 @@
 #define NEUTRON_VM_H
 
 #include "expr.h"
+#include "stmt.h"
+#include "environment.h"
+#include "value.h"
 #include <vector>
 #include <unordered_map>
 #include <stack>
@@ -9,9 +12,6 @@
 #include <cstdint>
 #include <variant>
 #include <functional>
-
-// Forward declarations
-class Environment;
 
 class Environment;
 
@@ -27,6 +27,8 @@ namespace neutron {
 namespace neutron {
 
 // Forward declarations
+class Stmt;
+class FunctionStmt;  // Needed for Function class
 class VM;
 class Callable;
 class Module;
@@ -43,39 +45,7 @@ struct CallFrame {
     size_t slot_offset;  // Store offset instead of raw pointer
 };
 
-enum class ValueType {
-    NIL,
-    BOOLEAN,
-    NUMBER,
-    STRING,
-    ARRAY,
-    OBJECT,
-    CALLABLE,
-    MODULE,
-    CLASS,
-    INSTANCE
-};
 
-using Literal = std::variant<std::nullptr_t, bool, double, std::string, Array*, Object*, Callable*, Module*, class Class*, class Instance*>;
-
-struct Value {
-    ValueType type;
-    Literal as;
-
-    Value();
-    Value(std::nullptr_t);
-    Value(bool value);
-    Value(double value);
-    Value(const std::string& value);
-    Value(Array* array);
-    Value(Object* object);
-    Value(Callable* callable);
-    Value(Module* module);
-    Value(Class* klass);
-    Value(Instance* instance);
-
-    std::string toString() const;
-};
 
 class Object {
 public:
@@ -174,31 +144,21 @@ Value native_array_length(std::vector<Value> arguments);
 Value native_array_at(std::vector<Value> arguments);
 Value native_array_set(std::vector<Value> arguments);
 
-class Environment {
-public:
-    std::shared_ptr<Environment> enclosing;
-    std::unordered_map<std::string, Value> values;
 
-    Environment();
-    Environment(std::shared_ptr<Environment> enclosing);
-    
-    void define(const std::string& name, const Value& value);
-    Value get(const std::string& name);
-    void assign(const std::string& name, const Value& value);
-};
 
 class Module {
 public:
     std::string name;
     std::shared_ptr<Environment> env;
+    std::vector<std::unique_ptr<Stmt>> statements;
 
     Module(const std::string& name, std::shared_ptr<Environment> env)
         : name(name), env(env) {}
+    // Note: The 3-parameter constructor is defined only in runtime.cpp where full Stmt definitions are available
 
     Value get(const std::string& name) {
         return env->get(name);
     }
-
     void define(const std::string& name, const Value& value) {
         env->define(name, value);
     }
@@ -293,7 +253,6 @@ public:
     void define_native(const std::string& name, Callable* function);
     void define_module(const std::string& name, Module* module);
     void define(const std::string& name, const Value& value);
-    void init_module(const std::string& name, std::function<void(Module*)> init_fn);
     void load_module(const std::string& name);
     Value call(const Value& callee, const std::vector<Value>& arguments);
     Value execute_string(const std::string& source);

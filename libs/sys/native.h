@@ -1,15 +1,10 @@
-#ifndef NEUTRON_SYS_NATIVE_H
-#define NEUTRON_SYS_NATIVE_H
+#pragma once
 
 #include "vm.h"
-#include "expr.h"
+#include "environment.h"
 
 namespace neutron {
     void register_sys_functions(std::shared_ptr<Environment> env);
-
-extern "C" {
-    void neutron_init_sys_module(VM* vm);
-}
 }
 
-#endif
+extern "C" void neutron_init_sys_module(neutron::VM* vm);

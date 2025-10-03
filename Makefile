@@ -51,7 +51,7 @@ endif
 LIBTARGET = libneutron_runtime$(SHARED_EXT)
 
 SRCS = $(shell find src -type f -name "*.cpp" ! -name "main.cpp" ! -name "bytecode_runner.cpp")
-LIBSRCS = $(shell find libs -type f -name "*.cpp" ! -name "native.cpp")
+LIBSRCS = $(shell find libs -type f -name "*.cpp")
 BOXSRCS = $(shell find $(BOXDIR) -type f -name "*.cpp")
 OBJS = $(SRCS:src/%.cpp=build/%.o)
 LIBOBJS = $(LIBSRCS:libs/%.cpp=build/%.o)
@@ -62,14 +62,20 @@ DEPENDENCIES = -I$(INCDIR) -I. -Ilibs -I$(BOXDIR)
 DEBUG ?= 0
 
 ifeq ($(DEBUG), 1)
-    CXXFLAGS = -std=c++17 -Wall -Wextra -g -O0 -DDEBUG_TRACE_EXECUTION -DDEBUG_PRINT_CODE -fPIC
+    CXXFLAGS = -std=c++17 -Wall -Wextra -g -O0 -DDEBUG_TRACE_EXECUTION -DDEBUG_PRINT_CODE -fPIC -Iinclude
 else
-    CXXFLAGS = -std=c++17 -Wall -Wextra -O2 -fPIC
+    CXXFLAGS = -std=c++17 -Wall -Wextra -O2 -fPIC -Iinclude
 endif
 
-.PHONY: all clean directories release
+.PHONY: all clean directories release install uninstall
 
 all: directories $(TARGET) $(LIBTARGET)
+
+clean:
+	rm -rf $(BUILDDIR)
+	rm -f $(TARGET)
+	rm -f $(LIBTARGET)
+	@echo "Clean complete"
 
 build-box:
 	@if [ -z "$(MODULE)" ]; then \

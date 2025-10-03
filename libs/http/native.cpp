@@ -1,4 +1,4 @@
-#include "libs/http/native.h"
+#include "native.h"
 #include <string>
 #include <unordered_map>
 
@@ -219,4 +219,11 @@ void register_http_functions(std::shared_ptr<Environment> env) {
     env->define("http_patch", Value(new NativeFn(http_patch, -1))); // 1-3 arguments
 }
 
+} // namespace neutron
+
+extern "C" void neutron_init_http_module(neutron::VM* vm) {
+    auto http_env = std::make_shared<neutron::Environment>();
+    neutron::register_http_functions(http_env);
+    auto http_module = new neutron::Module("http", http_env);
+    vm->define_module("http", http_module);
 }

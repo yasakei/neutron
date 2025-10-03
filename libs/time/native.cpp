@@ -1,4 +1,4 @@
-#include "libs/time/native.h"
+#include "native.h"
 #include "vm.h"
 #include <chrono>
 #include <ctime>
@@ -68,15 +68,17 @@ Value time_sleep(std::vector<Value> arguments) {
     return Value(nullptr);
 }
 
-void register_time_functions(std::shared_ptr<Environment> env) {
-    env->define("now", Value(new NativeFn(time_now, 0)));
-    env->define("format", Value(new NativeFn(time_format, -1))); // -1 for variable arguments
-    env->define("sleep", Value(new NativeFn(time_sleep, 1)));
+namespace neutron {
+    void register_time_functions(std::shared_ptr<Environment> env) {
+        env->define("now", Value(new NativeFn(time_now, 0)));
+        env->define("format", Value(new NativeFn(time_format, -1))); // -1 for variable arguments
+        env->define("sleep", Value(new NativeFn(time_sleep, 1)));
+    }
 }
 
-extern "C" void neutron_init_time_module(VM* vm) {
-    auto time_env = std::make_shared<Environment>();
-    register_time_functions(time_env);
-    auto time_module = new Module("time", time_env);
+extern "C" void neutron_init_time_module(neutron::VM* vm) {
+    auto time_env = std::make_shared<neutron::Environment>();
+    neutron::register_time_functions(time_env);
+    auto time_module = new neutron::Module("time", time_env);
     vm->define_module("time", time_module);
 }
