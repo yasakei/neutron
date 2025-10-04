@@ -10,7 +10,7 @@
 #include <sstream>
 #include <cstdlib>
 #include <cstring>
-#include <unistd.h>
+#include <cross-platfrom/compat_unistd.h>
 #include <sys/stat.h>
 #include <array>
 #include <memory>
