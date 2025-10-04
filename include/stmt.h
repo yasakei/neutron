@@ -18,7 +18,9 @@ enum class StmtType {
     USE,
     FUNCTION,
     RETURN,
-    CLASS
+    CLASS,
+    BREAK,
+    CONTINUE
 };
 
 // Base statement class
@@ -164,6 +166,22 @@ public:
 
     Token name;
     std::vector<std::unique_ptr<Stmt>> body;
+    
+    void accept(Compiler* compiler) const override;
+};
+
+// Break statement
+class BreakStmt : public Stmt {
+public:
+    BreakStmt() : Stmt(StmtType::BREAK) {}
+    
+    void accept(Compiler* compiler) const override;
+};
+
+// Continue statement
+class ContinueStmt : public Stmt {
+public:
+    ContinueStmt() : Stmt(StmtType::CONTINUE) {}
     
     void accept(Compiler* compiler) const override;
 };

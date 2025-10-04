@@ -20,17 +20,37 @@ Neutron is a simple, modern, and lightweight interpreted programming language wr
 
 ### Prerequisites
 
-To build and run Neutron, you will need a C++ compiler that supports C++17.
+To build and run Neutron, you will need:
+- A C++ compiler that supports C++17 (g++, clang++, or MSVC)
+- CMake 3.10 or higher
+- pkg-config (for dependency management)
+- Required libraries: libcurl, jsoncpp
 
 ### Building the Project
 
-To build the Neutron interpreter, simply run the `make` command in the root of the project directory:
+Neutron now uses CMake for cross-platform builds:
 
 ```sh
-make
+mkdir -p build
+cd build
+cmake ..
+cmake --build .
 ```
 
-This will create the `neutron` executable in the root directory.
+This will create:
+- `build/neutron` - The interpreter executable
+- `build/libneutron_runtime.so` - The runtime library
+- Copies of both in the project root directory for convenience
+
+For a clean rebuild:
+
+```sh
+rm -rf build
+mkdir build
+cd build
+cmake ..
+cmake --build .
+```
 
 ### Running the Interpreter
 
@@ -38,6 +58,12 @@ You can run a Neutron script by passing the file path to the `neutron` executabl
 
 ```sh
 ./neutron examples/hello.nt
+```
+
+Or use the binary in the build directory:
+
+```sh
+./build/neutron examples/hello.nt
 ```
 
 You can also start the REPL (Read-Eval-Print Loop) by running `neutron` without any arguments:
@@ -159,25 +185,33 @@ For known issues and limitations, please see the [Known Issues](docs/known_issue
 
 ### Modules
 
-Neutron includes several built-in modules and supports importing your own Neutron files:
+Neutron includes several built-in modules and supports importing your own Neutron files.
+
+**Important:** As of the latest version, all modules require explicit import using the `use` statement. Modules are lazily loaded only when needed.
 
 **Module Import Syntax:**
 ```neutron
+use sys;            // Import built-in module
 use json;           // Import built-in module
 using 'utils.nt';   // Import Neutron source file
 ```
 
 **Built-in Modules:**
-- **[Sys Module](docs/modules/sys_module.md)** - File operations and system utilities
+- **[Sys Module](docs/modules/sys_module.md)** - Complete file I/O, directory operations, environment access, and process control
 - **[Math Module](docs/modules/math_module.md)** - Mathematical operations and functions  
 - **[HTTP Module](docs/modules/http_module.md)** - HTTP client functionality
 - **[JSON Module](docs/modules/json_module.md)** - JSON parsing and generation
 - **[Time Module](docs/modules/time_module.md)** - Time and date functions
 - **[Convert Module](docs/modules/convert_module.md)** - Data type conversion utilities
 
-For comprehensive module system documentation, see [Module System Guide](docs/module_system.md).
+**Module Loading:**
+All modules use lazy loading - they're only initialized when explicitly imported with `use`. This provides:
+- Faster startup time
+- Explicit dependencies
+- Better memory management
+- Clear module boundaries
 
-Examples of module usage can be found in the test files: `test_import.nt`, `comprehensive_module_test.nt`.
+For comprehensive module system documentation, see [Module System Guide](docs/module_system.md).
 
 ### External Modules
 

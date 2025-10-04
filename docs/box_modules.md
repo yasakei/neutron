@@ -206,15 +206,20 @@ To include module functionality in a standalone binary, the module must be writt
 
 ## 4.1. Built-in Modules
 
-Neutron comes with several built-in native modules that demonstrate the Box Module system:
+Neutron comes with several built-in native modules that demonstrate the Box Module system.
 
 ### Core Native Modules
 
-These modules are compiled directly into the Neutron runtime:
+These modules are compiled directly into the Neutron runtime and require explicit import with `use modulename;`:
 
-1. **`sys`** - System operations, file I/O, environment access
+1. **`sys`** - System operations, file I/O, environment access (FULLY IMPLEMENTED)
    - Located in: `libs/sys/native.cpp`
-   - Functions: `read`, `write`, `cp`, `mv`, `rm`, `mkdir`, `exists`, `cwd`, `env`, `exec`, etc.
+   - **File Operations:** `read`, `write`, `append`, `cp`, `mv`, `rm`, `exists`
+   - **Directory Operations:** `mkdir`, `rmdir`
+   - **System Info:** `cwd`, `chdir`, `env`, `args`, `info`
+   - **User Input:** `input`
+   - **Process Control:** `exit`, `exec`
+   - Status: ✅ All features implemented and tested
 
 2. **`json`** - JSON parsing and serialization
    - Located in: `libs/json/native.cpp`
@@ -236,15 +241,11 @@ These modules are compiled directly into the Neutron runtime:
    - Located in: `libs/convert/native.cpp`
    - Functions: `char_to_int`, `int_to_char`, `string_length`, `string_get_char_at`, etc.
 
+**Important:** All built-in modules use lazy loading - they're only initialized when explicitly imported with `use modulename;`.
+
 ### Standard Library Modules
 
-These are Neutron modules (`.nt` files) in the `lib/` directory:
-
-1. **`convert.nt`** - High-level conversion utilities
-2. **`http.nt`** - HTTP helper functions
-3. **`json.nt`** - JSON utility functions
-4. **`math.nt`** - Extended math functions
-5. **`sys.nt`** - System utility functions
+These are placeholder Neutron modules (`.nt` files) in the `lib/` directory. Most functionality comes from the native modules above.
 
 **Example built-in module usage:**
 

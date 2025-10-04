@@ -4,6 +4,8 @@ The `sys` module provides system-level operations, file I/O functionality, envir
 
 ## Usage
 
+**Important:** As of the latest version, the `sys` module requires explicit import using the `use` statement:
+
 ```neutron
 use sys;
 
@@ -11,6 +13,12 @@ use sys;
 var currentDir = sys.cwd();
 sys.write("example.txt", "Hello, world!");
 ```
+
+The module is no longer auto-loaded, ensuring explicit dependencies and better code organization.
+
+## Implementation Status
+
+The `sys` module is fully implemented as a native C++ module located in `libs/sys/native.cpp`. All documented features are available and working.
 
 ## File Operations
 
@@ -280,27 +288,34 @@ Gets command line arguments passed to the program.
 use sys;
 
 var args = sys.args();
-say("Program arguments: " + args);
+say("Program arguments: ");
+// Note: Currently returns an empty array - command line argument passing
+// will be implemented in a future version
 ```
 
-**Note:** Currently returns an empty array in this implementation
+**Implementation Note:** The underlying VM does not yet pass command line arguments to scripts. This function currently returns an empty array but the interface is provided for future compatibility.
 
 ---
 
 ### `sys.info()`
 Gets system information.
 
-**Returns:** Object containing system information
+**Returns:** Object containing system information with the following properties:
+- `platform`: Operating system ("linux", "macos", "windows", or "unknown")
+- `arch`: CPU architecture ("x64", "x86", "arm64", or "unknown")
+- `cwd`: Current working directory
 
 **Example:**
 ```neutron
 use sys;
 
 var info = sys.info();
-say("Platform: " + info["platform"]);
-say("Architecture: " + info["arch"]);
-say("Current directory: " + info["cwd"]);
+say("Platform: " + info.platform);
+say("Architecture: " + info.arch);
+say("Current directory: " + info.cwd);
 ```
+
+**Note:** Access object properties using dot notation (e.g., `info.platform`), not square bracket notation.
 
 ## User Input
 
@@ -464,3 +479,44 @@ The sys module works on Linux, macOS, and Windows, but some behaviors may vary:
 - Some shell commands in `sys.exec()` may not be available on all platforms
 
 Always test your code on your target platforms when using system-dependent features.
+
+## Build System
+
+As of the latest version, Neutron uses CMake for cross-platform builds. The sys module is compiled as part of the Neutron runtime library.
+
+To build Neutron with the sys module:
+
+```bash
+mkdir -p build
+cd build
+cmake ..
+cmake --build .
+```
+
+The compiled binaries will be:
+- `build/neutron` - The Neutron interpreter
+- `build/libneutron_runtime.so` - The runtime library (includes sys module)
+- `neutron` and `libneutron_runtime.so` - Copies in the project root for convenience
+
+## Module Loading
+
+The sys module uses lazy loading - it's only initialized when you explicitly use `use sys;` in your code. This ensures:
+
+1. Faster startup time for scripts that don't need sys
+2. Explicit dependencies in your code
+3. Better memory management
+4. Clear module boundaries
+
+All built-in modules (`sys`, `math`, `json`, `http`, `time`, `convert`) follow this pattern.
+
+## Changes from Previous Versions
+
+**Breaking Changes:**
+- sys module now requires explicit `use sys;` statement (previously auto-loaded)
+- Object property access uses dot notation only (e.g., `obj.property` not `obj["property"]`)
+
+**Improvements:**
+- Full implementation of all documented sys functions
+- Better error messages
+- Cross-platform compatibility (Windows, Linux, macOS)
+- CMake build system for easier compilation

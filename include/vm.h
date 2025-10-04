@@ -1,22 +1,34 @@
 #ifndef NEUTRON_VM_H
 #define NEUTRON_VM_H
 
-#include "expr.h"
-#include "stmt.h"
-#include "environment.h"
-#include "value.h"
+// Include all necessary type headers
+#include "types/value.h"
+#include "types/object.h"
+#include "types/array.h"
+#include "types/json_object.h"
+#include "types/json_array.h"
+#include "types/callable.h"
+#include "types/function.h"
+#include "types/native_fn.h"
+#include "types/bound_method.h"
+#include "types/class.h"
+#include "types/instance.h"
+#include "modules/module.h"
+#include "runtime/environment.h"
+#include "compiler/bytecode.h"
+
 #include <vector>
 #include <unordered_map>
-#include <stack>
 #include <memory>
 #include <cstdint>
-#include <variant>
-#include <functional>
+#include <string>
 
-class Environment;
-
-// Forward declarations for module registration functions
+// Forward declarations only for types defined elsewhere
 namespace neutron {
+    class Stmt;
+    class FunctionStmt;
+    
+    // Forward declarations for module registration functions
     void register_sys_functions(std::shared_ptr<Environment> env);
     void register_json_functions(std::shared_ptr<Environment> env);
     void register_convert_functions(std::shared_ptr<Environment> env);
@@ -26,222 +38,16 @@ namespace neutron {
 
 namespace neutron {
 
-// Forward declarations
-class Stmt;
-class FunctionStmt;  // Needed for Function class
-class VM;
-class Callable;
-class Module;
-class Object;
-class Array;
-class Chunk;
-
-struct Value;
-class Function;
-
 struct CallFrame {
     Function* function;
     uint8_t* ip;
-    size_t slot_offset;  // Store offset instead of raw pointer
-};
-
-
-
-class Object {
-public:
-    bool is_marked = false;
-    virtual ~Object() = default;
-    virtual std::string toString() const = 0;
-    virtual void mark() { is_marked = true; }
-    virtual void sweep() {} // Default implementation, can be overridden
-};
-
-class JsonObject : public Object {
-public:
-    std::unordered_map<std::string, Value> properties;
-    std::string toString() const override {
-        return "<json object>";
-    }
-};
-
-class Array : public Object {
-public:
-    std::vector<Value> elements;
-    
-    Array() = default;
-    Array(std::vector<Value> elements) : elements(std::move(elements)) {}
-    
-    std::string toString() const override;
-    
-    size_t size() const { return elements.size(); }
-    void push(const Value& value) { elements.push_back(value); }
-    Value pop() { 
-        if (elements.empty()) {
-            throw std::runtime_error("Cannot pop from empty array");
-        }
-        Value value = elements.back();
-        elements.pop_back();
-        return value;
-    }
-    Value& at(size_t index) { 
-        if (index >= elements.size()) {
-            throw std::runtime_error("Array index out of bounds");
-        }
-        return elements[index]; 
-    }
-    const Value& at(size_t index) const { 
-        if (index >= elements.size()) {
-            throw std::runtime_error("Array index out of bounds");
-        }
-        return elements[index]; 
-    }
-    void set(size_t index, const Value& value) {
-        if (index >= elements.size()) {
-            throw std::runtime_error("Array index out of bounds");
-        }
-        elements[index] = value;
-    }
-    
-    void mark() override {
-        Object::mark(); // Mark this object
-        // Mark all elements in the array
-        for (auto& element : elements) {
-            if (element.type == ValueType::OBJECT) {
-                Object* obj = std::get<Object*>(element.as);
-                if (obj && !obj->is_marked) {
-                    obj->mark();
-                }
-            } else if (element.type == ValueType::ARRAY) {
-                Array* arr = std::get<Array*>(element.as);
-                if (arr && !arr->is_marked) {
-                    arr->mark();
-                }
-            }
-        }
-    }
-};
-
-class JsonArray : public Object {
-public:
-    std::vector<Value> elements;
-    std::string toString() const override {
-        return "<json array>";
-    }
-};
-
-// Native primitive functions for string/char manipulation
-Value native_char_to_int(std::vector<Value> arguments);
-Value native_int_to_char(std::vector<Value> arguments);
-Value native_string_get_char_at(std::vector<Value> arguments);
-Value native_string_length(std::vector<Value> arguments);
-Value native_say(std::vector<Value> arguments);
-
-// Native functions for arrays
-Value native_array_new(std::vector<Value> arguments);
-Value native_array_push(std::vector<Value> arguments);
-Value native_array_pop(std::vector<Value> arguments);
-Value native_array_length(std::vector<Value> arguments);
-Value native_array_at(std::vector<Value> arguments);
-Value native_array_set(std::vector<Value> arguments);
-
-
-
-class Module {
-public:
-    std::string name;
-    std::shared_ptr<Environment> env;
-    std::vector<std::unique_ptr<Stmt>> statements;
-
-    Module(const std::string& name, std::shared_ptr<Environment> env)
-        : name(name), env(env) {}
-    // Note: The 3-parameter constructor is defined only in runtime.cpp where full Stmt definitions are available
-
-    Value get(const std::string& name) {
-        return env->get(name);
-    }
-    void define(const std::string& name, const Value& value) {
-        env->define(name, value);
-    }
-};
-
-class Callable {
-public:
-    virtual ~Callable() = default;
-    virtual int arity() = 0;
-    virtual Value call(VM& vm, std::vector<Value> arguments) = 0;
-    virtual std::string toString() = 0;
-    virtual bool isCNativeFn() const { return false; }
-};
-
-class Class;
-class Instance;
-
-class BoundMethod : public Callable {
-public:
-    BoundMethod(Value receiver, Function* method);
-    int arity() override;
-    Value call(VM& vm, std::vector<Value> arguments) override;
-    std::string toString() override;
-    
-    Value receiver;
-    Function* method;
-};
-
-class Class : public Callable {
-public:
-    Class(const std::string& name);
-    Class(const std::string& name, std::shared_ptr<Environment> class_env);
-    int arity() override;
-    Value call(VM& vm, std::vector<Value> arguments) override;
-    std::string toString() override;
-    
-    std::string name;
-    std::shared_ptr<Environment> class_env;  // Store the environment for this class
-    std::unordered_map<std::string, Value> methods;  // Store method definitions
-};
-
-class Instance : public Object {
-public:
-    Instance(Class* klass);
-    std::string toString() const override;
-    
-    Class* klass;
-    std::unordered_map<std::string, Value> fields;
-};
-
-class Function : public Callable {
-public:
-    Function(const FunctionStmt* declaration, std::shared_ptr<Environment> closure);
-    int arity() override;
-    Value call(VM& vm, std::vector<Value> arguments) override;
-    std::string toString() override;
-
-    std::string name;
-    int arity_val;
-    Chunk* chunk;
-private:
-    const FunctionStmt* declaration;
-    std::shared_ptr<Environment> closure;
-};
-
-class NativeFn : public Callable {
-public:
-    using NativeFnPtr = std::function<Value(std::vector<Value>)>;
-
-    NativeFn(NativeFnPtr function, int arity);
-    int arity() override;
-    Value call(VM& vm, std::vector<Value> arguments) override;
-    std::string toString() override;
-
-private:
-    NativeFnPtr function;
-    int _arity;
+    size_t slot_offset;
 };
 
 class Return {
 public:
     Value value;
-    Return(Value value) : value(value) {}
+    Return(Value value);
 };
 
 class VM {
@@ -267,10 +73,22 @@ public:
         return obj;
     }
 
+    // Public data members (for access from other components)
+    std::vector<CallFrame> frames;
+    Chunk* chunk;
+    uint8_t* ip;
+    std::vector<Value> stack;
+    std::unordered_map<std::string, Value> globals;
+    std::vector<std::string> module_search_paths;
+    std::vector<Object*> heap;
+    size_t nextGC;
+    std::vector<std::string> commandLineArgs;  // Store command line arguments
+
 private:
     bool call(Function* function, int argCount);
     bool callValue(Value callee, int argCount);
-    void run();
+    bool callArrayMethod(class BoundArrayMethod* method, int argCount);
+    void run(size_t minFrameDepth = 0);  // Run until frames.size() <= minFrameDepth (0 = run completely)
     void interpret_module(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> module_env);
     
     // Garbage collection methods
@@ -278,18 +96,6 @@ private:
     void markValue(const Value& value);
     void collectGarbage();
     void sweep();
-
-    std::vector<CallFrame> frames;
-    Chunk* chunk;
-    uint8_t* ip;
-    std::vector<Value> stack;
-    std::unordered_map<std::string, Value> globals;
-    
-    std::vector<std::string> module_search_paths;
-    
-    // Memory management
-    std::vector<Object*> heap;
-    size_t nextGC;
 };
 
 } // namespace neutron

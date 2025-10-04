@@ -41,8 +41,16 @@ Value native_string_to_int(std::vector<Value> arguments) {
     if (arguments.size() != 1 || arguments[0].type != ValueType::STRING) {
         throw std::runtime_error("Expected a string argument for int().");
     }
+    
+    std::string str = std::get<std::string>(arguments[0].as);
+    
+    // Handle empty string - return 0
+    if (str.empty()) {
+        return Value(0.0);
+    }
+    
     try {
-        return Value(std::stod(std::get<std::string>(arguments[0].as)));
+        return Value(std::stod(str));
     } catch (const std::invalid_argument& ia) {
         throw std::runtime_error("Invalid string format for int().");
     } catch (const std::out_of_range& oor) {

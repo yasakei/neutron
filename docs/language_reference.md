@@ -335,27 +335,41 @@ Neutron supports two types of imports:
 1. **Module imports** using `use modulename;` - for built-in and native modules
 2. **File imports** using `using 'filename.nt';` - for importing other Neutron source files
 
+**Important:** As of the latest version, all built-in modules use lazy loading and must be explicitly imported with `use modulename;` before use.
+
 ### Module Imports
 
 The `use` statement is used to import built-in or native modules. Modules must be imported before they can be used.
 
 ```neutron
-use math;
 use sys;
 use json;
+use math;
+
+// Now you can use these modules
+sys.write("data.txt", "Hello!");
+var data = json.parse('{"name": "John"}');
+var result = math.sqrt(16);
 ```
 
 **Built-in Modules:**
+- `sys` - File I/O, directory operations, environment access, process control (fully implemented)
 - `json` - JSON parsing and stringification
+- `math` - Mathematical operations
 - `convert` - Type conversion utilities
 - `time` - Time and date functions
 - `http` - HTTP client operations
-- `math` - Mathematical operations (auto-loaded)
-- `sys` - System functions (auto-loaded)
 
-**Important:** If you try to use a module without importing it, you'll get a helpful error:
+**Module Loading:**
+All modules use lazy loading - they're only initialized when you explicitly use `use modulename;`. This provides:
+- Faster startup time
+- Explicit dependencies
+- Better memory management
+
+**Error Messages:**
+If you try to use a module without importing it, you'll get a helpful error:
 ```
-Runtime error: Undefined variable 'json'. Did you forget to import it? Use 'use json;' at the top of your file.
+Runtime error: Undefined variable 'sys'. Did you forget to import it? Use 'use sys;' at the top of your file.
 ```
 
 ### File Imports

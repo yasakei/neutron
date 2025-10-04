@@ -1,15 +1,19 @@
 #include "vm.h"
+#include "runtime/native_functions.h"
 #include "sys/native.h"
-#include "compiler.h"
-#include "bytecode.h"
-#include "debug.h"
-#include "scanner.h"
-#include "parser.h"
+#include "compiler/compiler.h"
+#include "compiler/bytecode.h"
+#include "runtime/debug.h"
+#include "compiler/scanner.h"
+#include "compiler/parser.h"
+#include "types/json_object.h"
+#include "types/bound_array_method.h"
 #include <iostream>
 #include <stdexcept>
 #include <fstream>
 #include <dlfcn.h>
 #include <cmath>
+#include <algorithm>
 
 #include "capi.h"
 #include "json/native.h"
@@ -17,7 +21,7 @@
 #include "time/native.h"
 #include "math/native.h"
 #include "http/native.h"
-#include "module_registry.h"
+#include "modules/module_registry.h"
 
 namespace neutron {
     
@@ -56,18 +60,11 @@ VM::VM() : ip(nullptr), nextGC(1024) {  // Start GC at 1024 bytes
     globals["array_at"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_at), 2));
     globals["array_set"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_set), 3));
     
-    // Create a shared environment for global functions
-    //auto globalEnv = std::make_shared<Environment>();
+    // Built-in modules (sys, math, json, http, time, convert) are now loaded on-demand
+    // when explicitly imported with "use modulename;"
     
-    neutron_init_sys_module(this);
-    neutron_init_math_module(this);
-
+    // External modules are registered but not initialized until imported
     run_external_module_initializers(this);
-    
-    // Copy registered functions to globals
-    //for (const auto& pair : globalEnv->values) {
-    //    globals[pair.first] = pair.second;
-    //}
     
     // Set up module search paths
     module_search_paths.push_back(".");
@@ -140,6 +137,15 @@ bool VM::call(Function* function, int argCount) {
 }
 
 bool VM::callValue(Value callee, int argCount) {
+    // Handle BoundArrayMethod
+    if (callee.type == ValueType::OBJECT) {
+        Object* obj = std::get<Object*>(callee.as);
+        BoundArrayMethod* method = dynamic_cast<BoundArrayMethod*>(obj);
+        if (method != nullptr) {
+            return callArrayMethod(method, argCount);
+        }
+    }
+    
     if (callee.type == ValueType::CALLABLE) {
         Callable* callable = std::get<Callable*>(callee.as);
         if (Function* function = dynamic_cast<Function*>(callable)) {
@@ -187,7 +193,230 @@ bool VM::callValue(Value callee, int argCount) {
     return false;
 }
 
-void VM::run() {
+bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
+    Array* arr = method->array;
+    std::string methodName = method->methodName;
+    
+    // Save original stack size (before method and args)
+    size_t stackBase = stack.size() - argCount - 1;
+    
+    // Get arguments from stack
+    std::vector<Value> args;
+    for (int i = 0; i < argCount; i++) {
+        args.push_back(stack[stackBase + 1 + i]);
+    }
+    
+    Value result;
+    
+    try {
+        if (methodName == "push") {
+            // push(value) - add element to end
+            if (argCount != 1) {
+                runtimeError("push() expects 1 argument.");
+                return false;
+            }
+            arr->push(args[0]);
+            result = Value(); // nil
+        } else if (methodName == "pop") {
+            // pop() - remove and return last element
+            if (argCount != 0) {
+                runtimeError("pop() expects 0 arguments.");
+                return false;
+            }
+            result = arr->pop();
+        } else if (methodName == "slice") {
+            // slice(start, end) - return subarray
+            if (argCount != 2) {
+                runtimeError("slice() expects 2 arguments.");
+                return false;
+            }
+            if (args[0].type != ValueType::NUMBER || args[1].type != ValueType::NUMBER) {
+                runtimeError("slice() arguments must be numbers.");
+                return false;
+            }
+            int start = static_cast<int>(std::get<double>(args[0].as));
+            int end = static_cast<int>(std::get<double>(args[1].as));
+            
+            if (start < 0) start = 0;
+            if (end > static_cast<int>(arr->size())) end = arr->size();
+            if (start > end) start = end;
+            
+            std::vector<Value> sliced;
+            for (int i = start; i < end; i++) {
+                sliced.push_back(arr->at(i));
+            }
+            result = Value(new Array(sliced));
+        } else if (methodName == "indexOf") {
+            // indexOf(value) - return index of first occurrence or -1
+            if (argCount != 1) {
+                runtimeError("indexOf() expects 1 argument.");
+                return false;
+            }
+            int index = -1;
+            for (size_t i = 0; i < arr->size(); i++) {
+                if (arr->at(i).toString() == args[0].toString()) {
+                    index = static_cast<int>(i);
+                    break;
+                }
+            }
+            result = Value(static_cast<double>(index));
+        } else if (methodName == "join") {
+            // join(separator) - join array elements into string
+            if (argCount != 1) {
+                runtimeError("join() expects 1 argument.");
+                return false;
+            }
+            std::string separator = args[0].toString();
+            std::string joined;
+            for (size_t i = 0; i < arr->size(); i++) {
+                if (i > 0) joined += separator;
+                joined += arr->at(i).toString();
+            }
+            result = Value(joined);
+        } else if (methodName == "reverse") {
+            // reverse() - reverse array in place
+            if (argCount != 0) {
+                runtimeError("reverse() expects 0 arguments.");
+                return false;
+            }
+            std::reverse(arr->elements.begin(), arr->elements.end());
+            result = Value(); // nil
+        } else if (methodName == "sort") {
+            // sort() - sort array in place (numbers then strings)
+            if (argCount != 0) {
+                runtimeError("sort() expects 0 arguments.");
+                return false;
+            }
+            std::sort(arr->elements.begin(), arr->elements.end(), [](const Value& a, const Value& b) {
+                // Numbers come before strings
+                if (a.type == ValueType::NUMBER && b.type == ValueType::NUMBER) {
+                    return std::get<double>(a.as) < std::get<double>(b.as);
+                } else if (a.type == ValueType::STRING && b.type == ValueType::STRING) {
+                    return a.toString() < b.toString();
+                } else if (a.type == ValueType::NUMBER) {
+                    return true;
+                } else {
+                    return false;
+                }
+            });
+            result = Value(); // nil
+        } else if (methodName == "map") {
+            // map(function) - transform each element
+            if (argCount != 1) {
+                runtimeError("map() expects 1 argument (function).");
+                return false;
+            }
+            if (args[0].type != ValueType::CALLABLE) {
+                runtimeError("map() argument must be a function.");
+                return false;
+            }
+            
+            // Save the current frame depth - we want to return to this depth after each call
+            size_t baseFrameDepth = frames.size();
+            
+            std::vector<Value> mapped;
+            for (size_t i = 0; i < arr->size(); i++) {
+                // Push function and argument for call
+                push(args[0]); // function
+                push(arr->at(i)); // argument
+                
+                // Call the function - this sets up a new frame but doesn't execute it
+                if (!callValue(args[0], 1)) {
+                    return false;
+                }
+                
+                // Now execute the function by running until we return to base frame depth
+                run(baseFrameDepth);
+                
+                // Get result and store it
+                mapped.push_back(pop());
+            }
+            result = Value(new Array(mapped));
+        } else if (methodName == "filter") {
+            // filter(function) - filter elements by predicate
+            if (argCount != 1) {
+                runtimeError("filter() expects 1 argument (function).");
+                return false;
+            }
+            if (args[0].type != ValueType::CALLABLE) {
+                runtimeError("filter() argument must be a function.");
+                return false;
+            }
+            
+            size_t baseFrameDepth = frames.size();
+            
+            std::vector<Value> filtered;
+            for (size_t i = 0; i < arr->size(); i++) {
+                // Push function and argument for call
+                push(args[0]); // function
+                push(arr->at(i)); // argument
+                
+                // Call the function
+                if (!callValue(args[0], 1)) {
+                    return false;
+                }
+                
+                // Execute the function
+                run(baseFrameDepth);
+                
+                // Get result and test it
+                Value test = pop();
+                if (isTruthy(test)) {
+                    filtered.push_back(arr->at(i));
+                }
+            }
+            result = Value(new Array(filtered));
+        } else if (methodName == "find") {
+            // find(function) - find first element matching predicate
+            if (argCount != 1) {
+                runtimeError("find() expects 1 argument (function).");
+                return false;
+            }
+            if (args[0].type != ValueType::CALLABLE) {
+                runtimeError("find() argument must be a function.");
+                return false;
+            }
+            
+            size_t baseFrameDepth = frames.size();
+            
+            result = Value(); // nil by default
+            for (size_t i = 0; i < arr->size(); i++) {
+                // Push function and argument for call
+                push(args[0]); // function
+                push(arr->at(i)); // argument
+                
+                // Call the function
+                if (!callValue(args[0], 1)) {
+                    return false;
+                }
+                
+                // Execute the function
+                run(baseFrameDepth);
+                
+                // Get result and test it
+                Value test = pop();
+                if (isTruthy(test)) {
+                    result = arr->at(i);
+                    break;
+                }
+            }
+        } else {
+            runtimeError("Unknown array method: " + methodName);
+            return false;
+        }
+        
+        // Restore stack to original size and push result
+        stack.resize(stackBase);
+        push(result);
+        return true;
+        
+    } catch (const std::runtime_error& e) {
+        runtimeError(e.what());
+        return false;
+    }
+}
+
+void VM::run(size_t minFrameDepth) {
     CallFrame* frame = &frames.back();
 
 #define READ_BYTE() (*frame->ip++)
@@ -203,9 +432,13 @@ void VM::run() {
                 Value result = pop();
                 size_t return_slot_offset = frame->slot_offset;  // Save before popping
                 frames.pop_back();
-                if (frames.empty()) {
-                    // We are done executing the main script. The result is on the stack.
-                    // The extra pop is not needed.
+                if (frames.empty() || frames.size() <= minFrameDepth) {
+                    // We are done executing - either the main script or we've returned to target depth
+                    if (!frames.empty()) {
+                        // Returning to a specific frame depth (from array method)
+                        stack.resize(return_slot_offset);
+                        push(result);
+                    }
                     return;
                 }
 
@@ -288,8 +521,62 @@ void VM::run() {
                     } catch (const std::runtime_error& e) {
                         runtimeError(std::string(e.what()) + " Make sure the module is properly imported with 'use' statement.");
                     }
+                } else if (object.type == ValueType::ARRAY) {
+                    // Handle array properties and methods
+                    Array* arr = std::get<Array*>(object.as);
+                    
+                    if (propertyName == "length") {
+                        stack.pop_back();
+                        push(Value(static_cast<double>(arr->size())));
+                    } else if (propertyName == "push" || propertyName == "pop" || 
+                               propertyName == "slice" || propertyName == "map" ||
+                               propertyName == "filter" || propertyName == "find" ||
+                               propertyName == "indexOf" || propertyName == "join" ||
+                               propertyName == "reverse" || propertyName == "sort") {
+                        // Return a bound method that captures the array
+                        stack.pop_back();
+                        push(Value(new BoundArrayMethod(arr, propertyName)));
+                    } else {
+                        runtimeError("Array does not have property '" + propertyName + "'.");
+                    }
+                } else if (object.type == ValueType::OBJECT) {
+                    Object* objPtr = std::get<Object*>(object.as);
+                    
+                    // Check if it's an Array
+                    Array* arr = dynamic_cast<Array*>(objPtr);
+                    if (arr != nullptr) {
+                        // Handle array methods
+                        if (propertyName == "length") {
+                            stack.pop_back();
+                            push(Value(static_cast<double>(arr->size())));
+                        } else if (propertyName == "push" || propertyName == "pop" || 
+                                   propertyName == "slice" || propertyName == "map" ||
+                                   propertyName == "filter" || propertyName == "find" ||
+                                   propertyName == "indexOf" || propertyName == "join" ||
+                                   propertyName == "reverse" || propertyName == "sort") {
+                            // Return a bound method that captures the array
+                            stack.pop_back();
+                            push(Value(new BoundArrayMethod(arr, propertyName)));
+                        } else {
+                            runtimeError("Array does not have property '" + propertyName + "'.");
+                        }
+                    } else {
+                        // Check if it's a JsonObject
+                        JsonObject* obj = dynamic_cast<JsonObject*>(objPtr);
+                        if (obj != nullptr) {
+                            auto it = obj->properties.find(propertyName);
+                            if (it != obj->properties.end()) {
+                                stack.pop_back();
+                                push(it->second);
+                            } else {
+                                runtimeError("Property '" + propertyName + "' not found on object.");
+                            }
+                        } else {
+                            runtimeError("Object does not support property access.");
+                        }
+                    }
                 } else {
-                    runtimeError("Only modules have properties. Cannot use dot notation on non-module values.");
+                    runtimeError("Only modules, arrays, and objects have properties. Cannot use dot notation on this value type.");
                 }
                 break;
             }
@@ -360,6 +647,18 @@ void VM::run() {
                     runtimeError("Division by zero.");
                 }
                 push(Value(a / b));
+                break;
+            }
+            case (uint8_t)OpCode::OP_MODULO: {
+                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+                    runtimeError("Operands must be numbers.");
+                }
+                double b = std::get<double>(pop().as);
+                double a = std::get<double>(pop().as);
+                if (b == 0) {
+                    runtimeError("Modulo by zero.");
+                }
+                push(Value(fmod(a, b)));
                 break;
             }
             case (uint8_t)OpCode::OP_NOT: {
@@ -594,8 +893,35 @@ void VM::load_module(const std::string& name) {
     
     std::string module_nt_path = "box/" + name + "/" + name + ".nt";
 
-    // First, check for a module-specific .nt file
-    std::ifstream module_nt_file(module_nt_path);
+    // Search paths for .nt modules
+    std::vector<std::string> search_paths = {
+        "box/" + name + "/",  // box/name/name.nt
+        "box/",               // box/name.nt
+        "dev_tests/",         // dev_tests/name.nt
+        "lib/",               // lib/name.nt
+        ""                    // ./name.nt (current directory)
+    };
+
+    // First, try to find a .nt module file in the search paths
+    std::string found_nt_path;
+    std::ifstream module_nt_file;
+    
+    for (const auto& path : search_paths) {
+        std::string test_path;
+        if (path == "box/" + name + "/") {
+            test_path = path + name + ".nt";
+        } else {
+            test_path = path + name + ".nt";
+        }
+        
+        module_nt_file.open(test_path);
+        if (module_nt_file.is_open()) {
+            found_nt_path = test_path;
+            break;
+        }
+    }
+
+    // If we found a .nt file, load it as a module
     if (module_nt_file.is_open()) {
         // It's a Neutron module, we need to execute it.
         std::string source((std::istreambuf_iterator<char>(module_nt_file)),
@@ -641,53 +967,7 @@ void VM::load_module(const std::string& name) {
         return;
     }
 
-    // Check for a standalone .nt file
-    std::ifstream nt_file(nt_path);
-    if (nt_file.is_open()) {
-        // It's a Neutron module, we need to execute it.
-        std::string source((std::istreambuf_iterator<char>(nt_file)),
-                            std::istreambuf_iterator<char>());
-        nt_file.close();
-        
-        // Parse the module
-        Scanner scanner(source);
-        std::vector<Token> tokens = scanner.scanTokens();
-        Parser parser(tokens);
-        std::vector<std::unique_ptr<Stmt>> statements = parser.parse();
-        
-        // Create a module environment
-        auto module_env = std::make_shared<Environment>();
-        
-        // Save current globals
-        auto saved_globals = globals;
-        
-        // Create a temporary VM with the module environment as globals
-        // This is a hack to make the compiler use the module environment
-        globals.clear();
-        
-        // Create a temporary compiler and execute the module code
-        Compiler compiler(*this);
-        Function* module_function = compiler.compile(statements);
-        if (module_function) {
-            // Execute the module to populate its functions/variables in the module environment
-            interpret(module_function);
-            delete module_function;  // Clean up the allocated function
-        }
-        
-        // Copy the defined values from globals to the module environment
-        for (const auto& pair : globals) {
-            module_env->define(pair.first, pair.second);
-        }
-        
-        // Restore globals
-        globals = saved_globals;
-        
-        // Create the module with the populated environment
-        auto module = new Module(name, module_env);
-        define_module(name, module);
-        return;
-    }
-
+    // Try to load as a native shared library module
     void* handle = dlopen(shared_lib_path.c_str(), RTLD_LAZY);
     if (handle) {
         // It's a native module, we need to load it.
