@@ -3,8 +3,8 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include "callable.h"
-#include "environment.h"
+#include "types/callable.h"
+#include "runtime/environment.h"
 
 namespace neutron {
 

@@ -1,4 +1,4 @@
-#include "scanner.h"
+#include "compiler/scanner.h"
 #include "token.h"
 #include <stdexcept>
 

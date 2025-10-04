@@ -1,6 +1,6 @@
 #include <iostream>
-#include "debug.h"
-#include "bytecode.h"
+#include "runtime/debug.h"
+#include "compiler/bytecode.h"
 #include "vm.h"
 
 namespace neutron {

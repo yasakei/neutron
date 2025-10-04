@@ -1,4 +1,4 @@
-#include "array.h"
+#include "types/array.h"
 #include <sstream>
 
 namespace neutron {

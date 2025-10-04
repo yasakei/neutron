@@ -2,8 +2,8 @@
 
 #include <string>
 #include <vector>
-#include "object.h"
-#include "value.h"
+#include "types/object.h"
+#include "types/value.h"
 
 namespace neutron {
 

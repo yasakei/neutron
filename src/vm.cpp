@@ -1,10 +1,12 @@
 #include "vm.h"
+#include "runtime/native_functions.h"
 #include "sys/native.h"
-#include "compiler.h"
-#include "bytecode.h"
-#include "debug.h"
-#include "scanner.h"
-#include "parser.h"
+#include "compiler/compiler.h"
+#include "compiler/bytecode.h"
+#include "runtime/debug.h"
+#include "compiler/scanner.h"
+#include "compiler/parser.h"
+#include "types/json_object.h"
 #include <iostream>
 #include <stdexcept>
 #include <fstream>
@@ -17,7 +19,7 @@
 #include "time/native.h"
 #include "math/native.h"
 #include "http/native.h"
-#include "module_registry.h"
+#include "modules/module_registry.h"
 
 namespace neutron {
     
@@ -56,18 +58,11 @@ VM::VM() : ip(nullptr), nextGC(1024) {  // Start GC at 1024 bytes
     globals["array_at"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_at), 2));
     globals["array_set"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_set), 3));
     
-    // Create a shared environment for global functions
-    //auto globalEnv = std::make_shared<Environment>();
+    // Built-in modules (sys, math, json, http, time, convert) are now loaded on-demand
+    // when explicitly imported with "use modulename;"
     
-    neutron_init_sys_module(this);
-    neutron_init_math_module(this);
-
+    // External modules are registered but not initialized until imported
     run_external_module_initializers(this);
-    
-    // Copy registered functions to globals
-    //for (const auto& pair : globalEnv->values) {
-    //    globals[pair.first] = pair.second;
-    //}
     
     // Set up module search paths
     module_search_paths.push_back(".");
@@ -288,8 +283,22 @@ void VM::run() {
                     } catch (const std::runtime_error& e) {
                         runtimeError(std::string(e.what()) + " Make sure the module is properly imported with 'use' statement.");
                     }
+                } else if (object.type == ValueType::OBJECT) {
+                    Object* objPtr = std::get<Object*>(object.as);
+                    JsonObject* obj = dynamic_cast<JsonObject*>(objPtr);
+                    if (obj != nullptr) {
+                        auto it = obj->properties.find(propertyName);
+                        if (it != obj->properties.end()) {
+                            stack.pop_back();
+                            push(it->second);
+                        } else {
+                            runtimeError("Property '" + propertyName + "' not found on object.");
+                        }
+                    } else {
+                        runtimeError("Object does not support property access.");
+                    }
                 } else {
-                    runtimeError("Only modules have properties. Cannot use dot notation on non-module values.");
+                    runtimeError("Only modules and objects have properties. Cannot use dot notation on this value type.");
                 }
                 break;
             }
@@ -594,8 +603,35 @@ void VM::load_module(const std::string& name) {
     
     std::string module_nt_path = "box/" + name + "/" + name + ".nt";
 
-    // First, check for a module-specific .nt file
-    std::ifstream module_nt_file(module_nt_path);
+    // Search paths for .nt modules
+    std::vector<std::string> search_paths = {
+        "box/" + name + "/",  // box/name/name.nt
+        "box/",               // box/name.nt
+        "dev_tests/",         // dev_tests/name.nt
+        "lib/",               // lib/name.nt
+        ""                    // ./name.nt (current directory)
+    };
+
+    // First, try to find a .nt module file in the search paths
+    std::string found_nt_path;
+    std::ifstream module_nt_file;
+    
+    for (const auto& path : search_paths) {
+        std::string test_path;
+        if (path == "box/" + name + "/") {
+            test_path = path + name + ".nt";
+        } else {
+            test_path = path + name + ".nt";
+        }
+        
+        module_nt_file.open(test_path);
+        if (module_nt_file.is_open()) {
+            found_nt_path = test_path;
+            break;
+        }
+    }
+
+    // If we found a .nt file, load it as a module
     if (module_nt_file.is_open()) {
         // It's a Neutron module, we need to execute it.
         std::string source((std::istreambuf_iterator<char>(module_nt_file)),
@@ -641,53 +677,7 @@ void VM::load_module(const std::string& name) {
         return;
     }
 
-    // Check for a standalone .nt file
-    std::ifstream nt_file(nt_path);
-    if (nt_file.is_open()) {
-        // It's a Neutron module, we need to execute it.
-        std::string source((std::istreambuf_iterator<char>(nt_file)),
-                            std::istreambuf_iterator<char>());
-        nt_file.close();
-        
-        // Parse the module
-        Scanner scanner(source);
-        std::vector<Token> tokens = scanner.scanTokens();
-        Parser parser(tokens);
-        std::vector<std::unique_ptr<Stmt>> statements = parser.parse();
-        
-        // Create a module environment
-        auto module_env = std::make_shared<Environment>();
-        
-        // Save current globals
-        auto saved_globals = globals;
-        
-        // Create a temporary VM with the module environment as globals
-        // This is a hack to make the compiler use the module environment
-        globals.clear();
-        
-        // Create a temporary compiler and execute the module code
-        Compiler compiler(*this);
-        Function* module_function = compiler.compile(statements);
-        if (module_function) {
-            // Execute the module to populate its functions/variables in the module environment
-            interpret(module_function);
-            delete module_function;  // Clean up the allocated function
-        }
-        
-        // Copy the defined values from globals to the module environment
-        for (const auto& pair : globals) {
-            module_env->define(pair.first, pair.second);
-        }
-        
-        // Restore globals
-        globals = saved_globals;
-        
-        // Create the module with the populated environment
-        auto module = new Module(name, module_env);
-        define_module(name, module);
-        return;
-    }
-
+    // Try to load as a native shared library module
     void* handle = dlopen(shared_lib_path.c_str(), RTLD_LAZY);
     if (handle) {
         // It's a native module, we need to load it.

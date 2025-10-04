@@ -1,4 +1,4 @@
-#include "bytecode.h"
+#include "compiler/bytecode.h"
 #include "vm.h"
 
 namespace neutron {

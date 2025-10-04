@@ -3,8 +3,8 @@
 #include <stdexcept>
 #include <fstream>
 #include <sstream>
-#include "scanner.h"
-#include "parser.h"
+#include "compiler/scanner.h"
+#include "compiler/parser.h"
 #include <cmath>
 
 namespace neutron {

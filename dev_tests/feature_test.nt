@@ -24,7 +24,7 @@ while (i < 3) {
 
 say("\n--- Loop (For) ---");
 for (var k = 0; k < 3; k = k + 1) {
-    say("For Loop: " + str(k));
+    say("For Loop: " + convert.str(k));
 }
 
 say("\n--- Functions ---");

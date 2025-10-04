@@ -5,12 +5,12 @@
 #include <vector>
 #include <sstream>
 #include <iomanip>
-#include "scanner.h"
-#include "parser.h"
+#include "compiler/scanner.h"
+#include "compiler/parser.h"
 #include "vm.h"
-#include "compiler.h"
-#include "bytecode.h"
-#include "module_loader.h"
+#include "compiler/compiler.h"
+#include "compiler/bytecode.h"
+#include "modules/module_loader.h"
 
 void run(const std::string& source, neutron::VM& vm);
 void runFile(const std::string& path, neutron::VM& vm);

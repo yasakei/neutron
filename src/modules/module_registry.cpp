@@ -1,4 +1,4 @@
-#include "module_registry.h"
+#include "modules/module_registry.h"
 #include "vm.h"
 #include <vector>
 

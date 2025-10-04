@@ -3,8 +3,8 @@
 #include <string>
 #include <memory>
 #include <vector>
-#include "value.h"
-#include "environment.h"
+#include "types/value.h"
+#include "runtime/environment.h"
 #include "stmt.h"
 
 namespace neutron {

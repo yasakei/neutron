@@ -2,9 +2,9 @@
 
 #include <string>
 #include <unordered_map>
-#include "object.h"
-#include "class.h"
-#include "value.h"
+#include "types/object.h"
+#include "types/class.h"
+#include "types/value.h"
 
 namespace neutron {
 

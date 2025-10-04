@@ -1,10 +1,10 @@
-#include "value.h"
-#include "array.h"
-#include "object.h"
-#include "callable.h"
-#include "module.h"
-#include "class.h"
-#include "instance.h"
+#include "types/value.h"
+#include "types/array.h"
+#include "types/object.h"
+#include "types/callable.h"
+#include "modules/module.h"
+#include "types/class.h"
+#include "types/instance.h"
 #include <sstream>
 
 namespace neutron {

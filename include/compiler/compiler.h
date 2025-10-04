@@ -1,7 +1,7 @@
 #ifndef NEUTRON_COMPILER_H
 #define NEUTRON_COMPILER_H
 
-#include "bytecode.h"
+#include "compiler/bytecode.h"
 #include "expr.h"
 #include "vm.h"
 

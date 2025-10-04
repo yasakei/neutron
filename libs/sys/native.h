@@ -1,7 +1,7 @@
 #pragma once
 
 #include "vm.h"
-#include "environment.h"
+#include "runtime/environment.h"
 
 namespace neutron {
     void register_sys_functions(std::shared_ptr<Environment> env);

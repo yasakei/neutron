@@ -1,8 +1,8 @@
-#include "compiler.h"
-#include "parser.h" // For the Parser class
-#include "scanner.h" // For the Scanner class
-#include "bytecode.h"
-#include "debug.h"
+#include "compiler/compiler.h"
+#include "compiler/parser.h" // For the Parser class
+#include "compiler/scanner.h" // For the Scanner class
+#include "compiler/bytecode.h"
+#include "runtime/debug.h"
 #include <iostream>
 
 namespace neutron {

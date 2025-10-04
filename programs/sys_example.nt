@@ -1,0 +1,40 @@
+// Example: File operations with sys module
+use sys;
+
+say("=== Neutron sys Module Example ===");
+say("");
+
+// Get current directory
+var cwd = sys.cwd();
+say("Current directory: " + cwd);
+
+// Get system information
+var info = sys.info();
+say("Platform: " + info.platform + ", Architecture: " + info.arch);
+say("");
+
+// File operations example
+say("Creating a sample file...");
+sys.write("example.txt", "Hello from Neutron!\n");
+sys.append("example.txt", "This file was created using sys module.\n");
+
+if (sys.exists("example.txt")) {
+    say("File exists!");
+    var content = sys.read("example.txt");
+    say("File content:");
+    say(content);
+}
+
+// Copy the file
+sys.cp("example.txt", "example_backup.txt");
+say("Created backup copy");
+
+// Clean up
+say("");
+say("Cleaning up...");
+sys.rm("example.txt");
+sys.rm("example_backup.txt");
+say("Files removed");
+
+say("");
+say("Example completed successfully!");

@@ -3,11 +3,11 @@
 #include <string>
 #include <vector>
 #include <cstdlib>
-#include "scanner.h"
-#include "parser.h"
+#include "compiler/scanner.h"
+#include "compiler/parser.h"
 #include "vm.h"
-#include "compiler.h"
-#include "bytecode.h"
+#include "compiler/compiler.h"
+#include "compiler/bytecode.h"
 
 // This array will be populated with bytecode data during compilation
 extern "C" {

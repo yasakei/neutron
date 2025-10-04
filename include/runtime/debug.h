@@ -1,7 +1,7 @@
 #ifndef NEUTRON_DEBUG_H
 #define NEUTRON_DEBUG_H
 
-#include "bytecode.h"
+#include "compiler/bytecode.h"
 
 namespace neutron {
 

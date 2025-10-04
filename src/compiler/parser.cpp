@@ -1,9 +1,9 @@
-#include "parser.h"
+#include "compiler/parser.h"
 #include "token.h"
 #include <stdexcept>
 #include <iostream>
 #include <memory>
-#include "compiler.h"
+#include "compiler/compiler.h"
 
 namespace neutron {
 

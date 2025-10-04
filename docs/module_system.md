@@ -6,6 +6,8 @@ Neutron supports two types of imports:
 1. **Module imports** using `use modulename;` - for built-in and native modules
 2. **File imports** using `using 'filename.nt';` - for importing other Neutron source files
 
+**Important:** As of the latest version, all built-in modules use **lazy loading** and must be explicitly imported with `use modulename;` before use.
+
 ## Module Imports (`use`)
 
 ### Syntax
@@ -15,23 +17,32 @@ use modulename;
 
 ### Built-in Modules
 
-The following modules are built into the Neutron runtime:
+The following modules are built into the Neutron runtime and require explicit import:
 
+- **sys** - File I/O, directory operations, environment access, process control (fully implemented)
 - **json** - JSON parsing and stringification
-- **math** - Mathematical operations (auto-loaded)
-- **sys** - System functions like input() (auto-loaded)
+- **math** - Mathematical operations
 - **convert** - Type conversion utilities
 - **time** - Time and date functions
 - **http** - HTTP client operations
 
+**Note:** Modules are lazily loaded - they're only initialized when you explicitly use `use modulename;`. This provides faster startup times and explicit dependencies.
+
 ### Example
 ```neutron
+use sys;
 use json;
 use convert;
 
+// sys module - fully functional
+sys.write("data.txt", "Hello, Neutron!");
+var content = sys.read("data.txt");
+
+// json module
 var obj = json.parse("{\"name\": \"test\"}");
 say(json.stringify(obj));
 
+// convert module
 var num = convert.int("42");
 say(num);
 ```
