@@ -1,9 +1,41 @@
+# Clone the Repository
 
+```sh
+git clone --recurse-submodules https://github.com/moadabdou/neutron.git
+```
 
-# clone  : 
+# Set Up vcpkg
 
-# setup vcpkg :
+## Windows
 
-# configure the project :
+```sh
+./external/vcpkg/bootstrap-vcpkg.bat
+```
 
-# build the project : 
+## Linux
+
+```sh
+./external/vcpkg/bootstrap-vcpkg.sh
+```
+
+# Configure the Project
+
+## Windows (MSVC)
+
+```sh
+cmake --preset windows-msvc
+```
+
+## Linux (GCC)
+
+```sh
+cmake --preset linux-gcc
+```
+
+> **Note:** See `CMakePresets.json` for additional preset configurations.
+
+# Build the Project
+
+```sh
+cmake --build --preset default
+```
