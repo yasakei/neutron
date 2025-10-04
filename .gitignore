@@ -49,7 +49,6 @@ gdb_history
 examples/
 
 # External dependencies
-external/
 libs/
 
 # Benchmark

@@ -1,0 +1,9 @@
+{
+  "name": "neutron",
+  "version-string": "1.0.0",
+  "dependencies": [
+    "curl",
+    "jsoncpp",
+    "dlfcn-win32"
+  ]
+}

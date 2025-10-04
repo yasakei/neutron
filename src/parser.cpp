@@ -1,9 +1,9 @@
-#include "compiler/parser.h"
+#include "parser.h"
 #include "token.h"
 #include <stdexcept>
 #include <iostream>
 #include <memory>
-#include "compiler/compiler.h"
+#include "compiler.h"
 
 namespace neutron {
 
@@ -55,16 +55,6 @@ std::unique_ptr<Stmt> Parser::statement() {
     
     if (match({TokenType::RETURN})) {
         return returnStatement();
-    }
-    
-    if (match({TokenType::BREAK})) {
-        consume(TokenType::SEMICOLON, "Expect ';' after 'break'.");
-        return std::make_unique<BreakStmt>();
-    }
-    
-    if (match({TokenType::CONTINUE})) {
-        consume(TokenType::SEMICOLON, "Expect ';' after 'continue'.");
-        return std::make_unique<ContinueStmt>();
     }
     
     if (check(TokenType::LEFT_BRACE)) {
@@ -316,7 +306,7 @@ std::unique_ptr<Expr> Parser::term() {
 std::unique_ptr<Expr> Parser::factor() {
     std::unique_ptr<Expr> expr = unary();
     
-    while (match({TokenType::SLASH, TokenType::STAR, TokenType::PERCENT})) {
+    while (match({TokenType::SLASH, TokenType::STAR})) {
         Token op = previous();
         std::unique_ptr<Expr> right = unary();
         expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
@@ -669,14 +659,6 @@ void ReturnStmt::accept(Compiler* compiler) const {
 
 void ClassStmt::accept(Compiler* compiler) const {
     compiler->visitClassStmt(this);
-}
-
-void BreakStmt::accept(Compiler* compiler) const {
-    compiler->visitBreakStmt(this);
-}
-
-void ContinueStmt::accept(Compiler* compiler) const {
-    compiler->visitContinueStmt(this);
 }
 
 void MemberSetExpr::accept(Compiler* compiler) const {

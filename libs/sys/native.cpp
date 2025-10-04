@@ -10,7 +10,7 @@
 #include <sstream>
 #include <cstdlib>
 #include <cstring>
-#include <unistd.h>
+#include <cross-platfrom/compat_unistd.h>
 #include <sys/stat.h>
 #include <array>
 #include <memory>
@@ -278,14 +278,16 @@ static Value sys_env(const std::vector<Value>& args) {
     return Value(std::string(value));
 }
 
-static Value sys_args(const std::vector<Value>& args) {
+static Value sys_args(VM& vm, const std::vector<Value>& args) {
     if (args.size() != 0) {
         throw std::runtime_error("sys.args() expects 0 arguments");
     }
     
-    // For now, return an empty array
-    // In a full implementation, you'd need to pass command line args to the VM
+    // Return command line arguments from VM
     auto array = new Array();
+    for (const auto& arg : vm.commandLineArgs) {
+        array->elements.push_back(Value(arg));
+    }
     return Value(array);
 }
 
@@ -409,7 +411,7 @@ namespace neutron {
         env->define("cwd", Value(new NativeFn(sys_cwd, 0)));
         env->define("chdir", Value(new NativeFn(sys_chdir, 1)));
         env->define("env", Value(new NativeFn(sys_env, 1)));
-        env->define("args", Value(new NativeFn(sys_args, 0)));
+        env->define("args", Value(new NativeFn(sys_args, 0, true)));  // true = needs VM
         env->define("info", Value(new NativeFn(sys_info, 0)));
         
         // User Input

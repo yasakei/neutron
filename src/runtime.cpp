@@ -3,8 +3,8 @@
 #include <stdexcept>
 #include <fstream>
 #include <sstream>
-#include "compiler/scanner.h"
-#include "compiler/parser.h"
+#include "scanner.h"
+#include "parser.h"
 #include <cmath>
 
 namespace neutron {
@@ -16,19 +16,13 @@ namespace neutron {
 
 
 
-NativeFn::NativeFn(NativeFnPtr function, int arity) : function(std::move(function)), _arity(arity), _needsVM(false) {}
-
-NativeFn::NativeFn(NativeFnPtrWithVM function, int arity, bool needsVM) 
-    : functionWithVM(std::move(function)), _arity(arity), _needsVM(needsVM) {}
+NativeFn::NativeFn(NativeFnPtr function, int arity) : function(std::move(function)), _arity(arity) {}
 
 int NativeFn::arity() {
     return _arity;
 }
 
-Value NativeFn::call(VM& vm, std::vector<Value> arguments) {
-    if (_needsVM) {
-        return functionWithVM(vm, arguments);
-    }
+Value NativeFn::call(VM& /*vm*/, std::vector<Value> arguments) {
     return function(arguments);
 }
 

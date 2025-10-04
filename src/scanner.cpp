@@ -1,4 +1,4 @@
-#include "compiler/scanner.h"
+#include "scanner.h"
 #include "token.h"
 #include <stdexcept>
 
@@ -22,8 +22,6 @@ Scanner::Scanner(const std::string& source)
     keywords["true"] = TokenType::TRUE;
     keywords["var"] = TokenType::VAR;
     keywords["while"] = TokenType::WHILE;
-    keywords["break"] = TokenType::BREAK;
-    keywords["continue"] = TokenType::CONTINUE;
     keywords["use"] = TokenType::USE;
     keywords["using"] = TokenType::USING;
 }
@@ -58,7 +56,6 @@ void Scanner::scanToken() {
         case ';': addToken(TokenType::SEMICOLON); break;
         case ':': addToken(TokenType::COLON); break;
         case '*': addToken(TokenType::STAR); break;
-        case '%': addToken(TokenType::PERCENT); break;
         case '!': addToken(match('=') ? TokenType::BANG_EQUAL : TokenType::BANG); break;
         case '=': addToken(match('=') ? TokenType::EQUAL_EQUAL : TokenType::EQUAL); break;
         case '<': addToken(match('=') ? TokenType::LESS_EQUAL : TokenType::LESS); break;
@@ -129,70 +126,10 @@ char Scanner::peekNext() {
 
 void Scanner::string(char quote) {
     std::string value;
-    bool hasInterpolation = false;
-    std::vector<std::vector<Token>> chunks;  // Each chunk is either a STRING token or an expression group
     
     while (peek() != quote && !isAtEnd()) {
         if (peek() == '\n') line++;
-        
-        // Check for string interpolation ${...}
-        if (peek() == '$' && peekNext() == '{') {
-            hasInterpolation = true;
-            
-            // Add the string part before interpolation as a chunk
-            if (!value.empty()) {
-                std::vector<Token> stringChunk;
-                stringChunk.push_back(Token(TokenType::STRING, value, line));
-                chunks.push_back(stringChunk);
-                value.clear();
-            }
-            
-            // Skip ${
-            advance();
-            advance();
-            
-            // Scan the expression inside ${}
-            int braceDepth = 1;
-            int exprStart = current;
-            
-            while (braceDepth > 0 && !isAtEnd()) {
-                if (peek() == '{') braceDepth++;
-                else if (peek() == '}') braceDepth--;
-                
-                if (braceDepth > 0) {
-                    advance();
-                }
-            }
-            
-            if (isAtEnd()) {
-                throw std::runtime_error("Unterminated string interpolation.");
-            }
-            
-            // Extract and scan the expression
-            std::string expr = source.substr(exprStart, current - exprStart);
-            
-            // Create a sub-scanner for the expression
-            Scanner exprScanner(expr);
-            std::vector<Token> exprTokens = exprScanner.scanTokens();
-            
-            // Remove the EOF token from expression
-            if (!exprTokens.empty() && exprTokens.back().type == TokenType::END_OF_FILE) {
-                exprTokens.pop_back();
-            }
-            
-            // Add expression tokens wrapped in parentheses as a chunk
-            std::vector<Token> exprChunk;
-            exprChunk.push_back(Token(TokenType::LEFT_PAREN, "(", line));
-            for (const auto& token : exprTokens) {
-                exprChunk.push_back(token);
-            }
-            exprChunk.push_back(Token(TokenType::RIGHT_PAREN, ")", line));
-            chunks.push_back(exprChunk);
-            
-            // Skip the closing }
-            advance();
-            
-        } else if (peek() == '\\') {
+        if (peek() == '\\') {
             // Handle escape sequences
             advance(); // Skip the backslash
             if (!isAtEnd()) {
@@ -218,36 +155,7 @@ void Scanner::string(char quote) {
 
     advance(); // Skip the closing quote
 
-    if (hasInterpolation) {
-        // Add the final string part as a chunk
-        if (!value.empty()) {
-            std::vector<Token> stringChunk;
-            stringChunk.push_back(Token(TokenType::STRING, value, line));
-            chunks.push_back(stringChunk);
-        }
-        
-        // Now create concatenation: chunk1 + chunk2 + chunk3 + ...
-        if (!chunks.empty()) {
-            // Add first chunk
-            for (const auto& token : chunks[0]) {
-                tokens.push_back(token);
-            }
-            
-            // Add remaining chunks with PLUS between them
-            for (size_t i = 1; i < chunks.size(); i++) {
-                tokens.push_back(Token(TokenType::PLUS, "+", line));
-                for (const auto& token : chunks[i]) {
-                    tokens.push_back(token);
-                }
-            }
-        } else {
-            // Empty interpolation, just add empty string
-            addToken(TokenType::STRING, "");
-        }
-    } else {
-        // No interpolation, just a regular string
-        addToken(TokenType::STRING, value);
-    }
+    addToken(TokenType::STRING, value);
 }
 
 void Scanner::number() {
