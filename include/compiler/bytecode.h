@@ -30,6 +30,7 @@ enum class OpCode : uint8_t {
     OP_SUBTRACT,
     OP_MULTIPLY,
     OP_DIVIDE,
+    OP_MODULO,
     OP_NOT,
     OP_NEGATE,
     OP_SAY,
@@ -44,7 +45,9 @@ enum class OpCode : uint8_t {
     OP_ARRAY,
     OP_INDEX_GET,
     OP_INDEX_SET,
-    OP_THIS
+    OP_THIS,
+    OP_BREAK,
+    OP_CONTINUE
 };
 
 class Chunk {

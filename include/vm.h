@@ -82,11 +82,13 @@ public:
     std::vector<std::string> module_search_paths;
     std::vector<Object*> heap;
     size_t nextGC;
+    std::vector<std::string> commandLineArgs;  // Store command line arguments
 
 private:
     bool call(Function* function, int argCount);
     bool callValue(Value callee, int argCount);
-    void run();
+    bool callArrayMethod(class BoundArrayMethod* method, int argCount);
+    void run(size_t minFrameDepth = 0);  // Run until frames.size() <= minFrameDepth (0 = run completely)
     void interpret_module(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> module_env);
     
     // Garbage collection methods

@@ -7,11 +7,13 @@
 #include "compiler/scanner.h"
 #include "compiler/parser.h"
 #include "types/json_object.h"
+#include "types/bound_array_method.h"
 #include <iostream>
 #include <stdexcept>
 #include <fstream>
 #include <dlfcn.h>
 #include <cmath>
+#include <algorithm>
 
 #include "capi.h"
 #include "json/native.h"
@@ -135,6 +137,15 @@ bool VM::call(Function* function, int argCount) {
 }
 
 bool VM::callValue(Value callee, int argCount) {
+    // Handle BoundArrayMethod
+    if (callee.type == ValueType::OBJECT) {
+        Object* obj = std::get<Object*>(callee.as);
+        BoundArrayMethod* method = dynamic_cast<BoundArrayMethod*>(obj);
+        if (method != nullptr) {
+            return callArrayMethod(method, argCount);
+        }
+    }
+    
     if (callee.type == ValueType::CALLABLE) {
         Callable* callable = std::get<Callable*>(callee.as);
         if (Function* function = dynamic_cast<Function*>(callable)) {
@@ -182,7 +193,230 @@ bool VM::callValue(Value callee, int argCount) {
     return false;
 }
 
-void VM::run() {
+bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
+    Array* arr = method->array;
+    std::string methodName = method->methodName;
+    
+    // Save original stack size (before method and args)
+    size_t stackBase = stack.size() - argCount - 1;
+    
+    // Get arguments from stack
+    std::vector<Value> args;
+    for (int i = 0; i < argCount; i++) {
+        args.push_back(stack[stackBase + 1 + i]);
+    }
+    
+    Value result;
+    
+    try {
+        if (methodName == "push") {
+            // push(value) - add element to end
+            if (argCount != 1) {
+                runtimeError("push() expects 1 argument.");
+                return false;
+            }
+            arr->push(args[0]);
+            result = Value(); // nil
+        } else if (methodName == "pop") {
+            // pop() - remove and return last element
+            if (argCount != 0) {
+                runtimeError("pop() expects 0 arguments.");
+                return false;
+            }
+            result = arr->pop();
+        } else if (methodName == "slice") {
+            // slice(start, end) - return subarray
+            if (argCount != 2) {
+                runtimeError("slice() expects 2 arguments.");
+                return false;
+            }
+            if (args[0].type != ValueType::NUMBER || args[1].type != ValueType::NUMBER) {
+                runtimeError("slice() arguments must be numbers.");
+                return false;
+            }
+            int start = static_cast<int>(std::get<double>(args[0].as));
+            int end = static_cast<int>(std::get<double>(args[1].as));
+            
+            if (start < 0) start = 0;
+            if (end > static_cast<int>(arr->size())) end = arr->size();
+            if (start > end) start = end;
+            
+            std::vector<Value> sliced;
+            for (int i = start; i < end; i++) {
+                sliced.push_back(arr->at(i));
+            }
+            result = Value(new Array(sliced));
+        } else if (methodName == "indexOf") {
+            // indexOf(value) - return index of first occurrence or -1
+            if (argCount != 1) {
+                runtimeError("indexOf() expects 1 argument.");
+                return false;
+            }
+            int index = -1;
+            for (size_t i = 0; i < arr->size(); i++) {
+                if (arr->at(i).toString() == args[0].toString()) {
+                    index = static_cast<int>(i);
+                    break;
+                }
+            }
+            result = Value(static_cast<double>(index));
+        } else if (methodName == "join") {
+            // join(separator) - join array elements into string
+            if (argCount != 1) {
+                runtimeError("join() expects 1 argument.");
+                return false;
+            }
+            std::string separator = args[0].toString();
+            std::string joined;
+            for (size_t i = 0; i < arr->size(); i++) {
+                if (i > 0) joined += separator;
+                joined += arr->at(i).toString();
+            }
+            result = Value(joined);
+        } else if (methodName == "reverse") {
+            // reverse() - reverse array in place
+            if (argCount != 0) {
+                runtimeError("reverse() expects 0 arguments.");
+                return false;
+            }
+            std::reverse(arr->elements.begin(), arr->elements.end());
+            result = Value(); // nil
+        } else if (methodName == "sort") {
+            // sort() - sort array in place (numbers then strings)
+            if (argCount != 0) {
+                runtimeError("sort() expects 0 arguments.");
+                return false;
+            }
+            std::sort(arr->elements.begin(), arr->elements.end(), [](const Value& a, const Value& b) {
+                // Numbers come before strings
+                if (a.type == ValueType::NUMBER && b.type == ValueType::NUMBER) {
+                    return std::get<double>(a.as) < std::get<double>(b.as);
+                } else if (a.type == ValueType::STRING && b.type == ValueType::STRING) {
+                    return a.toString() < b.toString();
+                } else if (a.type == ValueType::NUMBER) {
+                    return true;
+                } else {
+                    return false;
+                }
+            });
+            result = Value(); // nil
+        } else if (methodName == "map") {
+            // map(function) - transform each element
+            if (argCount != 1) {
+                runtimeError("map() expects 1 argument (function).");
+                return false;
+            }
+            if (args[0].type != ValueType::CALLABLE) {
+                runtimeError("map() argument must be a function.");
+                return false;
+            }
+            
+            // Save the current frame depth - we want to return to this depth after each call
+            size_t baseFrameDepth = frames.size();
+            
+            std::vector<Value> mapped;
+            for (size_t i = 0; i < arr->size(); i++) {
+                // Push function and argument for call
+                push(args[0]); // function
+                push(arr->at(i)); // argument
+                
+                // Call the function - this sets up a new frame but doesn't execute it
+                if (!callValue(args[0], 1)) {
+                    return false;
+                }
+                
+                // Now execute the function by running until we return to base frame depth
+                run(baseFrameDepth);
+                
+                // Get result and store it
+                mapped.push_back(pop());
+            }
+            result = Value(new Array(mapped));
+        } else if (methodName == "filter") {
+            // filter(function) - filter elements by predicate
+            if (argCount != 1) {
+                runtimeError("filter() expects 1 argument (function).");
+                return false;
+            }
+            if (args[0].type != ValueType::CALLABLE) {
+                runtimeError("filter() argument must be a function.");
+                return false;
+            }
+            
+            size_t baseFrameDepth = frames.size();
+            
+            std::vector<Value> filtered;
+            for (size_t i = 0; i < arr->size(); i++) {
+                // Push function and argument for call
+                push(args[0]); // function
+                push(arr->at(i)); // argument
+                
+                // Call the function
+                if (!callValue(args[0], 1)) {
+                    return false;
+                }
+                
+                // Execute the function
+                run(baseFrameDepth);
+                
+                // Get result and test it
+                Value test = pop();
+                if (isTruthy(test)) {
+                    filtered.push_back(arr->at(i));
+                }
+            }
+            result = Value(new Array(filtered));
+        } else if (methodName == "find") {
+            // find(function) - find first element matching predicate
+            if (argCount != 1) {
+                runtimeError("find() expects 1 argument (function).");
+                return false;
+            }
+            if (args[0].type != ValueType::CALLABLE) {
+                runtimeError("find() argument must be a function.");
+                return false;
+            }
+            
+            size_t baseFrameDepth = frames.size();
+            
+            result = Value(); // nil by default
+            for (size_t i = 0; i < arr->size(); i++) {
+                // Push function and argument for call
+                push(args[0]); // function
+                push(arr->at(i)); // argument
+                
+                // Call the function
+                if (!callValue(args[0], 1)) {
+                    return false;
+                }
+                
+                // Execute the function
+                run(baseFrameDepth);
+                
+                // Get result and test it
+                Value test = pop();
+                if (isTruthy(test)) {
+                    result = arr->at(i);
+                    break;
+                }
+            }
+        } else {
+            runtimeError("Unknown array method: " + methodName);
+            return false;
+        }
+        
+        // Restore stack to original size and push result
+        stack.resize(stackBase);
+        push(result);
+        return true;
+        
+    } catch (const std::runtime_error& e) {
+        runtimeError(e.what());
+        return false;
+    }
+}
+
+void VM::run(size_t minFrameDepth) {
     CallFrame* frame = &frames.back();
 
 #define READ_BYTE() (*frame->ip++)
@@ -198,9 +432,13 @@ void VM::run() {
                 Value result = pop();
                 size_t return_slot_offset = frame->slot_offset;  // Save before popping
                 frames.pop_back();
-                if (frames.empty()) {
-                    // We are done executing the main script. The result is on the stack.
-                    // The extra pop is not needed.
+                if (frames.empty() || frames.size() <= minFrameDepth) {
+                    // We are done executing - either the main script or we've returned to target depth
+                    if (!frames.empty()) {
+                        // Returning to a specific frame depth (from array method)
+                        stack.resize(return_slot_offset);
+                        push(result);
+                    }
                     return;
                 }
 
@@ -283,22 +521,62 @@ void VM::run() {
                     } catch (const std::runtime_error& e) {
                         runtimeError(std::string(e.what()) + " Make sure the module is properly imported with 'use' statement.");
                     }
+                } else if (object.type == ValueType::ARRAY) {
+                    // Handle array properties and methods
+                    Array* arr = std::get<Array*>(object.as);
+                    
+                    if (propertyName == "length") {
+                        stack.pop_back();
+                        push(Value(static_cast<double>(arr->size())));
+                    } else if (propertyName == "push" || propertyName == "pop" || 
+                               propertyName == "slice" || propertyName == "map" ||
+                               propertyName == "filter" || propertyName == "find" ||
+                               propertyName == "indexOf" || propertyName == "join" ||
+                               propertyName == "reverse" || propertyName == "sort") {
+                        // Return a bound method that captures the array
+                        stack.pop_back();
+                        push(Value(new BoundArrayMethod(arr, propertyName)));
+                    } else {
+                        runtimeError("Array does not have property '" + propertyName + "'.");
+                    }
                 } else if (object.type == ValueType::OBJECT) {
                     Object* objPtr = std::get<Object*>(object.as);
-                    JsonObject* obj = dynamic_cast<JsonObject*>(objPtr);
-                    if (obj != nullptr) {
-                        auto it = obj->properties.find(propertyName);
-                        if (it != obj->properties.end()) {
+                    
+                    // Check if it's an Array
+                    Array* arr = dynamic_cast<Array*>(objPtr);
+                    if (arr != nullptr) {
+                        // Handle array methods
+                        if (propertyName == "length") {
                             stack.pop_back();
-                            push(it->second);
+                            push(Value(static_cast<double>(arr->size())));
+                        } else if (propertyName == "push" || propertyName == "pop" || 
+                                   propertyName == "slice" || propertyName == "map" ||
+                                   propertyName == "filter" || propertyName == "find" ||
+                                   propertyName == "indexOf" || propertyName == "join" ||
+                                   propertyName == "reverse" || propertyName == "sort") {
+                            // Return a bound method that captures the array
+                            stack.pop_back();
+                            push(Value(new BoundArrayMethod(arr, propertyName)));
                         } else {
-                            runtimeError("Property '" + propertyName + "' not found on object.");
+                            runtimeError("Array does not have property '" + propertyName + "'.");
                         }
                     } else {
-                        runtimeError("Object does not support property access.");
+                        // Check if it's a JsonObject
+                        JsonObject* obj = dynamic_cast<JsonObject*>(objPtr);
+                        if (obj != nullptr) {
+                            auto it = obj->properties.find(propertyName);
+                            if (it != obj->properties.end()) {
+                                stack.pop_back();
+                                push(it->second);
+                            } else {
+                                runtimeError("Property '" + propertyName + "' not found on object.");
+                            }
+                        } else {
+                            runtimeError("Object does not support property access.");
+                        }
                     }
                 } else {
-                    runtimeError("Only modules and objects have properties. Cannot use dot notation on this value type.");
+                    runtimeError("Only modules, arrays, and objects have properties. Cannot use dot notation on this value type.");
                 }
                 break;
             }
@@ -369,6 +647,18 @@ void VM::run() {
                     runtimeError("Division by zero.");
                 }
                 push(Value(a / b));
+                break;
+            }
+            case (uint8_t)OpCode::OP_MODULO: {
+                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+                    runtimeError("Operands must be numbers.");
+                }
+                double b = std::get<double>(pop().as);
+                double a = std::get<double>(pop().as);
+                if (b == 0) {
+                    runtimeError("Modulo by zero.");
+                }
+                push(Value(fmod(a, b)));
                 break;
             }
             case (uint8_t)OpCode::OP_NOT: {

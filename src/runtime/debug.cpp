@@ -108,6 +108,8 @@ size_t disassembleInstruction(const Chunk* chunk, size_t offset) {
             return simpleInstruction("OP_MULTIPLY", offset);
         case OpCode::OP_DIVIDE:
             return simpleInstruction("OP_DIVIDE", offset);
+        case OpCode::OP_MODULO:
+            return simpleInstruction("OP_MODULO", offset);
         case OpCode::OP_NOT:
             return simpleInstruction("OP_NOT", offset);
         case OpCode::OP_NEGATE:
@@ -132,6 +134,10 @@ size_t disassembleInstruction(const Chunk* chunk, size_t offset) {
             return constantInstruction("OP_SET_UPVALUE", chunk, offset);
         case OpCode::OP_CLOSE_UPVALUE:
             return simpleInstruction("OP_CLOSE_UPVALUE", offset);
+        case OpCode::OP_BREAK:
+            return simpleInstruction("OP_BREAK", offset);
+        case OpCode::OP_CONTINUE:
+            return simpleInstruction("OP_CONTINUE", offset);
         default:
             std::cout << "Unknown opcode " << instruction << std::endl;
             return offset + 1;

@@ -16,13 +16,19 @@ namespace neutron {
 
 
 
-NativeFn::NativeFn(NativeFnPtr function, int arity) : function(std::move(function)), _arity(arity) {}
+NativeFn::NativeFn(NativeFnPtr function, int arity) : function(std::move(function)), _arity(arity), _needsVM(false) {}
+
+NativeFn::NativeFn(NativeFnPtrWithVM function, int arity, bool needsVM) 
+    : functionWithVM(std::move(function)), _arity(arity), _needsVM(needsVM) {}
 
 int NativeFn::arity() {
     return _arity;
 }
 
-Value NativeFn::call(VM& /*vm*/, std::vector<Value> arguments) {
+Value NativeFn::call(VM& vm, std::vector<Value> arguments) {
+    if (_needsVM) {
+        return functionWithVM(vm, arguments);
+    }
     return function(arguments);
 }
 

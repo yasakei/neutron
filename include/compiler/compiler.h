@@ -58,6 +58,8 @@ public:
     void visitUseStmt(const UseStmt* stmt);
     void visitFunctionStmt(const FunctionStmt* stmt);
     void visitReturnStmt(const ReturnStmt* stmt);
+    void visitBreakStmt(const BreakStmt* stmt);
+    void visitContinueStmt(const ContinueStmt* stmt);
 
     Compiler* enclosing;
     Function* function;
@@ -65,6 +67,12 @@ public:
     Chunk* chunk; // Current chunk being compiled
     int scopeDepth;
     std::vector<Local> locals;
+    
+    // Loop information for break/continue
+    std::vector<int> loopStarts;  // Stack of loop start positions
+    std::vector<int> continueTargets;  // Stack of continue target positions (for for-loop increments)
+    std::vector<std::vector<int>> breakJumps;  // Stack of break jump positions for each loop
+    std::vector<std::vector<int>> continueJumps;  // Stack of continue jump positions for each loop
 };
 } // namespace neutron
 

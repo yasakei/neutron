@@ -166,6 +166,7 @@ void Compiler::visitBinaryExpr(const BinaryExpr* expr) {
         case TokenType::MINUS:         emitByte((uint8_t)OpCode::OP_SUBTRACT); break;
         case TokenType::STAR:          emitByte((uint8_t)OpCode::OP_MULTIPLY); break;
         case TokenType::SLASH:         emitByte((uint8_t)OpCode::OP_DIVIDE); break;
+        case TokenType::PERCENT:       emitByte((uint8_t)OpCode::OP_MODULO); break;
         case TokenType::EQUAL_EQUAL:   emitByte((uint8_t)OpCode::OP_EQUAL); break;
         case TokenType::GREATER:       emitByte((uint8_t)OpCode::OP_GREATER); break;
         case TokenType::GREATER_EQUAL: emitBytes((uint8_t)OpCode::OP_LESS, (uint8_t)OpCode::OP_NOT); break;
@@ -269,16 +270,78 @@ void Compiler::visitIfStmt(const IfStmt* stmt) {
 
 void Compiler::visitWhileStmt(const WhileStmt* stmt) {
     int loopStart = chunk->code.size();
+    
+    // Check if this is a for-loop (body is a BlockStmt with 2 statements, last being ExpressionStmt)
+    bool isForLoop = false;
+    const BlockStmt* blockBody = dynamic_cast<const BlockStmt*>(stmt->body.get());
+    if (blockBody && blockBody->statements.size() == 2) {
+        if (dynamic_cast<const ExpressionStmt*>(blockBody->statements[1].get())) {
+            isForLoop = true;
+        }
+    }
+    
+    // Push loop info for break/continue tracking
+    loopStarts.push_back(loopStart);
+    breakJumps.push_back(std::vector<int>());
+    continueJumps.push_back(std::vector<int>());
+    continueTargets.push_back(-1);  // Will be set later for for-loops
 
     compileExpression(stmt->condition.get());
 
     int exitJump = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE);
 
-    compileStatement(stmt->body.get());
+    if (isForLoop && blockBody) {
+        // For for-loops, compile body and increment separately
+        // so we can set continue target before increment
+        beginScope();
+        
+        // Compile the main body (first statement)
+        compileStatement(blockBody->statements[0].get());
+        
+        // Set continue target here (before increment)
+        continueTargets.back() = chunk->code.size();
+        
+        // Compile the increment (second statement)
+        compileStatement(blockBody->statements[1].get());
+        
+        endScope();
+    } else {
+        // Regular while loop - continue target is loop start
+        continueTargets.back() = loopStart;
+        compileStatement(stmt->body.get());
+    }
+    
+    // Patch all continue jumps
+    for (int jump : continueJumps.back()) {
+        int target = continueTargets.back();
+        int offset = target - jump - 2;
+        if (offset < 0) {
+            // Backward jump (to loop start for while loops)
+            offset = -offset;
+            chunk->code[jump - 1] = (uint8_t)OpCode::OP_LOOP;
+            chunk->code[jump] = (offset >> 8) & 0xff;
+            chunk->code[jump + 1] = offset & 0xff;
+        } else {
+            // Forward jump (to increment for for loops)
+            chunk->code[jump] = (offset >> 8) & 0xff;
+            chunk->code[jump + 1] = offset & 0xff;
+        }
+    }
 
     emitLoop(loopStart);
 
     patchJump(exitJump);
+    
+    // Patch all break jumps to jump to end of loop
+    for (int breakJump : breakJumps.back()) {
+        patchJump(breakJump);
+    }
+    
+    // Pop loop info
+    loopStarts.pop_back();
+    breakJumps.pop_back();
+    continueJumps.pop_back();
+    continueTargets.pop_back();
 }
 
 void Compiler::visitClassStmt(const ClassStmt* stmt) {
@@ -458,6 +521,26 @@ void Compiler::visitThisExpr(const ThisExpr* expr) {
     // In class methods, 'this' refers to the current instance
     // We'll emit an OP_THIS instruction to load the current instance
     emitByte((uint8_t)OpCode::OP_THIS);
+}
+
+void Compiler::visitBreakStmt(const BreakStmt* stmt) {
+    if (breakJumps.empty()) {
+        throw std::runtime_error("Cannot use 'break' outside of a loop.");
+    }
+    
+    // Emit a jump instruction and record it for later patching
+    int jump = emitJump((uint8_t)OpCode::OP_JUMP);
+    breakJumps.back().push_back(jump);
+}
+
+void Compiler::visitContinueStmt(const ContinueStmt* stmt) {
+    if (continueJumps.empty()) {
+        throw std::runtime_error("Cannot use 'continue' outside of a loop.");
+    }
+    
+    // Emit a forward jump to the continue target (end of loop body, before loop back)
+    int jump = emitJump((uint8_t)OpCode::OP_JUMP);
+    continueJumps.back().push_back(jump);
 }
 
 } // namespace neutron
