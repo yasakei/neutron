@@ -1,0 +1,25 @@
+// Test comments
+say("=== Testing Comments ===");
+
+// This is a single line comment
+var x = 10; // Comment after statement
+
+// Multiple comment lines
+// can be written
+// like this
+
+if (x == 10) { // Inline comment
+    say("✓ Comments don't affect code execution");
+}
+
+// Comments can contain special characters: !@#$%^&*()
+// Comments can contain quotes: " ' ` 
+// Comments with numbers: 123456789
+
+var y = 20; // var z = 30; This is commented out
+
+if (y == 20) {
+    say("✓ Commented code is ignored");
+}
+
+say("\n=== All comment tests passed ===");

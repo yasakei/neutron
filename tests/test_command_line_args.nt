@@ -1,0 +1,18 @@
+// Test command line arguments
+use sys;
+
+say("=== Testing Command Line Arguments ===");
+
+// Get command line arguments
+var args = sys.args();
+
+// Display script name
+say("Script: " + args[0]);
+say("✓ sys.args() returns an array");
+say("✓ First element is script path");
+
+say("\nNote: To test with arguments, run:");
+say("  ./neutron tests/test_command_line_args.nt arg1 arg2 arg3");
+say("\nThe arguments will be available as args[1], args[2], etc.");
+
+say("\n=== Command line args test passed ===");

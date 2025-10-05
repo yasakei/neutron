@@ -1,4 +1,0 @@
-use my_utils;
-say("Module loaded");
-var test = my_utils.calculate_fibonacci;
-say("Function retrieved");

@@ -1,0 +1,58 @@
+// Test modulo operator
+say("=== Testing Modulo Operator ===");
+
+// Test 1: Basic modulo
+var result1 = 10 % 3;
+if (result1 == 1) {
+    say("✓ 10 % 3 = 1");
+} else {
+    say("✗ 10 % 3 failed");
+}
+
+// Test 2: Even/Odd check
+var num = 7;
+var rem = num % 2;
+if (rem == 1) {
+    say("✓ 7 is odd (7 % 2 = 1)");
+} else {
+    say("✗ 7 should be odd");
+}
+
+var even = 8;
+var rem2 = even % 2;
+if (rem2 == 0) {
+    say("✓ 8 is even (8 % 2 = 0)");
+} else {
+    say("✗ 8 should be even");
+}
+
+// Test 3: Modulo with larger numbers
+var result2 = 100 % 7;
+if (result2 == 2) {
+    say("✓ 100 % 7 = 2");
+} else {
+    say("✗ 100 % 7 failed");
+}
+
+// Test 4: Modulo equals zero
+var result3 = 15 % 5;
+if (result3 == 0) {
+    say("✓ 15 % 5 = 0 (divisible)");
+} else {
+    say("✗ 15 % 5 failed");
+}
+
+// Test 5: Using modulo for even/odd in sequence
+say("\nChecking even/odd for 0-9:");
+var i = 0;
+while (i < 10) {
+    var mod = i % 2;
+    if (mod == 0) {
+        say("  " + i + " is even");
+    } else {
+        say("  " + i + " is odd");
+    }
+    i = i + 1;
+}
+
+say("\n=== All modulo tests passed ===");

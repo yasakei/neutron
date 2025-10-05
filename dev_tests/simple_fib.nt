@@ -1,3 +1,0 @@
-use my_utils;
-var result = my_utils.calculate_fibonacci(5);
-say("Result from fibonacci(5): " + result);

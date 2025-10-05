@@ -211,12 +211,12 @@ Value http_patch(std::vector<Value> arguments) {
 }
 
 void register_http_functions(std::shared_ptr<Environment> env) {
-    env->define("http_get", Value(new NativeFn(http_get, -1))); // 1-2 arguments
-    env->define("http_post", Value(new NativeFn(http_post, -1))); // 1-3 arguments
-    env->define("http_put", Value(new NativeFn(http_put, -1))); // 1-3 arguments
-    env->define("http_delete", Value(new NativeFn(http_delete, -1))); // 1-2 arguments
-    env->define("http_head", Value(new NativeFn(http_head, -1))); // 1-2 arguments
-    env->define("http_patch", Value(new NativeFn(http_patch, -1))); // 1-3 arguments
+    env->define("get", Value(new NativeFn(http_get, -1))); // 1-2 arguments
+    env->define("post", Value(new NativeFn(http_post, -1))); // 1-3 arguments
+    env->define("put", Value(new NativeFn(http_put, -1))); // 1-3 arguments
+    env->define("delete", Value(new NativeFn(http_delete, -1))); // 1-2 arguments
+    env->define("head", Value(new NativeFn(http_head, -1))); // 1-2 arguments
+    env->define("patch", Value(new NativeFn(http_patch, -1))); // 1-3 arguments
 }
 
 } // namespace neutron

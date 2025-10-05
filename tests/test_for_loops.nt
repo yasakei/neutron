@@ -1,0 +1,78 @@
+// Test for loops
+say("=== Testing For Loops ===");
+
+// Test 1: Basic for loop
+var sum = 0;
+for (var i = 0; i < 5; i = i + 1) {
+    sum = sum + i;
+}
+if (sum == 10) {
+    say("✓ Basic for loop works");
+} else {
+    say("✗ Basic for loop failed");
+}
+
+// Test 2: For loop with different increment
+var count = 0;
+for (var j = 0; j < 10; j = j + 2) {
+    count = count + 1;
+}
+if (count == 5) {
+    say("✓ For loop with step 2 works");
+} else {
+    say("✗ For loop with step failed");
+}
+
+// Test 3: Countdown for loop
+var countdown = 0;
+for (var k = 10; k > 0; k = k - 1) {
+    countdown = k;
+}
+if (countdown == 1) {
+    say("✓ Countdown for loop works");
+} else {
+    say("✗ Countdown for loop failed");
+}
+
+// Test 4: For loop with break
+var breakSum = 0;
+for (var m = 0; m < 10; m = m + 1) {
+    if (m == 5) {
+        break;
+    }
+    breakSum = breakSum + m;
+}
+if (breakSum == 10) {
+    say("✓ For loop with break works");
+} else {
+    say("✗ For loop with break failed");
+}
+
+// Test 5: For loop with continue
+var continueSum = 0;
+for (var n = 0; n < 5; n = n + 1) {
+    if (n == 2) {
+        continue;
+    }
+    continueSum = continueSum + n;
+}
+if (continueSum == 8) {
+    say("✓ For loop with continue works");
+} else {
+    say("✗ For loop with continue failed");
+}
+
+// Test 6: Nested for loops
+var nestedSum = 0;
+for (var outer = 0; outer < 3; outer = outer + 1) {
+    for (var inner = 0; inner < 2; inner = inner + 1) {
+        nestedSum = nestedSum + 1;
+    }
+}
+if (nestedSum == 6) {
+    say("✓ Nested for loops work");
+} else {
+    say("✗ Nested for loops failed");
+}
+
+say("\n=== All for loop tests passed ===");

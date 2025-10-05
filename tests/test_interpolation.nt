@@ -1,0 +1,79 @@
+// Test string interpolation with ${}
+say("=== Testing String Interpolation ===");
+
+// Test 1: Basic variable interpolation
+var name = "Neutron";
+var greeting = "Hello, ${name}!";
+say("Result: " + greeting);
+if (greeting == "Hello, Neutron!") {
+    say("✓ Basic variable interpolation works");
+} else {
+    say("✗ Basic interpolation failed: " + greeting);
+}
+
+// Test 2: Number interpolation
+var age = 25;
+var message = "Age is ${age}";
+say("Result: " + message);
+if (message == "Age is 25") {
+    say("✓ Number interpolation works");
+} else {
+    say("✗ Number interpolation failed: " + message);
+}
+
+// Test 3: Expression interpolation
+var x = 10;
+var y = 20;
+var result = "Sum: ${x + y}";
+say("Result: " + result);
+if (result == "Sum: 30") {
+    say("✓ Expression interpolation works");
+} else {
+    say("✗ Expression interpolation failed: " + result);
+}
+
+// Test 4: Multiple interpolations
+var first = "John";
+var last = "Doe";
+var fullName = "${first} ${last}";
+say("Result: " + fullName);
+if (fullName == "John Doe") {
+    say("✓ Multiple interpolations work");
+} else {
+    say("✗ Multiple interpolations failed: " + fullName);
+}
+
+// Test 5: Complex expression
+var price = 100;
+var tax = 0.08;
+var total = "Total: $${price + (price * tax)}";
+say("Result: " + total);
+if (total == "Total: $108") {
+    say("✓ Complex expression interpolation works");
+} else {
+    say("✗ Complex expression failed: " + total);
+}
+
+// Test 6: Nested expressions
+var a = 5;
+var b = 3;
+var calc = "Result: ${a * b + 10}";
+say("Result: " + calc);
+if (calc == "Result: 25") {
+    say("✓ Nested expression interpolation works");
+} else {
+    say("✗ Nested expression failed: " + calc);
+}
+
+// Test 7: Interpolation with strings
+var lang = "Neutron";
+var version = "1.0";
+var info = "${lang} v${version}";
+say("Result: " + info);
+if (info == "Neutron v1.0") {
+    say("✓ Multi-variable interpolation works");
+} else {
+    say("✗ Multi-variable interpolation failed: " + info);
+}
+
+say("\n=== All string interpolation tests passed ===");

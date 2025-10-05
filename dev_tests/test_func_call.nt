@@ -1,4 +1,0 @@
-use my_utils;
-say("About to call function");
-var result = my_utils.calculate_fibonacci(10);
-say("Function returned: " + result);

@@ -37,10 +37,10 @@ fi
 # Copy documentation
 echo "Copying documentation..."
 cp README.md "$RELEASE_NAME/"
-cp DOCS.md "$RELEASE_NAME/"
-cp CHANGELOG.md "$RELEASE_NAME/"
-cp TECHNICAL_DOCS.md "$RELEASE_NAME/"
+cp LICENSE "$RELEASE_NAME/"
 cp CONTRIBUTING.md "$RELEASE_NAME/"
+mkdir -p "$RELEASE_NAME/docs"
+cp -r docs/* "$RELEASE_NAME/docs/" 2>/dev/null || echo "No docs directory found"
 
 # Copy examples if they exist
 echo "Checking for examples..."
@@ -48,10 +48,26 @@ if [ -d "examples" ]; then
     cp -r examples "$RELEASE_NAME/"
 fi
 
-# Copy dev_tests for verification
-echo "Copying dev_tests..."
-if [ -d "dev_tests" ]; then
-    cp -r dev_tests "$RELEASE_NAME/"
+# Copy programs directory
+echo "Copying programs..."
+if [ -d "programs" ]; then
+    cp -r programs "$RELEASE_NAME/"
+fi
+
+# Copy tests for verification
+echo "Copying tests..."
+if [ -d "tests" ]; then
+    cp -r tests "$RELEASE_NAME/"
+fi
+
+# Copy test runners
+echo "Copying test runners..."
+if [ -f "run_tests.sh" ]; then
+    cp run_tests.sh "$RELEASE_NAME/"
+    chmod +x "$RELEASE_NAME/run_tests.sh"
+fi
+if [ -f "run_tests.ps1" ]; then
+    cp run_tests.ps1 "$RELEASE_NAME/"
 fi
 
 # Create a simple usage example
@@ -61,16 +77,27 @@ NEUTRON USAGE
 To run a Neutron script:
     ./neutron script.nt
 
-To run development tests:
-    ./neutron dev_tests/feature_test.nt
-    ./neutron dev_tests/module_test.nt
-    ./neutron dev_tests/class_test.nt
-    ./neutron dev_tests/binary_conversion_feature_test.nt
+To run the test suite:
+    ./run_tests.sh          # Linux/macOS
+    ./run_tests.ps1         # Windows (PowerShell)
 
-Examples:
-    ./neutron examples/hello.nt
+To run individual tests:
+    ./neutron tests/test_break_continue.nt
+    ./neutron tests/test_modulo.nt
+    ./neutron tests/test_string_interpolation.nt
+    ./neutron tests/test_array_operations.nt
+    ./neutron tests/test_command_line_args.nt arg1 arg2
+    ./neutron tests/test_cross_platform.nt
 
-Note: Make sure libneutron_runtime.so is in the same directory as the neutron binary.
+Example programs:
+    ./neutron programs/fibonacci.nt
+    ./neutron programs/quiz.nt
+    ./neutron programs/sys_example.nt
+
+Note: 
+- On Linux/macOS, make sure libneutron_runtime.so is in the same directory
+- On Windows, make sure neutron_runtime.dll is in the same directory
+- Run chmod +x run_tests.sh on Linux/macOS to make test runner executable
 EOF
 
 # Create a build info
@@ -80,7 +107,16 @@ Neutron Release Build Information
 Built on: $(date)
 Compiler: ${COMPILER_INFO}
 Platform: $(uname -a)
-Features: Enhanced stack management, improved module system, dual access modules
+
+Features:
+- Break/Continue statements
+- Command line arguments (sys.args())
+- Modulo operator (%)
+- String interpolation (\${variable})
+- Enhanced array operations (map, filter, find, forEach, etc.)
+- Cross-platform support (Windows, macOS, Linux, BSD)
+- Platform abstraction layer
+- Native system module with file/directory operations
 EOF
 
 echo "Release package created: $RELEASE_NAME/"

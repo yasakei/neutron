@@ -1,0 +1,101 @@
+// Test classes and OOP
+say("=== Testing Classes and OOP ===");
+
+// Test 1: Simple class definition
+class Person {
+    var name;
+    var age;
+    
+    fun initialize(n, a) {
+        this.name = n;
+        this.age = a;
+    }
+    
+    fun greet() {
+        say("Hello, I am " + this.name);
+    }
+    
+    fun getAge() {
+        return this.age;
+    }
+}
+
+var person = Person();
+person.initialize("Alice", 30);
+person.greet();
+var age = person.getAge();
+if (age == 30) {
+    say("✓ Class definition and methods work");
+} else {
+    say("✗ Class methods failed");
+}
+
+// Test 2: Class with this keyword
+class Counter {
+    var count;
+    
+    fun initialize() {
+        this.count = 0;
+    }
+    
+    fun increment() {
+        this.count = this.count + 1;
+        return this.count;
+    }
+    
+    fun getValue() {
+        return this.count;
+    }
+}
+
+var counter = Counter();
+counter.initialize();
+var val1 = counter.increment();
+var val2 = counter.increment();
+if (val1 == 1 and val2 == 2) {
+    say("✓ This keyword and state management work");
+} else {
+    say("✗ This keyword failed");
+}
+
+// Test 3: Multiple instances
+var counter1 = Counter();
+counter1.initialize();
+var counter2 = Counter();
+counter2.initialize();
+counter1.increment();
+counter1.increment();
+counter2.increment();
+var c1 = counter1.getValue();
+var c2 = counter2.getValue();
+if (c1 == 2 and c2 == 1) {
+    say("✓ Multiple instances work independently");
+} else {
+    say("✗ Multiple instances failed");
+}
+
+// Test 4: Class with calculations
+class Rectangle {
+    var width;
+    var height;
+    
+    fun initialize(w, h) {
+        this.width = w;
+        this.height = h;
+    }
+    
+    fun area() {
+        return this.width * this.height;
+    }
+}
+
+var rect = Rectangle();
+rect.initialize(5, 3);
+var area = rect.area();
+if (area == 15) {
+    say("✓ Class methods with calculations work");
+} else {
+    say("✗ Class calculations failed");
+}
+
+say("\n=== All class and OOP tests passed ===");

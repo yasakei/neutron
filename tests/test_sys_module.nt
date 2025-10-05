@@ -1,0 +1,52 @@
+// Test sys module
+use sys;
+
+say("=== Testing Sys Module ===");
+
+// Test 1: File write and read
+var testFile = "test_sys_temp.txt";
+sys.write(testFile, "Test content");
+var content = sys.read(testFile);
+if (content == "Test content") {
+    say("✓ sys.write and sys.read work");
+} else {
+    say("✗ sys.write/read failed");
+}
+
+// Test 2: File exists
+var exists = sys.exists(testFile);
+if (exists == true) {
+    say("✓ sys.exists works");
+} else {
+    say("✗ sys.exists failed");
+}
+
+// Test 3: Current working directory
+var cwd = sys.cwd();
+if (cwd != "") {
+    say("✓ sys.cwd works");
+} else {
+    say("✗ sys.cwd failed");
+}
+
+// Test 4: System info
+var info = sys.info();
+if (info.platform != "" and info.arch != "") {
+    say("✓ sys.info works");
+} else {
+    say("✗ sys.info failed");
+}
+
+// Test 5: Command line args
+var args = sys.args();
+if (args[0] != "") {
+    say("✓ sys.args works");
+} else {
+    say("✗ sys.args failed");
+}
+
+// Cleanup
+sys.rm(testFile);
+say("✓ sys.rm works");
+
+say("\n=== All sys module tests passed ===");

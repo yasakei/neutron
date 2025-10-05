@@ -1,0 +1,25 @@
+// Test strings
+say("=== Testing Strings ===");
+
+var name = "Neutron";
+var greeting = "Hello, " + name + "!";
+say("Test: " + greeting);
+if (greeting == "Hello, Neutron!") {
+    say("✓ String concatenation works");
+} else {
+    say("✗ String concatenation failed");
+}
+
+var x = 10;
+var y = 20;
+var result = x + y;
+if (result == 30) {
+    say("✓ Expression evaluation works");
+} else {
+    say("✗ Expression evaluation failed");
+}
+
+say("\n✓ Basic string operations work");
+say("\nNote: String interpolation is in the roadmap");
+
+say("\n=== String tests passed ===");
