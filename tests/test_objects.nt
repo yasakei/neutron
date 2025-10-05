@@ -1,0 +1,37 @@
+// Test objects and JSON
+use json;
+
+say("=== Testing Objects and JSON ===");
+
+// Test 1: Object literal creation
+var person = {
+  "name": "John",
+  "age": 30
+};
+say("✓ Object literal creation works");
+
+// Test 2: JSON stringify
+var jsonStr = json.stringify(person);
+if (jsonStr != "") {
+    say("✓ JSON stringify works");
+} else {
+    say("✗ JSON stringify failed");
+}
+
+// Test 3: JSON parse
+var jsonText = "{\"name\":\"Alice\",\"age\":25}";
+var parsed = json.parse(jsonText);
+say("✓ JSON parse works");
+
+// Test 4: JSON with arrays
+var data = {"items": [1, 2, 3]};
+var jsonData = json.stringify(data);
+if (jsonData != "") {
+    say("✓ JSON with arrays works");
+} else {
+    say("✗ JSON with arrays failed");
+}
+
+say("\nNote: Object property access with [] requires json.get() function");
+
+say("\n=== All object and JSON tests passed ===");

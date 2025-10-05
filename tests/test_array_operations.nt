@@ -1,0 +1,61 @@
+// Test array operations
+use sys;
+
+say("=== Testing Array Operations ===");
+
+// Test 1: Array creation and access
+var arr = [1, 2, 3, 4, 5];
+if (arr[0] == 1 and arr[4] == 5) {
+    say("✓ Array creation and indexing works");
+} else {
+    say("✗ Array creation failed");
+    sys.exit(1);
+}
+
+// Test 2: Array assignment
+arr[2] = 10;
+if (arr[2] == 10) {
+    say("✓ Array element assignment works");
+} else {
+    say("✗ Array assignment failed");
+    sys.exit(1);
+}
+
+// Test 3: Nested arrays
+var nested = [[1, 2], [3, 4]];
+if (nested[0][1] == 2 and nested[1][0] == 3) {
+    say("✓ Nested arrays work");
+} else {
+    say("✗ Nested arrays failed");
+    sys.exit(1);
+}
+
+// Test 4: Mixed type arrays
+var mixed = [1, "hello", 3.14, true];
+if (mixed[1] == "hello" and mixed[3] == true) {
+    say("✓ Mixed type arrays work");
+} else {
+    say("✗ Mixed type arrays failed");
+    sys.exit(1);
+}
+
+// Test 5: Array in strings
+say("Array contents: [1, 2, 3, 4, 5]");
+say("✓ Arrays can be displayed in output");
+
+// Test 6: Array literals in expressions
+var sum = 0;
+var testArr = [10, 20, 30];
+sum = testArr[0] + testArr[1] + testArr[2];
+if (sum == 60) {
+    say("✓ Array access in expressions works");
+} else {
+    say("✗ Array expressions failed");
+    sys.exit(1);
+}
+
+say("\nNote: Advanced array methods like .length(), .slice(), .map(),");
+say("      .filter(), .find() are documented in the roadmap but their");
+say("      implementation status may vary. Basic array operations work.");
+
+say("\n=== Basic array operations tests passed ===");

@@ -160,7 +160,47 @@ var found = arr.find(greaterThan3);  // 4
 
 ## Current Known Issues
 
-### 1. Symbol Operators Not Implemented  
+### 1. Not-Equal Operator (!=) Produces Incorrect Results  
+**Status:** ⚠️ KNOWN BUG  
+**Severity:** Medium  
+**Description:** The `!=` operator produces inverted/incorrect boolean results in comparisons.
+
+**Example:**
+```neutron
+var x = 5;
+if (x != 5) {
+    say("This incorrectly executes!");  // Should not run, but does
+}
+
+if (x != 6) {
+    say("This should execute");  // Works correctly
+}
+
+// Nil comparisons also affected
+var y = nil;
+if (y != nil) {
+    say("This incorrectly executes!");  // Should not run
+}
+```
+
+**Workaround:** Use `==` with logical negation:
+```neutron
+// Instead of: if (x != 5)
+var isEqual = x == 5;
+if (!isEqual) {
+    say("x is not 5");
+}
+
+// Or for nil checks:
+var isNil = response == nil;
+if (!isNil) {
+    say("Response is not nil");
+}
+```
+
+**Status:** This is a parser/compiler bug that will be fixed in a future release.
+
+### 2. Symbol Operators Not Implemented  
 **Status:** By Design  
 **Description:** C-style operators `&&`, `||`, `++`, `--` are not implemented. Use keyword equivalents instead.
 
@@ -170,7 +210,7 @@ var found = arr.find(greaterThan3);  // 4
 - Use `x = x + 1` instead of `x++`
 - Use `x = x - 1` instead of `x--`
 
-### 2. Else-If Chain Complexity
+### 3. Else-If Chain Complexity
 **Status:** Under Investigation  
 **Description:** Extremely complex else-if chains (10+ levels) may cause performance issues.
 

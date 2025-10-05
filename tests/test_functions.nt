@@ -1,0 +1,62 @@
+// Test functions
+say("=== Testing Functions ===");
+
+// Test 1: Simple function definition and call
+fun greet(name) {
+    say("Hello, " + name + "!");
+}
+greet("Neutron");
+say("✓ Simple function works");
+
+// Test 2: Function with return value
+fun add(a, b) {
+    return a + b;
+}
+var result = add(5, 10);
+if (result == 15) {
+    say("✓ Function with return works");
+} else {
+    say("✗ Function with return failed");
+}
+
+// Test 3: Function with multiple parameters
+fun calculate(x, y, z) {
+    return x + y * z;
+}
+var calc = calculate(2, 3, 4);
+if (calc == 14) {
+    say("✓ Function with multiple parameters works");
+} else {
+    say("✗ Function with multiple parameters failed");
+}
+
+// Test 4: Function calling function
+fun double(n) {
+    return n * 2;
+}
+fun quadruple(n) {
+    return double(double(n));
+}
+var quad = quadruple(5);
+if (quad == 20) {
+    say("✓ Function calling function works");
+} else {
+    say("✗ Function calling function failed");
+}
+
+// Test 5: Function with conditional return
+fun isPositive(n) {
+    if (n > 0) {
+        return true;
+    }
+    return false;
+}
+var pos = isPositive(10);
+var neg = isPositive(-5);
+if (pos == true and neg == false) {
+    say("✓ Function with conditional return works");
+} else {
+    say("✗ Function with conditional return failed");
+}
+
+say("\n=== All function tests passed ===");

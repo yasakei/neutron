@@ -1,0 +1,60 @@
+// Test operators
+say("=== Testing Operators ===");
+
+// Test 1: Arithmetic operators
+var sum = 10 + 5;
+var diff = 20 - 10;
+var product = 5 * 2;
+var quotient = 10 / 2;
+if (sum == 15 and diff == 10 and product == 10 and quotient == 5) {
+    say("✓ Arithmetic operators work");
+} else {
+    say("✗ Arithmetic operators failed");
+}
+
+// Test 2: Comparison operators
+var eq = 10 == 10;
+var neq = 10 != 5;
+var lt = 5 < 10;
+var gt = 10 > 5;
+if (eq and neq and lt and gt) {
+    say("✓ Comparison operators work");
+} else {
+    say("✗ Comparison operators failed");
+}
+
+// Test 3: Logical operators
+var andResult = true and false;
+var orResult = true or false;
+if (andResult == false and orResult == true) {
+    say("✓ Logical operators (and, or) work");
+} else {
+    say("✗ Logical operators failed");
+}
+
+// Test 4: String concatenation
+var greeting = "Hello, " + "world!";
+var withNumber = "Value: " + 42;
+if (greeting == "Hello, world!") {
+    say("✓ String concatenation works");
+} else {
+    say("✗ String concatenation failed");
+}
+
+// Test 5: Operator precedence
+var result = 2 + 3 * 4;
+if (result == 14) {
+    say("✓ Operator precedence works");
+} else {
+    say("✗ Operator precedence failed");
+}
+
+// Test 6: Parentheses
+var result2 = (2 + 3) * 4;
+if (result2 == 20) {
+    say("✓ Parentheses for precedence work");
+} else {
+    say("✗ Parentheses failed");
+}
+
+say("\n=== All operator tests passed ===");

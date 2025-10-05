@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # This script checks for the required dependencies to build the project.
-# It supports both macOS and Linux.
+# It supports macOS, Linux, and Windows (via Git Bash/MSYS2).
 
 echo "Checking for required dependencies..."
 
@@ -14,7 +14,7 @@ command_exists() {
 OS="$(uname -s)"
 
 # Common dependencies
-COMMON_DEPS=("make" "git" "curl")
+COMMON_DEPS=("make" "git" "cmake")
 
 # OS-specific dependencies
 if [ "$OS" = "Darwin" ]; then
@@ -24,6 +24,16 @@ if [ "$OS" = "Darwin" ]; then
     INSTALL_CMD="brew install"
     JSONCPP_INSTALLED=false
     if [ -f "/opt/homebrew/lib/libjsoncpp.dylib" ] || [ -f "/usr/local/lib/libjsoncpp.dylib" ]; then
+        JSONCPP_INSTALLED=true
+    fi
+elif [[ "$OS" == MINGW* ]] || [[ "$OS" == MSYS* ]] || [[ "$OS" == CYGWIN* ]]; then
+    # Windows (Git Bash/MSYS2)
+    echo "Detected Windows."
+    DEPS=("${COMMON_DEPS[@]}" "g++")
+    INSTALL_CMD="pacman -S --noconfirm"  # MSYS2 package manager
+    JSONCPP_INSTALLED=false
+    # On Windows, jsoncpp might be in MSYS2 packages
+    if command_exists pkg-config && pkg-config --exists jsoncpp; then
         JSONCPP_INSTALLED=true
     fi
 elif [ "$OS" = "Linux" ]; then
@@ -65,6 +75,7 @@ elif [ "$OS" = "Linux" ]; then
     fi
 else
     echo "Unsupported OS: $OS"
+    echo "Supported platforms: macOS, Linux, Windows (Git Bash/MSYS2)"
     exit 1
 fi
 
@@ -80,6 +91,8 @@ done
 if ! $JSONCPP_INSTALLED; then
     if [ "$OS" = "Darwin" ]; then
         MISSING_DEPS+=("jsoncpp")
+    elif [[ "$OS" == MINGW* ]] || [[ "$OS" == MSYS* ]] || [[ "$OS" == CYGWIN* ]]; then
+        MISSING_DEPS+=("mingw-w64-x86_64-jsoncpp")
     elif [ "$OS" = "Linux" ]; then
         MISSING_DEPS+=("$JSONCPP_PKG")
     fi
@@ -95,12 +108,30 @@ if [ ${#MISSING_DEPS[@]} -ne 0 ]; then
     echo "You can try to install them by running the following command:"
     if [ "$OS" = "Darwin" ]; then
         echo "  brew install ${MISSING_DEPS[*]}"
+    elif [[ "$OS" == MINGW* ]] || [[ "$OS" == MSYS* ]] || [[ "$OS" == CYGWIN* ]]; then
+        echo "  pacman -S --noconfirm ${MISSING_DEPS[*]}"
+        echo ""
+        echo "Note: On Windows, you may also need Visual Studio Build Tools"
+        echo "      or install via MSYS2: https://www.msys2.org/"
     elif [ "$OS" = "Linux" ]; then
         echo "  $INSTALL_CMD ${MISSING_DEPS[*]}"
     fi
     exit 1
 else
     echo "All dependencies are installed."
+    echo ""
+    echo "Build instructions:"
+    echo "  1. Build with CMake:"
+    echo "     mkdir -p build && cd build"
+    echo "     cmake .."
+    echo "     make"
+    echo ""
+    echo "  2. Or use the Makefile:"
+    echo "     make"
+    echo ""
+    echo "  3. Run tests:"
+    echo "     ./run_tests.sh          # Linux/macOS"
+    echo "     ./run_tests.ps1         # Windows (PowerShell)"
 fi
 
 exit 0

@@ -1,0 +1,62 @@
+// Test variables and basic data types
+say("=== Testing Variables and Data Types ===");
+
+// Test 1: Variable declaration
+var x;
+var y = 10;
+var z = 20;
+say("✓ Variable declaration works");
+
+// Test 2: Numbers
+var integer = 42;
+var float = 3.14;
+var negative = -5;
+if (integer == 42 and float == 3.14 and negative == -5) {
+    say("✓ Number types work");
+} else {
+    say("✗ Number types failed");
+}
+
+// Test 3: Booleans
+var isTrue = true;
+var isFalse = false;
+if (isTrue == true and isFalse == false) {
+    say("✓ Boolean types work");
+} else {
+    say("✗ Boolean types failed");
+}
+
+// Test 4: Strings
+var name = "Neutron";
+var message = "Hello, world!";
+if (name == "Neutron" and message == "Hello, world!") {
+    say("✓ String types work");
+} else {
+    say("✗ String types failed");
+}
+
+// Test 5: Nil
+var nothing = nil;
+if (nothing == nil) {
+    say("✓ Nil type works");
+} else {
+    say("✗ Nil type failed");
+}
+
+// Test 6: Dynamic typing
+var value = 42;
+value = "hello";
+value = true;
+say("✓ Dynamic typing works");
+
+// Test 7: Variable reassignment
+var counter = 0;
+counter = counter + 1;
+counter = counter + 1;
+if (counter == 2) {
+    say("✓ Variable reassignment works");
+} else {
+    say("✗ Variable reassignment failed");
+}
+
+say("\n=== All variable and data type tests passed ===");

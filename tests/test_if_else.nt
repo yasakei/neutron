@@ -1,0 +1,94 @@
+// Test if-else with else-if chains
+say("=== Testing If-Else-If Chains ===");
+
+// Test 1: Grade system with multiple else-if
+var score = 85;
+var grade = "";
+if (score >= 90) {
+    grade = "A";
+} else if (score >= 80) {
+    grade = "B";
+} else if (score >= 70) {
+    grade = "C";
+} else if (score >= 60) {
+    grade = "D";
+} else {
+    grade = "F";
+}
+if (grade == "B") {
+    say("✓ Else-if chain works (score 85 = B)");
+} else {
+    say("✗ Else-if chain failed");
+}
+
+// Test 2: Multiple conditions
+var score2 = 95;
+var result = "";
+if (score2 >= 90) {
+    result = "Excellent";
+} else if (score2 >= 80) {
+    result = "Good";
+} else {
+    result = "Pass";
+}
+if (result == "Excellent") {
+    say("✓ Else-if with high score works");
+} else {
+    say("✗ High score check failed");
+}
+
+// Test 3: Falling through to else
+var score3 = 55;
+var outcome = "";
+if (score3 >= 90) {
+    outcome = "A";
+} else if (score3 >= 80) {
+    outcome = "B";
+} else if (score3 >= 70) {
+    outcome = "C";
+} else {
+    outcome = "F";
+}
+if (outcome == "F") {
+    say("✓ Else clause works when no if/else-if matches");
+} else {
+    say("✗ Else clause failed");
+}
+
+// Test 4: Nested if-else-if
+var x = 15;
+var category = "";
+if (x > 20) {
+    category = "large";
+} else {
+    if (x > 10) {
+        category = "medium";
+    } else {
+        category = "small";
+    }
+}
+if (category == "medium") {
+    say("✓ Nested if-else works");
+} else {
+    say("✗ Nested if-else failed");
+}
+
+// Test 5: Complex condition with else-if
+var age = 25;
+var status = "";
+if (age < 13) {
+    status = "child";
+} else if (age < 20) {
+    status = "teenager";
+} else if (age < 65) {
+    status = "adult";
+} else {
+    status = "senior";
+}
+if (status == "adult") {
+    say("✓ Age categorization with else-if works");
+} else {
+    say("✗ Age categorization failed");
+}
+
+say("\n=== All if-else-if tests passed ===");

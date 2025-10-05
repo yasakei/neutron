@@ -44,8 +44,8 @@ int BoundMethod::arity() {
 }
 
 Value BoundMethod::call(VM& vm, std::vector<Value> arguments) {
-    // For now, just call the underlying method without 'this' context
-    // Proper 'this' implementation would require more complex changes
+    // This shouldn't be called directly - the VM's callValue handles BoundMethod
+    // But if it is, just delegate to the underlying method
     return method->call(vm, arguments);
 }
 

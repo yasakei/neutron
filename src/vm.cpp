@@ -7,6 +7,8 @@
 #include "compiler/scanner.h"
 #include "compiler/parser.h"
 #include "types/json_object.h"
+#include "types/instance.h"
+#include "types/bound_method.h"
 #include "types/bound_array_method.h"
 #include <iostream>
 #include <stdexcept>
@@ -140,15 +142,45 @@ bool VM::callValue(Value callee, int argCount) {
     // Handle BoundArrayMethod
     if (callee.type == ValueType::OBJECT) {
         Object* obj = std::get<Object*>(callee.as);
-        BoundArrayMethod* method = dynamic_cast<BoundArrayMethod*>(obj);
-        if (method != nullptr) {
-            return callArrayMethod(method, argCount);
+        BoundArrayMethod* arrayMethod = dynamic_cast<BoundArrayMethod*>(obj);
+        if (arrayMethod != nullptr) {
+            return callArrayMethod(arrayMethod, argCount);
         }
     }
     
     if (callee.type == ValueType::CALLABLE) {
         Callable* callable = std::get<Callable*>(callee.as);
-        if (Function* function = dynamic_cast<Function*>(callable)) {
+        
+        // Check for BoundMethod first
+        if (BoundMethod* boundMethod = dynamic_cast<BoundMethod*>(callable)) {
+            // For bound methods, replace the method on the stack with the receiver
+            // Stack before: [... | boundMethod | arg1 | arg2]
+            // Stack after:  [... | receiver | arg1 | arg2]
+            // The receiver becomes an implicit first argument
+            size_t methodPos = stack.size() - argCount - 1;
+            stack[methodPos] = boundMethod->receiver;
+            // Call with argCount+1 to include the receiver as first argument (slot 0)
+            // But we need to adjust the method's arity check
+            if (boundMethod->method->arity_val != argCount) {
+                runtimeError("Expected " + std::to_string(boundMethod->method->arity_val) + " arguments but got " + std::to_string(argCount) + ".");
+                return false;
+            }
+            // Manually set up the call frame to include receiver at slot 0
+            if (frames.size() == 256) {
+                runtimeError("Stack overflow.");
+                return false;
+            }
+            CallFrame* frame = &frames.emplace_back();
+            frame->function = boundMethod->method;
+            if (boundMethod->method->chunk->code.empty()) {
+                frame->ip = nullptr;
+            } else {
+                frame->ip = boundMethod->method->chunk->code.data();
+            }
+            // slot_offset points to the receiver (one position before args)
+            frame->slot_offset = stack.size() - argCount - 1;
+            return true;
+        } else if (Function* function = dynamic_cast<Function*>(callable)) {
             return call(function, argCount);
         } else if (NativeFn* native = dynamic_cast<NativeFn*>(callable)) {
             if (native->arity() != -1 && native->arity() != argCount) {
@@ -187,6 +219,28 @@ bool VM::callValue(Value callee, int argCount) {
             }
             return true;
         }
+    }
+
+    // Handle CLASS type
+    if (callee.type == ValueType::CLASS) {
+        Class* klass = std::get<Class*>(callee.as);
+        if (klass->arity() != -1 && klass->arity() != argCount) {
+            runtimeError("Expected " + std::to_string(klass->arity()) + " arguments but got " + std::to_string(argCount) + ".");
+            return false;
+        }
+        std::vector<Value> args;
+        for (int i = 0; i < argCount; i++) {
+            args.push_back(stack[stack.size() - argCount + i]);
+        }
+        try {
+            Value result = klass->call(*this, args);
+            stack.resize(stack.size() - argCount - 1);
+            push(result);
+        } catch (const std::runtime_error& e) {
+            runtimeError(e.what());
+            return false;
+        }
+        return true;
     }
 
     runtimeError("Can only call functions and classes.");
@@ -539,6 +593,38 @@ void VM::run(size_t minFrameDepth) {
                     } else {
                         runtimeError("Array does not have property '" + propertyName + "'.");
                     }
+                } else if (object.type == ValueType::INSTANCE) {
+                    // Handle instance properties and methods
+                    Instance* inst = std::get<Instance*>(object.as);
+                    
+                    // Check fields first
+                    auto it = inst->fields.find(propertyName);
+                    if (it != inst->fields.end()) {
+                        stack.pop_back();
+                        push(it->second);
+                    } else {
+                        // Check methods in the class
+                        auto methIt = inst->klass->methods.find(propertyName);
+                        if (methIt != inst->klass->methods.end()) {
+                            // Create a bound method that captures the instance
+                            Value methodValue = methIt->second;
+                            if (methodValue.type == ValueType::CALLABLE) {
+                                Function* func = dynamic_cast<Function*>(std::get<Callable*>(methodValue.as));
+                                if (func != nullptr) {
+                                    stack.pop_back();
+                                    push(Value(new BoundMethod(object, func)));
+                                } else {
+                                    stack.pop_back();
+                                    push(methodValue);
+                                }
+                            } else {
+                                stack.pop_back();
+                                push(methodValue);
+                            }
+                        } else {
+                            runtimeError("Property '" + propertyName + "' not found on instance.");
+                        }
+                    }
                 } else if (object.type == ValueType::OBJECT) {
                     Object* objPtr = std::get<Object*>(object.as);
                     
@@ -561,23 +647,72 @@ void VM::run(size_t minFrameDepth) {
                             runtimeError("Array does not have property '" + propertyName + "'.");
                         }
                     } else {
-                        // Check if it's a JsonObject
-                        JsonObject* obj = dynamic_cast<JsonObject*>(objPtr);
-                        if (obj != nullptr) {
-                            auto it = obj->properties.find(propertyName);
-                            if (it != obj->properties.end()) {
+                        // Check if it's an Instance
+                        Instance* inst = dynamic_cast<Instance*>(objPtr);
+                        if (inst != nullptr) {
+                            // Check fields first
+                            auto it = inst->fields.find(propertyName);
+                            if (it != inst->fields.end()) {
                                 stack.pop_back();
                                 push(it->second);
                             } else {
-                                runtimeError("Property '" + propertyName + "' not found on object.");
+                                // Check methods in the class
+                                auto methIt = inst->klass->methods.find(propertyName);
+                                if (methIt != inst->klass->methods.end()) {
+                                    stack.pop_back();
+                                    push(methIt->second);
+                                } else {
+                                    runtimeError("Property '" + propertyName + "' not found on instance.");
+                                }
                             }
                         } else {
-                            runtimeError("Object does not support property access.");
+                            // Check if it's a JsonObject
+                            JsonObject* obj = dynamic_cast<JsonObject*>(objPtr);
+                            if (obj != nullptr) {
+                                auto it = obj->properties.find(propertyName);
+                                if (it != obj->properties.end()) {
+                                    stack.pop_back();
+                                    push(it->second);
+                                } else {
+                                    runtimeError("Property '" + propertyName + "' not found on object.");
+                                }
+                            } else {
+                                runtimeError("Object does not support property access.");
+                            }
                         }
                     }
                 } else {
                     runtimeError("Only modules, arrays, and objects have properties. Cannot use dot notation on this value type.");
                 }
+                break;
+            }
+            case (uint8_t)OpCode::OP_SET_PROPERTY: {
+                std::string propertyName = READ_STRING();
+                Value value = pop();  // The value to set
+                Value object = pop();  // The object/instance
+                
+                if (object.type == ValueType::INSTANCE) {
+                    Instance* inst = std::get<Instance*>(object.as);
+                    inst->fields[propertyName] = value;
+                    push(value);  // Assignment expression returns the value
+                } else if (object.type == ValueType::OBJECT) {
+                    Object* objPtr = std::get<Object*>(object.as);
+                    JsonObject* jsonObj = dynamic_cast<JsonObject*>(objPtr);
+                    if (jsonObj != nullptr) {
+                        jsonObj->properties[propertyName] = value;
+                        push(value);
+                    } else {
+                        runtimeError("Cannot set property on this object type.");
+                    }
+                } else {
+                    runtimeError("Only instances and objects support property assignment.");
+                }
+                break;
+            }
+            case (uint8_t)OpCode::OP_THIS: {
+                // 'this' is stored as the first local variable (slot 0) in method calls
+                CallFrame* frame = &frames[frames.size() - 1];
+                push(stack[frame->slot_offset]);
                 break;
             }
             case (uint8_t)OpCode::OP_EQUAL: {

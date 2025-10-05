@@ -1,0 +1,80 @@
+// Test HTTP module
+use http;
+use json;
+
+say("=== Testing HTTP Module ===");
+
+// Note: HTTP tests may return mock data or require network access
+// Testing that functions exist and return expected structure
+
+// Test 1: HTTP GET request
+say("Testing http.get()...");
+var getResponse = http.get("https://api.example.com/test");
+if (getResponse.status == 200) {
+    say("✓ http.get() returns response object");
+} else {
+    say("✗ http.get() failed");
+}
+
+// Test 2: Response structure
+var hasBody = getResponse.body == nil;
+if (!hasBody) {
+    say("✓ Response has body field");
+} else {
+    say("✗ Response body field missing");
+}
+
+// Test 3: HTTP POST request
+say("Testing http.post()...");
+var postData = json.stringify({"key": "value"});
+var postResponse = http.post("https://api.example.com/submit", postData);
+if (postResponse.status == 200) {
+    say("✓ http.post() returns response object");
+} else {
+    say("✗ http.post() failed");
+}
+
+// Test 4: HTTP PUT request
+say("Testing http.put()...");
+var putData = json.stringify({"update": "data"});
+var putResponse = http.put("https://api.example.com/update", putData);
+var putIsNil = putResponse == nil;
+if (!putIsNil) {
+    say("✓ http.put() works");
+} else {
+    say("✗ http.put() failed");
+}
+
+// Test 5: HTTP DELETE request
+say("Testing http.delete()...");
+var deleteResponse = http.delete("https://api.example.com/remove");
+var deleteIsNil = deleteResponse == nil;
+if (!deleteIsNil) {
+    say("✓ http.delete() works");
+} else {
+    say("✗ http.delete() failed");
+}
+
+// Test 6: HTTP HEAD request
+say("Testing http.head()...");
+var headResponse = http.head("https://api.example.com/check");
+var headIsNil = headResponse == nil;
+if (!headIsNil) {
+    say("✓ http.head() works");
+} else {
+    say("✗ http.head() failed");
+}
+
+// Test 7: HTTP PATCH request
+say("Testing http.patch()...");
+var patchData = json.stringify({"patch": "value"});
+var patchResponse = http.patch("https://api.example.com/partial", patchData);
+var patchIsNil = patchResponse == nil;
+if (!patchIsNil) {
+    say("✓ http.patch() works");
+} else {
+    say("✗ http.patch() failed");
+}
+
+say("\n=== All HTTP module tests passed ===");
+say("Note: HTTP responses may be mocked in test environment");

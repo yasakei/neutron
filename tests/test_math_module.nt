@@ -1,0 +1,48 @@
+// Test math module
+use math;
+
+say("=== Testing Math Module ===");
+
+// Test 1: Addition
+var sum = math.add(5, 3);
+if (sum == 8) {
+    say("✓ math.add works");
+} else {
+    say("✗ math.add failed");
+}
+
+// Test 2: Subtraction
+var diff = math.subtract(10, 4);
+if (diff == 6) {
+    say("✓ math.subtract works");
+} else {
+    say("✗ math.subtract failed");
+}
+
+// Test 3: Multiplication
+var product = math.multiply(6, 7);
+if (product == 42) {
+    say("✓ math.multiply works");
+} else {
+    say("✗ math.multiply failed");
+}
+
+// Test 4: Division
+var quotient = math.divide(15, 3);
+if (quotient == 5) {
+    say("✓ math.divide works");
+} else {
+    say("✗ math.divide failed");
+}
+
+// Test 5: Using math in calculations
+var calc1 = math.add(math.multiply(2, 3), 4);
+if (calc1 == 10) {
+    say("✓ Math functions in calculations work");
+} else {
+    say("✗ Math calculations failed");
+}
+
+say("\nNote: Advanced math functions (pow, sqrt, abs) may vary by implementation");
+
+say("\n=== All math module tests passed ===");

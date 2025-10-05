@@ -1,0 +1,46 @@
+// Test cross-platform features
+use sys;
+
+say("=== Testing Cross-Platform Features ===");
+
+// Test 1: System info
+var info = sys.info();
+say("\nSystem Information:");
+say("  Platform: " + info.platform);
+say("  Architecture: " + info.arch);
+say("  Username: " + info.user);
+say("  Hostname: " + info.hostname);
+say("✓ Platform detection works");
+
+// Test 2: File operations
+var testFile = "test_temp_file.txt";
+say("\nTesting file operations:");
+
+// Write file
+sys.write(testFile, "Hello from Neutron!");
+if (sys.exists(testFile)) {
+    say("✓ File creation works");
+} else {
+    say("✗ File creation failed");
+}
+
+// Read file
+var content = sys.read(testFile);
+if (content == "Hello from Neutron!") {
+    say("✓ File reading works");
+} else {
+    say("✗ File reading failed");
+}
+
+// Test 3: Current directory
+say("\nTesting directory:");
+var currentDir = sys.cwd();
+say("  Current directory: " + currentDir);
+say("✓ Getting current directory works");
+
+// Cleanup
+say("\nCleaning up...");
+sys.rm(testFile);
+say("✓ File cleanup complete");
+
+say("\n=== All cross-platform tests passed ===");

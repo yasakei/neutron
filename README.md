@@ -2,6 +2,13 @@
 
 Neutron is a simple, modern, and lightweight interpreted programming language written in C++. It is designed to be easy to learn and use, with a clean and expressive syntax.
 
+## Quick Links
+
+- 🚀 **[Quick Start Guide](docs/QUICKSTART.md)** - Get up and running in 5 minutes
+- 📖 **[Complete Build Guide](docs/BUILD.md)** - Platform-specific build instructions
+- 📚 **[Language Reference](docs/language_reference.md)** - Full syntax documentation
+- ✅ **[Test Suite](docs/TEST_SUITE.md)** - 21 tests covering all features
+
 ## Features
 
 - **Dynamically Typed:** No need to declare the type of a variable.
@@ -20,56 +27,204 @@ Neutron is a simple, modern, and lightweight interpreted programming language wr
 
 ### Prerequisites
 
-To build and run Neutron, you will need:
-- A C++ compiler that supports C++17 (g++, clang++, or MSVC)
-- CMake 3.10 or higher
-- pkg-config (for dependency management)
-- Required libraries: libcurl, jsoncpp
+Neutron requires the following dependencies to build:
+
+#### All Platforms
+- **CMake** 3.15 or higher
+- **C++17 compiler** (GCC 7+, Clang 5+, MSVC 2017+)
+- **libcurl** - HTTP client library
+- **jsoncpp** - JSON parsing library
+
+#### Linux (Debian/Ubuntu)
+```bash
+sudo apt-get update
+sudo apt-get install build-essential cmake pkg-config libcurl4-openssl-dev libjsoncpp-dev
+```
+
+#### Linux (Fedora/RHEL)
+```bash
+sudo dnf install gcc-c++ cmake pkgconfig libcurl-devel jsoncpp-devel
+```
+
+#### Linux (Arch)
+```bash
+sudo pacman -S base-devel cmake curl jsoncpp
+```
+
+#### macOS
+```bash
+# Install Homebrew if not already installed: https://brew.sh
+brew install cmake curl jsoncpp
+```
+
+#### Windows
+
+**Option 1: MSYS2 (Recommended)**
+```bash
+# Install MSYS2 from https://www.msys2.org/
+# Then in MSYS2 MINGW64 terminal:
+pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-curl mingw-w64-x86_64-jsoncpp make
+```
+
+**Option 2: vcpkg**
+```cmd
+# Install vcpkg from https://github.com/microsoft/vcpkg
+vcpkg install curl jsoncpp
+```
 
 ### Building the Project
 
-Neutron now uses CMake for cross-platform builds:
+Neutron uses CMake for cross-platform builds. Choose the instructions for your platform:
 
-```sh
+#### Linux / macOS
+
+**Quick Build:**
+```bash
+cmake -B build -S .
+cmake --build build -j$(nproc)
+```
+
+**Or step-by-step:**
+```bash
 mkdir -p build
 cd build
 cmake ..
-cmake --build .
+make -j$(nproc)
+cd ..
 ```
 
-This will create:
-- `build/neutron` - The interpreter executable
-- `build/libneutron_runtime.so` - The runtime library
-- Copies of both in the project root directory for convenience
-
-For a clean rebuild:
-
-```sh
+**Clean rebuild:**
+```bash
 rm -rf build
+cmake -B build -S .
+cmake --build build -j$(nproc)
+```
+
+#### Windows (MSYS2)
+
+**In MSYS2 MINGW64 terminal:**
+```bash
+cmake -B build -S . -G "MSYS Makefiles"
+cmake --build build -j$(nproc)
+```
+
+**Or:**
+```bash
 mkdir build
 cd build
-cmake ..
-cmake --build .
+cmake .. -G "MSYS Makefiles"
+make -j$(nproc)
+cd ..
+```
+
+#### Windows (Visual Studio)
+
+**Using vcpkg:**
+```cmd
+cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=[vcpkg-root]/scripts/buildsystems/vcpkg.cmake
+cmake --build build --config Release
+```
+
+**Or generate Visual Studio solution:**
+```cmd
+mkdir build
+cd build
+cmake .. -G "Visual Studio 17 2022"
+cmake --build . --config Release
+cd ..
+```
+
+#### Build Output
+
+Successful builds create:
+- `build/neutron` (or `neutron.exe` on Windows) - The interpreter
+- `build/libneutron_runtime.so` / `.dll` / `.dylib` - Runtime library
+- Copies in project root for convenience
+
+#### Troubleshooting
+
+**Linux:** If you get "curl not found" or "jsoncpp not found":
+```bash
+sudo apt-get install libcurl4-openssl-dev libjsoncpp-dev
+# or use your distribution's package manager
+```
+
+**macOS:** If CMake can't find libraries:
+```bash
+export PKG_CONFIG_PATH="$(brew --prefix)/lib/pkgconfig"
+cmake -B build -S .
+```
+
+**Windows/MSYS2:** Make sure you're using the MINGW64 terminal (not MSYS):
+```bash
+# The prompt should show: MINGW64
+echo $MSYSTEM  # Should output: MINGW64
 ```
 
 ### Running the Interpreter
 
-You can run a Neutron script by passing the file path to the `neutron` executable:
+#### Linux / macOS
 
-```sh
+Run a Neutron script:
+```bash
 ./neutron examples/hello.nt
-```
-
-Or use the binary in the build directory:
-
-```sh
+# or from build directory:
 ./build/neutron examples/hello.nt
 ```
 
-You can also start the REPL (Read-Eval-Print Loop) by running `neutron` without any arguments:
-
-```sh
+Start the REPL:
+```bash
 ./neutron
+```
+
+#### Windows (MSYS2)
+
+```bash
+./neutron.exe examples/hello.nt
+# or:
+./build/neutron.exe examples/hello.nt
+```
+
+#### Windows (Visual Studio)
+
+```cmd
+neutron.exe examples\hello.nt
+REM or:
+build\Release\neutron.exe examples\hello.nt
+```
+
+### Running Tests
+
+Neutron includes a comprehensive test suite with 21 tests covering all language features.
+
+#### Linux / macOS
+
+```bash
+./run_tests.sh
+```
+
+#### Windows (MSYS2)
+
+```bash
+bash run_tests.sh
+```
+
+#### Windows (PowerShell)
+
+```powershell
+.\run_tests.ps1
+```
+
+All tests should pass with output:
+```
+================================
+  Test Summary
+================================
+Total tests: 21
+Passed: 21
+Failed: 0
+
+All tests passed!
 ```
 
 ### Binary Conversion
@@ -91,6 +246,14 @@ To run the generated executable:
 The generated executable contains the Neutron runtime and the embedded source code, making it a fully standalone program that can be distributed and run on any compatible system.
 
 **Note:** See [Binary Conversion Documentation](docs/binary_conversion.md) for detailed information about supported features, limitations, and best practices.
+
+## Documentation
+
+- **[Complete Build Guide](docs/BUILD.md)** - Comprehensive building instructions for all platforms
+- **[Language Reference](docs/language_reference.md)** - Complete language syntax and features
+- **[Cross-Platform Guide](docs/cross_platform.md)** - Platform-specific implementation details
+- **[Known Issues](docs/known_issues.md)** - Known bugs and limitations
+- **[Test Suite Documentation](docs/TEST_SUITE.md)** - Test coverage and usage
 
 ## Examples
 

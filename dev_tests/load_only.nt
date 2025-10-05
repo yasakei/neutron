@@ -1,4 +1,0 @@
-use my_utils;
-// If we reach here, use statement worked
-say("Module loaded successfully");
-// Now try to access the variable

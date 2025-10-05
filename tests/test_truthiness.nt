@@ -1,0 +1,81 @@
+// Test truthiness rules
+say("=== Testing Truthiness Rules ===");
+
+// Test 1: nil is falsy
+var nilCheck = false;
+if (nil) {
+    nilCheck = true;
+}
+if (nilCheck == false) {
+    say("✓ nil is falsy");
+} else {
+    say("✗ nil truthiness failed");
+}
+
+// Test 2: false is falsy
+var falseCheck = false;
+if (false) {
+    falseCheck = true;
+}
+if (falseCheck == false) {
+    say("✓ false is falsy");
+} else {
+    say("✗ false truthiness failed");
+}
+
+// Test 3: true is truthy
+var trueCheck = false;
+if (true) {
+    trueCheck = true;
+}
+if (trueCheck == true) {
+    say("✓ true is truthy");
+} else {
+    say("✗ true truthiness failed");
+}
+
+// Test 4: 0 is truthy
+var zeroCheck = false;
+if (0) {
+    zeroCheck = true;
+}
+if (zeroCheck == true) {
+    say("✓ 0 is truthy");
+} else {
+    say("✗ 0 truthiness failed");
+}
+
+// Test 5: Empty string is truthy
+var emptyCheck = false;
+if ("") {
+    emptyCheck = true;
+}
+if (emptyCheck == true) {
+    say("✓ Empty string is truthy");
+} else {
+    say("✗ Empty string truthiness failed");
+}
+
+// Test 6: Non-empty string is truthy
+var stringCheck = false;
+if ("hello") {
+    stringCheck = true;
+}
+if (stringCheck == true) {
+    say("✓ Non-empty string is truthy");
+} else {
+    say("✗ String truthiness failed");
+}
+
+// Test 7: Negative numbers are truthy
+var negCheck = false;
+if (-1) {
+    negCheck = true;
+}
+if (negCheck == true) {
+    say("✓ Negative numbers are truthy");
+} else {
+    say("✗ Negative number truthiness failed");
+}
+
+say("\n=== All truthiness tests passed ===");

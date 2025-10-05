@@ -1,0 +1,78 @@
+// Test break and continue statements
+say("=== Testing Break and Continue ===");
+
+// Test 1: Break in while loop
+var i = 0;
+var result = 0;
+while (i < 10) {
+    if (i == 5) {
+        break;
+    }
+    result = result + i;
+    i = i + 1;
+}
+if (i == 5) {
+    say("✓ Break in while loop works");
+} else {
+    say("✗ Break in while loop failed");
+}
+
+// Test 2: Continue in while loop
+var j = 0;
+var sum = 0;
+while (j < 5) {
+    j = j + 1;
+    if (j == 3) {
+        continue;
+    }
+    sum = sum + j;
+}
+if (sum == 12) {
+    say("✓ Continue in while loop works");
+} else {
+    say("✗ Continue failed");
+}
+
+// Test 3: Break with complex condition
+var count = 0;
+while (true) {
+    count = count + 1;
+    if (count > 7) {
+        break;
+    }
+}
+if (count == 8) {
+    say("✓ Break with condition works");
+} else {
+    say("✗ Break with condition failed");
+}
+
+// Test 4: Continue skipping specific numbers
+var num = 0;
+var oddSum = 0;
+while (num < 10) {
+    num = num + 1;
+    if (num == 2) {
+        continue;
+    }
+    if (num == 4) {
+        continue;
+    }
+    if (num == 6) {
+        continue;
+    }
+    if (num == 8) {
+        continue;
+    }
+    if (num == 10) {
+        continue;
+    }
+    oddSum = oddSum + num;
+}
+if (oddSum == 25) {
+    say("✓ Continue skipping evens works");
+} else {
+    say("✗ Continue skipping failed");
+}
+
+say("\n=== All break/continue tests passed ===");

@@ -5,29 +5,14 @@
 #include "types/json_object.h"
 #include "types/array.h"
 #include "expr.h"
+#include "platform/platform.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
 #include <cstring>
-#include <unistd.h>
-#include <sys/stat.h>
 #include <array>
 #include <memory>
-
-#ifdef _WIN32
-#include <direct.h>
-#include <windows.h>
-#define getcwd _getcwd
-#define chdir _chdir
-#define mkdir(path, mode) _mkdir(path)
-#define rmdir _rmdir
-#define popen _popen
-#define pclose _pclose
-#else
-#include <sys/types.h>
-#include <dirent.h>
-#endif
 
 using namespace neutron;
 
@@ -112,19 +97,9 @@ static Value sys_cp(const std::vector<Value>& args) {
     std::string source = std::get<std::string>(args[0].as);
     std::string destination = std::get<std::string>(args[1].as);
     
-    std::ifstream src(source, std::ios::binary);
-    if (!src.is_open()) {
-        throw std::runtime_error("Failed to open source file: " + source);
+    if (!platform::copyFile(source, destination)) {
+        throw std::runtime_error("Failed to copy file from " + source + " to " + destination);
     }
-    
-    std::ofstream dst(destination, std::ios::binary);
-    if (!dst.is_open()) {
-        throw std::runtime_error("Failed to open destination file: " + destination);
-    }
-    
-    dst << src.rdbuf();
-    src.close();
-    dst.close();
     
     return Value(true);
 }
@@ -140,7 +115,7 @@ static Value sys_mv(const std::vector<Value>& args) {
     std::string source = std::get<std::string>(args[0].as);
     std::string destination = std::get<std::string>(args[1].as);
     
-    if (std::rename(source.c_str(), destination.c_str()) != 0) {
+    if (!platform::moveFile(source, destination)) {
         throw std::runtime_error("Failed to move file from " + source + " to " + destination);
     }
     
@@ -157,16 +132,14 @@ static Value sys_rm(const std::vector<Value>& args) {
     
     std::string filepath = std::get<std::string>(args[0].as);
     
-    if (std::remove(filepath.c_str()) == 0) {
-        return Value(true);
-    } else {
-        // Check if file doesn't exist
-        std::ifstream file(filepath);
-        if (!file.good()) {
+    if (!platform::removeFile(filepath)) {
+        if (!platform::fileExists(filepath)) {
             return Value(false); // File doesn't exist
         }
         throw std::runtime_error("Failed to remove file: " + filepath);
     }
+    
+    return Value(true);
 }
 
 static Value sys_exists(const std::vector<Value>& args) {
@@ -178,14 +151,7 @@ static Value sys_exists(const std::vector<Value>& args) {
     }
     
     std::string path = std::get<std::string>(args[0].as);
-    
-#ifdef _WIN32
-    DWORD attrs = GetFileAttributesA(path.c_str());
-    return Value(attrs != INVALID_FILE_ATTRIBUTES);
-#else
-    struct stat buffer;
-    return Value(stat(path.c_str(), &buffer) == 0);
-#endif
+    return Value(platform::fileExists(path));
 }
 
 // Directory Operations
@@ -200,11 +166,7 @@ static Value sys_mkdir(const std::vector<Value>& args) {
     
     std::string path = std::get<std::string>(args[0].as);
     
-#ifdef _WIN32
-    if (mkdir(path.c_str(), 0755) != 0) {
-#else
-    if (mkdir(path.c_str(), 0755) != 0) {
-#endif
+    if (!platform::createDirectory(path)) {
         throw std::runtime_error("Failed to create directory: " + path);
     }
     
@@ -221,7 +183,7 @@ static Value sys_rmdir(const std::vector<Value>& args) {
     
     std::string path = std::get<std::string>(args[0].as);
     
-    if (rmdir(path.c_str()) != 0) {
+    if (!platform::removeDirectory(path)) {
         throw std::runtime_error("Failed to remove directory: " + path);
     }
     
@@ -235,12 +197,12 @@ static Value sys_cwd(const std::vector<Value>& args) {
         throw std::runtime_error("sys.cwd() expects 0 arguments");
     }
     
-    char buffer[4096];
-    if (getcwd(buffer, sizeof(buffer)) == nullptr) {
+    std::string cwd = platform::getCwd();
+    if (cwd.empty()) {
         throw std::runtime_error("Failed to get current working directory");
     }
     
-    return Value(std::string(buffer));
+    return Value(cwd);
 }
 
 static Value sys_chdir(const std::vector<Value>& args) {
@@ -253,7 +215,7 @@ static Value sys_chdir(const std::vector<Value>& args) {
     
     std::string path = std::get<std::string>(args[0].as);
     
-    if (chdir(path.c_str()) != 0) {
+    if (!platform::setCwd(path)) {
         throw std::runtime_error("Failed to change directory to: " + path);
     }
     
@@ -269,13 +231,13 @@ static Value sys_env(const std::vector<Value>& args) {
     }
     
     std::string varname = std::get<std::string>(args[0].as);
-    const char* value = std::getenv(varname.c_str());
+    std::string value = platform::getEnv(varname);
     
-    if (value == nullptr) {
+    if (value.empty()) {
         return Value(); // Return nil
     }
     
-    return Value(std::string(value));
+    return Value(value);
 }
 
 static Value sys_args(VM& vm, const std::vector<Value>& args) {
@@ -298,33 +260,12 @@ static Value sys_info(const std::vector<Value>& args) {
     
     auto info = new JsonObject();
     
-    // Platform
-#ifdef _WIN32
-    info->properties["platform"] = Value(std::string("windows"));
-#elif __APPLE__
-    info->properties["platform"] = Value(std::string("macos"));
-#elif __linux__
-    info->properties["platform"] = Value(std::string("linux"));
-#else
-    info->properties["platform"] = Value(std::string("unknown"));
-#endif
-    
-    // Architecture
-#if defined(__x86_64__) || defined(_M_X64)
-    info->properties["arch"] = Value(std::string("x64"));
-#elif defined(__i386__) || defined(_M_IX86)
-    info->properties["arch"] = Value(std::string("x86"));
-#elif defined(__aarch64__) || defined(_M_ARM64)
-    info->properties["arch"] = Value(std::string("arm64"));
-#else
-    info->properties["arch"] = Value(std::string("unknown"));
-#endif
-    
-    // Current working directory
-    char buffer[4096];
-    if (getcwd(buffer, sizeof(buffer)) != nullptr) {
-        info->properties["cwd"] = Value(std::string(buffer));
-    }
+    // Use platform abstraction for system info
+    info->properties["platform"] = Value(platform::getPlatform());
+    info->properties["arch"] = Value(platform::getArch());
+    info->properties["user"] = Value(platform::getUsername());
+    info->properties["hostname"] = Value(platform::getHostname());
+    info->properties["cwd"] = Value(platform::getCwd());
     
     return Value(info);
 }
@@ -363,7 +304,7 @@ static Value sys_exit(const std::vector<Value>& args) {
         exit_code = static_cast<int>(std::get<double>(args[0].as));
     }
     
-    std::exit(exit_code);
+    platform::exitProcess(exit_code);
     return Value(); // Never reached
 }
 
@@ -376,20 +317,9 @@ static Value sys_exec(const std::vector<Value>& args) {
     }
     
     std::string command = std::get<std::string>(args[0].as);
-    std::array<char, 128> buffer;
-    std::string result;
+    int exitCode = platform::execute(command);
     
-    FILE* pipe = popen(command.c_str(), "r");
-    if (!pipe) {
-        throw std::runtime_error("Failed to execute command: " + command);
-    }
-    
-    while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
-        result += buffer.data();
-    }
-    
-    pclose(pipe);
-    return Value(result);
+    return Value(static_cast<double>(exitCode));
 }
 
 namespace neutron {

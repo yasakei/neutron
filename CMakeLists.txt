@@ -6,9 +6,18 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Platform detection
+if(WIN32)
+    add_definitions(-DNEUTRON_WINDOWS)
+elseif(APPLE)
+    add_definitions(-DNEUTRON_MACOS)
+elseif(UNIX)
+    add_definitions(-DNEUTRON_LINUX)
+endif()
+
 # Compiler options
 if(MSVC)
-    add_compile_options(/W4)
+    add_compile_options(/W4 /utf-8)
 else()
     add_compile_options(-Wall -Wextra -O2)
 endif()
@@ -42,6 +51,7 @@ set(NEUTRON_CORE_SOURCES
     src/modules/module_loader.cpp
     src/modules/module_registry.cpp
     src/modules/module_utils.cpp
+    src/platform/platform.cpp
 )
 
 # Type sources

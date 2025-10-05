@@ -356,6 +356,12 @@ void Compiler::visitClassStmt(const ClassStmt* stmt) {
             compiler.function->arity_val = funcStmt->params.size();
 
             compiler.beginScope();
+            
+            // Reserve slot 0 for 'this' in class methods
+            Token thisToken(TokenType::THIS, "this", 0);
+            compiler.locals.push_back({thisToken, compiler.scopeDepth});
+            
+            // Add parameters starting at slot 1
             for (const auto& param : funcStmt->params) {
                 compiler.locals.push_back({param, compiler.scopeDepth});
             }

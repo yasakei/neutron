@@ -1,8 +1,0 @@
-class Person {
-    fun say_name() {
-        say("My name is John");
-    }
-}
-
-var p = Person();
-p.say_name();
