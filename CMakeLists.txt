@@ -73,15 +73,25 @@ set(NEUTRON_MODULE_SOURCES
 )
 
 # Create shared runtime library
-add_library(neutron_runtime SHARED
+add_library(neutron_runtime
     ${NEUTRON_CORE_SOURCES}
     ${NEUTRON_TYPE_SOURCES}
     ${NEUTRON_MODULE_SOURCES}
 )
 
+set( DLFCN_WIN "")
+
+if(WIN32)
+    find_package(dlfcn-win32 CONFIG REQUIRED)
+    set( DLFCN_WIN dlfcn-win32::dl)
+    find_package(jsoncpp CONFIG REQUIRED)
+    set( JSONCPP_LIBRARIES JsonCpp::JsonCpp)
+endif()
+
 target_link_libraries(neutron_runtime
     CURL::libcurl
     ${JSONCPP_LIBRARIES}
+    ${DLFCN_WIN}
 )
 
 target_include_directories(neutron_runtime PUBLIC
@@ -123,12 +133,15 @@ install(TARGETS neutron neutron_runtime
     LIBRARY DESTINATION lib
 )
 
+
 # Copy binaries to project root for convenience
-add_custom_command(TARGET neutron POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neutron> ${CMAKE_SOURCE_DIR}/neutron
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neutron_runtime> ${CMAKE_SOURCE_DIR}/libneutron_runtime.so
-    COMMENT "Copying binaries to project root"
-)
+if (NOT WIN32)
+    add_custom_command(TARGET neutron POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neutron> ${CMAKE_SOURCE_DIR}/$<TARGET_FILE_NAME:neutron>
+        # COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neutron_runtime> ${CMAKE_SOURCE_DIR}/libneutron_runtime.so (no need as we compile the runtime as a static lib atm)
+        COMMENT "Copying binaries to project root"
+    )
+endif()
 
 # Optional: Add tests
 enable_testing()

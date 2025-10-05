@@ -224,38 +224,35 @@ cmake --build build -j$(nproc)
 bash run_tests.sh
 ```
 
-### Visual Studio 2019/2022 with vcpkg
+### Visual Studio 2019/2022 with vcpkg [powershell]
 
-```cmd
+```pwsh
 REM 1. Install Visual Studio with C++ Desktop Development workload
 REM    Download from: https://visualstudio.microsoft.com/
 
-REM 2. Install vcpkg
-git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
-cd C:\vcpkg
-bootstrap-vcpkg.bat
-
-REM 3. Install dependencies
-vcpkg install curl:x64-windows jsoncpp:x64-windows
-
-REM 4. Clone Neutron repository
+REM 2. Clone Neutron repository
 git clone https://github.com/yasakei/neutron.git
 cd neutron
 
+REM 3. Install vcpkg
+git submodule add https://github.com/microsoft/vcpkg.git vcpkg
+./vcpkg/bootstrap-vcpkg.bat
+
+REM 4. Install dependencies
+./vcpkg/vcpkg install dlfcn-win32 curl:x64-windows jsoncpp:x64-windows                                
+
+
 REM 5. Generate Visual Studio solution
-cmake -B build -S . ^
-    -G "Visual Studio 17 2022" ^
-    -A x64 ^
-    -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
+cmake --preset winmsvc
 
 REM 6. Build
-cmake --build build --config Release -j
+cmake --build build --config Release
 
 REM 7. Verify
-build\Release\neutron.exe --version
+.\build\Release\neutron.exe --version
 
 REM 8. Run tests (PowerShell)
-powershell -ExecutionPolicy Bypass -File .\run_tests.ps1
+.\run_tests.ps1
 ```
 
 ### MinGW-w64 (Alternative)
