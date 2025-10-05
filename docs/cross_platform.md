@@ -155,22 +155,129 @@ say("Exit code: " + code);
 
 ## Building for Different Platforms
 
-### Linux (tested)
+### Linux
+
+**Ubuntu/Debian:**
 ```bash
-cmake -B build
-cmake --build build
+# Install dependencies
+sudo apt-get update
+sudo apt-get install build-essential cmake pkg-config libcurl4-openssl-dev libjsoncpp-dev
+
+# Build
+cmake -B build -S .
+cmake --build build -j$(nproc)
+
+# Test
+./neutron tests/test_cross_platform.nt
+```
+
+**Fedora/RHEL:**
+```bash
+# Install dependencies
+sudo dnf install gcc-c++ cmake pkgconfig libcurl-devel jsoncpp-devel
+
+# Build
+cmake -B build -S .
+cmake --build build -j$(nproc)
+```
+
+**Arch Linux:**
+```bash
+# Install dependencies
+sudo pacman -S base-devel cmake curl jsoncpp
+
+# Build
+cmake -B build -S .
+cmake --build build -j$(nproc)
 ```
 
 ### Windows
+
+**MSYS2 (Recommended):**
 ```bash
-cmake -B build -G "Visual Studio 17 2022"
+# Install MSYS2 from https://www.msys2.org/
+# Open MSYS2 MINGW64 terminal
+
+# Install dependencies
+pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake \\
+          mingw-w64-x86_64-curl mingw-w64-x86_64-jsoncpp make
+
+# Build
+cmake -B build -S . -G "MSYS Makefiles"
+cmake --build build -j$(nproc)
+
+# Test
+./neutron.exe tests/test_cross_platform.nt
+```
+
+**Visual Studio:**
+```cmd
+REM Install Visual Studio 2017 or later with C++ tools
+REM Install vcpkg: https://github.com/microsoft/vcpkg
+
+REM Install dependencies with vcpkg
+vcpkg install curl jsoncpp --triplet x64-windows
+
+REM Generate Visual Studio solution
+cmake -B build -S . ^
+  -G "Visual Studio 17 2022" ^
+  -DCMAKE_TOOLCHAIN_FILE=[vcpkg-root]/scripts/buildsystems/vcpkg.cmake
+
+REM Build
 cmake --build build --config Release
+
+REM Test
+build\\Release\\neutron.exe tests\\test_cross_platform.nt
+```
+
+**MinGW (Alternative):**
+```cmd
+REM Install MinGW-w64 from https://www.mingw-w64.org/
+
+cmake -B build -S . -G "MinGW Makefiles"
+cmake --build build
 ```
 
 ### macOS
+
+**Using Homebrew:**
 ```bash
-cmake -B build -G Xcode
+# Install Homebrew if not installed: https://brew.sh
+
+# Install dependencies
+brew install cmake curl jsoncpp
+
+# Build
+cmake -B build -S .
+cmake --build build -j$(sysctl -n hw.ncpu)
+
+# Test
+./neutron tests/test_cross_platform.nt
+```
+
+**Using Xcode:**
+```bash
+# Ensure Xcode Command Line Tools are installed
+xcode-select --install
+
+# Generate Xcode project
+cmake -B build -S . -G Xcode
+
+# Build with Xcode
 cmake --build build --config Release
+
+# Or open in Xcode
+open build/neutron.xcodeproj
+```
+
+**For Apple Silicon (M1/M2/M3):**
+```bash
+# Dependencies
+brew install cmake curl jsoncpp
+
+# Build with architecture specification
+cmake -B build -S . -DCMAKE_OSX_ARCHITECTURES=arm64
+cmake --build build -j$(sysctl -n hw.ncpu)
 ```
 
 ## CMake Configuration
