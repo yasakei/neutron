@@ -9,63 +9,6 @@ use math;
 use time;
 
 // ============================================================================
-// CLASSES
-// ============================================================================
-
-class QuizQuestion {
-    var text;
-    var opts;
-    var answer;
-    
-    fun init(t, o, a) {
-        this.text = t;
-        this.opts = o;
-        this.answer = a;
-    }
-    
-    fun show() {
-        say(this.text);
-        var opt1 = this.opts[0];
-        var opt2 = this.opts[1];
-        var opt3 = this.opts[2];
-        var opt4 = this.opts[3];
-        say("  1) " + opt1);
-        say("  2) " + opt2);
-        say("  3) " + opt3);
-        say("  4) " + opt4);
-    }
-    
-    fun isCorrect(userAns) {
-        if (userAns == this.answer) {
-            return true;
-        }
-        return false;
-    }
-}
-
-class Score {
-    var points;
-    var correct;
-    var total;
-    
-    fun init() {
-        this.points = 0;
-        this.correct = 0;
-        this.total = 0;
-    }
-    
-    fun add(pts) {
-        this.points = this.points + pts;
-        this.correct = this.correct + 1;
-        this.total = this.total + 1;
-    }
-    
-    fun miss() {
-        this.total = this.total + 1;
-    }
-}
-
-// ============================================================================
 // DEMONSTRATIONS
 // ============================================================================
 
@@ -266,114 +209,14 @@ sys.rm(testFile);
 say("  File removed");
 
 // ============================================================================
-// QUIZ TIME
+// PROGRAM COMPLETE
 // ============================================================================
 
 say("\n\n============================================================");
-say("  NOW LET'S PLAY THE QUIZ!");
+say("  PROGRAM COMPLETE");
 say("============================================================\n");
 
-var score = Score();
-score.init();
-
-// Question 1
-var q1 = QuizQuestion();
-var opts1 = ["Object-Oriented Programming", "Only One Program", "Output Protocol", "Ordered Process"];
-q1.init("What does OOP stand for?", opts1, 1);
-
-say("\n[Question 1 of 5]");
-q1.show();
-var ans1 = 1;
-say("Your answer: " + ans1);
-if (q1.isCorrect(ans1)) {
-    say("[CORRECT] +10 points\n");
-    score.add(10);
-} else {
-    say("[WRONG]\n");
-    score.miss();
-}
-
-// Question 2
-var q2 = QuizQuestion();
-var opts2 = ["while", "for", "do-while", "infinite"];
-q2.init("Best loop for known iterations?", opts2, 2);
-
-say("\n[Question 2 of 5]");
-q2.show();
-var ans2 = 2;
-say("Your answer: " + ans2);
-if (q2.isCorrect(ans2)) {
-    say("[CORRECT] +10 points\n");
-    score.add(10);
-} else {
-    say("[WRONG]\n");
-    score.miss();
-}
-
-// Question 3
-var q3 = QuizQuestion();
-var opts3 = ["30", "35", "40", "45"];
-q3.init("What is 15 + 25?", opts3, 3);
-
-say("\n[Question 3 of 5]");
-q3.show();
-var ans3 = 3;
-say("Your answer: " + ans3);
-if (q3.isCorrect(ans3)) {
-    say("[CORRECT] +10 points\n");
-    score.add(10);
-} else {
-    say("[WRONG]\n");
-    score.miss();
-}
-
-// Question 4
-var q4 = QuizQuestion();
-var opts4 = ["H2O", "CO2", "O2", "N2"];
-q4.init("Chemical symbol for water?", opts4, 1);
-
-say("\n[Question 4 of 5]");
-q4.show();
-var ans4 = 1;
-say("Your answer: " + ans4);
-if (q4.isCorrect(ans4)) {
-    say("[CORRECT] +10 points\n");
-    score.add(10);
-} else {
-    say("[WRONG]\n");
-    score.miss();
-}
-
-// Question 5
-var q5 = QuizQuestion();
-var opts5 = ["1", "2", "3", "4"];
-q5.init("What is 17 % 5?", opts5, 2);
-
-say("\n[Question 5 of 5]");
-q5.show();
-var ans5 = 2;
-say("Your answer: " + ans5);
-if (q5.isCorrect(ans5)) {
-    say("[CORRECT] +10 points\n");
-    score.add(10);
-} else {
-    say("[WRONG]\n");
-    score.miss();
-}
-
-// RESULTS
-say("\n============================================================");
-say("  QUIZ RESULTS");
-say("============================================================");
-say("Score: " + score.points + " points");
-say("Correct: " + score.correct + " / " + score.total);
-say("============================================================\n");
-
-// Save results
-var results = {"score": score.points, "correct": score.correct, "total": score.total};
-var resultsJson = json.stringify(results);
-sys.write("quiz_results.json", resultsJson);
-say("Results saved to quiz_results.json\n");
+say("This program successfully demonstrated all 21 Neutron features!");
 
 // SUMMARY
 say("============================================================");
