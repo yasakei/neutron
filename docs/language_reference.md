@@ -210,6 +210,49 @@ for (var i = 0; i < 5; i = i + 1) {
 }
 ```
 
+### Match Statements
+
+The `match` statement provides pattern matching for cleaner conditional logic. It evaluates an expression and executes the code block corresponding to the matching case.
+
+```neutron
+var day = 3;
+match (day) {
+    case 1 => say("Monday");
+    case 2 => say("Tuesday");
+    case 3 => say("Wednesday");
+    default => say("Other day");
+}
+```
+
+Match statements can also use block statements:
+
+```neutron
+var status = 2;
+match (status) {
+    case 1 => {
+        say("Status is 1");
+        say("Ready");
+    }
+    case 2 => {
+        say("Status is 2");
+        say("Running");
+    }
+    default => say("Unknown status");
+}
+```
+
+The `default` case is optional. If no case matches and there's no default, execution continues normally.
+
+```neutron
+// Match with strings
+var command = "start";
+match (command) {
+    case "start" => say("Starting...");
+    case "stop" => say("Stopping...");
+    case "restart" => say("Restarting...");
+}
+```
+
 ## Functions
 
 Functions are defined using the `fun` keyword.
@@ -250,6 +293,66 @@ fun print_message(message) {
     }
     say(message);
 }
+```
+
+### Lambda Functions (Anonymous Functions)
+
+Lambda functions allow you to create anonymous functions inline. They are defined using the `fun` keyword with parameters and a body, but without a function name.
+
+```neutron
+// Lambda assigned to a variable
+var add = fun(a, b) {
+    return a + b;
+};
+say(add(5, 3));  // 8
+```
+
+Lambdas with single parameter:
+
+```neutron
+var square = fun(x) {
+    return x * x;
+};
+say(square(4));  // 16
+```
+
+Lambdas with no parameters:
+
+```neutron
+var greet = fun() {
+    return "Hello!";
+};
+say(greet());  // Hello!
+```
+
+Lambdas can be stored in arrays:
+
+```neutron
+var operations = [
+    fun(x) { return x + 10; },
+    fun(x) { return x * 2; },
+    fun(x) { return x * x; }
+];
+say(operations[0](5));  // 15
+say(operations[1](5));  // 10
+say(operations[2](5));  // 25
+```
+
+Lambdas can be passed as arguments:
+
+```neutron
+fun applyTwice(f, value) {
+    return f(f(value));
+}
+var double = fun(x) { return x * 2; };
+say(applyTwice(double, 5));  // 20
+```
+
+Immediately invoked lambdas:
+
+```neutron
+var result = fun(x) { return x + 1; }(5);
+say(result);  // 6
 ```
 
 ## Built-in Functions

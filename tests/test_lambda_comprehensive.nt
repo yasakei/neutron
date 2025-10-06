@@ -1,0 +1,70 @@
+// Comprehensive lambda function tests
+
+say("=== Lambda Function Tests ===");
+
+// Test 1: Basic lambda with two parameters
+say("\n1. Basic lambda with addition:");
+var add = fun(a, b) {
+    return a + b;
+};
+say(add(5, 3));
+
+// Test 2: Lambda with single parameter
+say("\n2. Lambda with square:");
+var square = fun(x) {
+    return x * x;
+};
+say(square(4));
+
+// Test 3: Lambda with no parameters
+say("\n3. Lambda with no parameters:");
+var greet = fun() {
+    return "Hello!";
+};
+say(greet());
+
+// Test 4: Lambda with multiple statements
+say("\n4. Lambda with multiple statements:");
+var compute = fun(x, y) {
+    var sum = x + y;
+    var product = x * y;
+    return sum + product;
+};
+say(compute(3, 4));
+
+// Test 5: Lambdas in array
+say("\n5. Lambdas stored in array:");
+var funcs = [
+    fun(x) { return x + 1; },
+    fun(x) { return x * 2; },
+    fun(x) { return x - 1; }
+];
+say(funcs[0](10));
+say(funcs[1](10));
+say(funcs[2](10));
+
+// Test 6: Lambda passed as argument to function
+say("\n6. Lambda passed to function:");
+fun applyTwice(f, value) {
+    return f(f(value));
+}
+var double = fun(x) { return x * 2; };
+say(applyTwice(double, 5));
+
+// Test 7: Multiple lambdas
+say("\n7. Multiple lambdas with different operations:");
+var operations = [
+    fun(x, y) { return x + y; },
+    fun(x, y) { return x - y; },
+    fun(x, y) { return x * y; }
+];
+say(operations[0](10, 5));
+say(operations[1](10, 5));
+say(operations[2](10, 5));
+
+// Test 8: Immediately invoked lambda
+say("\n8. Immediately invoked lambda:");
+var result = fun(x) { return x + 1; }(5);
+say(result);
+
+say("\n=== All Lambda Tests Passed ===");

@@ -1,5 +1,0 @@
-use sys;
-
-say("What is your name?");
-var name = sys.input();
-say("Hello, " + name + "!");

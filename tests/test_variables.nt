@@ -9,9 +9,9 @@ say("✓ Variable declaration works");
 
 // Test 2: Numbers
 var integer = 42;
-var float = 3.14;
+var decimal = 3.14;
 var negative = -5;
-if (integer == 42 and float == 3.14 and negative == -5) {
+if (integer == 42 and decimal == 3.14 and negative == -5) {
     say("✓ Number types work");
 } else {
     say("✗ Number types failed");

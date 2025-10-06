@@ -16,6 +16,7 @@ enum class OpCode : uint8_t {
     OP_TRUE,
     OP_FALSE,
     OP_POP,
+    OP_DUP,  // Duplicate top of stack
     OP_GET_LOCAL,
     OP_SET_LOCAL,
     OP_GET_GLOBAL,

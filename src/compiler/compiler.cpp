@@ -63,6 +63,7 @@ void Compiler::emitBytes(uint8_t byte1, uint8_t byte2) {
 }
 
 void Compiler::emitReturn() {
+    emitByte((uint8_t)OpCode::OP_NIL);
     emitByte((uint8_t)OpCode::OP_RETURN);
 }
 
@@ -220,8 +221,17 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
             }
         }
 
+        // Perform compile-time type checking if type annotation exists
+        if (stmt->typeAnnotation.has_value() && stmt->initializer) {
+            ValueType exprType = getExpressionType(stmt->initializer.get());
+            if (exprType != ValueType::NIL && !validateType(stmt->typeAnnotation, exprType)) {
+                // Type mismatch warning (we don't throw since this is optional)
+                // In production, you might want to make this configurable
+                // For now, we'll allow it but could log a warning
+            }
+        }
 
-        locals.push_back({stmt->name, scopeDepth});
+        locals.push_back(Local{stmt->name, scopeDepth, stmt->typeAnnotation});
 
         if (stmt->initializer) {
             compileExpression(stmt->initializer.get());
@@ -359,11 +369,11 @@ void Compiler::visitClassStmt(const ClassStmt* stmt) {
             
             // Reserve slot 0 for 'this' in class methods
             Token thisToken(TokenType::THIS, "this", 0);
-            compiler.locals.push_back({thisToken, compiler.scopeDepth});
+            compiler.locals.push_back(Local{thisToken, compiler.scopeDepth, std::nullopt});
             
             // Add parameters starting at slot 1
             for (const auto& param : funcStmt->params) {
-                compiler.locals.push_back({param, compiler.scopeDepth});
+                compiler.locals.push_back(Local{param, compiler.scopeDepth, std::nullopt});
             }
 
             for (const auto& statement : funcStmt->body) {
@@ -405,7 +415,7 @@ void Compiler::visitFunctionStmt(const FunctionStmt* stmt) {
     // Add parameters as local variables
     compiler.beginScope();
     for (const auto& param : stmt->params) {
-        compiler.locals.push_back({param, compiler.scopeDepth});
+        compiler.locals.push_back(Local{param, compiler.scopeDepth, std::nullopt});
     }
 
     // Compile the function body
@@ -529,6 +539,32 @@ void Compiler::visitThisExpr(const ThisExpr* expr) {
     emitByte((uint8_t)OpCode::OP_THIS);
 }
 
+void Compiler::visitFunctionExpr(const FunctionExpr* expr) {
+    // Create a new compiler for the lambda function
+    Compiler compiler(this);
+    compiler.function = new Function(nullptr, std::make_shared<Environment>());
+    compiler.function->chunk = new Chunk();
+    compiler.chunk = compiler.function->chunk;
+    compiler.function->arity_val = expr->params.size();
+    
+    // Add parameters as local variables
+    compiler.beginScope();
+    for (const auto& param : expr->params) {
+        compiler.locals.push_back(Local{param, compiler.scopeDepth, std::nullopt});
+    }
+    
+    // Compile the function body
+    for (const auto& statement : expr->body) {
+        compiler.compileStatement(statement.get());
+    }
+    
+    // Emit return
+    compiler.emitReturn();
+    
+    // Create a closure for the lambda
+    emitBytes((uint8_t)OpCode::OP_CLOSURE, makeConstant(Value(compiler.function)));
+}
+
 void Compiler::visitBreakStmt(const BreakStmt* stmt) {
     if (breakJumps.empty()) {
         throw std::runtime_error("Cannot use 'break' outside of a loop.");
@@ -547,6 +583,207 @@ void Compiler::visitContinueStmt(const ContinueStmt* stmt) {
     // Emit a forward jump to the continue target (end of loop body, before loop back)
     int jump = emitJump((uint8_t)OpCode::OP_JUMP);
     continueJumps.back().push_back(jump);
+}
+
+bool Compiler::validateType(const std::optional<Token>& typeAnnotation, ValueType actualType) {
+    if (!typeAnnotation.has_value()) {
+        return true; // No type annotation means no validation needed
+    }
+    
+    TokenType expectedType = typeAnnotation.value().type;
+    
+    // Map token types to value types
+    switch (expectedType) {
+        case TokenType::TYPE_INT:
+        case TokenType::TYPE_FLOAT:
+            return actualType == ValueType::NUMBER;
+        case TokenType::TYPE_STRING:
+            return actualType == ValueType::STRING;
+        case TokenType::TYPE_BOOL:
+            return actualType == ValueType::BOOLEAN;
+        case TokenType::TYPE_ARRAY:
+            return actualType == ValueType::ARRAY;
+        case TokenType::TYPE_OBJECT:
+            return actualType == ValueType::OBJECT;
+        case TokenType::TYPE_ANY:
+            return true; // 'any' type accepts everything
+        default:
+            return true;
+    }
+}
+
+ValueType Compiler::getExpressionType(const Expr* expr) {
+    // Try to determine the type of an expression at compile time
+    // This is a best-effort analysis - some types can only be known at runtime
+    
+    if (auto* literal = dynamic_cast<const LiteralExpr*>(expr)) {
+        // Map LiteralValueType to ValueType
+        switch (literal->valueType) {
+            case LiteralValueType::NIL:
+                return ValueType::NIL;
+            case LiteralValueType::BOOLEAN:
+                return ValueType::BOOLEAN;
+            case LiteralValueType::NUMBER:
+                return ValueType::NUMBER;
+            case LiteralValueType::STRING:
+                return ValueType::STRING;
+            default:
+                return ValueType::NIL;
+        }
+    }
+    
+    if (auto* binary = dynamic_cast<const BinaryExpr*>(expr)) {
+        // Most binary operations return numbers
+        if (binary->op.type == TokenType::PLUS) {
+            // Could be number or string concatenation
+            ValueType leftType = getExpressionType(binary->left.get());
+            ValueType rightType = getExpressionType(binary->right.get());
+            if (leftType == ValueType::STRING || rightType == ValueType::STRING) {
+                return ValueType::STRING;
+            }
+            return ValueType::NUMBER;
+        }
+        
+        // Comparison operators return boolean
+        if (binary->op.type == TokenType::EQUAL_EQUAL ||
+            binary->op.type == TokenType::BANG_EQUAL ||
+            binary->op.type == TokenType::GREATER ||
+            binary->op.type == TokenType::GREATER_EQUAL ||
+            binary->op.type == TokenType::LESS ||
+            binary->op.type == TokenType::LESS_EQUAL) {
+            return ValueType::BOOLEAN;
+        }
+        
+        return ValueType::NUMBER; // Default for arithmetic
+    }
+    
+    if (auto* unary = dynamic_cast<const UnaryExpr*>(expr)) {
+        if (unary->op.type == TokenType::BANG) {
+            return ValueType::BOOLEAN;
+        }
+        return ValueType::NUMBER; // Minus operator
+    }
+    
+    if (dynamic_cast<const ArrayExpr*>(expr)) {
+        return ValueType::ARRAY;
+    }
+    
+    if (dynamic_cast<const ObjectExpr*>(expr)) {
+        return ValueType::OBJECT;
+    }
+    
+    if (auto* variable = dynamic_cast<const VariableExpr*>(expr)) {
+        // Try to find the variable's declared type
+        int local = resolveLocal(variable->name);
+        if (local != -1 && locals[local].typeAnnotation.has_value()) {
+            Token typeToken = locals[local].typeAnnotation.value();
+            switch (typeToken.type) {
+                case TokenType::TYPE_INT:
+                case TokenType::TYPE_FLOAT:
+                    return ValueType::NUMBER;
+                case TokenType::TYPE_STRING:
+                    return ValueType::STRING;
+                case TokenType::TYPE_BOOL:
+                    return ValueType::BOOLEAN;
+                case TokenType::TYPE_ARRAY:
+                    return ValueType::ARRAY;
+                case TokenType::TYPE_OBJECT:
+                    return ValueType::OBJECT;
+                default:
+                    break;
+            }
+        }
+    }
+    
+    // Unknown type at compile time
+    return ValueType::NIL; // Use NIL as "unknown" marker
+}
+
+void Compiler::visitMatchStmt(const MatchStmt* stmt) {
+    // Compile the match expression
+    compileExpression(stmt->expression.get());
+    
+    std::vector<int> endJumps;  // Track jumps to the end of match statement
+    size_t numCases = stmt->cases.size();
+    
+    // Compile each case
+    for (size_t i = 0; i < numCases; i++) {
+        const MatchCase& matchCase = stmt->cases[i];
+        
+        // Safety checks
+        if (!matchCase.value || !matchCase.action) {
+            throw std::runtime_error("Invalid match case: null value or action");
+        }
+        
+        // Duplicate the match value on stack for comparison
+        emitByte((uint8_t)OpCode::OP_DUP);
+        
+        // Compile the case value
+        compileExpression(matchCase.value.get());
+        
+        // Check if they're equal
+        emitByte((uint8_t)OpCode::OP_EQUAL);
+        
+        // If not equal, jump to next case (OP_JUMP_IF_FALSE pops the comparison result)
+        int skipJump = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE);
+        
+        // Case matched! (comparison result was already popped by JUMP_IF_FALSE)
+        emitByte((uint8_t)OpCode::OP_POP);  // Pop the match value (we're done with it)
+        
+        // Execute the case action
+        compileStatement(matchCase.action.get());
+        
+        // Jump to end after executing case
+        endJumps.push_back(emitJump((uint8_t)OpCode::OP_JUMP));
+        
+        // Patch the skip jump to here (case didn't match, comparison already popped)
+        patchJump(skipJump);
+        // Match value is still on stack for next iteration or cleanup
+    }
+    
+    // At this point, if no case matched, match value is still on stack
+    // Pop it before default case
+    emitByte((uint8_t)OpCode::OP_POP);
+    
+    // Compile default case if present
+    if (stmt->defaultCase) {
+        compileStatement(stmt->defaultCase.get());
+    }
+    
+    // Patch all end jumps to here (after default case)
+    for (size_t i = 0; i < endJumps.size(); i++) {
+        patchJump(endJumps[i]);
+    }
+}
+
+void Compiler::visitTryStmt(const TryStmt* stmt) {
+    // For now, implement a simple version that just executes the try block
+    // Full exception handling would require VM-level support
+    
+    // TODO: Implement proper try-catch with exception handling
+    // This requires adding exception stack to VM and unwinding mechanism
+    
+    // For basic implementation: just execute try block
+    if (stmt->tryBlock) {
+        compileStatement(stmt->tryBlock.get());
+    }
+    
+    // If there's a finally block, always execute it
+    if (stmt->finallyBlock) {
+        compileStatement(stmt->finallyBlock.get());
+    }
+    
+    // Note: Catch block is not yet implemented
+    // Would need runtime exception propagation
+}
+
+void Compiler::visitThrowStmt(const ThrowStmt* stmt) {
+    // Compile the value to throw
+    compileExpression(stmt->value.get());
+    
+    // For now, just error out
+    // TODO: Implement proper exception throwing with VM support
+    throw std::runtime_error("throw statement not yet fully implemented");
 }
 
 } // namespace neutron

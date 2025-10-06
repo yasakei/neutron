@@ -67,6 +67,18 @@ std::unique_ptr<Stmt> Parser::statement() {
         return std::make_unique<ContinueStmt>();
     }
     
+    if (match({TokenType::MATCH})) {
+        return matchStatement();
+    }
+    
+    if (match({TokenType::TRY})) {
+        return tryStatement();
+    }
+    
+    if (match({TokenType::THROW})) {
+        return throwStatement();
+    }
+    
     if (check(TokenType::LEFT_BRACE)) {
         return block();
     }
@@ -89,6 +101,14 @@ std::unique_ptr<Stmt> Parser::expressionStatement() {
 }
 
 std::unique_ptr<Stmt> Parser::varDeclaration() {
+    // Check for optional type annotation
+    std::optional<Token> typeAnnotation = std::nullopt;
+    if (match({TokenType::TYPE_INT, TokenType::TYPE_FLOAT, TokenType::TYPE_STRING, 
+               TokenType::TYPE_BOOL, TokenType::TYPE_ARRAY, TokenType::TYPE_OBJECT, 
+               TokenType::TYPE_ANY})) {
+        typeAnnotation = previous();
+    }
+    
     Token name = consume(TokenType::IDENTIFIER, "Expect variable name.");
     
     std::unique_ptr<Expr> initializer = nullptr;
@@ -97,7 +117,7 @@ std::unique_ptr<Stmt> Parser::varDeclaration() {
     }
     
     consume(TokenType::SEMICOLON, "Expect ';' after variable declaration.");
-    return std::make_unique<VarStmt>(name, std::move(initializer));
+    return std::make_unique<VarStmt>(name, std::move(initializer), typeAnnotation);
 }
 
 std::unique_ptr<Stmt> Parser::ifStatement() {
@@ -417,6 +437,11 @@ std::unique_ptr<Expr> Parser::primary() {
         return objectLiteral();
     }
     
+    // Handle lambda/anonymous functions
+    if (match({TokenType::FUN})) {
+        return lambdaFunction();
+    }
+    
     error(peek(), "Expect expression.");
     return nullptr; // This line should never be reached
 }
@@ -464,6 +489,36 @@ std::unique_ptr<Expr> Parser::objectLiteral() {
     consume(TokenType::RIGHT_BRACE, "Expect '}' after object literal.");
     
     return std::make_unique<ObjectExpr>(std::move(properties));
+}
+
+std::unique_ptr<Expr> Parser::lambdaFunction() {
+    // fun ( params ) { body }
+    consume(TokenType::LEFT_PAREN, "Expect '(' after 'fun' keyword.");
+    
+    std::vector<Token> params;
+    if (!check(TokenType::RIGHT_PAREN)) {
+        do {
+            if (params.size() >= 255) {
+                error(peek(), "Can't have more than 255 parameters.");
+            }
+            
+            Token param = consume(TokenType::IDENTIFIER, "Expect parameter name.");
+            params.push_back(param);
+        } while (match({TokenType::COMMA}));
+    }
+    
+    consume(TokenType::RIGHT_PAREN, "Expect ')' after parameters.");
+    consume(TokenType::LEFT_BRACE, "Expect '{' before lambda body.");
+    
+    // Parse the body statements
+    std::vector<std::unique_ptr<Stmt>> body;
+    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        body.push_back(statement());
+    }
+    
+    consume(TokenType::RIGHT_BRACE, "Expect '}' after lambda body.");
+    
+    return std::make_unique<FunctionExpr>(params, std::move(body));
 }
 
 bool Parser::isAtEnd() {
@@ -685,6 +740,105 @@ void MemberSetExpr::accept(Compiler* compiler) const {
 
 void ThisExpr::accept(Compiler* compiler) const {
     compiler->visitThisExpr(this);
+}
+
+void FunctionExpr::accept(Compiler* compiler) const {
+    compiler->visitFunctionExpr(this);
+}
+
+void MatchStmt::accept(Compiler* compiler) const {
+    compiler->visitMatchStmt(this);
+}
+
+void TryStmt::accept(Compiler* compiler) const {
+    compiler->visitTryStmt(this);
+}
+
+void ThrowStmt::accept(Compiler* compiler) const {
+    compiler->visitThrowStmt(this);
+}
+
+std::unique_ptr<Stmt> Parser::matchStatement() {
+    consume(TokenType::LEFT_PAREN, "Expect '(' after 'match'.");
+    auto expr = expression();
+    consume(TokenType::RIGHT_PAREN, "Expect ')' after match expression.");
+    consume(TokenType::LEFT_BRACE, "Expect '{' before match cases.");
+    
+    std::vector<MatchCase> cases;
+    std::unique_ptr<Stmt> defaultCase = nullptr;
+    
+    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        if (match({TokenType::CASE})) {
+            // Parse case value
+            auto caseValue = expression();
+            consume(TokenType::ARROW, "Expect '=>' after case value.");
+            
+            // Parse case action (can be a block or single statement)
+            std::unique_ptr<Stmt> action;
+            if (check(TokenType::LEFT_BRACE)) {
+                action = block();
+            } else {
+                action = statement();
+            }
+            
+            MatchCase matchCase;
+            matchCase.value = std::move(caseValue);
+            matchCase.action = std::move(action);
+            cases.push_back(std::move(matchCase));
+            
+        } else if (match({TokenType::DEFAULT})) {
+            consume(TokenType::ARROW, "Expect '=>' after 'default'.");
+            
+            // Parse default action
+            if (check(TokenType::LEFT_BRACE)) {
+                defaultCase = block();
+            } else {
+                defaultCase = statement();
+            }
+            break;  // default must be last
+        } else {
+            throw std::runtime_error("Expect 'case' or 'default' in match statement.");
+        }
+    }
+    
+    consume(TokenType::RIGHT_BRACE, "Expect '}' after match cases.");
+    
+    return std::make_unique<MatchStmt>(std::move(expr), std::move(cases), std::move(defaultCase));
+}
+
+std::unique_ptr<Stmt> Parser::tryStatement() {
+    consume(TokenType::LEFT_BRACE, "Expect '{' after 'try'.");
+    auto tryBlock = block();
+    
+    Token catchVar = Token(TokenType::IDENTIFIER, "", current);  // Placeholder
+    std::unique_ptr<Stmt> catchBlock = nullptr;
+    std::unique_ptr<Stmt> finallyBlock = nullptr;
+    
+    if (match({TokenType::CATCH})) {
+        consume(TokenType::LEFT_PAREN, "Expect '(' after 'catch'.");
+        catchVar = consume(TokenType::IDENTIFIER, "Expect exception variable name.");
+        consume(TokenType::RIGHT_PAREN, "Expect ')' after exception variable.");
+        consume(TokenType::LEFT_BRACE, "Expect '{' before catch block.");
+        catchBlock = block();
+    }
+    
+    if (match({TokenType::FINALLY})) {
+        consume(TokenType::LEFT_BRACE, "Expect '{' after 'finally'.");
+        finallyBlock = block();
+    }
+    
+    if (!catchBlock && !finallyBlock) {
+        throw std::runtime_error("Expect 'catch' or 'finally' after try block.");
+    }
+    
+    return std::make_unique<TryStmt>(std::move(tryBlock), catchVar, 
+                                      std::move(catchBlock), std::move(finallyBlock));
+}
+
+std::unique_ptr<Stmt> Parser::throwStatement() {
+    auto value = expression();
+    consume(TokenType::SEMICOLON, "Expect ';' after throw expression.");
+    return std::make_unique<ThrowStmt>(std::move(value));
 }
 
 } // namespace neutron

@@ -266,7 +266,7 @@ int main(int argc, char* argv[]) {
     if (argc > 1) {
         std::string arg = argv[1];
         if (arg == "--version") {
-            std::cout << "Neutron 0.1(Alpha)" << std::endl;
+            std::cout << "Neutron 1.0.2 (Alpha)" << std::endl;
             return 0;
         } else if (arg == "--build-box" && argc > 2) {
                         std::string module_name = argv[2];

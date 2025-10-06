@@ -24,8 +24,24 @@ Scanner::Scanner(const std::string& source)
     keywords["while"] = TokenType::WHILE;
     keywords["break"] = TokenType::BREAK;
     keywords["continue"] = TokenType::CONTINUE;
+    keywords["match"] = TokenType::MATCH;
+    keywords["case"] = TokenType::CASE;
+    keywords["default"] = TokenType::DEFAULT;
+    keywords["try"] = TokenType::TRY;
+    keywords["catch"] = TokenType::CATCH;
+    keywords["finally"] = TokenType::FINALLY;
+    keywords["throw"] = TokenType::THROW;
     keywords["use"] = TokenType::USE;
     keywords["using"] = TokenType::USING;
+    
+    // Type annotations (optional type safety)
+    keywords["int"] = TokenType::TYPE_INT;
+    keywords["float"] = TokenType::TYPE_FLOAT;
+    keywords["string"] = TokenType::TYPE_STRING;
+    keywords["bool"] = TokenType::TYPE_BOOL;
+    keywords["array"] = TokenType::TYPE_ARRAY;
+    keywords["object"] = TokenType::TYPE_OBJECT;
+    keywords["any"] = TokenType::TYPE_ANY;
 }
 
 std::vector<Token> Scanner::scanTokens() {
@@ -60,7 +76,15 @@ void Scanner::scanToken() {
         case '*': addToken(TokenType::STAR); break;
         case '%': addToken(TokenType::PERCENT); break;
         case '!': addToken(match('=') ? TokenType::BANG_EQUAL : TokenType::BANG); break;
-        case '=': addToken(match('=') ? TokenType::EQUAL_EQUAL : TokenType::EQUAL); break;
+        case '=': 
+            if (match('=')) {
+                addToken(TokenType::EQUAL_EQUAL);
+            } else if (match('>')) {
+                addToken(TokenType::ARROW);  // =>
+            } else {
+                addToken(TokenType::EQUAL);
+            }
+            break;
         case '<': addToken(match('=') ? TokenType::LESS_EQUAL : TokenType::LESS); break;
         case '>': addToken(match('=') ? TokenType::GREATER_EQUAL : TokenType::GREATER); break;
         case '/':

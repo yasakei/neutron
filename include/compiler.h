@@ -4,12 +4,14 @@
 #include "bytecode.h"
 #include "expr.h"
 #include "vm.h"
+#include <optional>
 
 namespace neutron {
 
 struct Local {
     Token name;
     int depth;
+    std::optional<Token> typeAnnotation;  // Optional type annotation for this local
 };
 
 class Compiler {
@@ -32,6 +34,8 @@ public:
     void patchJump(int offset);
     void emitLoop(int loopStart);
     int resolveLocal(const Token& name);
+    bool validateType(const std::optional<Token>& typeAnnotation, ValueType actualType);
+    ValueType getExpressionType(const Expr* expr);
 
 public:
     void visitLiteralExpr(const LiteralExpr* expr);

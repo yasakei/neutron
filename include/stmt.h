@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <vector>
+#include <optional>
 #include "token.h"
 #include "expr.h"
 
@@ -20,7 +21,10 @@ enum class StmtType {
     RETURN,
     CLASS,
     BREAK,
-    CONTINUE
+    CONTINUE,
+    MATCH,
+    TRY,
+    THROW
 };
 
 // Base statement class
@@ -59,10 +63,11 @@ public:
 class VarStmt : public Stmt {
 public:
     Token name;
+    std::optional<Token> typeAnnotation;  // Optional type annotation (e.g., int, string, bool)
     std::unique_ptr<Expr> initializer;
     
-    VarStmt(Token name, std::unique_ptr<Expr> initializer)
-        : Stmt(StmtType::VAR), name(name), initializer(std::move(initializer)) {}
+    VarStmt(Token name, std::unique_ptr<Expr> initializer, std::optional<Token> typeAnnotation = std::nullopt)
+        : Stmt(StmtType::VAR), name(name), typeAnnotation(typeAnnotation), initializer(std::move(initializer)) {}
         
     void accept(Compiler* compiler) const override;
 };
@@ -182,6 +187,62 @@ public:
 class ContinueStmt : public Stmt {
 public:
     ContinueStmt() : Stmt(StmtType::CONTINUE) {}
+    
+    void accept(Compiler* compiler) const override;
+};
+
+// Match case clause
+struct MatchCase {
+    std::unique_ptr<Expr> value;  // Case value to match against
+    std::unique_ptr<Stmt> action;  // Statement to execute if matched
+};
+
+// Match statement
+class MatchStmt : public Stmt {
+public:
+    std::unique_ptr<Expr> expression;  // Expression to match
+    std::vector<MatchCase> cases;  // List of cases
+    std::unique_ptr<Stmt> defaultCase;  // Optional default case
+    
+    MatchStmt(std::unique_ptr<Expr> expression, 
+              std::vector<MatchCase> cases,
+              std::unique_ptr<Stmt> defaultCase)
+        : Stmt(StmtType::MATCH), 
+          expression(std::move(expression)),
+          cases(std::move(cases)),
+          defaultCase(std::move(defaultCase)) {}
+    
+    void accept(Compiler* compiler) const override;
+};
+
+// Try-Catch statement
+class TryStmt : public Stmt {
+public:
+    std::unique_ptr<Stmt> tryBlock;  // Try block
+    Token catchVar;  // Exception variable name (optional)
+    std::unique_ptr<Stmt> catchBlock;  // Catch block (optional)
+    std::unique_ptr<Stmt> finallyBlock;  // Finally block (optional)
+    
+    TryStmt(std::unique_ptr<Stmt> tryBlock,
+            Token catchVar,
+            std::unique_ptr<Stmt> catchBlock,
+            std::unique_ptr<Stmt> finallyBlock)
+        : Stmt(StmtType::TRY),
+          tryBlock(std::move(tryBlock)),
+          catchVar(catchVar),
+          catchBlock(std::move(catchBlock)),
+          finallyBlock(std::move(finallyBlock)) {}
+    
+    void accept(Compiler* compiler) const override;
+};
+
+// Throw statement
+class ThrowStmt : public Stmt {
+public:
+    std::unique_ptr<Expr> value;  // Value to throw
+    
+    ThrowStmt(std::unique_ptr<Expr> value)
+        : Stmt(StmtType::THROW), value(std::move(value)) {}
     
     void accept(Compiler* compiler) const override;
 };

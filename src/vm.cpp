@@ -506,6 +506,16 @@ void VM::run(size_t minFrameDepth) {
                 push(constant);
                 break;
             }
+            case (uint8_t)OpCode::OP_CLOSURE: {
+                Value constant = READ_CONSTANT();
+                // The constant should be a Function
+                if (constant.type == ValueType::CALLABLE) {
+                    push(constant);
+                } else {
+                    runtimeError("OP_CLOSURE constant must be a function.");
+                }
+                break;
+            }
             case (uint8_t)OpCode::OP_NIL: {
                 push(Value());
                 break;
@@ -520,6 +530,11 @@ void VM::run(size_t minFrameDepth) {
             }
             case (uint8_t)OpCode::OP_POP: {
                 pop();
+                break;
+            }
+            case (uint8_t)OpCode::OP_DUP: {
+                // Duplicate the value on top of the stack
+                push(stack.back());
                 break;
             }
             case (uint8_t)OpCode::OP_GET_LOCAL: {

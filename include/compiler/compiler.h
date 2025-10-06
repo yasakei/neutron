@@ -4,12 +4,14 @@
 #include "compiler/bytecode.h"
 #include "expr.h"
 #include "vm.h"
+#include <optional>
 
 namespace neutron {
 
 struct Local {
     Token name;
     int depth;
+    std::optional<Token> typeAnnotation;  // Optional type annotation for this local
 };
 
 class Compiler {
@@ -32,6 +34,8 @@ public:
     void patchJump(int offset);
     void emitLoop(int loopStart);
     int resolveLocal(const Token& name);
+    bool validateType(const std::optional<Token>& typeAnnotation, ValueType actualType);
+    ValueType getExpressionType(const Expr* expr);
 
 public:
     void visitLiteralExpr(const LiteralExpr* expr);
@@ -48,6 +52,7 @@ public:
     void visitIndexSetExpr(const IndexSetExpr* expr);
     void visitMemberSetExpr(const MemberSetExpr* expr);
     void visitThisExpr(const ThisExpr* expr);
+    void visitFunctionExpr(const FunctionExpr* expr);
     void visitExpressionStmt(const ExpressionStmt* stmt);
     void visitSayStmt(const SayStmt* stmt);
     void visitVarStmt(const VarStmt* stmt);
@@ -60,6 +65,9 @@ public:
     void visitReturnStmt(const ReturnStmt* stmt);
     void visitBreakStmt(const BreakStmt* stmt);
     void visitContinueStmt(const ContinueStmt* stmt);
+    void visitMatchStmt(const MatchStmt* stmt);
+    void visitTryStmt(const TryStmt* stmt);
+    void visitThrowStmt(const ThrowStmt* stmt);
 
     Compiler* enclosing;
     Function* function;

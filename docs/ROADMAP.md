@@ -148,10 +148,12 @@ arr.find(fun(x) { return x == 3; });    // 3
 
 ## 🔥 High Priority
 
-### 6. Switch/Match Statement
+### 6. Switch/Match Statement ✅ COMPLETED
 **Impact:** Medium  
 **Effort:** High  
 **Description:** Add switch/match statement for cleaner conditional logic.
+
+**Status:** Implemented and tested. See `tests/test_match.nt` for comprehensive tests.
 
 **Example:**
 ```neutron
@@ -169,10 +171,12 @@ match (day) {
 
 ## 💡 Medium Priority
 
-### 7. Try-Catch Error Handling
+### 7. Try-Catch Error Handling ⚠️ PARTIAL
 **Impact:** Medium  
 **Effort:** High  
 **Description:** Add structured exception handling.
+
+**Status:** Tokens and AST infrastructure implemented. Full VM exception handling deferred.
 
 **Example:**
 ```neutron
@@ -194,10 +198,12 @@ try {
 
 ---
 
-### 8. Lambda Functions / Anonymous Functions
+### 8. Lambda Functions / Anonymous Functions ✅ COMPLETED
 **Impact:** Medium  
 **Effort:** Medium  
 **Description:** Support inline function definitions.
+
+**Status:** Fully implemented with OP_CLOSURE bytecode. See `tests/test_lambda_comprehensive.nt` for tests.
 
 **Example:**
 ```neutron

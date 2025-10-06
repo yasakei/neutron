@@ -1,0 +1,123 @@
+// Test Match Statement
+say("=== Match Statement Tests ===");
+
+// Test 1: Basic match with numbers
+say("\n1. Basic match with numbers:");
+var day = 3;
+match (day) {
+    case 1 => say("Monday");
+    case 2 => say("Tuesday");
+    case 3 => say("Wednesday");
+    case 4 => say("Thursday");
+    case 5 => say("Friday");
+    default => say("Weekend!");
+}
+
+// Test 2: Match with expressions
+say("\n2. Match with expressions:");
+var x = 5 + 5;
+match (x) {
+    case 5 => say("Five");
+    case 10 => say("Ten");
+    case 15 => say("Fifteen");
+    default => say("Other number");
+}
+
+// Test 3: Match with strings
+say("\n3. Match with strings:");
+var command = "start";
+match (command) {
+    case "start" => say("Starting...");
+    case "stop" => say("Stopping...");
+    case "pause" => say("Pausing...");
+    default => say("Unknown command");
+}
+
+// Test 4: Match with block statements
+say("\n4. Match with block statements:");
+var status = 2;
+match (status) {
+    case 1 => {
+        say("Status is 1");
+        say("Initializing...");
+    }
+    case 2 => {
+        say("Status is 2");
+        say("Running...");
+    }
+    case 3 => {
+        say("Status is 3");
+        say("Stopping...");
+    }
+    default => {
+        say("Unknown status");
+    }
+}
+
+// Test 5: Match without default
+say("\n5. Match without default:");
+var choice = 1;
+match (choice) {
+    case 1 => say("Choice is 1");
+    case 2 => say("Choice is 2");
+}
+
+// Test 6: Match with variables
+say("\n6. Match with variables:");
+var a = 42;
+var b = 42;
+match (a) {
+    case b => say("Variables match!");
+    default => say("Variables don't match");
+}
+
+// Test 7: Match in a loop
+say("\n7. Match in a loop:");
+for (var i = 1; i <= 5; i = i + 1) {
+    match (i) {
+        case 1 => say("One");
+        case 2 => say("Two");
+        case 3 => say("Three");
+        case 4 => say("Four");
+        case 5 => say("Five");
+    }
+}
+
+// Test 8: Nested match
+say("\n8. Nested match:");
+var outer = 1;
+var inner = 2;
+match (outer) {
+    case 1 => {
+        say("Outer is 1");
+        match (inner) {
+            case 1 => say("  Inner is 1");
+            case 2 => say("  Inner is 2");
+            default => say("  Inner is other");
+        }
+    }
+    case 2 => say("Outer is 2");
+    default => say("Outer is other");
+}
+
+// Test 9: Match with booleans
+say("\n9. Match with booleans:");
+var flag = true;
+match (flag) {
+    case true => say("Flag is true");
+    case false => say("Flag is false");
+}
+
+// Test 10: Match returns work correctly
+say("\n10. Match with variable assignment:");
+var result = 0;
+var value = 2;
+match (value) {
+    case 1 => result = 10;
+    case 2 => result = 20;
+    case 3 => result = 30;
+    default => result = -1;
+}
+say("Result: " + result);
+
+say("\n=== All Match Statement Tests Complete ===");

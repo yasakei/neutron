@@ -29,7 +29,8 @@ enum class ExprType {
     INDEX_GET,
     INDEX_SET,
     MEMBER_SET,
-    THIS
+    THIS,
+    FUNCTION  // Lambda/anonymous function expression
 };
 
 // Literal types
@@ -232,6 +233,18 @@ public:
     
     ThisExpr(Token keyword)
         : Expr(ExprType::THIS), keyword(keyword) {}
+        
+    void accept(Compiler* compiler) const override;
+};
+
+// Function expression (lambda/anonymous function)
+class FunctionExpr : public Expr {
+public:
+    std::vector<Token> params;
+    std::vector<std::unique_ptr<Stmt>> body;
+    
+    FunctionExpr(std::vector<Token> params, std::vector<std::unique_ptr<Stmt>> body)
+        : Expr(ExprType::FUNCTION), params(std::move(params)), body(std::move(body)) {}
         
     void accept(Compiler* compiler) const override;
 };

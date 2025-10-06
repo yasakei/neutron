@@ -38,6 +38,7 @@ private:
     std::unique_ptr<Expr> primary();
     std::unique_ptr<Expr> objectLiteral();
     std::unique_ptr<Expr> arrayLiteral();
+    std::unique_ptr<Expr> lambdaFunction();
     
     std::unique_ptr<Stmt> statement();
     std::unique_ptr<Stmt> sayStatement();
@@ -50,6 +51,9 @@ private:
     std::unique_ptr<Stmt> useStatement();
     std::unique_ptr<Stmt> functionDeclaration();
     std::unique_ptr<Stmt> returnStatement();
+    std::unique_ptr<Stmt> matchStatement();
+    std::unique_ptr<Stmt> tryStatement();
+    std::unique_ptr<Stmt> throwStatement();
     
     std::unique_ptr<Stmt> block();
     

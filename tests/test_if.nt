@@ -1,0 +1,5 @@
+say("Start");
+if (true) {
+    say("Inside if");
+}
+say("End");

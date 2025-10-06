@@ -1,0 +1,80 @@
+// Test Type Annotations
+// This file tests the optional type annotation feature
+
+say("=== Type Annotation Tests ===");
+
+// Test 1: Basic type annotations
+say("\n1. Basic type annotations:");
+var int x = 42;
+say("int x = 42: " + x);
+
+var string name = "Alice";
+say("string name = 'Alice': " + name);
+
+var float pi = 3.14159;
+say("float pi = 3.14159: " + pi);
+
+var bool isActive = true;
+say("bool isActive = true: " + isActive);
+
+// Test 2: Variables without type annotations (backward compatibility)
+say("\n2. Untyped variables (backward compatibility):");
+var y = 100;
+say("var y = 100: " + y);
+
+var message = "Hello, World!";
+say("var message = 'Hello, World!': " + message);
+
+var ratio = 2.5;
+say("var ratio = 2.5: " + ratio);
+
+// Test 3: Reassignment of typed variables
+say("\n3. Reassignment of typed variables:");
+var int counter = 0;
+say("Initial counter: " + counter);
+counter = 10;
+say("After reassignment: " + counter);
+counter = counter + 5;
+say("After increment: " + counter);
+
+// Test 4: Type annotations with arrays
+say("\n4. Type annotations with arrays:");
+var array numbers = [1, 2, 3, 4, 5];
+say("array numbers: " + numbers);
+
+// Test 5: Type annotations with objects
+say("\n5. Type annotations with objects:");
+var object person = {"name": "Bob", "age": 30};
+say("object person: " + person);
+
+// Test 6: any type (accepts anything)
+say("\n6. Any type annotation:");
+var any value = 42;
+say("any value = 42: " + value);
+value = "now a string";
+say("any value = 'now a string': " + value);
+value = true;
+say("any value = true: " + value);
+
+// Test 7: Type annotations in for loops
+say("\n7. Type annotations in loops:");
+for (var int i = 0; i < 5; i = i + 1) {
+    say("Loop iteration " + i);
+}
+
+// Test 8: Multiple declarations
+say("\n8. Multiple typed declarations:");
+var string firstName = "John";
+var string lastName = "Doe";
+var int age = 25;
+var bool isStudent = false;
+say("Name: " + firstName + " " + lastName);
+say("Age: " + age);
+say("Student: " + isStudent);
+
+// Test 9: Uninitialized typed variables
+say("\n9. Uninitialized typed variables:");
+var int uninitialized;
+say("Uninitialized int: " + uninitialized);
+
+say("\n=== All Type Annotation Tests Complete ===");
