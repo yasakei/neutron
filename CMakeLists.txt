@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(Neutron VERSION 1.0.0 LANGUAGES CXX)
+project(Neutron VERSION 1.0.3 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -82,8 +82,16 @@ add_library(neutron_runtime
 set( DLFCN_WIN "")
 
 if(WIN32)
-    find_package(dlfcn-win32 CONFIG REQUIRED)
-    set( DLFCN_WIN dlfcn-win32::dl)
+    # Try to find dlfcn-win32, but do not require it. If it's missing, we'll compile
+    # a small compatibility shim that wraps LoadLibrary/GetProcAddress.
+    find_package(dlfcn-win32 CONFIG)
+    if (dlfcn-win32_FOUND)
+        set( DLFCN_WIN dlfcn-win32::dl)
+    else()
+        message(STATUS "dlfcn-win32 not found; using internal Windows shim for dlopen/dlsym/dlclose")
+        # Add the shim implementation to the runtime sources
+        target_sources(neutron_runtime PRIVATE src/platform/dlfcn_compat_win.cpp)
+    endif()
     find_package(jsoncpp CONFIG REQUIRED)
     set( JSONCPP_LIBRARIES JsonCpp::JsonCpp)
 endif()
@@ -140,6 +148,16 @@ if (NOT WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neutron> ${CMAKE_SOURCE_DIR}/$<TARGET_FILE_NAME:neutron>
         # COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neutron_runtime> ${CMAKE_SOURCE_DIR}/libneutron_runtime.so (no need as we compile the runtime as a static lib atm)
         COMMENT "Copying binaries to project root"
+    )
+elseif(WIN32 AND MINGW)
+    # Copy MinGW runtime DLLs to build directory so the executable works outside MSYS
+    add_custom_command(TARGET neutron POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CXX_COMPILER}/../libgcc_s_seh-1.dll
+            ${CMAKE_CXX_COMPILER}/../libwinpthread-1.dll
+            ${CMAKE_CXX_COMPILER}/../libstdc++-6.dll
+            $<TARGET_FILE_DIR:neutron>
+        COMMENT "Copying MinGW runtime DLLs to build directory"
     )
 endif()
 

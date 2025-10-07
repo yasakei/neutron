@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.3-alpha] - 2025-10-07
+
+### Fixed
+- **Windows MSYS/MinGW Build Support** - Fixed dlfcn-win32 dependency issue
+  - Made `dlfcn-win32` package optional on Windows builds
+  - Added internal Windows compatibility shim for `dlopen`/`dlsym`/`dlclose` 
+  - Shim uses native Windows API (`LoadLibrary`/`GetProcAddress`/`FreeLibrary`)
+  - Automatic fallback when `dlfcn-win32` not found
+  - Files added: `include/cross-platfrom/dlfcn_compat.h`, `src/platform/dlfcn_compat_win.cpp`
+  - Updated `src/vm.cpp` to use compatibility header on Windows
+  
+- **Windows Runtime DLL Dependencies**
+  - MinGW runtime DLLs now automatically copied to build directory
+  - Enables executable to run from PowerShell without MSYS environment
+  - DLLs: `libgcc_s_seh-1.dll`, `libwinpthread-1.dll`, `libstdc++-6.dll`
+
+- **Test Runner Cross-Platform Support**
+  - Updated `run_tests.ps1` to detect executable in multiple locations
+  - Supports both MSYS (`build/`) and MSVC (`build/Release/`) directory structures
+  - Simplified script without color formatting to prevent file corruption issues
+
+### Documentation
+- Updated `docs/BUILD.md` with clarification that `dlfcn-win32` is optional
+- Added notes about automatic MinGW DLL copying for Windows builds
+
+### Build System
+- Updated `CMakeLists.txt` to handle optional `dlfcn-win32` dependency
+- Added post-build command to copy MinGW DLLs on Windows
+- Maintains full Linux and macOS compatibility (no changes to Unix builds)
+
+### Testing
+- All 26 tests passing on Windows MSYS/MinGW64
+
+---
+
 ## [1.0.2-alpha] - 2025-10-06
 
 ### Added

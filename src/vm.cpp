@@ -13,7 +13,11 @@
 #include <iostream>
 #include <stdexcept>
 #include <fstream>
+#if defined(_WIN32) || defined(WIN32)
+#include "cross-platfrom/dlfcn_compat.h"
+#else
 #include <dlfcn.h>
+#endif
 #include <cmath>
 #include <algorithm>
 

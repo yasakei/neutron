@@ -6,8 +6,16 @@ This guide provides comprehensive instructions for building Neutron on all suppo
 - [Prerequisites](#prerequisites)
 - [Linux](#linux)
 - [macOS](#macos)
-- [Windows](#windows)
-- [Build Options](#build-options)
+- [Windows](#wi# 3. Install vcpkg
+git submodule add https://github.com/microsoft/vcpkg.git vcpkg
+./vcpkg/bootstrap-vcpkg.bat
+
+# 4. Install dependencies
+# Note: dlfcn-win32 is optional - Neutron includes a built-in Windows shim
+./vcpkg/vcpkg install curl:x64-windows jsoncpp:x64-windows
+# Optional: ./vcpkg/vcpkg install dlfcn-win32:x64-windows
+
+# 5. Generate Visual Studio solution [Build Options](#build-options)
 - [Troubleshooting](#troubleshooting)
 
 ## Prerequisites
@@ -209,6 +217,9 @@ pacman -S --needed \
     mingw-w64-x86_64-jsoncpp \
     make
 
+# Note: dlfcn-win32 is NOT required - Neutron includes a built-in Windows shim
+# for dlopen/dlsym/dlclose that will be used automatically if dlfcn-win32 is not found
+
 # 5. Clone repository
 git clone https://github.com/yasakei/neutron.git
 cd neutron
@@ -217,11 +228,15 @@ cd neutron
 cmake -B build -S . -G "MSYS Makefiles"
 cmake --build build -j$(nproc)
 
+# MinGW runtime DLLs are automatically copied to the build directory
+# so the executable works from PowerShell or outside the MSYS environment
+
 # 7. Verify
-./neutron.exe --version
+./build/neutron.exe --version
 
 # 8. Run tests
 bash run_tests.sh
+# Or from PowerShell: ./run_tests.ps1
 ```
 
 ### Visual Studio 2019/2022 with vcpkg [powershell]
