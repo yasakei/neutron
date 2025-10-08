@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.4-alpha] - 2025-10-08
 
 ### Added
+- **Centralized Version Management**
+  - New `Version` class in `types/version.h` for centralized version control
+  - Single source of truth for version information across entire project
+  - Version components: MAJOR, MINOR, PATCH, STAGE (e.g., "1.0.4-alpha")
+  - Platform detection: Reports "Linux", "macOS", "Windows MSVC", "Windows MINGW64"
+  - Build date/time tracking via `__DATE__` and `__TIME__` macros
+  - Methods: `getVersion()`, `getFullVersion()`, `getMajorMinorPatch()`, `getPlatform()`, `getBuildDate()`
+
 - **Box Package Manager MINGW64 Support**
   - Added full MSYS2/MINGW64 toolchain support for building native modules on Windows
   - Box now automatically detects MINGW64 environment via `MSYSTEM` variable
@@ -22,18 +30,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Shared Runtime Library**
   - Added `libneutron_runtime.so` (Linux), `libneutron_runtime.dylib` (macOS), `neutron_runtime.dll` (Windows)
   - Static library (`libneutron_runtime.a`) still built for executable linking
-  - Shared library with proper versioning (SOVERSION 1, VERSION 1.0.3)
+  - Shared library with proper versioning (SOVERSION 1, VERSION 1.0.4)
   - Both libraries built from same source with appropriate flags
   - Enables third-party module developers to link against Neutron runtime
 
 ### Changed
+- **Version Information Display**
+  - `--version` flag now shows detailed version with platform and build date
+  - Added `-v` as shorthand for `--version`
+  - REPL startup now displays: version, platform, and helpful instructions
+  - All version strings now sourced from centralized `Version` class
+  - CMakeLists.txt project version updated to 1.0.4
+  - Shared library version updated to 1.0.4
+
 - **Box Builder Architecture**
   - `getCompiler()` now checks `MSYSTEM` environment variable
   - `getLinkerFlags()` returns compiler-appropriate flags
   - `generateBuildCommand()` generates correct commands for MSVC or GCC
   - `findNeutronDir()` searches MINGW64 paths when in MINGW environment
 
+- **Binary Conversion (-b) Cross-Platform Support**
+  - Binary conversion now works on Windows (MSVC + MINGW64), macOS, and Linux
+  - Automatically detects platform and selects appropriate compiler (MSVC/GCC/Clang)
+  - Uses correct object file extensions (`.obj` for MSVC, `.o` for GCC)
+  - Applies platform-specific flags: `/EHsc /W4` (MSVC), `-Wall -Wextra` (GCC)
+  - Links with static runtime library instead of individual object files
+  - Automatically adds `.exe` extension on Windows
+  - Proper include paths in generated code (`compiler/scanner.h` vs `scanner.h`)
+  - macOS support includes CoreFoundation framework
+  - Native module compilation within binary conversion respects platform
+
 ### Fixed
+- **Build Warnings**
+  - Fixed unused parameter warnings in `Compiler::visitThisExpr()`, `Compiler::visitBreakStmt()`, `Compiler::visitContinueStmt()`
+  - Fixed unused parameter warnings in `Class::call()` for VM and arguments
+  - Fixed macro redefinition warning for `PLATFORM_LINUX` in Box (now checks if already defined)
+  - Clean build with zero warnings on GCC 15.2.1
+
 - **REPL Error Handling**
   - REPL no longer crashes on syntax errors (e.g., unterminated strings)
   - Errors are caught and displayed gracefully: `Error: <message>`

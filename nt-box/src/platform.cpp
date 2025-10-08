@@ -1,11 +1,18 @@
 #include "platform.h"
 
+// Platform detection macros (only define if not already defined)
 #ifdef _WIN32
+    #ifndef PLATFORM_WINDOWS
     #define PLATFORM_WINDOWS
+    #endif
 #elif defined(__APPLE__) && defined(__MACH__)
+    #ifndef PLATFORM_MACOS
     #define PLATFORM_MACOS
+    #endif
 #elif defined(__linux__)
+    #ifndef PLATFORM_LINUX
     #define PLATFORM_LINUX
+    #endif
 #endif
 
 namespace box {

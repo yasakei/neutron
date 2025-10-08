@@ -11,6 +11,7 @@
 #include "compiler/compiler.h"
 #include "compiler/bytecode.h"
 #include "modules/module_loader.h"
+#include "types/version.h"
 
 void run(const std::string& source, neutron::VM& vm);
 void runFile(const std::string& path, neutron::VM& vm);
@@ -59,7 +60,10 @@ void runFile(const std::string& path, neutron::VM& vm) {
 
 void runPrompt(neutron::VM& vm) {
     std::string line;
-    std::cout << "Neutron REPL (Press Ctrl+C to exit)" << std::endl;
+    std::cout << "Neutron " << neutron::Version::getVersion() << " REPL" << std::endl;
+    std::cout << "Platform: " << neutron::Version::getPlatform() << std::endl;
+    std::cout << "Type Ctrl+C to exit" << std::endl;
+    std::cout << std::endl;
     
     while (true) {
         std::cout << "> ";
@@ -75,8 +79,28 @@ void runPrompt(neutron::VM& vm) {
 }
 
 void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& outputPath, const std::string& sourcePath) {
+    // Detect platform
+#if defined(_WIN32)
+    bool isWindows = true;
+    bool isMingw = (std::getenv("MSYSTEM") != nullptr);
+#elif defined(__APPLE__)
+    bool isWindows = false;
+    bool isMingw = false;
+    bool isMacOS = true;
+#else
+    bool isWindows = false;
+    bool isMingw = false;
+    bool isMacOS = false;
+#endif
+
+    // Adjust output path extension based on platform
+    std::string finalOutputPath = outputPath;
+    if (isWindows && finalOutputPath.find(".exe") == std::string::npos) {
+        finalOutputPath += ".exe";
+    }
+
     // Create a C++ source file with embedded source code
-    std::string executableSourcePath = outputPath + "_main.cpp";
+    std::string executableSourcePath = finalOutputPath + "_main.cpp";
     std::ofstream executableFile(executableSourcePath);
     
     if (!executableFile.is_open()) {
@@ -89,10 +113,11 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
     executableFile << "#include <string>\n";
     executableFile << "#include <vector>\n";
     executableFile << "#include <map>\n";
-    executableFile << "#include \"scanner.h\"\n";
-    executableFile << "#include \"parser.h\"\n";
+    executableFile << "#include \"compiler/scanner.h\"\n";
+    executableFile << "#include \"compiler/parser.h\"\n";
     executableFile << "#include \"vm.h\"\n";
-    executableFile << "#include \"compiler.h\"\n\n";
+    executableFile << "#include \"compiler/compiler.h\"\n";
+    executableFile << "#include \"modules/module_loader.h\"\n\n";
     
     // Get used modules
     std::vector<std::string> usedModules = neutron::getUsedModules(sourceCode);
@@ -192,13 +217,52 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
     
     executableFile.close();
     
+    // Determine compiler and flags based on platform
+    std::string compiler, objExt, mkdirCmd, linkFlags, picFlag;
+    
+    if (isWindows && !isMingw) {
+        // MSVC
+        compiler = "cl";
+        objExt = ".obj";
+        mkdirCmd = "if not exist build\\box mkdir build\\box";
+        linkFlags = "/link /LIBPATH:build CURL::libcurl.lib JsonCpp::JsonCpp.lib";
+        picFlag = "";
+    } else if (isWindows && isMingw) {
+        // MINGW64
+        compiler = "g++";
+        objExt = ".o";
+        mkdirCmd = "mkdir -p build/box";
+        linkFlags = "-lcurl -ljsoncpp";
+        picFlag = "-fPIC";
+    } else {
+        // Linux/macOS
+        compiler = "g++";
+        objExt = ".o";
+        mkdirCmd = "mkdir -p build/box";
+        if (isMacOS) {
+            linkFlags = "-lcurl -ljsoncpp -framework CoreFoundation";
+        } else {
+            linkFlags = "-lcurl -ljsoncpp -ldl";
+        }
+        picFlag = "-fPIC";
+    }
+    
     // Build native modules if needed and prepare the compilation command
-    std::string compileCommand = "g++ -std=c++17 -Wall -Wextra -O2 -Iinclude -I. -Ilibs/json -Ilibs/http -Ilibs/time -Ilibs/sys -Ibox -Ilibs/websocket " +
-                                executableSourcePath + " " +
-                                "build/parser.o build/scanner.o build/capi.o build/runtime.o build/module_utils.o " +
-                                "build/bytecode.o build/debug.o build/compiler.o build/vm.o build/token.o build/module_registry.o " +
-                                "build/sys/native.o build/convert/native.o build/json/native.o build/math/native.o " +
-                                "build/http/native.o build/time/native.o build/module_loader.o ";
+    std::string compileCommand;
+    
+    if (isWindows && !isMingw) {
+        // MSVC compile command
+        compileCommand = compiler + " /std:c++17 /EHsc /W4 /O2 /I include /I . /I libs " +
+                        executableSourcePath + " ";
+        // Link with static library instead of individual object files on Windows
+        compileCommand += "build/neutron_runtime.lib ";
+    } else {
+        // GCC/Clang compile command
+        compileCommand = compiler + " -std=c++17 -Wall -Wextra -O2 -Iinclude -I. -Ilibs " +
+                        executableSourcePath + " ";
+        // Link with static library
+        compileCommand += "build/libneutron_runtime.a ";
+    }
     
     // Check for and compile native modules that are used
     for (const auto& moduleName : usedModules) {
@@ -207,14 +271,21 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
         
         if (std::ifstream(nativeCppPath).good()) {
             // Compile native.cpp for this module
-            std::string moduleObj = "build/box/" + moduleName + ".o";
+            std::string moduleObj = "build/box/" + moduleName + objExt;
             
             // Create the build directory if it doesn't exist
-            system("mkdir -p build/box");
+            system(mkdirCmd.c_str());
             
             // Compile the native module to an object file
-            std::string objCmd = "g++ -std=c++17 -Wall -Wextra -O2 -fPIC -Iinclude -I. -Ilibs -Ibox -c " +
-                                nativeCppPath + " -o " + moduleObj;
+            std::string objCmd;
+            if (isWindows && !isMingw) {
+                objCmd = compiler + " /std:c++17 /EHsc /W4 /O2 /I include /I . /I libs /I box /c " +
+                        nativeCppPath + " /Fo:" + moduleObj;
+            } else {
+                objCmd = compiler + " -std=c++17 -Wall -Wextra -O2 " + picFlag + " -Iinclude -I. -Ilibs -Ibox -c " +
+                        nativeCppPath + " -o " + moduleObj;
+            }
+            
             int objResult = system(objCmd.c_str());
             if (objResult == 0) {
                 compileCommand += moduleObj + " ";
@@ -225,14 +296,21 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
             }
         } else if (std::ifstream(nativeCPath).good()) {
             // Compile native.c for this module
-            std::string moduleObj = "build/box/" + moduleName + ".o";
+            std::string moduleObj = "build/box/" + moduleName + objExt;
             
             // Create the build directory if it doesn't exist
-            system("mkdir -p build/box");
+            system(mkdirCmd.c_str());
             
             // Compile the native module to an object file
-            std::string objCmd = "g++ -std=c++17 -Wall -Wextra -O2 -fPIC -Iinclude -I. -Ilibs -Ibox -c " +
-                                nativeCPath + " -o " + moduleObj;
+            std::string objCmd;
+            if (isWindows && !isMingw) {
+                objCmd = compiler + " /std:c++17 /EHsc /W4 /O2 /I include /I . /I libs /I box /c " +
+                        nativeCPath + " /Fo:" + moduleObj;
+            } else {
+                objCmd = compiler + " -std=c++17 -Wall -Wextra -O2 " + picFlag + " -Iinclude -I. -Ilibs -Ibox -c " +
+                        nativeCPath + " -o " + moduleObj;
+            }
+            
             int objResult = system(objCmd.c_str());
             if (objResult == 0) {
                 compileCommand += moduleObj + " ";
@@ -244,21 +322,28 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
         }
     }
     
-    compileCommand += "-lcurl -ljsoncpp -o " + outputPath;
+    // Add output and link flags
+    if (isWindows && !isMingw) {
+        compileCommand += "/Fe:" + finalOutputPath + " " + linkFlags;
+    } else {
+        compileCommand += linkFlags + " -o " + finalOutputPath;
+    }
     
-    std::cout << "Compiling to executable: " << outputPath << std::endl;
+    std::cout << "Compiling to executable: " << finalOutputPath << std::endl;
     int result = system(compileCommand.c_str());
     
     // Clean up the temporary source file
     std::remove(executableSourcePath.c_str());
     
     if (result == 0) {
-        std::cout << "Executable created: " << outputPath << std::endl;
-        // Make the file executable
-        std::string chmodCommand = "chmod +x " + outputPath;
+        std::cout << "Executable created: " << finalOutputPath << std::endl;
+        // Make the file executable on Unix systems
+#ifndef _WIN32
+        std::string chmodCommand = "chmod +x " + finalOutputPath;
         if (system(chmodCommand.c_str()) != 0) {
             std::cerr << "Failed to make file executable" << std::endl;
         }
+#endif
     } else {
         std::cerr << "Failed to create executable" << std::endl;
         exit(1);
@@ -269,8 +354,9 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
 int main(int argc, char* argv[]) {
     if (argc > 1) {
         std::string arg = argv[1];
-        if (arg == "--version") {
-            std::cout << "Neutron 1.0.3 (Alpha)" << std::endl;
+        if (arg == "--version" || arg == "-v") {
+            std::cout << neutron::Version::getFullVersion() << std::endl;
+            std::cout << "Build: " << neutron::Version::getBuildDate() << std::endl;
             return 0;
         } else if (arg == "--build-box" && argc > 2) {
                         std::string module_name = argv[2];

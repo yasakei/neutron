@@ -65,6 +65,8 @@ int Class::arity() {
 }
 
 Value Class::call(VM& vm, std::vector<Value> arguments) {
+    (void)vm; // Unused parameter
+    (void)arguments; // Unused parameter
     // Create a new instance of this class
     Instance* instance = new Instance(this);
     return Value(instance);

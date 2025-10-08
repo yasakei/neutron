@@ -534,6 +534,7 @@ void Compiler::visitObjectExpr(const ObjectExpr* expr) {
 }
 
 void Compiler::visitThisExpr(const ThisExpr* expr) {
+    (void)expr; // Unused parameter
     // In class methods, 'this' refers to the current instance
     // We'll emit an OP_THIS instruction to load the current instance
     emitByte((uint8_t)OpCode::OP_THIS);
@@ -566,6 +567,7 @@ void Compiler::visitFunctionExpr(const FunctionExpr* expr) {
 }
 
 void Compiler::visitBreakStmt(const BreakStmt* stmt) {
+    (void)stmt; // Unused parameter
     if (breakJumps.empty()) {
         throw std::runtime_error("Cannot use 'break' outside of a loop.");
     }
@@ -576,6 +578,7 @@ void Compiler::visitBreakStmt(const BreakStmt* stmt) {
 }
 
 void Compiler::visitContinueStmt(const ContinueStmt* stmt) {
+    (void)stmt; // Unused parameter
     if (continueJumps.empty()) {
         throw std::runtime_error("Cannot use 'continue' outside of a loop.");
     }

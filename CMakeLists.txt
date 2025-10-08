@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(Neutron VERSION 1.0.3 LANGUAGES CXX)
+project(Neutron VERSION 1.0.4 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -59,6 +59,7 @@ set(NEUTRON_TYPE_SOURCES
     src/types/json_object.cpp
     src/types/json_array.cpp
     src/types/return.cpp
+    src/types/version.cpp
 )
 
 # Module sources
@@ -156,7 +157,7 @@ if(UNIX AND NOT APPLE)
         ENABLE_EXPORTS ON
     )
     set_target_properties(neutron_runtime_shared PROPERTIES
-        VERSION 1.0.3
+        VERSION 1.0.4
         SOVERSION 1
     )
 elseif(APPLE)
@@ -167,7 +168,7 @@ elseif(APPLE)
         INSTALL_RPATH "@executable_path"
     )
     set_target_properties(neutron_runtime_shared PROPERTIES
-        VERSION 1.0.3
+        VERSION 1.0.4
         SOVERSION 1
     )
 elseif(WIN32)

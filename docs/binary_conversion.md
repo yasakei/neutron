@@ -490,10 +490,82 @@ myapp/
 
 ### Cross-Platform Considerations
 
-- Binaries are platform-specific (Linux, macOS, Windows)
-- Compile on target platform or use cross-compilation
-- Native modules (`.so`) are also platform-specific
-- Test on target systems before distribution
+Binary conversion is fully cross-platform and automatically adapts to your build environment:
+
+#### Supported Platforms
+
+| Platform | Compiler | Object Extension | Output Extension | Link Flags |
+|----------|----------|------------------|------------------|------------|
+| **Linux** | GCC/Clang | `.o` | (none) | `-lcurl -ljsoncpp -ldl` |
+| **macOS** | Clang/GCC | `.o` | (none) | `-lcurl -ljsoncpp -framework CoreFoundation` |
+| **Windows (MSVC)** | `cl.exe` | `.obj` | `.exe` | `/link CURL::libcurl.lib JsonCpp::JsonCpp.lib` |
+| **Windows (MINGW64)** | `g++` | `.o` | `.exe` | `-lcurl -ljsoncpp` |
+
+#### Platform Detection
+
+The binary converter automatically:
+
+1. **Detects the platform** using C++ preprocessor macros:
+   - `_WIN32` for Windows (MSVC or MINGW64)
+   - `__APPLE__` for macOS
+   - Otherwise assumes Linux
+
+2. **Detects MINGW64** on Windows via `MSYSTEM` environment variable
+
+3. **Selects the appropriate compiler**:
+   - Windows: MSVC (`cl`) or MINGW64 (`g++`)
+   - macOS: Clang (`clang++`) or GCC (`g++`)
+   - Linux: GCC (`g++`) or Clang (`clang++`)
+
+4. **Uses platform-specific flags**:
+   - MSVC: `/std:c++17 /EHsc /W4 /O2`
+   - GCC/Clang: `-std=c++17 -Wall -Wextra -O2`
+
+5. **Applies correct file extensions**:
+   - Windows automatically adds `.exe` if missing
+   - Unix systems don't add extensions
+
+#### Building for Multiple Platforms
+
+To create executables for multiple platforms, compile on each target platform:
+
+**Linux:**
+```bash
+./neutron -b myapp.nt myapp
+# Creates: myapp (Linux x86_64 ELF)
+```
+
+**macOS:**
+```bash
+./neutron -b myapp.nt myapp
+# Creates: myapp (macOS Mach-O)
+```
+
+**Windows (MSVC):**
+```cmd
+neutron.exe -b myapp.nt myapp
+REM Creates: myapp.exe (Windows PE with MSVC runtime)
+```
+
+**Windows (MINGW64):**
+```bash
+./neutron -b myapp.nt myapp
+# Creates: myapp.exe (Windows PE with MinGW runtime)
+```
+
+#### Native Module Compatibility
+
+- **Native modules** (`.so`/`.dll`/`.dylib`) are platform-specific
+- Must compile native modules for each target platform
+- Use Box Package Manager's cross-platform build support
+- Ensure native modules are available in the same directory structure on target systems
+
+#### Cross-Compilation Limitations
+
+- Binary conversion requires compiling on the target platform or using cross-compilation toolchains
+- Native modules must be available for the target platform
+- The Neutron runtime library (`libneutron_runtime.a`) must exist for the target platform
+- Test thoroughly on target systems before distribution
 
 ## Troubleshooting
 
