@@ -26,7 +26,6 @@ endif()
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/libs
-    ${CMAKE_SOURCE_DIR}/box
 )
 
 # Find required packages

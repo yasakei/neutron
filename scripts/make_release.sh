@@ -30,9 +30,10 @@ detect_os() {
 
 # Get version from CHANGELOG.md
 get_version() {
-    local version=$(grep -m 1 "^## v" CHANGELOG.md | sed 's/## v\([0-9.]*\).*/\1/')
+    local version=$(grep -m 1 "^## \[" CHANGELOG.md | sed 's/## \[\([^]]*\)\].*/\1/')
     if [ -z "$version" ]; then
         print_msg "Could not extract version from CHANGELOG.md" "$RED"
+        print_msg "Expected format: ## [1.0.4-alpha] - YYYY-MM-DD" "$YELLOW"
         exit 1
     fi
     echo "$version"
