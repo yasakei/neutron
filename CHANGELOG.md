@@ -19,12 +19,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Skips `-rpath` flag on Windows (not supported by MINGW64)
   - Enables Windows module development without Visual Studio
 
+- **Shared Runtime Library**
+  - Added `libneutron_runtime.so` (Linux), `libneutron_runtime.dylib` (macOS), `neutron_runtime.dll` (Windows)
+  - Static library (`libneutron_runtime.a`) still built for executable linking
+  - Shared library with proper versioning (SOVERSION 1, VERSION 1.0.3)
+  - Both libraries built from same source with appropriate flags
+  - Enables third-party module developers to link against Neutron runtime
+
 ### Changed
 - **Box Builder Architecture**
   - `getCompiler()` now checks `MSYSTEM` environment variable
   - `getLinkerFlags()` returns compiler-appropriate flags
   - `generateBuildCommand()` generates correct commands for MSVC or GCC
   - `findNeutronDir()` searches MINGW64 paths when in MINGW environment
+
+### Fixed
+- **REPL Error Handling**
+  - REPL no longer crashes on syntax errors (e.g., unterminated strings)
+  - Errors are caught and displayed gracefully: `Error: <message>`
+  - User can continue using REPL after errors
+  - Fixes crash with signal: `IOT instruction (core dumped)`
 
 ### Documentation
 - **New Documentation Files**

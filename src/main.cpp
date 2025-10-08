@@ -66,7 +66,11 @@ void runPrompt(neutron::VM& vm) {
         if (!std::getline(std::cin, line)) {
             break;
         }
-        run(line, vm);
+        try {
+            run(line, vm);
+        } catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+        }
     }
 }
 
