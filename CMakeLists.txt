@@ -115,14 +115,22 @@ set_target_properties(neutron_runtime PROPERTIES
 # Create executable
 add_executable(neutron src/main.cpp)
 
-target_link_libraries(neutron neutron_runtime)
+# Link with whole-archive to ensure C API symbols are included
+if(UNIX)
+    target_link_libraries(neutron -Wl,--whole-archive neutron_runtime -Wl,--no-whole-archive)
+else()
+    target_link_libraries(neutron neutron_runtime)
+endif()
 
 # Platform-specific settings
 if(UNIX AND NOT APPLE)
     target_link_libraries(neutron_runtime dl)
+    # Export symbols from the executable so modules can access C API functions
+    target_link_options(neutron PRIVATE "-Wl,--export-dynamic")
     set_target_properties(neutron PROPERTIES
         BUILD_RPATH "$ORIGIN"
         INSTALL_RPATH "$ORIGIN"
+        ENABLE_EXPORTS ON
     )
 elseif(APPLE)
     target_link_libraries(neutron_runtime "-framework CoreFoundation")

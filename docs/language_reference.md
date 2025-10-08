@@ -491,7 +491,7 @@ say(greet("World"));
 Files are searched in the following order:
 1. Current directory (`.`)
 2. `lib/` directory
-3. `box/` directory
+3. `.box/modules/` directory (for installed modules)
 
 **Example:**
 
@@ -902,7 +902,7 @@ for (var j = 10; j > 0; j = j - 1) {
 Neutron supports two types of modules:
 
 1. **Neutron Modules** (`.nt` files): Written in Neutron language
-2. **Native Modules** (`.so` files): Written in C++ for performance or system integration
+2. **Native Modules** (`.so`/`.dll`/`.dylib` files): Written in C++ for performance or system integration
 
 ```neutron
 // Import built-in modules
@@ -913,9 +913,27 @@ use math;
 // Import custom Neutron modules
 use mymodule;  // Loads mymodule.nt
 
-// Import native modules (automatically loads .so files)
-use custom_extension;  // Loads custom_extension.so from box/ directory
+// Import native modules from Box
+use base64;     // Loads from .box/modules/base64/
+use websocket;  // Loads from .box/modules/websocket/
 ```
+
+**Managing Native Modules:**
+
+Use the Box package manager to install and manage native modules:
+
+```sh
+box install base64     # Install from NUR
+box list              # List installed modules
+box remove base64     # Remove a module
+```
+
+**Creating Native Modules:**
+
+See the comprehensive Box documentation:
+- [Module Development Guide](../nt-box/docs/MODULE_DEVELOPMENT.md)
+- [Box Commands](../nt-box/docs/COMMANDS.md)
+- [Cross-Platform Guide](../nt-box/docs/CROSS_PLATFORM.md)
 
 ### Binary Compilation
 

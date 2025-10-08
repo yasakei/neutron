@@ -46,6 +46,8 @@ static NeutronValue* to_c_value(neutron::Value* value) {
 
 // --- Value Management ---
 
+extern "C" {
+
 NeutronType neutron_get_type(NeutronValue* value) {
     switch (to_cpp_value(value)->type) {
         case neutron::ValueType::NIL: return NEUTRON_NIL;
@@ -108,3 +110,5 @@ void neutron_define_native(NeutronVM* vm, const char* name, NeutronNativeFn func
     neutron::VM* cpp_vm = reinterpret_cast<neutron::VM*>(vm);
     cpp_vm->define_native(name, new CNativeFn(function, arity));
 }
+
+} // extern "C"

@@ -14,6 +14,7 @@ Neutron is a simple, modern, and lightweight interpreted programming language wr
 - **Dynamically Typed:** No need to declare the type of a variable.
 - **C-like Syntax:** Familiar syntax for developers who have used C, C++, Java, or JavaScript.
 - **Rich Standard Library:** A comprehensive standard library with modules for math, system operations, HTTP client, JSON processing, time operations, and data conversion.
+- **📦 Box Package Manager:** Install and manage native modules with ease.
 - **Object-Oriented:** Supports classes, methods, and the `this` keyword.
 - **Built-in Functions:** A set of useful built-in functions for string manipulation, type conversion, and console output.
 - **Modular:** Supports both native C++ modules and Neutron language modules for organizing code.
@@ -86,6 +87,63 @@ Neutron supports converting scripts to standalone executables:
 ```
 
 See [Binary Conversion Documentation](docs/binary_conversion.md) for detailed information.
+
+## 📦 Box Package Manager
+
+Box is Neutron's official package manager for installing and managing native modules. It provides seamless cross-platform support and integrates with the Neutron Universe Registry (NUR).
+
+### Quick Start
+
+```sh
+# Install Box (from nt-box directory)
+cmake -B build && cmake --build build
+sudo cmake --install build
+
+# Install a module
+box install base64
+
+# Use the module in your code
+use base64;
+say(base64.encode("Hello, World!"));
+```
+
+### Features
+
+- **Cross-Platform:** Supports Linux (GCC/Clang), macOS (Clang), Windows (MSVC/MINGW64)
+- **Automatic Compiler Detection:** Detects and uses appropriate compiler for your platform
+- **Version Management:** Install specific module versions with `module@version` syntax
+- **Local Installation:** Modules install to `.box/modules/` in your project directory
+- **NUR Integration:** Access modules from the Neutron Universe Registry
+- **Native Module Building:** Build C++ modules with automatic platform-specific flags
+
+### Available Commands
+
+```sh
+box install <module>[@version]  # Install a module
+box list                        # List installed modules
+box search [query]              # Search available modules
+box remove <module>             # Remove a module
+box build                       # Build a native module
+box info <module>               # Show module information
+```
+
+### Documentation
+
+Complete Box documentation is available in the `nt-box/docs/` directory:
+
+- **[Box Guide](nt-box/docs/BOX_GUIDE.md)** - Comprehensive usage guide
+- **[Commands Reference](nt-box/docs/COMMANDS.md)** - Detailed command documentation
+- **[Module Development](nt-box/docs/MODULE_DEVELOPMENT.md)** - Creating native modules with C API
+- **[Cross-Platform Guide](nt-box/docs/CROSS_PLATFORM.md)** - Platform-specific build notes
+- **[MINGW64 Support](nt-box/docs/MINGW64_SUPPORT.md)** - Building with GCC on Windows
+
+### Supported Platforms
+
+| Platform | Compilers | Library Extension |
+|----------|-----------|-------------------|
+| Linux | GCC, Clang | `.so` |
+| macOS | Clang | `.dylib` |
+| Windows | MSVC, MINGW64 | `.dll` |
 
 ## Examples
 

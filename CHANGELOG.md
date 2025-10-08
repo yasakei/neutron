@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Box Package Manager MINGW64 Support**
+  - Added full MSYS2/MINGW64 toolchain support for building native modules on Windows
+  - Box now automatically detects MINGW64 environment via `MSYSTEM` variable
+  - Uses GCC (`g++`) in MINGW64, MSVC (`cl`) otherwise
+  - Added MINGW64-specific include paths: `/mingw64/neutron`, `/usr/local/neutron`, `/opt/neutron`
+  - Proper flag selection: `-shared -fPIC` for MINGW64, `/LD /MD` for MSVC
+  - Skips `-rpath` flag on Windows (not supported by MINGW64)
+  - Enables Windows module development without Visual Studio
+
+### Changed
+- **Box Builder Architecture**
+  - `getCompiler()` now checks `MSYSTEM` environment variable
+  - `getLinkerFlags()` returns compiler-appropriate flags
+  - `generateBuildCommand()` generates correct commands for MSVC or GCC
+  - `findNeutronDir()` searches MINGW64 paths when in MINGW environment
+
+### Documentation
+- **New Documentation Files**
+  - Added `nt-box/docs/MINGW64_SUPPORT.md` - Comprehensive MINGW64 guide (300+ lines)
+  - Added `nt-box/docs/IMPLEMENTATION_MINGW64.md` - Technical implementation details
+  - Added `nt-box/docs/README.md` - Documentation index with quick links
+  - Added `scripts/make_release.sh` - Linux/macOS release builder
+  - Added `scripts/make_release.ps1` - Windows release builder
+  - Added `RELEASE_NOTES.md` - Release workflow documentation
+
+- **Updated Documentation**
+  - Updated `nt-box/docs/CROSS_PLATFORM.md` - Added MINGW64 compiler section
+  - Updated `nt-box/docs/MODULE_DEVELOPMENT.md` - Added MINGW64 compilation examples
+  - Updated `nt-box/README.md` - Added MINGW64 to features list
+  - Updated `README.md` - Added Box Package Manager section
+  - Updated build matrix table to include MINGW64 toolchain
+
+- **Cross-References**
+  - Main Neutron docs now reference `nt-box/docs/` for module documentation
+  - Centralized Box documentation in nt-box subdirectory
+  - Clear separation between language docs and package manager docs
+
+### Release Infrastructure
+- **Automated Release Scripts**
+  - `scripts/make_release.sh` - Bash script for Linux/macOS releases
+    - Auto-detects OS, extracts version from CHANGELOG
+    - Builds Neutron + Box in Release mode
+    - Creates distribution packages with binaries, libraries, headers, docs
+    - Generates tarball with SHA256/MD5 checksums
+    - Includes installation script
+  - `scripts/make_release.ps1` - PowerShell script for Windows releases
+    - Visual Studio/MSVC support
+    - Creates ZIP package with checksums
+    - Includes Windows installer (.bat)
+  - Both scripts support optional test running
+
+---
+
 ## [1.0.3-alpha] - 2025-10-07
 
 ### Fixed

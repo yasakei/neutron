@@ -129,10 +129,91 @@ If you want to keep custom `.nt` library files, you can:
 
 ## Module Development
 
-To create a native module (C++ extension):
-1. Create a directory in `box/` or `libs/`
-2. Implement the module in C++
-3. Compile it as a shared library
-4. Load it with `use modulename;`
+Neutron supports creating native C++ modules that extend the language with custom functionality.
 
-For more details, see `docs/box_modules.md`.
+### Using Box Package Manager
+
+Box is Neutron's official package manager for managing native modules:
+
+```sh
+# Install a module from NUR
+box install base64
+
+# Use in your code
+use base64;
+say(base64.encode("Hello!"));
+```
+
+### Creating Native Modules
+
+To create your own native C++ module:
+
+1. **Set up module structure:**
+   ```sh
+   mkdir my-module
+   cd my-module
+   ```
+
+2. **Create module.json:**
+   ```json
+   {
+     "name": "mymodule",
+     "version": "1.0.0",
+     "description": "My custom module",
+     "entry": "mymodule.cpp"
+   }
+   ```
+
+3. **Write C++ code using Neutron C API:**
+   ```cpp
+   #include <neutron/capi.h>
+   
+   extern "C" {
+   void hello(NeutronVM* vm, int argc, NeutronValue* args) {
+       neutron_return(vm, neutron_new_string(vm, "Hello!"));
+   }
+   
+   void neutron_module_init(NeutronVM* vm) {
+       neutron_define_native(vm, "hello", hello);
+   }
+   }
+   ```
+
+4. **Build the module:**
+   ```sh
+   box build
+   ```
+
+### Comprehensive Documentation
+
+For complete module development documentation, see the Box documentation:
+
+- **[Module Development Guide](../nt-box/docs/MODULE_DEVELOPMENT.md)** - Complete C API reference and examples
+- **[Box Commands](../nt-box/docs/COMMANDS.md)** - All Box commands
+- **[Cross-Platform Guide](../nt-box/docs/CROSS_PLATFORM.md)** - Building on Linux, macOS, Windows
+- **[MINGW64 Support](../nt-box/docs/MINGW64_SUPPORT.md)** - Windows GCC toolchain
+
+### Module Installation
+
+Modules install to `.box/modules/` in your project directory:
+
+```
+.box/
+└── modules/
+    └── mymodule/
+        ├── mymodule.so       # Linux
+        ├── mymodule.dll      # Windows  
+        ├── mymodule.dylib    # macOS
+        └── metadata.json
+```
+
+Neutron automatically searches `.box/modules/` when you use `use mymodule;`
+
+### Supported Platforms
+
+Box supports building modules on:
+- **Linux:** GCC, Clang → `.so`
+- **macOS:** Clang → `.dylib`
+- **Windows:** MSVC, MINGW64 → `.dll`
+
+Box automatically detects your compiler and generates the appropriate build commands.

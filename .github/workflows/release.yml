@@ -1,0 +1,238 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - release
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.4-alpha)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Get version
+      id: get_version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Release version: $VERSION"
+    
+    - name: Extract release notes
+      id: extract_notes
+      run: |
+        VERSION="${{ steps.get_version.outputs.version }}"
+        VERSION_NO_V="${VERSION#v}"
+        
+        if [ -f "logs/${VERSION_NO_V}.md" ]; then
+          echo "Using logs/${VERSION_NO_V}.md"
+          cp "logs/${VERSION_NO_V}.md" release_notes.md
+        else
+          echo "Creating generic release notes"
+          echo "# Neutron ${VERSION}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "See CHANGELOG.md for details." >> release_notes.md
+        fi
+    
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.get_version.outputs.version }}
+        name: Neutron ${{ steps.get_version.outputs.version }}
+        body_path: release_notes.md
+        draft: false
+        prerelease: ${{ contains(steps.get_version.outputs.version, 'alpha') || contains(steps.get_version.outputs.version, 'beta') }}
+
+  build-linux:
+    name: Build Linux Release
+    needs: create-release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake ninja-build
+    
+    - name: Build release package
+      run: |
+        chmod +x scripts/make_release.sh
+        chmod +x scripts/build_all.sh
+        ./scripts/make_release.sh
+    
+    - name: Upload release asset
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ needs.create-release.outputs.version }}
+        files: |
+          releases/*.tar.gz
+          releases/*.sha256
+          releases/*.md5
+
+  build-macos:
+    name: Build macOS Release
+    needs: create-release
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies
+      run: |
+        brew install cmake ninja
+    
+    - name: Build release package
+      run: |
+        chmod +x scripts/make_release.sh
+        chmod +x scripts/build_all.sh
+        ./scripts/make_release.sh
+    
+    - name: Upload release asset
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ needs.create-release.outputs.version }}
+        files: |
+          releases/*.tar.gz
+          releases/*.sha256
+          releases/*.md5
+
+  build-windows-msvc:
+    name: Build Windows Release (MSVC)
+    needs: create-release
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup MSVC
+      uses: microsoft/setup-msbuild@v2
+    
+    - name: Install CMake
+      uses: lukka/get-cmake@latest
+    
+    - name: Build release package
+      run: |
+        .\scripts\make_release.ps1
+    
+    - name: Upload release asset
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ needs.create-release.outputs.version }}
+        files: |
+          releases/*.zip
+          releases/*.sha256
+          releases/*.md5
+
+  build-windows-mingw:
+    name: Build Windows Release (MINGW64)
+    needs: create-release
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-ninja
+          make
+          zip
+    
+    - name: Build release package
+      run: |
+        chmod +x scripts/make_release.sh
+        chmod +x scripts/build_all.sh
+        # Modify script to create .zip for Windows
+        ./scripts/make_release.sh
+        
+        # Convert .tar.gz to .zip for Windows distribution
+        cd releases
+        for f in *.tar.gz; do
+          if [ -f "$f" ]; then
+            tar -xzf "$f"
+            dirname="${f%.tar.gz}"
+            # Rename to indicate MINGW64
+            newname="${dirname}-mingw64"
+            mv "$dirname" "$newname"
+            zip -r "${newname}.zip" "$newname"
+            rm -rf "$newname"
+          fi
+        done
+    
+    - name: Upload release asset
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ needs.create-release.outputs.version }}
+        files: |
+          releases/*-mingw64.zip
+          releases/*-mingw64.zip.sha256
+          releases/*-mingw64.zip.md5
+
+  verify-release:
+    name: Verify Release
+    needs: [create-release, build-linux, build-macos, build-windows-msvc, build-windows-mingw]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Check all builds
+      run: |
+        echo "Linux build: ${{ needs.build-linux.result }}"
+        echo "macOS build: ${{ needs.build-macos.result }}"
+        echo "Windows MSVC build: ${{ needs.build-windows-msvc.result }}"
+        echo "Windows MINGW64 build: ${{ needs.build-windows-mingw.result }}"
+        
+        if [ "${{ needs.build-linux.result }}" != "success" ] || \
+           [ "${{ needs.build-macos.result }}" != "success" ] || \
+           [ "${{ needs.build-windows-msvc.result }}" != "success" ] || \
+           [ "${{ needs.build-windows-mingw.result }}" != "success" ]; then
+          echo "⚠️ One or more release builds failed"
+          exit 1
+        fi
+        
+        echo "✓ All release builds successful!"

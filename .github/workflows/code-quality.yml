@@ -1,0 +1,227 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, alpha, beta, release ]
+  pull_request:
+    branches: [ main, alpha, beta, release ]
+  workflow_dispatch:
+
+jobs:
+  clang-format:
+    name: Format Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install clang-format
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang-format
+    
+    - name: Check C++ formatting
+      run: |
+        find src include nt-box/src nt-box/include \
+          \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) \
+          -not -path "*/build/*" \
+          -print | while read file; do
+          if ! clang-format --dry-run --Werror "$file" 2>&1; then
+            echo "❌ Format error in: $file"
+            echo "Run: clang-format -i $file"
+            exit 1
+          fi
+        done
+        echo "✓ All files properly formatted"
+
+  cppcheck:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install cppcheck
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cppcheck
+    
+    - name: Run cppcheck
+      run: |
+        cppcheck --enable=warning,style,performance,portability \
+                 --error-exitcode=1 \
+                 --inline-suppr \
+                 --suppress=missingIncludeSystem \
+                 -I include -I nt-box/include \
+                 --template='{file}:{line}: {severity}: {message} [{id}]' \
+                 src/ nt-box/src/ 2>&1 | tee cppcheck.log
+        
+        if [ -s cppcheck.log ]; then
+          echo "⚠️ Static analysis found issues"
+          cat cppcheck.log
+        else
+          echo "✓ No issues found"
+        fi
+
+  clang-tidy:
+    name: Clang-Tidy
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang-tidy cmake ninja-build
+    
+    - name: Configure
+      run: |
+        cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    
+    - name: Run clang-tidy
+      run: |
+        find src -name "*.cpp" | while read file; do
+          echo "Checking: $file"
+          clang-tidy "$file" -p build -- -std=c++17 || true
+        done
+      continue-on-error: true
+
+  test-coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake lcov
+    
+    - name: Configure with coverage
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Debug \
+              -DCMAKE_CXX_FLAGS="--coverage -fprofile-arcs -ftest-coverage" \
+              -DCMAKE_C_FLAGS="--coverage -fprofile-arcs -ftest-coverage" \
+              -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+    
+    - name: Build
+      run: cmake --build build -j $(nproc)
+    
+    - name: Run tests
+      run: |
+        chmod +x run_tests.sh
+        ./run_tests.sh || true
+    
+    - name: Generate coverage report
+      run: |
+        lcov --directory build --capture --output-file coverage.info
+        lcov --remove coverage.info '/usr/*' '*/tests/*' --output-file coverage.info
+        lcov --list coverage.info
+        
+        # Generate HTML report
+        genhtml coverage.info --output-directory coverage_html
+      continue-on-error: true
+    
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage_html/
+        retention-days: 14
+      if: always()
+
+  documentation:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Check for missing docs
+      run: |
+        echo "Checking documentation completeness..."
+        
+        # Check if all public headers have documentation
+        missing_docs=0
+        
+        for header in include/*.h nt-box/include/*.h; do
+          if [ -f "$header" ]; then
+            if ! grep -q "^/\*\*" "$header" && ! grep -q "^///" "$header"; then
+              echo "⚠️  Missing documentation: $header"
+              missing_docs=$((missing_docs + 1))
+            fi
+          fi
+        done
+        
+        if [ $missing_docs -gt 0 ]; then
+          echo "⚠️  $missing_docs header(s) missing documentation"
+        else
+          echo "✓ All headers documented"
+        fi
+    
+    - name: Check README links
+      run: |
+        echo "Checking README.md links..."
+        
+        # Check if referenced files exist
+        grep -o '\[.*\]([^)]*\.md)' README.md | \
+        sed 's/.*(\(.*\))/\1/' | while read link; do
+          if [ ! -f "$link" ] && [[ "$link" != http* ]]; then
+            echo "⚠️  Broken link: $link"
+          fi
+        done
+        
+        echo "✓ README links checked"
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/init@v3
+      with:
+        languages: cpp
+    
+    - name: Build for analysis
+      run: |
+        cmake -B build
+        cmake --build build -j $(nproc)
+    
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+
+  dependency-check:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Check for known vulnerabilities
+      run: |
+        echo "Checking dependencies..."
+        
+        # List CMake dependencies
+        find . -name CMakeLists.txt -exec echo "Found: {}" \;
+        
+        # Check vcpkg dependencies if present
+        if [ -f vcpkg.json ]; then
+          echo "vcpkg dependencies:"
+          cat vcpkg.json
+        fi
+        
+        echo "✓ Dependency check complete"

@@ -85,3 +85,5 @@ cscope.*
 *.gcov
 coverage/
 dev_tests/
+.box/
+box

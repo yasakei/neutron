@@ -1,52 +1,238 @@
-# Creating External Modules for Neutron
+# Creating Native Modules for Neutron
 
-This guide explains how to create external modules for the Neutron programming language. Neutron supports two types of modules:
+> **📦 This documentation has moved!**
+>
+> Native module development is now managed by **Box**, Neutron's official package manager.
+> 
+> Please refer to the comprehensive Box documentation for creating, building, and distributing native modules.
 
-1. **Native Box Modules** (C/C++): High-performance modules written in C or C++ and compiled to shared libraries (`.so` files)
-2. **Neutron Modules** (`.nt` files): Modules written in Neutron language itself
+## Box Documentation
 
-Both types of modules are dynamically loaded at runtime, allowing you to extend the language with new functionality without modifying the core interpreter.
+Complete documentation for native module development is available in the `nt-box/docs/` directory:
 
-## 1. Module Types and Structure
+### 📚 Essential Guides
 
-### 1.1. Native Box Modules (C/C++)
+- **[Module Development Guide](../nt-box/docs/MODULE_DEVELOPMENT.md)**
+  - Complete C API reference
+  - Step-by-step module creation
+  - Working code examples
+  - Publishing to NUR (Neutron Universe Registry)
 
-Native Box Modules reside in the `box/` directory. Each module has its own subdirectory, and the directory name becomes the module name.
+- **[Box Commands Reference](../nt-box/docs/COMMANDS.md)**
+  - `box build` - Build native modules
+  - `box install` - Install modules from NUR
+  - All Box commands with examples
 
-For a module named `my_module`, the directory structure should be:
+- **[Cross-Platform Guide](../nt-box/docs/CROSS_PLATFORM.md)**
+  - Building on Linux (GCC, Clang)
+  - Building on macOS (Clang)
+  - Building on Windows (MSVC, MINGW64)
+  - Platform-specific troubleshooting
 
+- **[MINGW64 Support](../nt-box/docs/MINGW64_SUPPORT.md)**
+  - Building with GCC on Windows
+  - MSYS2 installation and setup
+  - Alternative to Visual Studio
+
+### 🚀 Quick Start
+
+#### 1. Create Module Structure
+
+```sh
+mkdir my-module
+cd my-module
 ```
-box/
-└── my_module/
-    └── native.cpp
+
+#### 2. Create `module.json`
+
+```json
+{
+  "name": "mymodule",
+  "version": "1.0.0",
+  "description": "My first Neutron module",
+  "entry": "mymodule.cpp"
+}
 ```
 
--   `box/my_module/`: The root directory of your module.
--   `native.cpp`: The C++ source file containing the implementation of your module.
+#### 3. Create `mymodule.cpp`
 
-Alternatively, you can use C instead of C++ by naming your file `native.c`:
+```cpp
+#include <neutron/capi.h>
 
+extern "C" {
+
+void hello(NeutronVM* vm, int argc, NeutronValue* args) {
+    neutron_return(vm, neutron_new_string(vm, "Hello from native code!"));
+}
+
+void neutron_module_init(NeutronVM* vm) {
+    neutron_define_native(vm, "hello", hello);
+}
+
+}
 ```
-box/
-└── my_module/
-    └── native.c
+
+#### 4. Build with Box
+
+```sh
+box build
 ```
 
-When using C, you'll still need to use C++ features for interacting with the Neutron VM, but your implementation file can have a `.c` extension.
+#### 5. Use in Neutron
 
-### 1.2. Neutron Modules (.nt files)
-
-Neutron modules are written in the Neutron language itself and stored as `.nt` files. These can be placed in:
-
-1. **Standard library location** (`lib/` directory): For system-wide modules
-2. **Local directory**: In the same directory as your script
-3. **Custom module paths**: As configured by the module loader
-
-For a module named `mymodule`, create:
-
+```neutron
+use mymodule;
+say(mymodule.hello());  // "Hello from native code!"
 ```
-mymodule.nt
+
+## Box Features
+
+- ✅ **Cross-Platform**: Automatic compiler detection (GCC, Clang, MSVC, MINGW64)
+- ✅ **Zero Configuration**: Box handles all build flags automatically
+- ✅ **Version Management**: Install and manage multiple module versions
+- ✅ **NUR Integration**: Publish and share modules via Neutron Universe Registry
+- ✅ **Local Installation**: Modules install to `.box/modules/` in your project
+
+## Neutron C API Overview
+
+### Core Functions
+
+```cpp
+// Module initialization (required)
+void neutron_module_init(NeutronVM* vm);
+
+// Define native functions
+void neutron_define_native(NeutronVM* vm, const char* name, 
+                          NeutronNativeFunction func);
+
+// Create values
+NeutronValue neutron_new_string(NeutronVM* vm, const char* str);
+NeutronValue neutron_new_number(NeutronVM* vm, double value);
+NeutronValue neutron_new_boolean(NeutronVM* vm, bool value);
+NeutronValue neutron_new_nil(NeutronVM* vm);
+
+// Check types
+bool neutron_is_string(NeutronValue value);
+bool neutron_is_number(NeutronValue value);
+bool neutron_is_boolean(NeutronValue value);
+bool neutron_is_nil(NeutronValue value);
+
+// Extract values
+const char* neutron_get_string(NeutronValue value);
+double neutron_get_number(NeutronValue value);
+bool neutron_get_boolean(NeutronValue value);
+
+// Return values and errors
+void neutron_return(NeutronVM* vm, NeutronValue value);
+void neutron_error(NeutronVM* vm, const char* message);
 ```
+
+For complete API documentation with examples, see:
+- [Module Development Guide](../nt-box/docs/MODULE_DEVELOPMENT.md)
+- [C API Header](../include/capi.h)
+
+## Module Examples
+
+### String Manipulation
+
+```cpp
+#include <neutron/capi.h>
+#include <algorithm>
+#include <string>
+
+extern "C" {
+
+void reverse_string(NeutronVM* vm, int argc, NeutronValue* args) {
+    if (argc != 1 || !neutron_is_string(args[0])) {
+        neutron_error(vm, "Expected 1 string argument");
+        return;
+    }
+    
+    std::string str = neutron_get_string(args[0]);
+    std::reverse(str.begin(), str.end());
+    
+    neutron_return(vm, neutron_new_string(vm, str.c_str()));
+}
+
+void neutron_module_init(NeutronVM* vm) {
+    neutron_define_native(vm, "reverse", reverse_string);
+}
+
+}
+```
+
+### Math Operations
+
+```cpp
+#include <neutron/capi.h>
+#include <cmath>
+
+extern "C" {
+
+void power(NeutronVM* vm, int argc, NeutronValue* args) {
+    if (argc != 2 || !neutron_is_number(args[0]) || !neutron_is_number(args[1])) {
+        neutron_error(vm, "Expected 2 number arguments");
+        return;
+    }
+    
+    double base = neutron_get_number(args[0]);
+    double exp = neutron_get_number(args[1]);
+    double result = std::pow(base, exp);
+    
+    neutron_return(vm, neutron_new_number(vm, result));
+}
+
+void neutron_module_init(NeutronVM* vm) {
+    neutron_define_native(vm, "power", power);
+}
+
+}
+```
+
+## Platform-Specific Builds
+
+Box automatically handles platform differences:
+
+| Platform | Compiler | Command | Output |
+|----------|----------|---------|--------|
+| Linux | g++ | `box build` | `.so` |
+| Linux | clang++ | `box build` | `.so` |
+| macOS | clang++ | `box build` | `.dylib` |
+| Windows | MSVC | `box build` | `.dll` |
+| Windows | MINGW64 | `box build` | `.dll` |
+
+No manual configuration needed!
+
+## Publishing Modules
+
+To share your module via NUR (Neutron Universe Registry):
+
+1. **Build for all platforms**
+2. **Create GitHub repository**
+3. **Add to NUR registry** 
+4. **Users install with:** `box install yourmodule`
+
+See [Module Development Guide](../nt-box/docs/MODULE_DEVELOPMENT.md#publishing-to-nur) for complete publishing instructions.
+
+## Migration from Old Box System
+
+If you have existing modules in the old `box/` directory format:
+
+1. Create `module.json` in your module directory
+2. Run `box build` to compile
+3. Install with `box install`
+
+Old modules will continue to work, but we recommend migrating to the new Box system for better cross-platform support and version management.
+
+## Getting Help
+
+- **Documentation:** See `nt-box/docs/` directory
+- **Examples:** Check existing modules in NUR
+- **Issues:** Report at https://github.com/yasakei/nt-box/issues
+
+## Legacy Information
+
+**Note:** This file previously contained detailed C API documentation. That information has been superseded by the comprehensive guides in `nt-box/docs/`. The old box directory structure is deprecated in favor of the new Box package manager workflow.
 
 Or in the standard library:
 
