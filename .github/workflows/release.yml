@@ -223,7 +223,7 @@ jobs:
             cp $MINGW_BIN/libcrypto-3-x64.dll "$newname/bin/" 2>/dev/null || true
             
             # Create README for DLLs
-            cat > "$newname/bin/README_DLLS.txt" << 'EOF'
+            cat > "$newname/bin/README_DLLS.txt" << 'EOFDLLS'
 MINGW64 Runtime DLLs
 ====================
 
@@ -241,7 +241,7 @@ These DLLs are from the MINGW64 project and are licensed under
 their respective licenses (GPL, LGPL, etc.).
 
 For more information: https://www.mingw-w64.org/
-EOF
+EOFDLLS
             
             echo "Copied DLLs:"
             ls -lh "$newname/bin/"*.dll
