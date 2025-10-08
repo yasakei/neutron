@@ -1040,11 +1040,9 @@ void VM::load_module(const std::string& name) {
     std::string nt_path = "box/" + name + ".nt";
     
 #ifdef __APPLE__
-    std::string shared_lib_path = "box/" + name + "/" + name + ".dylib";
-    std::string shared_lib_path2 = ".box/modules/" + name + "/" + name + ".dylib";
+    std::string shared_lib_path = ".box/modules/" + name + "/" + name + ".dylib";
 #else
-    std::string shared_lib_path = "box/" + name + "/" + name + ".so";
-    std::string shared_lib_path2 = ".box/modules/" + name + "/" + name + ".so";
+    std::string shared_lib_path = ".box/modules/" + name + "/" + name + ".so";
 #endif
     
     std::string module_nt_path = "box/" + name + "/" + name + ".nt";
@@ -1126,10 +1124,6 @@ void VM::load_module(const std::string& name) {
 
     // Try to load as a native shared library module
     void* handle = dlopen(shared_lib_path.c_str(), RTLD_LAZY);
-    if (!handle) {
-        // Try box-modules directory
-        handle = dlopen(shared_lib_path2.c_str(), RTLD_LAZY);
-    }
     
     if (handle) {
         // It's a native module, we need to load it.

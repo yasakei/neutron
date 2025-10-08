@@ -187,6 +187,8 @@ std::string Builder::generateBuildCommand(const std::string& moduleName,
             if (!Platform::isWindows()) {
                 command += "-Wl,-rpath,\"" + neutronDir + "/build\" ";
             }
+            // Link against the neutron runtime library
+            command += "-lneutron_runtime ";
         }
     }
     
