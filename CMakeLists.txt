@@ -30,8 +30,24 @@ include_directories(
 
 # Find required packages
 find_package(CURL REQUIRED)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(JSONCPP REQUIRED jsoncpp)
+# find_package(PkgConfig REQUIRED)
+# pkg_check_modules(JSONCPP REQUIRED jsoncpp)
+
+if(APPLE)
+    find_library(JSONCPP_LIBRARY
+        NAMES jsoncpp
+        PATHS /opt/homebrew/lib /usr/local/lib
+    )
+    find_path(JSONCPP_INCLUDE_DIR
+        NAMES json/json.h
+        PATHS /opt/homebrew/include /usr/local/include
+    )
+    set(JSONCPP_LIBRARIES ${JSONCPP_LIBRARY})
+    set(JSONCPP_INCLUDE_DIRS ${JSONCPP_INCLUDE_DIR})
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(JSONCPP REQUIRED jsoncpp)
+endif()
 
 # Core source files
 set(NEUTRON_CORE_SOURCES
@@ -138,11 +154,16 @@ set_target_properties(neutron_runtime_shared PROPERTIES
 # Create executable
 add_executable(neutron src/main.cpp)
 
-# Link with whole-archive to ensure C API symbols are included
-if(UNIX)
+# Link with whole-archive to ensure C API symbols are included (Linux only)
+if(UNIX AND NOT APPLE)
     target_link_libraries(neutron -Wl,--whole-archive neutron_runtime -Wl,--no-whole-archive)
 else()
     target_link_libraries(neutron neutron_runtime)
+endif()
+
+# On macOS, also link jsoncpp to the main executable to ensure the library can be found at runtime
+if(APPLE)
+    target_link_libraries(neutron ${JSONCPP_LIBRARIES})
 endif()
 
 # Platform-specific settings
@@ -163,6 +184,9 @@ if(UNIX AND NOT APPLE)
 elseif(APPLE)
     target_link_libraries(neutron_runtime "-framework CoreFoundation")
     target_link_libraries(neutron_runtime_shared "-framework CoreFoundation")
+    # Ensure jsoncpp library is explicitly linked for macOS shared library
+    # Use the full LDFLAGS from pkg-config to ensure proper linking on macOS
+    target_link_libraries(neutron_runtime_shared ${JSONCPP_LDFLAGS})
     set_target_properties(neutron PROPERTIES
         BUILD_RPATH "@executable_path"
         INSTALL_RPATH "@executable_path"

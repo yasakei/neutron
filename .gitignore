@@ -87,4 +87,5 @@ coverage/
 dev_tests/
 .box/
 box
+releases/libneutron_runtime.so.*
 releases/

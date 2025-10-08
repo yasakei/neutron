@@ -229,8 +229,13 @@ README_EOF
     # Calculate checksums
     print_msg "Generating checksums..." "$BLUE"
     cd releases
-    sha256sum "${package_name}.tar.gz" > "${package_name}.tar.gz.sha256"
-    md5sum "${package_name}.tar.gz" > "${package_name}.tar.gz.md5"
+    if [ "$os" = "macos" ]; then
+        shasum -a 256 "${package_name}.tar.gz" > "${package_name}.tar.gz.sha256"
+        md5 "${package_name}.tar.gz" | awk '{print $4}' > "${package_name}.tar.gz.md5"
+    else
+        sha256sum "${package_name}.tar.gz" > "${package_name}.tar.gz.sha256"
+        md5sum "${package_name}.tar.gz" > "${package_name}.tar.gz.md5"
+    fi
     cd ..
     
     print_msg "Package created: releases/${package_name}.tar.gz" "$GREEN"
