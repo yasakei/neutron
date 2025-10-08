@@ -80,7 +80,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential cmake ninja-build
+        sudo apt-get install -y build-essential cmake ninja-build libcurl4-openssl-dev
     
     - name: Build release package
       run: |
@@ -110,7 +110,7 @@ jobs:
     
     - name: Install dependencies
       run: |
-        brew install cmake ninja
+        brew install cmake ninja curl
     
     - name: Build release package
       run: |
@@ -190,7 +190,7 @@ jobs:
         # Modify script to create .zip for Windows
         ./scripts/make_release.sh
         
-        # Convert .tar.gz to .zip for Windows distribution
+        # Convert .tar.gz to .zip for Windows distribution and add DLLs
         cd releases
         for f in *.tar.gz; do
           if [ -f "$f" ]; then
@@ -199,7 +199,60 @@ jobs:
             # Rename to indicate MINGW64
             newname="${dirname}-mingw64"
             mv "$dirname" "$newname"
+            
+            # Copy MINGW64 runtime DLLs to bin directory
+            echo "Copying MINGW64 runtime DLLs..."
+            MINGW_BIN="/mingw64/bin"
+            
+            # Required DLLs for C++ programs
+            cp $MINGW_BIN/libgcc_s_seh-1.dll "$newname/bin/" 2>/dev/null || true
+            cp $MINGW_BIN/libstdc++-6.dll "$newname/bin/" 2>/dev/null || true
+            cp $MINGW_BIN/libwinpthread-1.dll "$newname/bin/" 2>/dev/null || true
+            
+            # CURL DLLs
+            cp $MINGW_BIN/libcurl-4.dll "$newname/bin/" 2>/dev/null || true
+            cp $MINGW_BIN/zlib1.dll "$newname/bin/" 2>/dev/null || true
+            cp $MINGW_BIN/libidn2-0.dll "$newname/bin/" 2>/dev/null || true
+            cp $MINGW_BIN/libunistring-5.dll "$newname/bin/" 2>/dev/null || true
+            cp $MINGW_BIN/libiconv-2.dll "$newname/bin/" 2>/dev/null || true
+            cp $MINGW_BIN/libintl-8.dll "$newname/bin/" 2>/dev/null || true
+            cp $MINGW_BIN/libpsl-5.dll "$newname/bin/" 2>/dev/null || true
+            cp $MINGW_BIN/libssh2-1.dll "$newname/bin/" 2>/dev/null || true
+            cp $MINGW_BIN/libnghttp2-14.dll "$newname/bin/" 2>/dev/null || true
+            cp $MINGW_BIN/libssl-3-x64.dll "$newname/bin/" 2>/dev/null || true
+            cp $MINGW_BIN/libcrypto-3-x64.dll "$newname/bin/" 2>/dev/null || true
+            
+            # Create README for DLLs
+            cat > "$newname/bin/README_DLLS.txt" << 'EOF'
+MINGW64 Runtime DLLs
+====================
+
+This directory contains the MINGW64 runtime DLLs required to run
+Neutron and Box on Windows without MSYS2 installed.
+
+Required DLLs:
+- libgcc_s_seh-1.dll      : GCC runtime
+- libstdc++-6.dll         : C++ standard library
+- libwinpthread-1.dll     : POSIX threads
+- libcurl-4.dll           : CURL library (for HTTP module)
+- Additional SSL/crypto DLLs for HTTPS support
+
+These DLLs are from the MINGW64 project and are licensed under
+their respective licenses (GPL, LGPL, etc.).
+
+For more information: https://www.mingw-w64.org/
+EOF
+            
+            echo "Copied DLLs:"
+            ls -lh "$newname/bin/"*.dll
+            
+            # Create ZIP archive
             zip -r "${newname}.zip" "$newname"
+            
+            # Generate checksums for ZIP
+            sha256sum "${newname}.zip" > "${newname}.zip.sha256"
+            md5sum "${newname}.zip" > "${newname}.zip.md5"
+            
             rm -rf "$newname"
           fi
         done
