@@ -12,6 +12,7 @@
 #include "compiler/bytecode.h"
 #include "modules/module_loader.h"
 #include "types/version.h"
+#include "runtime/error_handler.h"
 
 void run(const std::string& source, neutron::VM& vm);
 void runFile(const std::string& path, neutron::VM& vm);
@@ -19,6 +20,19 @@ void runPrompt(neutron::VM& vm);
 void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& outputPath, const std::string& sourcePath);
 
 void run(const std::string& source, neutron::VM& vm) {
+    // Split source into lines for error reporting
+    std::vector<std::string> lines;
+    std::istringstream iss(source);
+    std::string line;
+    while (std::getline(iss, line)) {
+        lines.push_back(line);
+    }
+    
+    // Configure error handler
+    neutron::ErrorHandler::setSourceLines(lines);
+    neutron::ErrorHandler::setColorEnabled(true);
+    neutron::ErrorHandler::setStackTraceEnabled(true);
+    
     neutron::Scanner scanner(source);
     std::vector<neutron::Token> tokens = scanner.scanTokens();
     
@@ -32,6 +46,10 @@ void run(const std::string& source, neutron::VM& vm) {
 }
 
 void runFile(const std::string& path, neutron::VM& vm) {
+    // Set current file for error reporting
+    neutron::ErrorHandler::setCurrentFile(path);
+    vm.currentFileName = path;
+    
     // Add the script's directory to the module search path
     std::string directory;
     const size_t last_slash_idx = path.rfind('/');
@@ -42,8 +60,7 @@ void runFile(const std::string& path, neutron::VM& vm) {
 
     std::ifstream file(path);
     if (!file.is_open()) {
-        std::cerr << "Could not open file: " << path << std::endl;
-        exit(1);
+        neutron::ErrorHandler::fatal("Could not open file: " + path, neutron::ErrorType::IO_ERROR);
     }
     
     std::string line;

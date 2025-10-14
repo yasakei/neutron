@@ -1,5 +1,6 @@
 #include "compiler/scanner.h"
 #include "token.h"
+#include "runtime/error_handler.h"
 #include <stdexcept>
 
 namespace neutron {
@@ -109,7 +110,11 @@ void Scanner::scanToken() {
             } else if (isAlpha(c)) {
                 identifier();
             } else {
-                throw std::runtime_error("Unexpected character.");
+                std::string msg = "Unexpected character '";
+                msg += c;
+                msg += "'";
+                ErrorHandler::reportLexicalError(msg, line, current - start);
+                exit(1);
             }
             break;
     }
@@ -189,7 +194,9 @@ void Scanner::string(char quote) {
             }
             
             if (isAtEnd()) {
-                throw std::runtime_error("Unterminated string interpolation.");
+                ErrorHandler::reportLexicalError("Unterminated string interpolation - missing closing '}'", 
+                                                line, current - start);
+                exit(1);
             }
             
             // Extract and scan the expression
@@ -237,7 +244,9 @@ void Scanner::string(char quote) {
     }
 
     if (isAtEnd()) {
-        throw std::runtime_error("Unterminated string.");
+        ErrorHandler::reportLexicalError("Unterminated string - missing closing quote", 
+                                        line, current - start);
+        exit(1);
     }
 
     advance(); // Skip the closing quote

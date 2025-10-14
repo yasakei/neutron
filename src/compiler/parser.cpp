@@ -1,5 +1,6 @@
 #include "compiler/parser.h"
 #include "token.h"
+#include "runtime/error_handler.h"
 #include <stdexcept>
 #include <iostream>
 #include <memory>
@@ -567,8 +568,7 @@ Token Parser::consume(TokenType type, const std::string& message) {
 }
 
 [[noreturn]] void Parser::error(Token token, const std::string& message) {
-    std::cerr << "Error at line " << token.line << ": " << message << std::endl;
-    // In a real implementation, we might want to throw or handle this differently
+    ErrorHandler::reportSyntaxError(message, token);
     exit(1);
 }
 

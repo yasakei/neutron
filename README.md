@@ -4,10 +4,10 @@ Neutron is a simple, modern, and lightweight interpreted programming language wr
 
 ## Quick Links
 
-- 🚀 **[Quick Start Guide](docs/QUICKSTART.md)** - Get up and running in 5 minutes
-- 📖 **[Complete Build Guide](docs/BUILD.md)** - Platform-specific build instructions
-- 📚 **[Language Reference](docs/language_reference.md)** - Full syntax documentation
-- ✅ **[Test Suite](docs/TEST_SUITE.md)** - 21 tests covering all features
+- 🚀 **[Quick Start Guide](docs/guides/QUICKSTART.md)** - Get up and running in 5 minutes
+- 📖 **[Complete Build Guide](docs/guides/BUILD.md)** - Platform-specific build instructions
+- 📚 **[Language Reference](docs/reference/language_reference.md)** - Full syntax documentation
+- ✅ **[Test Suite](docs/guides/TEST_SUITE.md)** - 21 tests covering all features
 
 ## Features
 
@@ -15,6 +15,7 @@ Neutron is a simple, modern, and lightweight interpreted programming language wr
 - **C-like Syntax:** Familiar syntax for developers who have used C, C++, Java, or JavaScript.
 - **Rich Standard Library:** A comprehensive standard library with modules for math, system operations, HTTP client, JSON processing, time operations, and data conversion.
 - **📦 Box Package Manager:** Install and manage native modules with ease.
+- **Comprehensive Error Handling:** Meaningful error messages with source code context, visual indicators, and helpful suggestions for fixing issues.
 - **Object-Oriented:** Supports classes, methods, and the `this` keyword.
 - **Built-in Functions:** A set of useful built-in functions for string manipulation, type conversion, and console output.
 - **Modular:** Supports both native C++ modules and Neutron language modules for organizing code.
@@ -26,9 +27,9 @@ Neutron is a simple, modern, and lightweight interpreted programming language wr
 
 ## Getting Started
 
-**Quick Setup:** See [Quick Start Guide](docs/QUICKSTART.md) for a 5-minute setup.
+**Quick Setup:** See [Quick Start Guide](docs/guides/QUICKSTART.md) for a 5-minute setup.
 
-**Detailed Instructions:** See [Complete Build Guide](docs/BUILD.md) for comprehensive platform-specific instructions.
+**Detailed Instructions:** See [Complete Build Guide](docs/guides/BUILD.md) for comprehensive platform-specific instructions.
 
 ### Quick Build (Linux/macOS)
 
@@ -66,17 +67,26 @@ cmake --build build
 .\run_tests.ps1         # Windows PowerShell
 ```
 
-See [Test Suite Documentation](docs/TEST_SUITE.md) for details.
+See [Test Suite Documentation](docs/guides/TEST_SUITE.md) for details.
 
 ## Documentation
 
-- **[Quick Start Guide](docs/QUICKSTART.md)** - Get up and running in 5 minutes
-- **[Complete Build Guide](docs/BUILD.md)** - Comprehensive building instructions for all platforms
-- **[Language Reference](docs/language_reference.md)** - Complete language syntax and features
-- **[Test Suite](docs/TEST_SUITE.md)** - 21 tests covering all features
-- **[Cross-Platform Guide](docs/cross_platform.md)** - Platform-specific implementation details
-- **[Known Issues](docs/known_issues.md)** - Known bugs and limitations
-- **[Module System](docs/module_system.md)** - Module loading and usage
+📖 **[Full Documentation Index](docs/README.md)**
+
+### Getting Started
+- **[Quick Start Guide](docs/guides/QUICKSTART.md)** - Get up and running in 5 minutes
+- **[Complete Build Guide](docs/guides/BUILD.md)** - Comprehensive building instructions
+- **[Test Suite](docs/guides/TEST_SUITE.md)** - 21 tests covering all features
+
+### Reference
+- **[Language Reference](docs/reference/language_reference.md)** - Complete language syntax
+- **[Module System](docs/reference/module_system.md)** - Module loading and usage
+- **[Error Handling](docs/error_handling/)** - Comprehensive error reporting system
+
+### Implementation
+- **[Cross-Platform Guide](docs/reference/cross_platform.md)** - Platform-specific details
+- **[Known Issues](docs/implementation/known_issues.md)** - Known bugs and limitations
+- **[Roadmap](docs/implementation/ROADMAP.md)** - Future plans
 
 ### Binary Conversion
 
@@ -86,7 +96,7 @@ Neutron supports converting scripts to standalone executables:
 ./neutron -b script.nt [output.out]
 ```
 
-See [Binary Conversion Documentation](docs/binary_conversion.md) for detailed information.
+See [Binary Conversion Documentation](docs/reference/binary_conversion.md) for detailed information.
 
 ## 📦 Box Package Manager
 
@@ -248,7 +258,7 @@ use json;           // Import built-in module
 using 'utils.nt';   // Import Neutron source file
 ```
 
-For comprehensive documentation, see [Module System Guide](docs/module_system.md).
+For comprehensive documentation, see [Module System Guide](docs/reference/module_system.md).
 
 ## Credits
 

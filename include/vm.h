@@ -42,6 +42,10 @@ struct CallFrame {
     Function* function;
     uint8_t* ip;
     size_t slot_offset;
+    std::string fileName;  // Source file name for error reporting
+    int currentLine;       // Current line number for error reporting
+    
+    CallFrame() : function(nullptr), ip(nullptr), slot_offset(0), fileName(""), currentLine(-1) {}
 };
 
 class Return {
@@ -83,6 +87,8 @@ public:
     std::vector<Object*> heap;
     size_t nextGC;
     std::vector<std::string> commandLineArgs;  // Store command line arguments
+    std::string currentFileName;  // Current source file being executed
+    std::vector<std::string> sourceLines;  // Source code lines for error reporting
 
 private:
     bool call(Function* function, int argCount);

@@ -20,9 +20,9 @@ public:
     std::string name;
     int arity_val;
     Chunk* chunk;
+    const FunctionStmt* declaration;  // Made public for error reporting
     
 private:
-    const FunctionStmt* declaration;
     std::shared_ptr<Environment> closure;
 };
 

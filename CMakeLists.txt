@@ -57,6 +57,7 @@ set(NEUTRON_CORE_SOURCES
     src/compiler/bytecode.cpp
     src/types/value.cpp
     src/runtime/environment.cpp
+    src/runtime/error_handler.cpp
     src/vm.cpp
     src/runtime/runtime.cpp
     src/runtime/debug.cpp
