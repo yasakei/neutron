@@ -100,6 +100,7 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
 #if defined(_WIN32)
     bool isWindows = true;
     bool isMingw = (std::getenv("MSYSTEM") != nullptr);
+    bool isMacOS = false;
 #elif defined(__APPLE__)
     bool isWindows = false;
     bool isMingw = false;
