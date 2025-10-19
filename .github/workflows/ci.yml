@@ -1,0 +1,149 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, release, develop ]
+  pull_request:
+    branches: [ main, release, develop ]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    name: Build on Ubuntu
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          pkg-config \
+          libcurl4-openssl-dev \
+          libjsoncpp-dev
+          
+    - name: Configure CMake
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+      
+    - name: Build
+      run: cmake --build build -j$(nproc)
+      
+    - name: Verify binary
+      run: |
+        ls -lh neutron
+        ./neutron --version
+        
+    - name: Run tests
+      run: ./run_tests.sh
+      
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: neutron-linux-x64
+        path: |
+          neutron
+          libneutron_runtime.so*
+        retention-days: 7
+
+  build-macos:
+    name: Build on macOS
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install dependencies
+      run: |
+        brew install cmake curl jsoncpp
+        
+    - name: Configure CMake
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+      
+    - name: Build
+      run: cmake --build build -j$(sysctl -n hw.ncpu)
+      
+    - name: Verify binary
+      run: |
+        ls -lh neutron
+        ./neutron --version
+        
+    - name: Run tests
+      run: ./run_tests.sh
+      
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: neutron-macos-x64
+        path: |
+          neutron
+          libneutron_runtime.dylib*
+        retention-days: 7
+
+  build-windows-msys2:
+    name: Build on Windows (MSYS2)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-curl
+          mingw-w64-x86_64-jsoncpp
+          make
+          
+    - name: Configure CMake
+      run: cmake -B build -S . -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release
+      
+    - name: Build
+      run: cmake --build build -j$(nproc)
+      
+    - name: Verify binary
+      run: |
+        ls -lh build/neutron.exe
+        ./build/neutron.exe --version
+        
+    - name: Run tests
+      run: bash run_tests.sh
+      
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: neutron-windows-x64
+        path: |
+          build/neutron.exe
+          build/*.dll
+        retention-days: 7
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [build-linux, build-macos, build-windows-msys2]
+    if: always()
+    
+    steps:
+    - name: Check build status
+      run: |
+        echo "Build Summary:"
+        echo "Linux: ${{ needs.build-linux.result }}"
+        echo "macOS: ${{ needs.build-macos.result }}"
+        echo "Windows: ${{ needs.build-windows-msys2.result }}"
+        
+    - name: Fail if any build failed
+      if: needs.build-linux.result != 'success' || needs.build-macos.result != 'success' || needs.build-windows-msys2.result != 'success'
+      run: exit 1

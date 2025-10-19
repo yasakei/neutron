@@ -1,0 +1,174 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release'
+        required: true
+        type: string
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Get version
+      id: get_version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.tag }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "Version: ${VERSION}"
+        
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.get_version.outputs.version }}
+        release_name: Neutron ${{ steps.get_version.outputs.version }}
+        draft: false
+        prerelease: ${{ contains(steps.get_version.outputs.version, 'alpha') || contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'rc') }}
+
+  build-linux:
+    name: Build Linux Release
+    needs: create-release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          pkg-config \
+          libcurl4-openssl-dev \
+          libjsoncpp-dev
+          
+    - name: Build
+      run: |
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+        cmake --build build -j$(nproc)
+        
+    - name: Package
+      run: |
+        mkdir -p neutron-linux-x64
+        cp neutron neutron-linux-x64/
+        cp libneutron_runtime.so* neutron-linux-x64/ 2>/dev/null || true
+        cp README.md LICENSE neutron-linux-x64/
+        tar -czf neutron-${{ needs.create-release.outputs.version }}-linux-x64.tar.gz neutron-linux-x64
+        
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-linux-x64.tar.gz
+        asset_name: neutron-${{ needs.create-release.outputs.version }}-linux-x64.tar.gz
+        asset_content_type: application/gzip
+
+  build-macos:
+    name: Build macOS Release
+    needs: create-release
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install dependencies
+      run: brew install cmake curl jsoncpp
+      
+    - name: Build
+      run: |
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+        cmake --build build -j$(sysctl -n hw.ncpu)
+        
+    - name: Package
+      run: |
+        mkdir -p neutron-macos-x64
+        cp neutron neutron-macos-x64/
+        cp libneutron_runtime.dylib* neutron-macos-x64/ 2>/dev/null || true
+        cp README.md LICENSE neutron-macos-x64/
+        tar -czf neutron-${{ needs.create-release.outputs.version }}-macos-x64.tar.gz neutron-macos-x64
+        
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-macos-x64.tar.gz
+        asset_name: neutron-${{ needs.create-release.outputs.version }}-macos-x64.tar.gz
+        asset_content_type: application/gzip
+
+  build-windows:
+    name: Build Windows Release
+    needs: create-release
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-curl
+          mingw-w64-x86_64-jsoncpp
+          make
+          zip
+          
+    - name: Build
+      run: |
+        cmake -B build -S . -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release
+        cmake --build build -j$(nproc)
+        
+    - name: Package
+      run: |
+        mkdir -p neutron-windows-x64
+        cp build/neutron.exe neutron-windows-x64/
+        cp build/*.dll neutron-windows-x64/ 2>/dev/null || true
+        cp README.md LICENSE neutron-windows-x64/
+        cd neutron-windows-x64
+        zip -r ../neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip .
+        cd ..
+        
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip
+        asset_name: neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip
+        asset_content_type: application/zip
