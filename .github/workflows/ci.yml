@@ -141,10 +141,15 @@ jobs:
     - name: Build
       run: cmake --build build -j$(nproc)
       
+    - name: Copy binaries to root for testing
+      run: |
+        cp build/neutron.exe ./
+        cp build/*.dll ./ 2>/dev/null || true
+        
     - name: Verify binary
       run: |
-        ls -lh build/neutron.exe
-        ./build/neutron.exe --version
+        ls -lh neutron.exe
+        ./neutron.exe --version
         
     - name: Run tests
       run: bash run_tests.sh

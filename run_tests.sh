@@ -13,10 +13,17 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Check if neutron binary exists
-if [ ! -f "./neutron" ]; then
+# Check if neutron binary exists (with or without .exe extension)
+NEUTRON_BIN=""
+if [ -f "./neutron" ]; then
+    NEUTRON_BIN="./neutron"
+elif [ -f "./neutron.exe" ]; then
+    NEUTRON_BIN="./neutron.exe"
+elif [ -f "./build/neutron.exe" ]; then
+    NEUTRON_BIN="./build/neutron.exe"
+else
     echo -e "${RED}Error: neutron binary not found${NC}"
-    echo "Please build the project first: make"
+    echo "Please build the project first: cmake --build build"
     exit 1
 fi
 
@@ -48,7 +55,7 @@ for test_file in "${TEST_FILES[@]}"; do
     echo -e "${YELLOW}Running: $test_name${NC}"
     
     # Run the test and capture output
-    if ./neutron "$test_file" > /tmp/neutron_test_output.txt 2>&1; then
+    if $NEUTRON_BIN "$test_file" > /tmp/neutron_test_output.txt 2>&1; then
         echo -e "${GREEN}✓ PASSED${NC}"
         cat /tmp/neutron_test_output.txt
         ((PASSED++))
