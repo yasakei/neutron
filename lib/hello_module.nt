@@ -1,4 +1,0 @@
-// A simple Neutron module in lib directory
-fun hello(name) {
-    return "Hello, " + name + "!";
-}

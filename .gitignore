@@ -10,11 +10,21 @@ neutron
 *.exe
 *.dll
 *.so
+*.so.*
 *.dylib
+*.dylib.*
 *.lib
 *.a
 *.o
 *.obj
+
+# Runtime libraries (with version suffixes)
+libneutron_runtime.so
+libneutron_runtime.so.*
+libneutron_runtime.dylib
+libneutron_runtime.dylib.*
+libneutron_runtime.dll
+libneutron_runtime.a
 
 # IDE files
 .vscode/
