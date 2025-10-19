@@ -89,19 +89,8 @@ set(NEUTRON_MODULE_SOURCES
     libs/time/native.cpp
 )
 
-# Create static runtime library for executable linking
-add_library(neutron_runtime STATIC
-    ${NEUTRON_CORE_SOURCES}
-    ${NEUTRON_TYPE_SOURCES}
-    ${NEUTRON_MODULE_SOURCES}
-)
-
-# Create shared runtime library for module developers
-add_library(neutron_runtime_shared SHARED
-    ${NEUTRON_CORE_SOURCES}
-    ${NEUTRON_TYPE_SOURCES}
-    ${NEUTRON_MODULE_SOURCES}
-)
+# Platform-specific sources
+set(NEUTRON_PLATFORM_SOURCES "")
 
 set( DLFCN_WIN "")
 
@@ -113,12 +102,28 @@ if(WIN32)
         set( DLFCN_WIN dlfcn-win32::dl)
     else()
         message(STATUS "dlfcn-win32 not found; using internal Windows shim for dlopen/dlsym/dlclose")
-        # Add the shim implementation to the runtime sources
-        target_sources(neutron_runtime PRIVATE src/platform/dlfcn_compat_win.cpp)
+        # Add the shim implementation to the platform sources
+        list(APPEND NEUTRON_PLATFORM_SOURCES src/platform/dlfcn_compat_win.cpp)
     endif()
     find_package(jsoncpp CONFIG REQUIRED)
     set( JSONCPP_LIBRARIES JsonCpp::JsonCpp)
 endif()
+
+# Create static runtime library for executable linking
+add_library(neutron_runtime STATIC
+    ${NEUTRON_CORE_SOURCES}
+    ${NEUTRON_TYPE_SOURCES}
+    ${NEUTRON_MODULE_SOURCES}
+    ${NEUTRON_PLATFORM_SOURCES}
+)
+
+# Create shared runtime library for module developers
+add_library(neutron_runtime_shared SHARED
+    ${NEUTRON_CORE_SOURCES}
+    ${NEUTRON_TYPE_SOURCES}
+    ${NEUTRON_MODULE_SOURCES}
+    ${NEUTRON_PLATFORM_SOURCES}
+)
 
 target_link_libraries(neutron_runtime
     CURL::libcurl
