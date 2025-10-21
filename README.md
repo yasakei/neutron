@@ -4,7 +4,8 @@
 
 Neutron is a simple, modern, and lightweight interpreted programming language written in C++. It is designed to be easy to learn and use, with a clean and expressive syntax.
 
-
+## Join our Discord
+<iframe src="https://discord.com/widget?id=1418142678301806645&theme=dark" width="350" height="500" allowtransparency="true" frameborder="0" sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"></iframe>
 ## Quick Links
 
 - 🚀 **[Quick Start Guide](docs/guides/QUICKSTART.md)** - Get up and running in 5 minutes
