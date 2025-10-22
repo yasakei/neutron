@@ -365,7 +365,7 @@ var result = math.sqrt(16);
 - `json`: JSON parsing/serialization
 - `http`: HTTP client
 - `time`: Time and date operations
-- `convert`: Type conversion utilities
+- `fmt`: Type conversion utilities
 
 **toString()**: Returns `"<module>"`
 

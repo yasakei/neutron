@@ -60,7 +60,6 @@ examples/
 
 # External dependencies
 external/
-libs/
 
 # Benchmark
 benchmark/

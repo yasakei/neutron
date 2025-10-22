@@ -35,4 +35,4 @@ Built-in module documentation
 - [http_module.md](modules/http_module.md)
 - [json_module.md](modules/json_module.md)
 - [time_module.md](modules/time_module.md)
-- [convert_module.md](modules/convert_module.md)
+- [fmt_module.md](modules/fmt_module.md)

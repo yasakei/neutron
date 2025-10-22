@@ -46,7 +46,7 @@ cmake --build .
   - `runtime/` - Runtime headers
   - `compiler/` - Compiler headers
   - `modules/` - Module system headers
-- `libs/` - Built-in native modules (sys, json, math, http, time, convert)
+- `libs/` - Built-in native modules (sys, json, math, http, time, fmt)
 - `examples/` - Example Neutron programs
 - `programs/` - Sample Neutron programs
 - `dev_tests/` - Development tests for core functionality
