@@ -84,6 +84,9 @@ jobs:
         cp libneutron_runtime.so* neutron-linux-x64/ 2>/dev/null || true
         cp README.md LICENSE neutron-linux-x64/
         cp -r docs neutron-linux-x64/
+        cp -r include neutron-linux-x64/
+        mkdir -p neutron-linux-x64/scripts
+        cp scripts/install.sh neutron-linux-x64/scripts/
         cp nt-box/build/box neutron-linux-x64/ 2>/dev/null || true
         tar -czf neutron-${{ needs.create-release.outputs.version }}-linux-x64.tar.gz neutron-linux-x64
         
@@ -128,6 +131,9 @@ jobs:
         cp libneutron_runtime.dylib* neutron-macos-x64/ 2>/dev/null || true
         cp README.md LICENSE neutron-macos-x64/
         cp -r docs neutron-macos-x64/
+        cp -r include neutron-macos-x64/
+        mkdir -p neutron-macos-x64/scripts
+        cp scripts/install.sh neutron-macos-x64/scripts/
         cp nt-box/build/box neutron-macos-x64/ 2>/dev/null || true
         tar -czf neutron-${{ needs.create-release.outputs.version }}-macos-x64.tar.gz neutron-macos-x64
         
@@ -185,6 +191,7 @@ jobs:
         cp build/*.dll neutron-windows-x64/ 2>/dev/null || true
         cp README.md LICENSE neutron-windows-x64/
         cp -r docs neutron-windows-x64/
+        cp -r include neutron-windows-x64/
         cp nt-box/build/box.exe neutron-windows-x64/ 2>/dev/null || true
         cd neutron-windows-x64
         zip -r ../neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip .

@@ -100,14 +100,17 @@ class IfStmt : public Stmt {
 public:
     std::unique_ptr<Expr> condition;
     std::unique_ptr<Stmt> thenBranch;
+    std::vector<std::pair<std::unique_ptr<Expr>, std::unique_ptr<Stmt>>> elifBranches; // elif conditions and branches
     std::unique_ptr<Stmt> elseBranch; // nullptr if no else clause
     
     IfStmt(std::unique_ptr<Expr> condition, 
            std::unique_ptr<Stmt> thenBranch, 
+           std::vector<std::pair<std::unique_ptr<Expr>, std::unique_ptr<Stmt>>> elifBranches,
            std::unique_ptr<Stmt> elseBranch)
         : Stmt(StmtType::IF), 
           condition(std::move(condition)), 
           thenBranch(std::move(thenBranch)), 
+          elifBranches(std::move(elifBranches)),
           elseBranch(std::move(elseBranch)) {}
           
     void accept(Compiler* compiler) const override;

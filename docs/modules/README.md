@@ -12,8 +12,12 @@ This directory contains comprehensive documentation for all built-in modules in 
 - **[JSON Module](json_module.md)** - JSON parsing, serialization, and object manipulation
   - **Functions:** `stringify`, `parse`, `get`
   
-- **[Convert Module](convert_module.md)** - Data type conversion and string manipulation utilities
-  - **Functions:** `char_to_int`, `int_to_char`, `string_length`, `string_get_char_at`, `str`, `int`, `int_to_bin`, `bin_to_int`
+- **[Fmt Module](fmt_module.md)** - Dynamic type conversion and type detection utilities
+  - **Functions:** `to_int`, `to_str`, `to_bin`, `to_float`, `type`
+
+### Array Manipulation
+- **[Arrays Module](arrays_module.md)** - Comprehensive array manipulation and utility functions
+  - **Functions:** `new`, `length`, `push`, `pop`, `at`, `set`, `slice`, `join`, `reverse`, `sort`, `index_of`, `contains`, `remove`, `remove_at`, `clear`, `clone`, `to_string`, `flat`, `fill`, `range`, `shuffle`
 
 ### Mathematical Operations
 - **[Math Module](math_module.md)** - Mathematical operations and functions
@@ -37,7 +41,7 @@ use math;
 use json;
 use http;
 use time;
-use convert;
+use fmt;
 
 // Use module functions
 var currentDir = sys.cwd();
@@ -45,7 +49,7 @@ var result = math.add(10, 20);
 var jsonStr = json.stringify({"key": "value"});
 var response = http.get("https://api.example.com");
 var timestamp = time.now();
-var ascii = char_to_int("A"); // Convert functions also available globally
+var type = fmt.type(42);        // Fmt functions for type conversion
 ```
 
 ## Module Categories
@@ -55,7 +59,7 @@ var ascii = char_to_int("A"); // Convert functions also available globally
 
 ### **Data Formats & Conversion**  
 - **json**: JSON processing for APIs and configuration
-- **convert**: String manipulation, character encoding, binary conversion
+- **fmt**: Dynamic type conversion, type detection, format utilities
 
 ### **Mathematical Computing**
 - **math**: Essential mathematical operations and functions
@@ -122,7 +126,7 @@ int_to_bin(number)
 
 Neutron supports two types of modules:
 
-- **Native Modules** (C++): Built-in modules compiled into the runtime (`sys`, `math`, `json`, `http`, `time`, `convert`)
+- **Native Modules** (C++): Built-in modules compiled into the runtime (`sys`, `math`, `json`, `http`, `time`, `fmt`)
 - **Neutron Modules** (.nt files): User-created modules written in Neutron language
 
 All built-in modules are automatically available and work in both interpreter and compiled binary modes.

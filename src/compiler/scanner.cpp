@@ -9,6 +9,7 @@ Scanner::Scanner(const std::string& source)
     : source(source), start(0), current(0), line(1) {
     keywords["and"] = TokenType::AND;
     keywords["class"] = TokenType::CLASS;
+    keywords["elif"] = TokenType::ELIF;
     keywords["else"] = TokenType::ELSE;
     keywords["false"] = TokenType::FALSE;
     keywords["for"] = TokenType::FOR;

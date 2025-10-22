@@ -49,18 +49,18 @@ jobs:
       
     - name: Package artifacts
       run: |
-        mkdir -p release-package
-        cp neutron release-package/
-        cp libneutron_runtime.so* release-package/ 2>/dev/null || true
-        cp README.md LICENSE release-package/
-        cp -r docs release-package/
-        cp nt-box/build/box release-package/ 2>/dev/null || true
+        mkdir -p release
+        cp neutron release/
+        cp libneutron_runtime.so* release/ 2>/dev/null || true
+        cp README.md LICENSE release/
+        cp -r docs release/
+        cp nt-box/build/box release/ 2>/dev/null || true
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: neutron-linux-x64
-        path: release-package/
+        path: release/
         retention-days: 7
 
   build-macos:
@@ -98,18 +98,18 @@ jobs:
       
     - name: Package artifacts
       run: |
-        mkdir -p release-package
-        cp neutron release-package/
-        cp libneutron_runtime.dylib* release-package/ 2>/dev/null || true
-        cp README.md LICENSE release-package/
-        cp -r docs release-package/
-        cp nt-box/build/box release-package/ 2>/dev/null || true
+        mkdir -p release
+        cp neutron release/
+        cp libneutron_runtime.dylib* release/ 2>/dev/null || true
+        cp README.md LICENSE release/
+        cp -r docs release/
+        cp nt-box/build/box release/ 2>/dev/null || true
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: neutron-macos-x64
-        path: release-package/
+        path: release/
         retention-days: 7
 
   build-windows-msys2:
@@ -163,18 +163,18 @@ jobs:
       
     - name: Package artifacts
       run: |
-        mkdir -p release-package
-        cp build/neutron.exe release-package/
-        cp build/*.dll release-package/ 2>/dev/null || true
-        cp README.md LICENSE release-package/
-        cp -r docs release-package/
-        cp nt-box/build/box.exe release-package/ 2>/dev/null || true
+        mkdir -p release
+        cp build/neutron.exe release/
+        cp build/*.dll release/ 2>/dev/null || true
+        cp README.md LICENSE release/
+        cp -r docs release/
+        cp nt-box/build/box.exe release/ 2>/dev/null || true
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: neutron-windows-x64
-        path: release-package/
+        path: release/
         retention-days: 7
 
   test-summary:

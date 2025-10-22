@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
+#include <functional>  // for std::function
 
 using namespace neutron;
 

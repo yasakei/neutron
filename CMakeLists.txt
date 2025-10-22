@@ -82,11 +82,12 @@ set(NEUTRON_TYPE_SOURCES
 # Module sources
 set(NEUTRON_MODULE_SOURCES
     libs/sys/native.cpp
-    libs/convert/native.cpp
+    libs/fmt/native.cpp
     libs/json/native.cpp
     libs/math/native.cpp
     libs/http/native.cpp
     libs/time/native.cpp
+    libs/arrays/native.cpp
 )
 
 # Platform-specific sources

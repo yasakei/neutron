@@ -127,13 +127,23 @@ std::unique_ptr<Stmt> Parser::ifStatement() {
     consume(TokenType::RIGHT_PAREN, "Expect ')' after if condition.");
     
     std::unique_ptr<Stmt> thenBranch = statement();
-    std::unique_ptr<Stmt> elseBranch = nullptr;
     
+    // Handle multiple elif clauses
+    std::vector<std::pair<std::unique_ptr<Expr>, std::unique_ptr<Stmt>>> elifBranches;
+    while (match({TokenType::ELIF})) {
+        consume(TokenType::LEFT_PAREN, "Expect '(' after 'elif'.");
+        std::unique_ptr<Expr> elifCondition = expression();
+        consume(TokenType::RIGHT_PAREN, "Expect ')' after elif condition.");
+        std::unique_ptr<Stmt> elifBranch = statement();
+        elifBranches.push_back({std::move(elifCondition), std::move(elifBranch)});
+    }
+    
+    std::unique_ptr<Stmt> elseBranch = nullptr;
     if (match({TokenType::ELSE})) {
         elseBranch = statement();
     }
     
-    return std::make_unique<IfStmt>(std::move(condition), std::move(thenBranch), std::move(elseBranch));
+    return std::make_unique<IfStmt>(std::move(condition), std::move(thenBranch), std::move(elifBranches), std::move(elseBranch));
 }
 
 std::unique_ptr<Stmt> Parser::whileStatement() {
@@ -313,10 +323,11 @@ std::unique_ptr<Expr> Parser::comparison() {
     std::unique_ptr<Expr> expr = term();
     
     while (match({TokenType::GREATER, TokenType::GREATER_EQUAL, 
-                  TokenType::LESS, TokenType::LESS_EQUAL})) {
-        Token op = previous();
+                  TokenType::LESS, TokenType::LESS_EQUAL,
+                  TokenType::BANG_EQUAL, TokenType::EQUAL_EQUAL})) {
+        Token operatorToken = previous();
         std::unique_ptr<Expr> right = term();
-        expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
+        expr = std::make_unique<BinaryExpr>(std::move(expr), operatorToken, std::move(right));
     }
     
     return expr;
@@ -745,6 +756,8 @@ void ThisExpr::accept(Compiler* compiler) const {
 void FunctionExpr::accept(Compiler* compiler) const {
     compiler->visitFunctionExpr(this);
 }
+
+
 
 void MatchStmt::accept(Compiler* compiler) const {
     compiler->visitMatchStmt(this);

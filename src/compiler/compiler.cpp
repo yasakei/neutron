@@ -260,22 +260,49 @@ void Compiler::visitBlockStmt(const BlockStmt* stmt) {
 }
 
 void Compiler::visitIfStmt(const IfStmt* stmt) {
+    // First, compile the main if condition and then branch
     compileExpression(stmt->condition.get());
-
-    // Emit a jump instruction with a placeholder offset.
+    
+    // Emit a jump instruction with a placeholder offset for the main if branch.
     int thenJump = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE);
-
+    
+    // Compile the main then branch
     compileStatement(stmt->thenBranch.get());
-
-    int elseJump = emitJump((uint8_t)OpCode::OP_JUMP);
-
+    
+    // Jump to end (skip all elif and else branches)
+    std::vector<int> endJumps;
+    endJumps.push_back(emitJump((uint8_t)OpCode::OP_JUMP));
+    
+    // Patch the main if condition jump
     patchJump(thenJump);
-
+    
+    // Compile elif branches
+    for (const auto& elifBranch : stmt->elifBranches) {
+        // Compile elif condition
+        compileExpression(elifBranch.first.get());
+        
+        // Emit a jump instruction with a placeholder offset for this elif branch
+        int elifJump = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE);
+        
+        // Compile elif body
+        compileStatement(elifBranch.second.get());
+        
+        // Jump to end (skip remaining elif and else branches)
+        endJumps.push_back(emitJump((uint8_t)OpCode::OP_JUMP));
+        
+        // Patch the elif condition jump
+        patchJump(elifJump);
+    }
+    
+    // Compile else branch if it exists
     if (stmt->elseBranch) {
         compileStatement(stmt->elseBranch.get());
     }
-
-    patchJump(elseJump);
+    
+    // Patch all end jumps to point to the end of the entire if-elif-else statement
+    for (int jump : endJumps) {
+        patchJump(jump);
+    }
 }
 
 void Compiler::visitWhileStmt(const WhileStmt* stmt) {
@@ -532,6 +559,7 @@ void Compiler::visitObjectExpr(const ObjectExpr* expr) {
     // Push the object onto the stack
     emitConstant(Value(obj));
 }
+
 
 void Compiler::visitThisExpr(const ThisExpr* expr) {
     (void)expr; // Unused parameter

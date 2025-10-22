@@ -160,6 +160,19 @@ say(10 != 5);  // true
 say(5 < 10);   // true
 ```
 
+**Note on Chained Comparisons:**
+Currently, the Neutron language does not fully support chained comparison operators in the form `a < b < c`. 
+While the parser may accept such expressions, they do not behave as expected (i.e., not equivalent to `(a < b) and (b < c)`).
+
+This is a known limitation that requires more sophisticated bytecode generation to implement properly with single evaluation semantics.
+
+As a workaround, use explicit comparisons joined with logical operators:
+
+```neutron
+// Instead of: a < b < c  (currently not working properly)
+// Use:        a < b and b < c  (recommended)
+```
+
 ### Logical Operators
 
 - `and`: Logical AND

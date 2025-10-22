@@ -1,0 +1,131 @@
+use arrays;
+use sys;
+
+say("=== Comprehensive Arrays Module Test ===");
+
+// Test 1: Basic array operations
+var arr = arrays.new();
+arrays.push(arr, 10);
+arrays.push(arr, 20);
+arrays.push(arr, 30);
+
+say("Basic operations test passed");
+
+// Test 2: Array access and modification
+var val = arrays.at(arr, 1);
+arrays.set(arr, 1, 25);
+
+say("Access and modification test passed");
+
+// Test 3: Array removal
+var popped = arrays.pop(arr);
+
+say("Removal test passed");
+
+// Test 4: Contains and index_of
+var testArr = arrays.new();
+arrays.push(testArr, "apple");
+arrays.push(testArr, "banana");
+arrays.push(testArr, "cherry");
+
+var hasBanana = arrays.contains(testArr, "banana");
+var noOrange = !arrays.contains(testArr, "orange");
+var bananaIndex = arrays.index_of(testArr, "banana");
+var orangeIndex = arrays.index_of(testArr, "orange");
+
+say("Contains and index_of test passed");
+
+// Test 5: Sorting and reversing
+var sortArr = arrays.new();
+arrays.push(sortArr, 5);
+arrays.push(sortArr, 2);
+arrays.push(sortArr, 8);
+arrays.push(sortArr, 1);
+
+arrays.sort(sortArr);
+arrays.reverse(sortArr);
+
+say("Sorting and reversing test passed");
+
+// Test 6: Range functionality
+var rangeArr = arrays.range(1);
+
+say("Range test passed");
+
+// Test 7: Cloning
+var original = arrays.new();
+arrays.push(original, 100);
+arrays.push(original, 200);
+var cloned = arrays.clone(original);
+
+say("Cloning test passed");
+
+// Test 8: Join functionality
+var joinArr = arrays.new();
+arrays.push(joinArr, "hello");
+arrays.push(joinArr, "world");
+var joined = arrays.join(joinArr);
+
+say("Join test passed");
+
+// Test 9: Flat functionality
+var nestedArr = arrays.new();
+arrays.push(nestedArr, 1);
+var inner = arrays.new();
+arrays.push(inner, 2);
+arrays.push(inner, 3);
+arrays.push(nestedArr, inner);
+
+var flattened = arrays.flat(nestedArr);
+
+say("Flat test passed");
+
+// Test 10: Slice functionality
+var sliceTest = arrays.range(3);
+var sliced = arrays.slice(sliceTest, 2, 5);
+
+say("Slice test passed");
+
+// Test 11: Shuffle functionality
+var shuffleTest = arrays.clone(rangeArr);
+arrays.shuffle(shuffleTest);
+
+say("Shuffle test passed");
+
+// Test 12: Fill functionality
+var fillTest = arrays.range(5);
+arrays.fill(fillTest, 0, 2, 5);
+
+say("Fill test passed");
+
+// Test 13: Remove functionality
+var removeTest = arrays.new();
+arrays.push(removeTest, "first");
+arrays.push(removeTest, "second");
+arrays.push(removeTest, "third");
+
+var removed = arrays.remove(removeTest, "second");
+var removedAt = arrays.remove_at(removeTest, 0);
+
+say("Remove test passed");
+
+// Test 14: Clear functionality
+var clearTest = arrays.new();
+arrays.push(clearTest, 1);
+arrays.push(clearTest, 2);
+arrays.push(clearTest, 3);
+
+arrays.clear(clearTest);
+
+say("Clear test passed");
+
+// Test 15: to_string functionality
+var strTest = arrays.new();
+arrays.push(strTest, 1);
+arrays.push(strTest, 2);
+var str = arrays.to_string(strTest);
+
+say("to_string test passed");
+
+say("");
+say("=== All Tests Passed ===");

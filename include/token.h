@@ -23,7 +23,7 @@ enum class TokenType {
     IDENTIFIER, STRING, NUMBER,
 
     // Keywords
-    AND, CLASS, ELSE, FALSE, FUN, FOR, IF, NIL, OR,
+    AND, CLASS, ELSE, ELIF, FALSE, FUN, FOR, IF, NIL, OR,
     SAY, RETURN, SUPER, THIS, TRUE, VAR, WHILE,
     BREAK, CONTINUE,
     MATCH, CASE, DEFAULT,  // Match statement

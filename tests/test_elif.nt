@@ -1,0 +1,87 @@
+// Test elif statement functionality
+use sys;
+
+say("=== Testing ELIF Statement ===");
+
+// Test 1: Basic elif chain
+var score = 85;
+
+if (score >= 90) {
+    say("Grade: A");
+} elif (score >= 80) {
+    say("Grade: B");
+} elif (score >= 70) {
+    say("Grade: C");
+} elif (score >= 60) {
+    say("Grade: D");
+} else {
+    say("Grade: F");
+}
+
+// Test 2: Only elif branches (no final else)
+var day = 3;
+
+if (day == 1) {
+    say("Monday");
+} elif (day == 2) {
+    say("Tuesday");
+} elif (day == 3) {
+    say("Wednesday");
+} elif (day == 4) {
+    say("Thursday");
+} elif (day == 5) {
+    say("Friday");
+}
+
+// Test 3: No elif branches, just if/else
+var isRaining = true;
+
+if (isRaining) {
+    say("Take an umbrella");
+} else {
+    say("Enjoy the weather");
+}
+
+// Test 4: Complex conditions
+var age = 25;
+var hasLicense = true;
+
+if (age < 16) {
+    say("Too young to drive");
+} elif (age >= 16 and age < 18) {
+    if (hasLicense) {
+        say("Teen driver with license");
+    } else {
+        say("Teen without license");
+    }
+} elif (age >= 18 and age < 65) {
+    if (hasLicense) {
+        say("Adult driver with license");
+    } else {
+        say("Adult without license");
+    }
+} else {
+    say("Senior citizen");
+}
+
+// Test 5: Nested elif statements
+var x = 10;
+var y = 20;
+
+if (x > 5) {
+    if (y > 15) {
+        say("Both x and y are large");
+    } elif (y > 10) {
+        say("x is large, y is medium");
+    } else {
+        say("x is large, y is small");
+    }
+} elif (x > 0) {
+    say("x is positive but small");
+} else {
+    say("x is zero or negative");
+}
+
+say("=== All ELIF Tests Passed ===");
+
+sys.exit(0);

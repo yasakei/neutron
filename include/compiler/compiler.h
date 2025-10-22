@@ -36,6 +36,8 @@ public:
     int resolveLocal(const Token& name);
     bool validateType(const std::optional<Token>& typeAnnotation, ValueType actualType);
     ValueType getExpressionType(const Expr* expr);
+    std::string valueTypeToString(ValueType type);
+    std::string tokenTypeToString(TokenType type);
 
 public:
     void visitLiteralExpr(const LiteralExpr* expr);

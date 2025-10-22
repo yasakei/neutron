@@ -1,0 +1,4 @@
+// fmt module - Format and type utilities for Neutron
+
+// This is the built-in fmt module that provides formatting and type checking utilities
+// All functions are implemented natively in C++ for performance

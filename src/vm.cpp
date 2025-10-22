@@ -24,8 +24,9 @@
 
 #include "capi.h"
 #include "json/native.h"
-#include "convert/native.h"
+#include "fmt/native.h"
 #include "time/native.h"
+#include "arrays/native.h"
 #include "math/native.h"
 #include "http/native.h"
 #include "modules/module_registry.h"
@@ -34,8 +35,8 @@ namespace neutron {
     
 // External symbols needed by bytecode_runner
 extern "C" {
-    const unsigned char bytecode_data[] = {0};  // Empty bytecode array
-    const unsigned int bytecode_size = 0;       // Size is 0
+    [[maybe_unused]] const unsigned char bytecode_data[] = {0};  // Empty bytecode array
+    [[maybe_unused]] const unsigned int bytecode_size = 0;       // Size is 0
 }
 
 bool isTruthy(const Value& value) {
@@ -595,7 +596,7 @@ void VM::run(size_t minFrameDepth) {
                 if (it == globals.end()) {
                     // Check if it looks like a module name (common module names)
                     if (name == "json" || name == "math" || name == "sys" || name == "http" || 
-                        name == "time" || name == "convert") {
+                        name == "time" || name == "fmt" || name == "arrays") {
                         runtimeError("Undefined variable '" + name + "'. Did you forget to import it? Use 'use " + name + ";' at the top of your file.");
                     } else {
                         runtimeError("Undefined variable '" + name + "'.");
@@ -1058,8 +1059,11 @@ void VM::load_module(const std::string& name) {
     if (name == "json") {
         neutron_init_json_module(this);
         return;
-    } else if (name == "convert") {
-        neutron_init_convert_module(this);
+    } else if (name == "fmt") {
+        neutron_init_fmt_module(this);
+        return;
+    } else if (name == "arrays") {
+        neutron_init_arrays_module(this);
         return;
     } else if (name == "time") {
         neutron_init_time_module(this);
