@@ -188,12 +188,32 @@ void Compiler::visitVariableExpr(const VariableExpr* expr) {
 }
 
 void Compiler::visitAssignExpr(const AssignExpr* expr) {
-    compileExpression(expr->value.get());
+    // Check if the variable has a type annotation
     int arg = resolveLocal(expr->name);
     if (arg != -1) {
-        emitBytes((uint8_t)OpCode::OP_SET_LOCAL, arg);
+        // It's a local variable, check if it has a type annotation
+        if (locals[arg].typeAnnotation.has_value()) {
+            Token typeAnnotation = locals[arg].typeAnnotation.value();
+            // Emit the value first
+            compileExpression(expr->value.get());
+            // Then emit the type-safe assignment instruction with the expected type
+            emitBytes((uint8_t)OpCode::OP_SET_LOCAL_TYPED, arg);
+            emitByte((uint8_t)typeAnnotation.type);
+        } else {
+            // No type annotation, use regular assignment
+            compileExpression(expr->value.get());
+            emitBytes((uint8_t)OpCode::OP_SET_LOCAL, arg);
+        }
     } else {
-        emitBytes((uint8_t)OpCode::OP_SET_GLOBAL, makeConstant(Value(expr->name.lexeme)));
+        // For global variables, we need to check if they have a type annotation
+        // Since we don't store type annotations for globals in the compiler,
+        // we need a different mechanism. For now, store type information in a special way.
+        // Look for a convention where we might store type info alongside the variable
+        
+        // For global variables, use the type-safe assignment which will check against stored type at runtime
+        compileExpression(expr->value.get());
+        // Use the type-safe assignment which will check against the stored type
+        emitBytes((uint8_t)OpCode::OP_SET_GLOBAL_TYPED, makeConstant(Value(expr->name.lexeme)));
     }
 }
 
@@ -224,10 +244,18 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
         // Perform compile-time type checking if type annotation exists
         if (stmt->typeAnnotation.has_value() && stmt->initializer) {
             ValueType exprType = getExpressionType(stmt->initializer.get());
-            if (exprType != ValueType::NIL && !validateType(stmt->typeAnnotation, exprType)) {
-                // Type mismatch warning (we don't throw since this is optional)
-                // In production, you might want to make this configurable
-                // For now, we'll allow it but could log a warning
+            // Debug: Print what we're checking
+            std::string expectedType = tokenTypeToString(stmt->typeAnnotation.value().type);
+            std::string actualType = valueTypeToString(exprType);
+            // For debugging, check if we have a type mismatch case
+            if (exprType != ValueType::NIL) {
+                bool isValid = validateType(stmt->typeAnnotation, exprType);
+                if (!isValid) {
+                    // Type mismatch - throw an error to enforce type safety
+                    throw std::runtime_error("Type mismatch on line " + std::to_string(stmt->name.line) + 
+                                             ": Cannot assign value of type '" + actualType + 
+                                             "' to variable of type '" + expectedType + "'");
+                }
             }
         }
 
@@ -248,7 +276,15 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
     } else {
         emitByte((uint8_t)OpCode::OP_NIL);
     }
-    emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(stmt->name.lexeme)));
+    
+    // If there's a type annotation, use the typed define instruction
+    if (stmt->typeAnnotation.has_value()) {
+        emitBytes((uint8_t)OpCode::OP_DEFINE_TYPED_GLOBAL, makeConstant(Value(stmt->name.lexeme)));
+        emitByte((uint8_t)stmt->typeAnnotation.value().type);
+    } else {
+        // Use regular define for variables without type annotations
+        emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(stmt->name.lexeme)));
+    }
 }
 
 void Compiler::visitBlockStmt(const BlockStmt* stmt) {
@@ -614,6 +650,35 @@ void Compiler::visitContinueStmt(const ContinueStmt* stmt) {
     // Emit a forward jump to the continue target (end of loop body, before loop back)
     int jump = emitJump((uint8_t)OpCode::OP_JUMP);
     continueJumps.back().push_back(jump);
+}
+
+std::string Compiler::valueTypeToString(ValueType type) {
+    switch (type) {
+        case ValueType::NIL: return "nil";
+        case ValueType::BOOLEAN: return "bool";
+        case ValueType::NUMBER: return "number";
+        case ValueType::STRING: return "string";
+        case ValueType::ARRAY: return "array";
+        case ValueType::OBJECT: return "object";
+        case ValueType::CALLABLE: return "function";
+        case ValueType::MODULE: return "module";
+        case ValueType::CLASS: return "class";
+        case ValueType::INSTANCE: return "instance";
+        default: return "unknown";
+    }
+}
+
+std::string Compiler::tokenTypeToString(TokenType type) {
+    switch (type) {
+        case TokenType::TYPE_INT: return "int";
+        case TokenType::TYPE_FLOAT: return "float";
+        case TokenType::TYPE_STRING: return "string";
+        case TokenType::TYPE_BOOL: return "bool";
+        case TokenType::TYPE_ARRAY: return "array";
+        case TokenType::TYPE_OBJECT: return "object";
+        case TokenType::TYPE_ANY: return "any";
+        default: return "unknown";
+    }
 }
 
 bool Compiler::validateType(const std::optional<Token>& typeAnnotation, ValueType actualType) {

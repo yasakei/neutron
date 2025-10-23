@@ -83,6 +83,7 @@ public:
     uint8_t* ip;
     std::vector<Value> stack;
     std::unordered_map<std::string, Value> globals;
+    std::unordered_map<std::string, TokenType> globalTypes;  // Track type annotations for global variables
     std::vector<std::string> module_search_paths;
     std::vector<Object*> heap;
     size_t nextGC;

@@ -611,6 +611,15 @@ void VM::run(size_t minFrameDepth) {
                 pop();
                 break;
             }
+            case (uint8_t)OpCode::OP_DEFINE_TYPED_GLOBAL: {
+                std::string name = READ_STRING();
+                TokenType type = static_cast<TokenType>(READ_BYTE());
+                
+                globals[name] = stack.back();
+                globalTypes[name] = type;  // Store the type information
+                pop();
+                break;
+            }
             case (uint8_t)OpCode::OP_SET_GLOBAL: {
                 std::string name = READ_STRING();
                 auto it = globals.find(name);
@@ -618,6 +627,169 @@ void VM::run(size_t minFrameDepth) {
                     runtimeError("Undefined variable '" + name + "'.");
                 }
                 globals[name] = stack.back();
+                break;
+            }
+            case (uint8_t)OpCode::OP_SET_GLOBAL_TYPED: {
+                std::string name = READ_STRING();
+                
+                auto it = globals.find(name);
+                if (it == globals.end()) {
+                    runtimeError("Undefined variable '" + name + "'.");
+                }
+                
+                // Look up the expected type for this global variable
+                auto typeIt = globalTypes.find(name);
+                if (typeIt == globalTypes.end()) {
+                    // If no type is stored, fall back to regular assignment
+                    globals[name] = stack.back();
+                    break;
+                }
+                
+                TokenType expectedType = typeIt->second;
+                Value value = stack.back();
+                
+                // Check type compatibility
+                bool isValid = false;
+                switch (expectedType) {
+                    case TokenType::TYPE_INT:
+                    case TokenType::TYPE_FLOAT:
+                        isValid = value.type == ValueType::NUMBER;
+                        break;
+                    case TokenType::TYPE_STRING:
+                        isValid = value.type == ValueType::STRING;
+                        break;
+                    case TokenType::TYPE_BOOL:
+                        isValid = value.type == ValueType::BOOLEAN;
+                        break;
+                    case TokenType::TYPE_ARRAY:
+                        isValid = value.type == ValueType::ARRAY;
+                        break;
+                    case TokenType::TYPE_OBJECT:
+                        isValid = value.type == ValueType::OBJECT;
+                        break;
+                    case TokenType::TYPE_ANY:
+                        isValid = true;
+                        break;
+                    default:
+                        isValid = true; // Unknown types are allowed
+                        break;
+                }
+                
+                if (!isValid) {
+                    std::string expectedTypeName;
+                    switch (expectedType) {
+                        case TokenType::TYPE_INT:
+                        case TokenType::TYPE_FLOAT:
+                            expectedTypeName = "number";
+                            break;
+                        case TokenType::TYPE_STRING:
+                            expectedTypeName = "string";
+                            break;
+                        case TokenType::TYPE_BOOL:
+                            expectedTypeName = "boolean";
+                            break;
+                        case TokenType::TYPE_ARRAY:
+                            expectedTypeName = "array";
+                            break;
+                        case TokenType::TYPE_OBJECT:
+                            expectedTypeName = "object";
+                            break;
+                        case TokenType::TYPE_ANY:
+                            expectedTypeName = "any";
+                            break;
+                        default:
+                            expectedTypeName = "unknown";
+                            break;
+                    }
+                    
+                    std::string actualTypeName = value.type == ValueType::NIL ? "nil" : 
+                                                  value.type == ValueType::BOOLEAN ? "boolean" :
+                                                  value.type == ValueType::NUMBER ? "number" :
+                                                  value.type == ValueType::STRING ? "string" :
+                                                  value.type == ValueType::ARRAY ? "array" :
+                                                  value.type == ValueType::OBJECT ? "object" :
+                                                  "callable";
+                    
+                    runtimeError("Type mismatch: Cannot assign value of type '" + actualTypeName + 
+                                "' to variable of type '" + expectedTypeName + "'");
+                }
+                
+                globals[name] = value;
+                break;
+            }
+            case (uint8_t)OpCode::OP_SET_LOCAL_TYPED: {
+                uint8_t slot = READ_BYTE();
+                TokenType expectedType = static_cast<TokenType>(READ_BYTE());
+                
+                Value value = stack.back();
+                
+                // Check type compatibility
+                bool isValid = false;
+                switch (expectedType) {
+                    case TokenType::TYPE_INT:
+                    case TokenType::TYPE_FLOAT:
+                        isValid = value.type == ValueType::NUMBER;
+                        break;
+                    case TokenType::TYPE_STRING:
+                        isValid = value.type == ValueType::STRING;
+                        break;
+                    case TokenType::TYPE_BOOL:
+                        isValid = value.type == ValueType::BOOLEAN;
+                        break;
+                    case TokenType::TYPE_ARRAY:
+                        isValid = value.type == ValueType::ARRAY;
+                        break;
+                    case TokenType::TYPE_OBJECT:
+                        isValid = value.type == ValueType::OBJECT;
+                        break;
+                    case TokenType::TYPE_ANY:
+                        isValid = true;
+                        break;
+                    default:
+                        isValid = true; // Unknown types are allowed
+                        break;
+                }
+                
+                if (!isValid) {
+                    std::string expectedTypeName;
+                    switch (expectedType) {
+                        case TokenType::TYPE_INT:
+                        case TokenType::TYPE_FLOAT:
+                            expectedTypeName = "number";
+                            break;
+                        case TokenType::TYPE_STRING:
+                            expectedTypeName = "string";
+                            break;
+                        case TokenType::TYPE_BOOL:
+                            expectedTypeName = "boolean";
+                            break;
+                        case TokenType::TYPE_ARRAY:
+                            expectedTypeName = "array";
+                            break;
+                        case TokenType::TYPE_OBJECT:
+                            expectedTypeName = "object";
+                            break;
+                        case TokenType::TYPE_ANY:
+                            expectedTypeName = "any";
+                            break;
+                        default:
+                            expectedTypeName = "unknown";
+                            break;
+                    }
+                    
+                    std::string actualTypeName = value.type == ValueType::NIL ? "nil" : 
+                                                  value.type == ValueType::BOOLEAN ? "boolean" :
+                                                  value.type == ValueType::NUMBER ? "number" :
+                                                  value.type == ValueType::STRING ? "string" :
+                                                  value.type == ValueType::ARRAY ? "array" :
+                                                  value.type == ValueType::OBJECT ? "object" :
+                                                  "callable";
+                    
+                    runtimeError("Type mismatch: Cannot assign value of type '" + actualTypeName + 
+                                "' to variable of type '" + expectedTypeName + "'");
+                }
+                
+                stack[frame->slot_offset + slot] = value;
                 break;
             }
             case (uint8_t)OpCode::OP_GET_PROPERTY: {

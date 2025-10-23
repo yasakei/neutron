@@ -22,6 +22,9 @@ enum class OpCode : uint8_t {
     OP_GET_GLOBAL,
     OP_DEFINE_GLOBAL,
     OP_SET_GLOBAL,
+    OP_SET_GLOBAL_TYPED,  // Type-safe global assignment
+    OP_SET_LOCAL_TYPED,   // Type-safe local assignment
+    OP_DEFINE_TYPED_GLOBAL,  // Define a global variable with type annotation
     OP_GET_PROPERTY,
     OP_SET_PROPERTY,
     OP_EQUAL,

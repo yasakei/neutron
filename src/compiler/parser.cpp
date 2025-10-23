@@ -5,8 +5,61 @@
 #include <iostream>
 #include <memory>
 #include "compiler/compiler.h"
+#include "types/value.h"
 
 namespace neutron {
+
+// Helper functions
+ValueType tokenTypeToValueType(TokenType type) {
+    switch (type) {
+        case TokenType::TYPE_INT: return ValueType::NUMBER;
+        case TokenType::TYPE_FLOAT: return ValueType::NUMBER;
+        case TokenType::TYPE_STRING: return ValueType::STRING;
+        case TokenType::TYPE_BOOL: return ValueType::BOOLEAN;
+        case TokenType::TYPE_ARRAY: return ValueType::ARRAY;
+        case TokenType::TYPE_OBJECT: return ValueType::OBJECT;
+        default: return ValueType::NIL; // Should not happen
+    }
+}
+
+std::string tokenTypeToString(TokenType type) {
+    switch (type) {
+        case TokenType::TYPE_INT: return "int";
+        case TokenType::TYPE_FLOAT: return "float";
+        case TokenType::TYPE_STRING: return "string";
+        case TokenType::TYPE_BOOL: return "bool";
+        case TokenType::TYPE_ARRAY: return "array";
+        case TokenType::TYPE_OBJECT: return "object";
+        case TokenType::TYPE_ANY: return "any";
+        default: return "unknown";
+    }
+}
+
+std::string valueTypeToString(ValueType type) {
+    switch (type) {
+        case ValueType::NIL: return "nil";
+        case ValueType::BOOLEAN: return "bool";
+        case ValueType::NUMBER: return "number";
+        case ValueType::STRING: return "string";
+        case ValueType::ARRAY: return "array";
+        case ValueType::OBJECT: return "object";
+        case ValueType::CALLABLE: return "callable";
+        case ValueType::MODULE: return "module";
+        case ValueType::CLASS: return "class";
+        case ValueType::INSTANCE: return "instance";
+        default: return "unknown";
+    }
+}
+
+ValueType literalValueTypeToValueType(LiteralValueType type) {
+    switch (type) {
+        case LiteralValueType::NIL: return ValueType::NIL;
+        case LiteralValueType::BOOLEAN: return ValueType::BOOLEAN;
+        case LiteralValueType::NUMBER: return ValueType::NUMBER;
+        case LiteralValueType::STRING: return ValueType::STRING;
+        default: return ValueType::NIL; // Should not happen
+    }
+}
 
 Parser::Parser(const std::vector<Token>& tokens)
     : tokens(tokens), current(0) {}
@@ -115,6 +168,17 @@ std::unique_ptr<Stmt> Parser::varDeclaration() {
     std::unique_ptr<Expr> initializer = nullptr;
     if (match({TokenType::EQUAL})) {
         initializer = expression();
+    }
+
+    if (typeAnnotation && initializer && typeAnnotation->type != TokenType::TYPE_ANY) {
+        if (initializer->type == ExprType::LITERAL) {
+            LiteralExpr* literal = static_cast<LiteralExpr*>(initializer.get());
+            ValueType expectedType = tokenTypeToValueType(typeAnnotation->type);
+            ValueType actualType = literalValueTypeToValueType(literal->valueType);
+            if (actualType != expectedType) {
+                error(name, "Invalid type assignment. Expected " + tokenTypeToString(typeAnnotation->type) + " but got " + valueTypeToString(actualType) + ".");
+            }
+        }
     }
     
     consume(TokenType::SEMICOLON, "Expect ';' after variable declaration.");
