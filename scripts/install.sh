@@ -53,8 +53,8 @@ if [ -d "lib" ]; then
 fi
 
 # Copy headers
-sudo mkdir -p "${PREFIX}/bin/neutron/include"
-sudo cp -r include/* "${PREFIX}/bin/neutron/include"
+sudo mkdir -p "${PREFIX}/bin/include"
+sudo cp -r include/* "${PREFIX}/bin/include"
 
 # Set permissions
 sudo chmod +x "${PREFIX}/bin/neutron"
