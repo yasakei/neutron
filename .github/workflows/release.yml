@@ -85,8 +85,7 @@ jobs:
         cp README.md LICENSE neutron-linux-x64/
         cp -r docs neutron-linux-x64/
         cp -r include neutron-linux-x64/
-        mkdir -p neutron-linux-x64/scripts
-        cp scripts/install.sh neutron-linux-x64/scripts/
+        cp scripts/install.sh neutron-linux-x64/
         cp nt-box/build/box neutron-linux-x64/ 2>/dev/null || true
         tar -czf neutron-${{ needs.create-release.outputs.version }}-linux-x64.tar.gz neutron-linux-x64
         
@@ -132,8 +131,7 @@ jobs:
         cp README.md LICENSE neutron-macos-x64/
         cp -r docs neutron-macos-x64/
         cp -r include neutron-macos-x64/
-        mkdir -p neutron-macos-x64/scripts
-        cp scripts/install.sh neutron-macos-x64/scripts/
+        cp scripts/install.sh neutron-macos-x64/
         cp nt-box/build/box neutron-macos-x64/ 2>/dev/null || true
         tar -czf neutron-${{ needs.create-release.outputs.version }}-macos-x64.tar.gz neutron-macos-x64
         
@@ -186,15 +184,15 @@ jobs:
         
     - name: Package
       run: |
-        mkdir -p neutron-windows-x64
-        cp build/neutron.exe neutron-windows-x64/
+        mkdir -p neutron-windows-x86_64
+        cp build/neutron.exe neutron-windows-x86_64/
         cp build/*.dll neutron-windows-x64/ 2>/dev/null || true
-        cp README.md LICENSE neutron-windows-x64/
+        cp README.md LICENSE neutron-windows-x86_64/
         cp -r docs neutron-windows-x64/
-        cp -r include neutron-windows-x64/
-        cp nt-box/build/box.exe neutron-windows-x64/ 2>/dev/null || true
+        cp -r include neutron-windows-x86_64/
+        cp nt-box/build/box.exe neutron-windows-x86_64/ 2>/dev/null || true
         cd neutron-windows-x64
-        zip -r ../neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip .
+        zip -r ../neutron-${{ needs.create-release.outputs.version }}-windows-x86_64.zip .
         cd ..
         
     - name: Upload Release Asset
@@ -203,6 +201,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip
-        asset_name: neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip
+        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-windows-x86_64.zip
+        asset_name: neutron-${{ needs.create-release.outputs.version }}-windows-x86_64.zip
         asset_content_type: application/zip

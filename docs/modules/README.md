@@ -91,7 +91,7 @@ sys.read("file.txt")
 sys.write("file.txt", "content")
 sys.exists("file.txt")
 
-// Math operations  
+// Math operations  Conver
 math.add(a, b)
 math.pow(base, exponent)
 math.sqrt(number)

@@ -385,63 +385,68 @@ say(nil);                      // Output:
 
 ### Type Conversion Functions
 
-- `str(number)`: Converts a number to a string.
-- `int(string)`: Converts a string to an integer.
+Neutron provides type conversion capabilities through the `fmt` module. These functions perform dynamic type conversion with appropriate error handling:
+
+**Available Functions in `fmt` Module:**
+- `fmt.to_str(value)`: Converts a value to its string representation.
+- `fmt.to_int(value)`: Converts a value to an integer.
+- `fmt.to_float(value)`: Converts a value to a float.
+- `fmt.to_bin(value)`: Converts a value to its binary string representation.
+- `fmt.type(value)`: Returns the type of the value as a string.
 
 ```neutron
+use fmt;
+
 var num = 42;
-var text = str(num);           // "42"
+var text = fmt.to_str(num);           // "42"
 say("Number as string: " + text);
 
 var numberText = "123";
-var number = int(numberText);  // 123
+var number = fmt.to_int(numberText);  // 123
 say("String as number: " + number);
-```
 
-### Binary Conversion Functions
+// Type detection
+var type = fmt.type(42);              // "number"
+say("Type of 42: " + type);
 
-- `int_to_bin(number)`: Converts an integer to a binary string.
-- `bin_to_int(string)`: Converts a binary string to an integer.
+// Float conversion
+var floatNum = fmt.to_float("3.14");  // 3.14
+say("Float: " + floatNum);
 
-```neutron
-var decimal = 10;
-var binary = int_to_bin(decimal);    // "1010"
+// Binary conversion
+var binary = fmt.to_bin(10);          // "1010"
 say("10 in binary: " + binary);
-
-var binaryStr = "1111";
-var decimalVal = bin_to_int(binaryStr); // 15
-say("1111 in decimal: " + decimalVal);
 ```
 
-### Character/ASCII Functions
+#### String Manipulation
 
-- `char_to_int(string)`: Converts a single-character string to its ASCII value.
-- `int_to_char(number)`: Converts a number (ASCII value) to a single-character string.
-
-```neutron
-var character = "A";
-var ascii = char_to_int(character);   // 65
-say("ASCII value of A: " + ascii);
-
-var asciiCode = 65;
-var char = int_to_char(asciiCode);    // "A"
-say("Character for ASCII 65: " + char);
-```
-
-### String Manipulation Functions
-
-- `string_length(string)`: Returns the length of the string.
-- `string_get_char_at(string, index)`: Returns the character at the given index.
+When working with strings, Neutron provides methods that can be accessed on string values directly or through array operations (since strings can be treated as character arrays in certain contexts):
 
 ```neutron
+// String length using array method (strings support array-like operations)
 var text = "Hello";
-var length = string_length(text);     // 5
+var length = text.length;             // 5
 say("Length of 'Hello': " + length);
 
-var firstChar = string_get_char_at(text, 0);  // "H"
-var lastChar = string_get_char_at(text, 4);   // "o"
-say("First character: " + firstChar);
-say("Last character: " + lastChar);
+// For character access, you can use array indexing
+say("First character: " + text[0]);   // "H"
+say("Last character: " + text[4]);    // "o"
+```
+
+**Note:** The `char_to_int`, `int_to_char`, `string_length`, and `string_get_char_at` functions are available in the `fmt` module rather than as global functions:
+
+```neutron
+use fmt;
+
+// These functions are provided in the fmt module
+// For character/ASCII operations, you can use fmt.to_int and fmt.to_str
+var type = fmt.type("A");                   // "string"
+var intVal = fmt.to_int(65.0);              // 65
+var strVal = fmt.to_str("Hello");           // "Hello"
+
+say("Type detection: " + type);
+say("Converted int: " + intVal);
+say("Converted string: " + strVal);
 ```
 
 ## Modules
@@ -472,7 +477,8 @@ var result = math.sqrt(16);
 - `sys` - File I/O, directory operations, environment access, process control (fully implemented)
 - `json` - JSON parsing and stringification
 - `math` - Mathematical operations
-- `convert` - Type conversion utilities
+- `fmt` - Type conversion and formatting utilities
+- `arrays` - Array manipulation and utility functions
 - `time` - Time and date functions
 - `http` - HTTP client operations
 
@@ -502,7 +508,7 @@ say(greet("World"));
 
 **File Search Paths:**
 Files are searched in the following order:
-1. Current directory (`.`)
+1. Current directory (`.`).
 2. `lib/` directory
 3. `.box/modules/` directory (for installed modules)
 
@@ -648,23 +654,90 @@ var name = json.get(parsed, "name"); // "Alice"
 - `json.parse(jsonString)`: Parse JSON string into object/array
 - `json.get(object, key)`: Get property value from object, returns `nil` if not found
 
-### The `convert` Module
+### The `fmt` Module
 
-The `convert` module provides advanced string and binary conversion utilities (extends the built-in conversion functions).
+The `fmt` module provides advanced type conversion and formatting utilities that must be imported before use.
 
 ```neutron
-use convert;
+use fmt;
 
-// These functions are also available globally
-var ascii = convert.char_to_int("A");      // 65
-var character = convert.int_to_char(65);   // "A"
-var length = convert.string_length("hello"); // 5
-var char = convert.string_get_char_at("hello", 1); // "e"
+// Type conversion functions
+var numStr = fmt.to_str(42);              // "42"
+var intVal = fmt.to_int("123");           // 123
+var floatVal = fmt.to_float("3.14");      // 3.14
+var binVal = fmt.to_bin(10);              // "1010"
+var typeStr = fmt.type(42);               // "number"
 
-// Binary conversions
-var binary = convert.int_to_bin(10);       // "1010"
-var decimal = convert.bin_to_int("1010");  // 10
+say("Number as string: " + numStr);
+say("String as integer: " + intVal);
+say("Float value: " + floatVal);
+say("Binary representation: " + binVal);
+say("Type: " + typeStr);
 ```
+
+**Available Functions:**
+- `fmt.to_str(value)`: Converts a value to its string representation
+- `fmt.to_int(value)`: Converts a value to an integer
+- `fmt.to_float(value)`: Converts a value to a float
+- `fmt.to_bin(value)`: Converts a value to its binary string representation  
+- `fmt.type(value)`: Returns the type of the value as a string
+
+**Type Conversion Behavior:**
+- `fmt.to_int()` converts numbers to integers (truncates decimal parts), strings to integers via parsing, booleans to 0/1, and nil to 0
+- `fmt.to_str()` converts values to their string representation
+- `fmt.to_float()` converts values to floating-point numbers
+- `fmt.to_bin()` converts values to their binary representation
+- `fmt.type()` returns type names like "number", "string", "bool", "array", "object", etc.
+
+### The `arrays` Module
+
+The `arrays` module provides comprehensive array manipulation and utility functions that must be imported before use.
+
+```neutron
+use arrays;
+
+// Create and manipulate arrays
+var arr = arrays.new();
+arrays.push(arr, 1);
+arrays.push(arr, 2);
+arrays.push(arr, 3);
+
+var length = arrays.length(arr);    // 3
+var element = arrays.at(arr, 0);    // 1
+var last = arrays.pop(arr);         // 3
+arrays.set(arr, 0, 10);             // Set first element to 10
+
+// Array operations
+arrays.reverse(arr);
+arrays.sort(arr);
+var index = arrays.index_of(arr, 10); // Find index of value
+var hasValue = arrays.contains(arr, 10); // Check if array contains value
+var joined = arrays.join(arr, ", ");    // Join elements with separator
+var sliced = arrays.slice(arr, 0, 2);   // Get subarray
+```
+
+**Available Functions:**
+- `arrays.new()`: Creates a new empty array
+- `arrays.length(array)`: Returns the length of the array
+- `arrays.push(array, value)`: Adds element to the end of the array
+- `arrays.pop(array)`: Removes and returns the last element
+- `arrays.at(array, index)`: Returns element at the specified index
+- `arrays.set(array, index, value)`: Sets element at the specified index
+- `arrays.reverse(array)`: Reverses the array in place
+- `arrays.sort(array)`: Sorts the array in place
+- `arrays.index_of(array, value)`: Returns index of first occurrence
+- `arrays.contains(array, value)`: Checks if array contains the value
+- `arrays.join(array, separator)`: Joins elements into a string with separator
+- `arrays.slice(array, start, end)`: Returns a subarray
+- `arrays.clear(array)`: Removes all elements from the array
+- `arrays.clone(array)`: Creates a shallow copy of the array
+- `arrays.remove(array, value)`: Removes first occurrence of a value
+- `arrays.remove_at(array, index)`: Removes element at specified index
+- `arrays.to_string(array)`: Converts array to string representation
+- `arrays.flat(array)`: Flattens nested arrays
+- `arrays.fill(array, value, start, end)`: Fills array with value
+- `arrays.range(start, end, step)`: Creates array of numbers in range
+- `arrays.shuffle(array)`: Randomly shuffles the array elements
 
 ### The `http` Module
 
@@ -854,7 +927,7 @@ say(rect.toString());                // "Rectangle(5x3)"
 
 Neutron supports `if` and `else` statements for conditional execution.
 
-```neutron
+```python
 var score = 85;
 
 if (score >= 90) {
@@ -874,7 +947,7 @@ if (score >= 90) {
 
 The `while` loop executes a block of code as long as a condition is true.
 
-```neutron
+```python
 var i = 0;
 while (i < 5) {
     say("Count: " + i);
@@ -897,7 +970,7 @@ while (running) {
 
 The `for` loop provides a more compact way to write loops with initialization, condition, and increment.
 
-```neutron
+```python
 for (var i = 0; i < 10; i = i + 1) {
     say("Number: " + i);
 }
@@ -917,7 +990,7 @@ Neutron supports two types of modules:
 1. **Neutron Modules** (`.nt` files): Written in Neutron language
 2. **Native Modules** (`.so`/`.dll`/`.dylib` files): Written in C++ for performance or system integration
 
-```neutron
+```python
 // Import built-in modules
 use sys;
 use json;
@@ -966,7 +1039,7 @@ This creates optimized, standalone executables that don't require the Neutron in
 
 Neutron provides runtime error reporting with descriptive messages:
 
-```neutron
+```python
 // Division by zero
 var result = 10 / 0;  // Runtime error: Division by zero.
 
@@ -985,7 +1058,7 @@ Neutron follows these truthiness rules:
 - `false` is falsy  
 - Everything else is truthy (including `0`, empty strings, etc.)
 
-```neutron
+```python
 if (nil) {
     say("This won't print");
 }
@@ -998,7 +1071,7 @@ if (0) {
     say("This WILL print - 0 is truthy");
 }
 
-if ("") {
+if ("" ) {
     say("This WILL print - empty string is truthy");
 }
 ```
@@ -1009,7 +1082,7 @@ Here are some complete example programs demonstrating various Neutron features:
 
 ### File Processing with System Operations
 
-```neutron
+```python
 use sys;
 use json;
 
@@ -1050,7 +1123,7 @@ say("Cleanup completed");
 
 ### Object-Oriented Calculator
 
-```neutron
+```python
 use math;
 
 class Calculator {
@@ -1101,7 +1174,7 @@ say("Power: " + power);
 
 ### Web API Client
 
-```neutron
+```python
 use http;
 use json;
 use sys;

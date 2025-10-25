@@ -28,7 +28,7 @@ Neutron is a simple, modern, and lightweight interpreted programming language wr
 - **Modular:** Supports both native C++ modules and Neutron language modules for organizing code.
 - **File Imports:** Import other `.nt` files with the `using 'filename.nt';` syntax.
 - **Binary Compilation:** Convert scripts to standalone executables with full module support.
-- **Array Support:** Dynamic arrays with literal syntax, indexing, and built-in functions.
+- **Array Support:** Dynamic arrays with literal syntax, indexing, and a dedicated `arrays` module.
 - **Enhanced Control Flow:** Fixed stack management issues in loops and conditionals for more reliable execution.
 - **Improved Module System:** Robust module loading with proper recursive function support and helpful error messages.
 
@@ -230,6 +230,8 @@ person.greet();
 **Arrays**
 
 ```neutron
+use arrays;
+
 // Array literal syntax
 var numbers = [1, 2, 3, 4, 5];
 var fruits = ["apple", "banana", "cherry"];
@@ -239,11 +241,11 @@ say(numbers[0]);      // 1
 numbers[0] = 100;
 say(numbers);         // [100, 2, 3, 4, 5]
 
-// Array manipulation with native functions
-var arr = array_new();
-array_push(arr, "hello");
-array_push(arr, "world");
-say(array_length(arr));  // 2
+// Array manipulation with the arrays module
+var arr = arrays.new();
+arrays.push(arr, "hello");
+arrays.push(arr, "world");
+say(arrays.length(arr));  // 2
 say(arr);                // [hello, world]
 ```
 

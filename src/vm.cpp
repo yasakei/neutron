@@ -83,13 +83,6 @@ VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>") {  // Start GC 
     globals["say"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_say), 1));
     
     // Register array functions
-    globals["array_new"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_new), 0));
-    globals["array_push"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_push), 2));
-    globals["array_pop"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_pop), 1));
-    globals["array_length"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_length), 1));
-    globals["array_at"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_at), 2));
-    globals["array_set"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_array_set), 3));
-    
     // Built-in modules (sys, math, json, http, time, convert) are now loaded on-demand
     // when explicitly imported with "use modulename;"
     

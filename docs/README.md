@@ -12,7 +12,6 @@ Getting started and building instructions
 Language and API reference
 - [language_reference.md](reference/language_reference.md) - Complete language syntax
 - [module_system.md](reference/module_system.md) - Module loading and usage
-- [array_implementation.md](reference/array_implementation.md) - Array internals
 - [binary_conversion.md](reference/binary_conversion.md) - Binary compilation
 - [box_modules.md](reference/box_modules.md) - Box module system
 - [cross_platform.md](reference/cross_platform.md) - Platform compatibility
@@ -30,9 +29,11 @@ Error handling system
 
 ### 📦 [modules/](modules/)
 Built-in module documentation
-- [sys_module.md](modules/sys_module.md)
-- [math_module.md](modules/math_module.md)
-- [http_module.md](modules/http_module.md)
-- [json_module.md](modules/json_module.md)
-- [time_module.md](modules/time_module.md)
-- [fmt_module.md](modules/fmt_module.md)
+- [arrays_module.md](modules/arrays_module.md) - Array manipulation and utility functions
+- [convert_module.md](modules/convert_module.md) - Legacy string and binary conversion utilities
+- [fmt_module.md](modules/fmt_module.md) - Dynamic type conversion and detection utilities
+- [http_module.md](modules/http_module.md) - HTTP client functionality
+- [json_module.md](modules/json_module.md) - JSON parsing and serialization
+- [math_module.md](modules/math_module.md) - Mathematical operations
+- [sys_module.md](modules/sys_module.md) - System operations and file I/O
+- [time_module.md](modules/time_module.md) - Time and date functions

@@ -32,18 +32,18 @@ print_msg "Installing Neutron to ${PREFIX}..." "$GREEN"
 print_msg "Detected OS: ${OS}" "$YELLOW"
 
 # Copy binaries
-sudo cp bin/neutron "${PREFIX}/bin/"
-sudo cp bin/box "${PREFIX}/bin/"
+sudo cp neutron "${PREFIX}/bin/"
+sudo cp box "${PREFIX}/bin/"
 
 # Copy runtime libraries to both bin and lib (for different rpath configurations)
 if [ "$OS" = "linux" ]; then
-    sudo cp bin/libneutron_runtime*.so* "${PREFIX}/lib/" 2>/dev/null || true
-    sudo cp bin/libneutron_runtime*.so* "${PREFIX}/bin/" 2>/dev/null || true
+    sudo cp libneutron_runtime*.so* "${PREFIX}/lib/" 2>/dev/null || true
+    sudo cp libneutron_runtime*.so* "${PREFIX}/bin/" 2>/dev/null || true
     # Update library cache on Linux
     sudo ldconfig 2>/dev/null || true
 elif [ "$OS" = "macos" ]; then
-    sudo cp bin/libneutron_runtime*.dylib "${PREFIX}/lib/" 2>/dev/null || true
-    sudo cp bin/libneutron_runtime*.dylib "${PREFIX}/bin/" 2>/dev/null || true
+    sudo cp libneutron_runtime*.dylib "${PREFIX}/lib/" 2>/dev/null || true
+    sudo cp libneutron_runtime*.dylib "${PREFIX}/bin/" 2>/dev/null || true
 fi
 
 # Copy standard library modules
