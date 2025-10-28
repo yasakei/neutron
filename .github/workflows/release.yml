@@ -46,8 +46,8 @@ jobs:
         draft: false
         prerelease: ${{ contains(steps.get_version.outputs.version, 'alpha') || contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'rc') }}
 
-  build-linux:
-    name: Build Linux Release
+  build-linux-x64:
+    name: Build Linux x64 Release
     needs: create-release
     runs-on: ubuntu-latest
     
@@ -99,8 +99,71 @@ jobs:
         asset_name: neutron-${{ needs.create-release.outputs.version }}-linux-x64.tar.gz
         asset_content_type: application/gzip
 
-  build-macos:
-    name: Build macOS Release
+  build-linux-arm64:
+    name: Build Linux ARM64 Release
+    needs: create-release
+    runs-on: ubuntu-20.04  # Using a specific runner version
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install dependencies for ARM64
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          pkg-config \
+          gcc-aarch64-linux-gnu \
+          g++-aarch64-linux-gnu \
+          libcurl4-openssl-dev \
+          libjsoncpp-dev
+          
+    - name: Build Neutron ARM64
+      run: |
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_SYSTEM_NAME=Linux \
+          -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+          -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
+        cmake --build build -j$(nproc)
+        
+    - name: Build nt-box ARM64
+      run: |
+        cd nt-box
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_SYSTEM_NAME=Linux \
+          -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+          -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
+        cmake --build build
+        cd ..
+        
+    - name: Package
+      run: |
+        mkdir -p neutron-linux-arm64
+        cp neutron neutron-linux-arm64/
+        cp libneutron_runtime.so* neutron-linux-arm64/ 2>/dev/null || true
+        cp README.md LICENSE neutron-linux-arm64/
+        cp -r docs neutron-linux-arm64/
+        cp -r include neutron-linux-arm64/
+        cp scripts/install.sh neutron-linux-arm64/
+        cp nt-box/build/box neutron-linux-arm64/ 2>/dev/null || true
+        tar -czf neutron-${{ needs.create-release.outputs.version }}-linux-arm64.tar.gz neutron-linux-arm64
+        
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-linux-arm64.tar.gz
+        asset_name: neutron-${{ needs.create-release.outputs.version }}-linux-arm64.tar.gz
+        asset_content_type: application/gzip
+
+  build-macos-universal:
+    name: Build macOS Universal Release
     needs: create-release
     runs-on: macos-latest
     
@@ -111,29 +174,29 @@ jobs:
     - name: Install dependencies
       run: brew install cmake curl jsoncpp
       
-    - name: Build Neutron
+    - name: Build Neutron Universal
       run: |
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
         cmake --build build -j$(sysctl -n hw.ncpu)
         
-    - name: Build nt-box
+    - name: Build nt-box Universal
       run: |
         cd nt-box
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
         cmake --build build
         cd ..
         
     - name: Package
       run: |
-        mkdir -p neutron-macos-x64
-        cp neutron neutron-macos-x64/
-        cp libneutron_runtime.dylib* neutron-macos-x64/ 2>/dev/null || true
-        cp README.md LICENSE neutron-macos-x64/
-        cp -r docs neutron-macos-x64/
-        cp -r include neutron-macos-x64/
-        cp scripts/install.sh neutron-macos-x64/
-        cp nt-box/build/box neutron-macos-x64/ 2>/dev/null || true
-        tar -czf neutron-${{ needs.create-release.outputs.version }}-macos-x64.tar.gz neutron-macos-x64
+        mkdir -p neutron-macos-universal
+        cp neutron neutron-macos-universal/
+        cp libneutron_runtime.dylib* neutron-macos-universal/ 2>/dev/null || true
+        cp README.md LICENSE neutron-macos-universal/
+        cp -r docs neutron-macos-universal/
+        cp -r include neutron-macos-universal/
+        cp scripts/install.sh neutron-macos-universal/
+        cp nt-box/build/box neutron-macos-universal/ 2>/dev/null || true
+        tar -czf neutron-${{ needs.create-release.outputs.version }}-macos-universal.tar.gz neutron-macos-universal
         
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
@@ -141,12 +204,12 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-macos-x64.tar.gz
-        asset_name: neutron-${{ needs.create-release.outputs.version }}-macos-x64.tar.gz
+        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-macos-universal.tar.gz
+        asset_name: neutron-${{ needs.create-release.outputs.version }}-macos-universal.tar.gz
         asset_content_type: application/gzip
 
   build-windows:
-    name: Build Windows Release
+    name: Build Windows x64 Release
     needs: create-release
     runs-on: windows-latest
     defaults:
@@ -184,15 +247,16 @@ jobs:
         
     - name: Package
       run: |
-        mkdir -p neutron-windows-x86_64
-        cp build/neutron.exe neutron-windows-x86_64/
+        mkdir -p neutron-windows-x64
+        cp build/neutron.exe neutron-windows-x64/
         cp build/*.dll neutron-windows-x64/ 2>/dev/null || true
-        cp README.md LICENSE neutron-windows-x86_64/
+        cp README.md LICENSE neutron-windows-x64/
         cp -r docs neutron-windows-x64/
-        cp -r include neutron-windows-x86_64/
-        cp nt-box/build/box.exe neutron-windows-x86_64/ 2>/dev/null || true
+        cp -r include neutron-windows-x64/
+        cp scripts/install.sh neutron-windows-x64/
+        cp nt-box/build/box.exe neutron-windows-x64/ 2>/dev/null || true
         cd neutron-windows-x64
-        zip -r ../neutron-${{ needs.create-release.outputs.version }}-windows-x86_64.zip .
+        zip -r ../neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip .
         cd ..
         
     - name: Upload Release Asset
@@ -201,6 +265,9 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-windows-x86_64.zip
-        asset_name: neutron-${{ needs.create-release.outputs.version }}-windows-x86_64.zip
+        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip
+        asset_name: neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip
         asset_content_type: application/zip
+
+  # NOTE: Windows ARM64 build is complex to cross-compile from x64 runner
+  # We'll focus on native Windows x64, and Linux multi-arch builds below
