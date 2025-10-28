@@ -49,38 +49,30 @@ else()
     pkg_check_modules(JSONCPP REQUIRED jsoncpp)
 endif()
 
-# Core source files
-set(NEUTRON_CORE_SOURCES
-    src/compiler/scanner.cpp
-    src/compiler/parser.cpp
-    src/compiler/compiler.cpp
-    src/compiler/bytecode.cpp
-    src/types/value.cpp
-    src/runtime/environment.cpp
-    src/runtime/error_handler.cpp
-    src/vm.cpp
-    src/runtime/runtime.cpp
-    src/runtime/debug.cpp
-    src/token.cpp
-    src/capi.cpp
-    src/modules/module.cpp
-    src/modules/module_loader.cpp
-    src/modules/module_registry.cpp
-    src/modules/module_utils.cpp
-    src/platform/platform.cpp
-)
+# Function to add a new module easily
+function(add_neutron_module MODULE_NAME)
+    set(MODULE_PATH "libs/${MODULE_NAME}/native.cpp")
+    if(EXISTS ${MODULE_PATH})
+        list(APPEND NEUTRON_ALL_MODULE_SOURCES ${MODULE_PATH})
+        set(NEUTRON_ALL_MODULE_SOURCES ${NEUTRON_ALL_MODULE_SOURCES} PARENT_SCOPE)
+        message(STATUS "Added module: ${MODULE_NAME}")
+    else()
+        message(WARNING "Module ${MODULE_NAME} not found at ${MODULE_PATH}")
+    endif()
+endfunction()
 
-# Type sources
-set(NEUTRON_TYPE_SOURCES
-    src/types/array.cpp
-    src/types/json_object.cpp
-    src/types/json_array.cpp
-    src/types/return.cpp
-    src/types/version.cpp
-)
+# Function to add a new core component
+function(add_neutron_component COMPONENT_NAME COMPONENT_PATH)
+    if(EXISTS ${CMAKE_SOURCE_DIR}/${COMPONENT_PATH})
+        set(NEUTRON_CORE_SOURCES ${NEUTRON_CORE_SOURCES} ${CMAKE_SOURCE_DIR}/${COMPONENT_PATH} PARENT_SCOPE)
+        message(STATUS "Added component: ${COMPONENT_NAME} at ${COMPONENT_PATH}")
+    else()
+        message(WARNING "Component ${COMPONENT_NAME} not found at ${CMAKE_SOURCE_DIR}/${COMPONENT_PATH}")
+    endif()
+endfunction()
 
-# Module sources
-set(NEUTRON_MODULE_SOURCES
+# Built-in module source files
+set(NEUTRON_BUILTIN_MODULE_SOURCES
     libs/sys/native.cpp
     libs/fmt/native.cpp
     libs/json/native.cpp
@@ -90,8 +82,128 @@ set(NEUTRON_MODULE_SOURCES
     libs/arrays/native.cpp
 )
 
-# Platform-specific sources
-set(NEUTRON_PLATFORM_SOURCES "")
+# All module-related sources (internal and built-in)
+set(NEUTRON_ALL_MODULE_SOURCES
+    ${NEUTRON_BUILTIN_MODULE_SOURCES}
+)
+
+# Compiler source files
+set(NEUTRON_COMPILER_SOURCES
+    src/compiler/scanner.cpp
+    src/compiler/parser.cpp
+    src/compiler/compiler.cpp
+    src/compiler/bytecode.cpp
+)
+
+# Type system source files
+set(NEUTRON_TYPES_SOURCES
+    src/types/value.cpp
+    src/types/array.cpp
+    src/types/json_object.cpp
+    src/types/json_array.cpp
+    src/types/return.cpp
+    src/types/version.cpp
+)
+
+# Runtime source files
+set(NEUTRON_RUNTIME_SOURCES
+    src/runtime/environment.cpp
+    src/runtime/error_handler.cpp
+    src/runtime/runtime.cpp
+    src/runtime/debug.cpp
+)
+
+# Module system source files
+set(NEUTRON_MODULE_SOURCES
+    src/modules/module.cpp
+    src/modules/module_loader.cpp
+    src/modules/module_registry.cpp
+    src/modules/module_utils.cpp
+)
+
+# Platform abstraction source files
+set(NEUTRON_PLATFORM_SOURCES_LIST
+    src/platform/platform.cpp
+)
+
+# Core system source files (excluding main.cpp which is only for the executable)
+set(NEUTRON_CORE_SOURCES
+    src/vm.cpp
+    src/token.cpp
+    src/capi.cpp
+    ${NEUTRON_COMPILER_SOURCES}
+    ${NEUTRON_TYPES_SOURCES}
+    ${NEUTRON_RUNTIME_SOURCES}
+    ${NEUTRON_MODULE_SOURCES}
+    ${NEUTRON_PLATFORM_SOURCES_LIST}
+)
+
+# Executable source files (only main.cpp for the executable)
+set(NEUTRON_EXECUTABLE_SOURCES
+    src/main.cpp
+)
+
+# Additional components that can be added by features/extensions
+set(NEUTRON_FEATURE_SOURCES "")
+set(NEUTRON_EXTENSION_SOURCES "")
+set(NEUTRON_UTILS_SOURCES "")
+
+# Function to add feature sources
+function(add_neutron_feature FEATURE_NAME FEATURE_PATH)
+    if(EXISTS ${CMAKE_SOURCE_DIR}/${FEATURE_PATH})
+        list(APPEND NEUTRON_FEATURE_SOURCES ${CMAKE_SOURCE_DIR}/${FEATURE_PATH})
+        set(NEUTRON_FEATURE_SOURCES ${NEUTRON_FEATURE_SOURCES} PARENT_SCOPE)
+        message(STATUS "Added feature: ${FEATURE_NAME}")
+    else()
+        message(WARNING "Feature ${FEATURE_NAME} not found at ${CMAKE_SOURCE_DIR}/${FEATURE_PATH}")
+    endif()
+endfunction()
+
+# Function to add extension sources
+function(add_neutron_extension EXTENSION_NAME EXTENSION_PATH)
+    if(EXISTS ${CMAKE_SOURCE_DIR}/${EXTENSION_PATH})
+        list(APPEND NEUTRON_EXTENSION_SOURCES ${CMAKE_SOURCE_DIR}/${EXTENSION_PATH})
+        set(NEUTRON_EXTENSION_SOURCES ${NEUTRON_EXTENSION_SOURCES} PARENT_SCOPE)
+        message(STATUS "Added extension: ${EXTENSION_NAME}")
+    else()
+        message(WARNING "Extension ${EXTENSION_NAME} not found at ${CMAKE_SOURCE_DIR}/${EXTENSION_PATH}")
+    endif()
+endfunction()
+
+# Function to add utility sources
+function(add_neutron_utility UTILITY_NAME UTILITY_PATH)
+    if(EXISTS ${CMAKE_SOURCE_DIR}/${UTILITY_PATH})
+        list(APPEND NEUTRON_UTILS_SOURCES ${CMAKE_SOURCE_DIR}/${UTILITY_PATH})
+        set(NEUTRON_UTILS_SOURCES ${NEUTRON_UTILS_SOURCES} PARENT_SCOPE)
+        message(STATUS "Added utility: ${UTILITY_NAME}")
+    else()
+        message(WARNING "Utility ${UTILITY_NAME} not found at ${CMAKE_SOURCE_DIR}/${UTILITY_PATH}")
+    endif()
+endfunction()
+
+# Add component interface sources to utilities
+list(APPEND NEUTRON_UTILS_SOURCES 
+    ${CMAKE_SOURCE_DIR}/src/utils/component_interface.cpp
+)
+
+# Add all component sources together (excluding main.cpp)
+set(NEUTRON_ALL_SOURCES
+    ${NEUTRON_CORE_SOURCES}
+    ${NEUTRON_TYPE_SOURCES}
+    ${NEUTRON_FEATURE_SOURCES}
+    ${NEUTRON_EXTENSION_SOURCES}
+    ${NEUTRON_UTILS_SOURCES}
+    ${NEUTRON_PLATFORM_SOURCES_LIST}
+)
+
+# Library sources (including modules)
+set(NEUTRON_LIBRARY_SOURCES
+    ${NEUTRON_ALL_SOURCES}
+    ${NEUTRON_ALL_MODULE_SOURCES}
+)
+
+# Platform-specific sources (updated variable name)
+set(NEUTRON_PLATFORM_SOURCES_LIST "")
 
 set( DLFCN_WIN "")
 
@@ -104,7 +216,7 @@ if(WIN32)
     else()
         message(STATUS "dlfcn-win32 not found; using internal Windows shim for dlopen/dlsym/dlclose")
         # Add the shim implementation to the platform sources
-        list(APPEND NEUTRON_PLATFORM_SOURCES src/platform/dlfcn_compat_win.cpp)
+        list(APPEND NEUTRON_PLATFORM_SOURCES_LIST src/platform/dlfcn_compat_win.cpp)
     endif()
     find_package(jsoncpp CONFIG REQUIRED)
     set( JSONCPP_LIBRARIES JsonCpp::JsonCpp)
@@ -112,18 +224,12 @@ endif()
 
 # Create static runtime library for executable linking
 add_library(neutron_runtime STATIC
-    ${NEUTRON_CORE_SOURCES}
-    ${NEUTRON_TYPE_SOURCES}
-    ${NEUTRON_MODULE_SOURCES}
-    ${NEUTRON_PLATFORM_SOURCES}
+    ${NEUTRON_LIBRARY_SOURCES}
 )
 
 # Create shared runtime library for module developers
 add_library(neutron_runtime_shared SHARED
-    ${NEUTRON_CORE_SOURCES}
-    ${NEUTRON_TYPE_SOURCES}
-    ${NEUTRON_MODULE_SOURCES}
-    ${NEUTRON_PLATFORM_SOURCES}
+    ${NEUTRON_LIBRARY_SOURCES}
 )
 
 target_link_libraries(neutron_runtime

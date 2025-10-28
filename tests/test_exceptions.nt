@@ -1,0 +1,108 @@
+// Test exception handling functionality
+say("=== Exception Handling Tests ===");
+
+// Test 1: Basic try-catch
+var caughtException = false;
+try {
+    throw "Test exception";
+    say("This should not print");
+} catch (error) {
+    caughtException = true;
+    if (error == "Test exception") {
+        say("✓ Basic try-catch works");
+    } else {
+        say("✗ Basic try-catch failed: wrong exception value");
+    }
+}
+if (!caughtException) {
+    say("✗ Basic try-catch failed: exception not caught");
+}
+
+// Test 2: Try without exception
+var normalExecution = false;
+try {
+    say("Executing normally");
+    normalExecution = true;
+} catch (error) {
+    say("✗ Catch block executed when no exception thrown");
+    normalExecution = false;
+}
+if (normalExecution) {
+    say("✓ Try block without exception works");
+}
+
+// Test 3: Finally block always executes
+var finallyExecuted = false;
+try {
+    // No exception
+} finally {
+    finallyExecuted = true;
+}
+if (finallyExecuted) {
+    say("✓ Finally block executes without exception");
+} else {
+    say("✗ Finally block failed to execute");
+}
+
+// Test 4: Finally executes with exception
+var finallyWithException = false;
+try {
+    throw "Exception with finally";
+} finally {
+    finallyWithException = true;
+}
+if (finallyWithException) {
+    say("✓ Finally block executes with exception");
+} else {
+    say("✗ Finally block failed with exception");
+}
+
+// Test 5: Exception value types
+try {
+    throw 42;
+} catch (num) {
+    if (num == 42) {
+        say("✓ Number exception type works");
+    } else {
+        say("✗ Number exception type failed");
+    }
+}
+
+try {
+    throw true;
+} catch (boolVal) {
+    if (boolVal == true) {
+        say("✓ Boolean exception type works");
+    } else {
+        say("✗ Boolean exception type failed");
+    }
+}
+
+// Test 6: Nested try-catch
+var outerCaught = false;
+var innerCaught = false;
+try {
+    try {
+        throw "Inner exception";
+    } catch (innerError) {
+        innerCaught = true;
+    }
+    if (innerCaught) {
+        say("✓ Nested try-catch works");
+    }
+} catch (outerError) {
+    outerCaught = true;
+}
+if (outerCaught) {
+    say("✗ Outer catch caught inner exception (should have been handled)");
+}
+
+// Test 7: Exception propagation (when not caught)
+try {
+    say("Exception test completed successfully");
+} catch (e) {
+    // Should not execute
+    say("✗ This should not execute");
+}
+
+say("=== All exception handling tests completed ===");

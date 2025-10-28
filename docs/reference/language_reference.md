@@ -943,6 +943,105 @@ if (score >= 90) {
 }
 ```
 
+### Exception Handling
+
+Neutron provides comprehensive exception handling with `try`, `catch`, `finally`, and `throw` statements to handle errors gracefully and prevent program crashes.
+
+**Basic Try-Catch:**
+```neutron
+try {
+    // Code that might throw an exception
+    var result = riskyOperation();
+    say("Operation completed successfully: " + result);
+} catch (error) {
+    // Handle the exception
+    say("An error occurred: " + error);
+}
+```
+
+**Try-Catch-Finally:**
+```neutron
+var fileHandle = openFile("data.txt");
+try {
+    // Risky operation with file
+    var content = readFile(fileHandle);
+    processContent(content);
+} catch (error) {
+    // Handle specific error
+    say("File operation failed: " + error);
+} finally {
+    // Always execute cleanup code
+    closeFile(fileHandle);
+    say("File handle closed");
+}
+```
+
+**Try-Finally (cleanup only):**
+```neutron
+try {
+    // Main operation
+    performOperation();
+} finally {
+    // Cleanup code that always runs
+    cleanupResources();
+}
+```
+
+**Throwing Exceptions:**
+```neutron
+fun validateAge(age) {
+    if (age < 0) {
+        throw "Age cannot be negative";
+    }
+    if (age > 150) {
+        throw "Age seems unrealistic: " + age;
+    }
+    return true;
+}
+
+try {
+    validateAge(-5);
+} catch (errorMsg) {
+    say("Validation error: " + errorMsg);
+}
+```
+
+**Exception Types:**
+You can throw any value as an exception:
+```neutron
+throw "Error message";           // String exception
+throw 404;                      // Number exception  
+throw true;                     // Boolean exception
+throw ["error", "details"];     // Array exception
+throw {"code": 500, "msg": "Internal error"};  // Object exception
+```
+
+**Nested Exception Handling:**
+```neutron
+try {
+    say("Outer try");
+    try {
+        say("Inner try");
+        throw "Inner exception";
+        say("This won't execute");
+    } catch (innerError) {
+        say("Caught in inner: " + innerError);
+    }
+    say("Back to outer after inner catch");
+} catch (outerError) {
+    say("Caught in outer: " + outerError);
+} finally {
+    say("Outer finally always runs");
+}
+```
+
+**Exception Flow:**
+- When an exception is thrown, the runtime searches for the nearest matching `catch` block
+- If found, execution jumps to the `catch` block and the exception value is assigned to the catch variable
+- The `finally` block runs regardless of whether an exception occurred
+- If no `catch` block handles an exception, it propagates up the call stack
+- If an exception reaches the top level without being caught, the program terminates with an error
+
 ### While Loops
 
 The `while` loop executes a block of code as long as a condition is true.

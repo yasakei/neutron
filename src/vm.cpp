@@ -30,6 +30,7 @@
 #include "math/native.h"
 #include "http/native.h"
 #include "modules/module_registry.h"
+#include "utils/component_interface.h"
 
 namespace neutron {
     
@@ -75,7 +76,7 @@ bool isTruthy(const Value& value) {
     exit(1);
 }
 
-VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>") {  // Start GC at 1024 bytes
+VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>"), hasException(false) {  // Start GC at 1024 bytes
     // Initialize error handler
     ErrorHandler::setColorEnabled(true);
     ErrorHandler::setStackTraceEnabled(true);
@@ -1127,6 +1128,102 @@ void VM::run(size_t minFrameDepth) {
                 }
                                 break;
             }
+            case (uint8_t)OpCode::OP_TRY: {
+                // Set up an exception handler frame
+                // Read handler information from bytecode
+                uint16_t tryEnd = READ_SHORT(); // End of try block
+                uint16_t catchStart = READ_SHORT(); // Start of catch block (-1 if none)
+                uint16_t finallyStart = READ_SHORT(); // Start of finally block (-1 if none)
+                
+                int currentIP = (frame->ip - 1) - frame->function->chunk->code.data(); // Position before reading shorts
+                int currentFrameBase = frame->slot_offset;
+                
+                exceptionFrames.emplace_back(
+                    currentIP, 
+                    tryEnd, 
+                    catchStart == 0xFFFF ? -1 : catchStart,  // 0xFFFF represents -1 (no handler)
+                    finallyStart == 0xFFFF ? -1 : finallyStart, // 0xFFFF represents -1 (no handler)
+                    currentFrameBase,
+                    frame->fileName,
+                    frame->currentLine
+                );
+                break;
+            }
+            case (uint8_t)OpCode::OP_END_TRY: {
+                // End of try block - remove the exception handler frame
+                if (!exceptionFrames.empty()) {
+                    exceptionFrames.pop_back();
+                }
+                break;
+            }
+            case (uint8_t)OpCode::OP_THROW: {
+                // A value has been pushed to the stack - this is the exception
+                Value exception = pop();
+                
+                // Find the closest exception handler in the current call frame
+                ExceptionFrame* handler = nullptr;
+                for (int i = exceptionFrames.size() - 1; i >= 0; i--) {
+                    ExceptionFrame& frame_handler = exceptionFrames[i];
+                    int current_pos = frame->ip - frame->function->chunk->code.data() - 1; // -1 to account for the read byte
+                    if (current_pos >= frame_handler.tryStart && current_pos <= frame_handler.tryEnd) {
+                        handler = &frame_handler;
+                        break;
+                    }
+                }
+                
+                if (!handler) {
+                    // No exception handler found - runtime error
+                    std::string errorMsg = "Uncaught exception: ";
+                    if (exception.type == ValueType::STRING) {
+                        errorMsg += std::get<std::string>(exception.as);
+                    } else {
+                        errorMsg += exception.toString();
+                    }
+                    runtimeError(errorMsg.c_str());
+                }
+                
+                // Execute finally block if it exists before jumping to catch
+                if (handler->finallyStart != -1 && handler->finallyStart != 0xFFFF) {
+                    // Store exception temporarily for later use in catch
+                    // Jump to finally block
+                    frame->ip = frame->function->chunk->code.data() + handler->finallyStart;
+                    // When finally completes, we'll need to jump to catch
+                    // For simplicity in this implementation, we'll just go to catch directly
+                    // but in a full implementation, finally should be executed first
+                }
+                
+                // Adjust the stack to the frame base when the exception frame was created
+                // This is stack unwinding to the exception frame scope
+                stack.resize(handler->frameBase);
+                
+                // Remove all exception frames up to and including this one
+                while (!exceptionFrames.empty() && 
+                       &exceptionFrames.back() != handler) {
+                    exceptionFrames.pop_back();
+                }
+                if (!exceptionFrames.empty()) {
+                    exceptionFrames.pop_back(); // Remove the current handler
+                }
+                
+                // Jump to the catch block if it exists
+                if (handler->catchStart != -1 && handler->catchStart != 0xFFFF) {
+                    frame->ip = frame->function->chunk->code.data() + handler->catchStart;
+                    
+                    // Push the exception value onto the stack for the catch block
+                    push(exception);
+                    
+                    // Set up the catch variable if we have locals to assign to
+                    // This requires adjusting how locals work during exception handling
+                } else if (handler->finallyStart != -1 && handler->finallyStart != 0xFFFF) {
+                    // If only finally exists, go to finally block
+                    frame->ip = frame->function->chunk->code.data() + handler->finallyStart;
+                } else {
+                    // This shouldn't happen based on our logic
+                    runtimeError("Exception occurred but no handler available");
+                }
+                
+                break;
+            }
         }
     }
 #undef READ_BYTE
@@ -1407,6 +1504,29 @@ void VM::load_file(const std::string& filepath) {
     }
 }
 
+void VM::registerComponent(std::shared_ptr<ComponentInterface> component) {
+    if (component) {
+        // Check if component is compatible before loading
+        if (component->isCompatible()) {
+            loadedComponents.push_back(component);
+            component->initialize(this);
+        }
+    }
+}
+
+std::vector<std::shared_ptr<ComponentInterface>> VM::getComponents() const {
+    return loadedComponents;
+}
+
+std::shared_ptr<ComponentInterface> VM::getComponent(const std::string& name) const {
+    for (const auto& component : loadedComponents) {
+        if (component->getName() == name) {
+            return component;
+        }
+    }
+    return nullptr;
+}
+
 void VM::collectGarbage() {
     // Mark all reachable objects
     markRoots();
@@ -1462,6 +1582,53 @@ void VM::sweep() {
             ++it;
         }
     }
+}
+
+bool VM::handleException(const Value& exception) {
+    // Find the most recent handler that covers the current IP position
+    for (int i = exceptionFrames.size() - 1; i >= 0; i--) {
+        ExceptionFrame& handler = exceptionFrames[i];
+        CallFrame* frame = &frames.back();
+        int current_pos = frame->ip - frame->function->chunk->code.data() - 1; // -1 to account for the read byte
+        
+        if (current_pos >= handler.tryStart && current_pos <= handler.tryEnd) {
+            // Found a matching handler
+            
+            // Adjust the stack to the frame base when the exception frame was created
+            stack.resize(handler.frameBase);
+            
+            // Remove all exception frames up to and including this one
+            while (!exceptionFrames.empty() && 
+                   &exceptionFrames.back() != &handler) {
+                exceptionFrames.pop_back();
+            }
+            if (!exceptionFrames.empty()) {
+                exceptionFrames.pop_back(); // Remove the current handler
+            }
+            
+            // Jump to the catch block if it exists
+            if (handler.catchStart != -1 && handler.catchStart != 0xFFFF) {
+                frame->ip = frame->function->chunk->code.data() + handler.catchStart;
+                
+                // Push the exception value onto the stack for the catch block
+                push(exception);
+                
+                return true; // Exception handled
+            } else if (handler.finallyStart != -1 && handler.finallyStart != 0xFFFF) {
+                // If only finally exists, go to finally block
+                frame->ip = frame->function->chunk->code.data() + handler.finallyStart;
+                // In a complete implementation, we'd need to handle the fact that 
+                // the exception wasn't caught but needs to be re-thrown after finally
+                // For now, just execute finally and re-throw
+                push(exception); // Store exception for potential re-throw after finally
+                
+                return true; // Exception processing started
+            }
+        }
+    }
+    
+    // No exception handler found
+    return false;
 }
 
 } // namespace neutron

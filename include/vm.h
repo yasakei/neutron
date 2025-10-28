@@ -14,6 +14,7 @@
 #include "types/class.h"
 #include "types/instance.h"
 #include "modules/module.h"
+#include "utils/component_interface.h"
 #include "runtime/environment.h"
 #include "compiler/bytecode.h"
 
@@ -22,6 +23,8 @@
 #include <memory>
 #include <cstdint>
 #include <string>
+#include <stack>
+#include <utility>
 
 // Forward declarations only for types defined elsewhere
 namespace neutron {
@@ -69,6 +72,11 @@ public:
     Value execute_string(const std::string& source);
     void add_module_search_path(const std::string& path);
     
+    // Component management
+    void registerComponent(std::shared_ptr<ComponentInterface> component);
+    std::vector<std::shared_ptr<ComponentInterface>> getComponents() const;
+    std::shared_ptr<ComponentInterface> getComponent(const std::string& name) const;
+    
     // Memory management functions
     template<typename T, typename... Args>
     T* allocate(Args&&... args) {
@@ -90,6 +98,24 @@ public:
     std::vector<std::string> commandLineArgs;  // Store command line arguments
     std::string currentFileName;  // Current source file being executed
     std::vector<std::string> sourceLines;  // Source code lines for error reporting
+    std::vector<std::shared_ptr<ComponentInterface>> loadedComponents;  // Loaded components
+    // Exception handling support
+    struct ExceptionFrame {
+        int tryStart;         // Start of try block
+        int tryEnd;           // End of try block
+        int catchStart;       // Start of catch block (or -1 if no catch)
+        int finallyStart;     // Start of finally block (or -1 if no finally)
+        int frameBase;        // Stack frame base when exception frame was created
+        std::string fileName;
+        int line;
+        
+        ExceptionFrame(int tryStart, int tryEnd, int catchStart, int finallyStart, int frameBase, const std::string& fileName, int line)
+            : tryStart(tryStart), tryEnd(tryEnd), catchStart(catchStart), finallyStart(finallyStart), 
+              frameBase(frameBase), fileName(fileName), line(line) {}
+    };
+    
+    std::vector<ExceptionFrame> exceptionFrames;  // Stack of exception frames
+    bool hasException;  // Flag to indicate if an exception is currently being handled
 
 private:
     bool call(Function* function, int argCount);
@@ -97,6 +123,9 @@ private:
     bool callArrayMethod(class BoundArrayMethod* method, int argCount);
     void run(size_t minFrameDepth = 0);  // Run until frames.size() <= minFrameDepth (0 = run completely)
     void interpret_module(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> module_env);
+    
+    // Exception handling methods
+    bool handleException(const Value& exception);
     
     // Garbage collection methods
     void markRoots();

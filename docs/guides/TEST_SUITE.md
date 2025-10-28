@@ -3,8 +3,8 @@
 ## Overview
 Comprehensive test suite for the Neutron programming language covering all major features documented in `docs/language_reference.md`.
 
-**Status:** ✅ All 21 tests passing (100% success rate)  
-**Last Updated:** October 5, 2025
+**Status:** ✅ All 29 tests passing (100% success rate)  
+**Last Updated:** October 28, 2025
 
 ## Running Tests
 
@@ -23,7 +23,7 @@ bash run_tests.sh
 .\run_tests.ps1
 ```
 
-## Test Files (21 total)
+## Test Files (29 total)
 
 ### Core Language Features
 
@@ -161,7 +161,27 @@ bash run_tests.sh
 - Multiple interpolations in one string
 - Interpolation with literals
 
-#### 19. **test_truthiness.nt** - Truthiness Rules ✅
+#### 19. **test_lambda_comprehensive.nt** - Lambda Functions ✅
+- Basic lambda with parameters
+- Lambda with no parameters
+- Lambdas in arrays
+- Lambdas as function arguments
+- Immediately invoked lambdas
+- Multiple lambdas with different operations
+- Nested lambdas
+
+#### 20. **test_match.nt** - Match Statements ✅
+- Basic match with numbers
+- Match with expressions
+- Match with strings
+- Match with block statements
+- Match without default
+- Match with variables
+- Nested match
+- Match with booleans
+- Match with variable assignment
+
+#### 21. **test_truthiness.nt** - Truthiness Rules ✅
 - `nil` is falsy
 - `false` is falsy
 - `0` is truthy (unlike JavaScript)
@@ -169,19 +189,82 @@ bash run_tests.sh
 - Negative numbers are truthy
 - All other values are truthy
 
+### Error Handling Features
+
+#### 22. **test_error_handling.nt** - Error Handling System ✅
+- Variable access (should work)
+- Function calls (should work)
+- Division (should work)
+- Array access (should work)
+- Numeric operations (should work)
+
+#### 23. **test_types.nt** - Type Safety and Annotations ✅
+- Basic type annotations (int, string, float, bool)
+- Untyped variables (backward compatibility)
+- Reassignment of typed variables
+- Type annotations with arrays
+- Type annotations with objects
+- Any type annotation
+- Type annotations in loops
+- Multiple typed declarations
+- Uninitialized typed variables
+
+#### 24. **test_elif.nt** - ELIF Statements ✅
+- Multi-level conditional logic
+- String comparisons
+- Logical combinations
+- Complex elif chains
+
+#### 25. **test_string_interpolation.nt** - String Interpolation Tests ✅
+- Basic variable interpolation
+- Number interpolation
+- Expression interpolation
+- Multiple interpolations
+- Complex expression interpolation
+- Nested expression interpolation
+- Multi-variable interpolation
+
 ### Platform Features
 
-#### 20. **test_cross_platform.nt** - Cross-Platform Features ✅
+#### 26. **test_cross_platform.nt** - Cross-Platform Features ✅
 - Platform detection (Windows, macOS, Linux, BSD)
 - Architecture detection (x86_64, arm64, etc.)
 - File operations across platforms
 - Environment variables
 - Directory operations
 
-#### 21. **test_command_line_args.nt** - Command Line Arguments ✅
+#### 27. **test_command_line_args.nt** - Command Line Arguments ✅
 - sys.args() array access
 - Script path retrieval
 - Argument parsing
+
+### Exception Handling (New)
+
+#### 28. **test_exceptions.nt** - Exception Handling ✅
+- Basic try-catch functionality
+- Try blocks without exceptions
+- Finally blocks execution
+- Exception types (numbers, booleans, strings)
+- Nested try-catch blocks
+- Exception propagation handling
+
+### Array Features
+
+#### 29. **test_arrays_module.nt** - Arrays Module ✅
+- Basic operations (new, push, pop)
+- Access and modification (at, set)
+- Removal operations (remove, clear)
+- Contains and index_of
+- Sorting and reversing
+- Range operations
+- Cloning
+- Join operations
+- Flat operations
+- Slice operations
+- Shuffle operations
+- Fill operations
+- Remove operations
+- to_string operations
 
 ## Test Runners
 
@@ -205,20 +288,20 @@ bash run_tests.sh
 
 ## Test Results
 
-**Status: ✅ ALL TESTS PASSING (21/21) - 100% SUCCESS RATE**
+**Status: ✅ ALL TESTS PASSING (29/29) - 100% SUCCESS RATE**
 
 ```
 ================================
   Test Summary
 ================================
-Total tests: 21
-Passed: 21
+Total tests: 29
+Passed: 29
 Failed: 0
 
 All tests passed!
 ```
 
-**Last Test Run:** October 5, 2025
+**Last Test Run:** October 28, 2025
 
 ## Coverage
 

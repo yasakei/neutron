@@ -232,6 +232,98 @@ Test the error handling system with:
 
 This test file contains various error scenarios to demonstrate the improved error messages.
 
+## Exception Handling
+
+Neutron now supports structured exception handling with `try`, `catch`, `finally`, and `throw` statements. This allows developers to handle errors gracefully and implement proper error recovery mechanisms.
+
+### Basic Exception Handling
+
+```neutron
+try {
+    // Code that might throw an exception
+    var result = riskyOperation();
+    say("Success: " + result);
+} catch (error) {
+    // Handle the exception
+    say("Error caught: " + error);
+}
+```
+
+### Try-Catch-Finally
+
+```neutron
+try {
+    // Risky operation
+    var file = openFile("data.txt");
+    processFile(file);
+} catch (error) {
+    // Handle specific error
+    say("Processing failed: " + error);
+} finally {
+    // Always execute cleanup
+    closeFile(file);  // Ensures resource cleanup regardless of errors
+}
+```
+
+### Throwing Exceptions
+
+```neutron
+fun validateInput(input) {
+    if (input == nil) {
+        throw "Input cannot be nil";
+    }
+    if (input.length < 3) {
+        throw "Input too short: " + input;
+    }
+    return true;
+}
+
+try {
+    validateInput("");
+} catch (validationError) {
+    say("Validation error: " + validationError);
+}
+```
+
+### Exception Value Types
+
+Neutron supports throwing any value as an exception:
+
+```neutron
+throw "Simple error message";           // String
+throw 404;                             // Number
+throw true;                            // Boolean  
+throw [1, 2, 3];                      // Array
+throw {"error": "code", "msg": "desc"}; // Object
+```
+
+### Nested Exception Handling
+
+```neutron
+try {
+    try {
+        riskyInnerOperation();
+    } catch (innerError) {
+        say("Inner error handled: " + innerError);
+        // Optionally re-throw or handle differently
+    }
+    safeOuterOperation();
+} catch (outerError) {
+    say("Outer error: " + outerError);
+} finally {
+    cleanup();
+}
+```
+
+### Exception Flow
+
+When an exception occurs:
+1. The runtime searches for the nearest `catch` block in the current scope
+2. If found, execution jumps to the `catch` block with the exception value
+3. The `finally` block executes regardless of whether an exception occurred
+4. If no `catch` block is found, the exception propagates up the call stack
+5. Unhandled exceptions cause program termination with a runtime error
+
 ## Future Enhancements
 
 - Error recovery in parser for multiple error reporting

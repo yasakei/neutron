@@ -32,6 +32,55 @@ if (andResult == false and orResult == true) {
     say("✗ Logical operators failed");
 }
 
+// Test 4: Logical operators with complex expressions and negative numbers
+var x = 10;
+var y = -5;
+
+// Test the specific issue reported: logical operators with negative numbers
+if (x < 1 and x < -1) {
+    say("✗ Complex condition with negatives failed (should not execute)");
+} elif (x == 10) {
+    say("✓ Complex logical expressions with negatives work");
+} else {
+    say("✗ Complex logical expressions with negatives failed");
+}
+
+// Test more complex logical combinations
+if (y < 0 and y > -10) {
+    say("✓ Logical AND with negative comparisons works");
+} else {
+    say("✗ Logical AND with negative comparisons failed");
+}
+
+if (y < 0 or y > 0) {
+    say("✓ Logical OR with negative comparisons works");
+} else {
+    say("✗ Logical OR with negative comparisons failed");
+}
+
+// Test short-circuit evaluation
+var counter = 0;
+fun incrementCounterAndReturn(val) {
+    counter = counter + 1;
+    return val;
+}
+
+counter = 0;
+var result1 = false and incrementCounterAndReturn(true);
+if (result1 == false and counter == 0) {
+    say("✓ Short-circuit AND works (right operand not evaluated when left is false)");
+} else {
+    say("✗ Short-circuit AND failed");
+}
+
+counter = 0;
+var result2 = true or incrementCounterAndReturn(false);
+if (result2 == true and counter == 0) {
+    say("✓ Short-circuit OR works (right operand not evaluated when left is true)");
+} else {
+    say("✗ Short-circuit OR failed");
+}
+
 // Test 4: String concatenation
 var greeting = "Hello, " + "world!";
 var withNumber = "Value: " + 42;

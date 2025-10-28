@@ -159,6 +159,53 @@ void Compiler::visitUnaryExpr(const UnaryExpr* expr) {
 }
 
 void Compiler::visitBinaryExpr(const BinaryExpr* expr) {
+    // Handle logical operators with short-circuit evaluation
+    if (expr->op.type == TokenType::AND) {
+        // Short-circuit AND: evaluate left, if falsy return left, else return right
+        compileExpression(expr->left.get());
+        emitByte((uint8_t)OpCode::OP_DUP);  // Duplicate left to keep original as potential result
+        int jumpToRight = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE); // Jump if duplicate is falsy (original is falsy)
+        
+        // If we reach here, original left was truthy (duplicate was truthy, so no jump)
+        // Stack has original left value since OP_JUMP_IF_FALSE popped the duplicate
+        emitByte((uint8_t)OpCode::OP_POP);  // Pop the original left value
+        compileExpression(expr->right.get());  // Evaluate right as result
+        
+        int skipFalsy = emitJump((uint8_t)OpCode::OP_JUMP);  // Skip the falsy case
+        
+        // When original left was falsy, we jump here
+        patchJump(jumpToRight);
+        // Stack has original falsy left value (since OP_JUMP_IF_FALSE popped the duplicate)
+        // That's our result when left is falsy - no additional operation needed
+        
+        patchJump(skipFalsy);  // End of both paths
+        return;
+    }
+    
+    if (expr->op.type == TokenType::OR) {
+        // Short-circuit OR: evaluate left, if truthy return left, else return right
+        compileExpression(expr->left.get());
+        emitByte((uint8_t)OpCode::OP_DUP);  // Duplicate to preserve original value
+        emitByte((uint8_t)OpCode::OP_NOT);  // NOT the duplicate
+        int jumpToRight = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE); // Jump if (NOT left) is falsy, i.e., if original left is truthy
+        
+        // If we reach here, original left was falsy (so we continue execution)
+        // Stack has original falsy left value
+        emitByte((uint8_t)OpCode::OP_POP);  // Pop the original falsy left 
+        compileExpression(expr->right.get()); // Evaluate right as result
+        
+        int skipRight = emitJump((uint8_t)OpCode::OP_JUMP); // Skip to end
+        
+        // When the jump happens (original left was truthy)
+        patchJump(jumpToRight);
+        // Stack has original truthy left value (since OP_JUMP_IF_FALSE popped the NOT'd duplicate)
+        // No additional operation needed, original truthy left is already result
+        
+        patchJump(skipRight); // End of both paths
+        return;
+    }
+    
+    // For non-logical operators, compile normally
     compileExpression(expr->left.get());
     compileExpression(expr->right.get());
 
@@ -174,7 +221,7 @@ void Compiler::visitBinaryExpr(const BinaryExpr* expr) {
         case TokenType::LESS:          emitByte((uint8_t)OpCode::OP_LESS); break;
         case TokenType::LESS_EQUAL:    emitBytes((uint8_t)OpCode::OP_GREATER, (uint8_t)OpCode::OP_NOT); break;
         default:
-            return; // Unreachable.
+            return; // Should not reach for logical operators due to early return
     }
 }
 
@@ -853,33 +900,99 @@ void Compiler::visitMatchStmt(const MatchStmt* stmt) {
 }
 
 void Compiler::visitTryStmt(const TryStmt* stmt) {
-    // For now, implement a simple version that just executes the try block
-    // Full exception handling would require VM-level support
+    // Store positions for patching later
+    std::vector<int> endJumps; // Jumps to skip catch and finally blocks when no exception occurs
     
-    // TODO: Implement proper try-catch with exception handling
-    // This requires adding exception stack to VM and unwinding mechanism
+    // Emit the TRY instruction and handler information
+    emitByte((uint8_t)OpCode::OP_TRY);
     
-    // For basic implementation: just execute try block
-    if (stmt->tryBlock) {
-        compileStatement(stmt->tryBlock.get());
+    // Placeholders: tryEnd(2 bytes), catchStart(2 bytes), finallyStart(2 bytes) = 6 bytes total
+    int handlerInfoStart = chunk->code.size();
+    emitBytes(0x00, 0x00); // Placeholder for tryEnd
+    emitBytes(0x00, 0x00); // Placeholder for catchStart  
+    emitBytes(0x00, 0x00); // Placeholder for finallyStart
+    
+
+    
+    // Compile the try block
+    compileStatement(stmt->tryBlock.get());
+    
+    // Now we know where the try block ends
+    int tryEnd = chunk->code.size();
+    
+    // Patch the tryEnd information
+    int tryEndPos = handlerInfoStart;
+    chunk->code[tryEndPos] = (tryEnd >> 8) & 0xFF;
+    chunk->code[tryEndPos + 1] = tryEnd & 0xFF;
+    
+    // Jump over catch block when try block completes normally (no exception)
+    if (stmt->catchBlock) {
+        int jumpOverCatch = emitJump((uint8_t)OpCode::OP_JUMP);
+        endJumps.push_back(jumpOverCatch);
     }
     
-    // If there's a finally block, always execute it
+    int catchStart = -1;
+    // Compile catch block if present
+    if (stmt->catchBlock) {
+        catchStart = chunk->code.size(); // Current position is catch start
+        
+        // Patch the catchStart information
+        int catchStartPos = handlerInfoStart + 2;
+        chunk->code[catchStartPos] = (catchStart >> 8) & 0xFF;
+        chunk->code[catchStartPos + 1] = catchStart & 0xFF;
+        
+        // Set up catch variable as local
+        beginScope();
+        if (stmt->catchVar.lexeme != "") {
+            // Add the catch variable to locals 
+            // When an exception is caught, the exception value is on the stack
+            locals.push_back(Local{stmt->catchVar, scopeDepth, std::nullopt});
+        }
+        
+        // Compile the catch block
+        compileStatement(stmt->catchBlock.get());
+        endScope();
+    } else {
+        // If no catch block, set catchStart to -1 (0xFFFF in bytecode)
+        int catchStartPos = handlerInfoStart + 2;
+        chunk->code[catchStartPos] = 0xFF;
+        chunk->code[catchStartPos + 1] = 0xFF;
+    }
+    
+    // If there's a finally block, we need to emit appropriate jump
     if (stmt->finallyBlock) {
+        // In a full implementation, we would handle the finally block properly
+        // For now, the finally block will be handled by the VM's exception mechanism
+        
+        int finallyStart = chunk->code.size();
+        // Patch the finallyStart information
+        int finallyStartPos = handlerInfoStart + 4;
+        chunk->code[finallyStartPos] = (finallyStart >> 8) & 0xFF;
+        chunk->code[finallyStartPos + 1] = finallyStart & 0xFF;
+        
         compileStatement(stmt->finallyBlock.get());
+    } else {
+        // If no finally block, set finallyStart to -1 (0xFFFF in bytecode) 
+        int finallyStartPos = handlerInfoStart + 4;
+        chunk->code[finallyStartPos] = 0xFF;
+        chunk->code[finallyStartPos + 1] = 0xFF;
     }
     
-    // Note: Catch block is not yet implemented
-    // Would need runtime exception propagation
+    // Patch the jumps that skip catch blocks when no exception occurs
+    for (int jump : endJumps) {
+        patchJump(jump);
+    }
+    
+    // Emit END_TRY to mark the end of the exception handling construct
+    emitByte((uint8_t)OpCode::OP_END_TRY);
 }
 
 void Compiler::visitThrowStmt(const ThrowStmt* stmt) {
     // Compile the value to throw
     compileExpression(stmt->value.get());
     
-    // For now, just error out
-    // TODO: Implement proper exception throwing with VM support
-    throw std::runtime_error("throw statement not yet fully implemented");
+    // Emit the throw instruction
+    emitByte((uint8_t)OpCode::OP_THROW);
 }
 
 } // namespace neutron

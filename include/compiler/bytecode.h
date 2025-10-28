@@ -51,7 +51,12 @@ enum class OpCode : uint8_t {
     OP_INDEX_SET,
     OP_THIS,
     OP_BREAK,
-    OP_CONTINUE
+    OP_CONTINUE,
+    OP_TRY,
+    OP_END_TRY,
+    OP_THROW,
+    OP_LOGICAL_AND,
+    OP_LOGICAL_OR
 };
 
 class Chunk {

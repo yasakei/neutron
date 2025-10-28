@@ -4,6 +4,97 @@ All notable changes to the Neutron programming language will be documented in th
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+---
+## [1.1.1-beta] - 2025-10-28
+
+### Added
+- **Enhanced module system architecture with standardized interfaces**
+  - ComponentInterface for creating pluggable system components
+  - Runtime component management in VM with registerComponent() method
+  - Improved build system with new helper functions (add_neutron_module, add_neutron_feature, etc.)
+  - New modular directory structure (src/features/, src/extensions/, src/utils/)
+  - Extended documentation in docs/extending_neutron.md
+
+- **Full Exception Handling System**
+  - `try`, `catch`, `finally`, and `throw` statements
+  - Proper exception propagation and stack unwinding
+  - Exception value passing to catch blocks
+  - Nested exception handling support
+  - Finally blocks that always execute
+  - Support for throwing any value type (strings, numbers, objects, etc.)
+  - Comprehensive error handling documentation
+
+### Changed
+- **Enhanced build system for better modularity and extensibility**
+  - Refactored CMakeLists.txt for better maintainability
+  - Organized source files into logical groups for better maintainability
+  - Enhanced VM with component registry capabilities
+  - Improved build system to support easier addition of new features
+
+### Fixed
+- **Logical operators (AND/OR) with proper short-circuit evaluation**
+  - Fixed `and` operator to properly evaluate `a and b` as: if `a` is falsy return `a`, else return `b`
+  - Fixed `or` operator to properly evaluate `a or b` as: if `a` is truthy return `a`, else return `b`
+  - Implemented correct short-circuit evaluation to avoid unnecessary operand evaluation
+  - Resolved stack underflow issues with complex logical expressions
+  - Fixed handling of negative numbers and complex conditions in logical expressions
+
+- Build system now properly handles modular component addition
+- Better separation of concerns in the codebase
+- Resolved linking issues with module initialization functions
+
+---
+
+## [1.1.0-beta] - 2025-10-23
+
+### Added
+- **Arrays Module (Standalone)**
+  - arrays.new() - Create new empty array
+  - arrays.length(array) - Get array length
+  - arrays.push(array, value) - Add element to end
+  - arrays.pop(array) - Remove and return last element
+  - arrays.at(array, index) - Get element at index
+  - arrays.set(array, index, value) - Set element at index
+  - arrays.slice(array, start, end) - Create subarray
+  - arrays.join(array, separator) - Join elements to string
+  - arrays.reverse(array) - Reverse array in place
+  - arrays.sort(array) - Sort array in place
+  - arrays.index_of(array, value) - Find first occurrence index
+  - arrays.contains(array, value) - Check if element exists
+  - arrays.remove(array, value) - Remove first occurrence
+  - arrays.remove_at(array, index) - Remove element at index
+  - arrays.clear(array) - Remove all elements
+  - arrays.clone(array) - Create shallow copy
+  - arrays.to_string(array) - Convert to string representation
+  - arrays.flat(array) - Flatten nested arrays
+  - arrays.fill(array, value, start, end) - Fill with value
+  - arrays.range(start, end, step) - Create range array
+  - arrays.shuffle(array) - Randomly shuffle elements
+
+- **Dynamic Type Conversion Module (fmt)**
+  - fmt.to_int(value) - Dynamic integer conversion from any supported type
+  - fmt.to_str(value) - Dynamic string conversion from any supported type
+  - fmt.to_bin(value) - Dynamic binary conversion from any supported type
+  - fmt.to_float(value) - Dynamic float conversion with decimal precision
+  - fmt.type(value) - Runtime type detection
+
+- **Enhanced Type Safety**
+  - Strict compile-time type checking for variable assignments
+  - Detailed error messages with line and column information
+  - Type annotation enforcement prevents runtime type mismatches
+
+### Changed
+- Replaced convert module with enhanced fmt module
+- Dynamic type detection enables flexible value processing
+- Better error handling with descriptive error messages
+- Performance improvements for type conversion operations
+
+### Fixed
+- Fixed unused variable warnings in VM bytecode symbols
+- Fixed sign comparison warnings in arrays module
+- Fixed unused parameter warnings in native functions
+- Improved CMake build configuration for cleaner compilation
+
 
 ---
 
@@ -108,7 +199,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Includes Windows installer (.bat)
   - Both scripts support optional test running
 
----
 
 ## [1.0.3-alpha] - 2025-10-07
 

@@ -138,6 +138,37 @@ ErrorHandler::setSourceLines(sourceCodeLines);
 5. **Stack Traces**: Understand the call chain when errors occur
 6. **Type Safety**: Catch type errors early with clear messages
 
+## Exception Handling
+
+Neutron supports structured exception handling:
+
+### Basic Try-Catch
+```neutron
+try {
+    riskyOperation();
+} catch (error) {
+    say("Error: " + error);
+}
+```
+
+### Try-Catch-Finally
+```neutron
+try {
+    operation();
+} catch (err) {
+    handle(err);
+} finally {
+    cleanup(); // Always runs
+}
+```
+
+### Throwing Exceptions
+```neutron
+throw "Error message";      // String
+throw 404;                 // Number
+throw {"code": 500};       // Object
+```
+
 ## Examples
 
 ### Syntax Error

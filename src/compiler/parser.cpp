@@ -884,8 +884,8 @@ std::unique_ptr<Stmt> Parser::matchStatement() {
 }
 
 std::unique_ptr<Stmt> Parser::tryStatement() {
-    consume(TokenType::LEFT_BRACE, "Expect '{' after 'try'.");
-    auto tryBlock = block();
+    // Expect a block after 'try' keyword
+    std::unique_ptr<Stmt> tryBlock = block();
     
     Token catchVar = Token(TokenType::IDENTIFIER, "", current);  // Placeholder
     std::unique_ptr<Stmt> catchBlock = nullptr;
@@ -895,17 +895,17 @@ std::unique_ptr<Stmt> Parser::tryStatement() {
         consume(TokenType::LEFT_PAREN, "Expect '(' after 'catch'.");
         catchVar = consume(TokenType::IDENTIFIER, "Expect exception variable name.");
         consume(TokenType::RIGHT_PAREN, "Expect ')' after exception variable.");
-        consume(TokenType::LEFT_BRACE, "Expect '{' before catch block.");
+        // The parser is now at '{' after ')', so call block() which expects '{'
         catchBlock = block();
     }
     
     if (match({TokenType::FINALLY})) {
-        consume(TokenType::LEFT_BRACE, "Expect '{' after 'finally'.");
+        // The parser is now at '{' after 'finally', so call block() which expects '{'
         finallyBlock = block();
     }
     
     if (!catchBlock && !finallyBlock) {
-        throw std::runtime_error("Expect 'catch' or 'finally' after try block.");
+        error(previous(), "Expect 'catch' or 'finally' after try block.");
     }
     
     return std::make_unique<TryStmt>(std::move(tryBlock), catchVar, 
