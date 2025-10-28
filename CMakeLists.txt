@@ -187,22 +187,6 @@ list(APPEND NEUTRON_UTILS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/utils/component_interface.cpp
 )
 
-# Add all component sources together (excluding main.cpp)
-set(NEUTRON_ALL_SOURCES
-    ${NEUTRON_CORE_SOURCES}
-    ${NEUTRON_TYPE_SOURCES}
-    ${NEUTRON_FEATURE_SOURCES}
-    ${NEUTRON_EXTENSION_SOURCES}
-    ${NEUTRON_UTILS_SOURCES}
-    ${NEUTRON_PLATFORM_SOURCES_LIST}
-)
-
-# Library sources (including modules)
-set(NEUTRON_LIBRARY_SOURCES
-    ${NEUTRON_ALL_SOURCES}
-    ${NEUTRON_ALL_MODULE_SOURCES}
-)
-
 # Platform-specific sources - declare and initialize
 set(NEUTRON_PLATFORM_SOURCES_LIST "")
 
@@ -223,7 +207,21 @@ if(WIN32)
     set( JSONCPP_LIBRARIES JsonCpp::JsonCpp)
 endif()
 
-# No need to manually add to core sources since NEUTRON_ALL_SOURCES already includes NEUTRON_PLATFORM_SOURCES_LIST
+# Add all component sources together (excluding main.cpp) - must be done after platform sources are determined
+set(NEUTRON_ALL_SOURCES
+    ${NEUTRON_CORE_SOURCES}
+    ${NEUTRON_TYPE_SOURCES}
+    ${NEUTRON_FEATURE_SOURCES}
+    ${NEUTRON_EXTENSION_SOURCES}
+    ${NEUTRON_UTILS_SOURCES}
+    ${NEUTRON_PLATFORM_SOURCES_LIST}
+)
+
+# Library sources (including modules) - must be defined after all sources are determined
+set(NEUTRON_LIBRARY_SOURCES
+    ${NEUTRON_ALL_SOURCES}
+    ${NEUTRON_ALL_MODULE_SOURCES}
+)
 
 # Create static runtime library for executable linking
 add_library(neutron_runtime STATIC
