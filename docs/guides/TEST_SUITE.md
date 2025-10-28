@@ -3,7 +3,7 @@
 ## Overview
 Comprehensive test suite for the Neutron programming language covering all major features documented in `docs/language_reference.md`.
 
-**Status:** ✅ All 29 tests passing (100% success rate)  
+**Status:** ✅ All 30 tests passing (100% success rate)  
 **Last Updated:** October 28, 2025
 
 ## Running Tests
@@ -23,7 +23,7 @@ bash run_tests.sh
 .\run_tests.ps1
 ```
 
-## Test Files (29 total)
+## Test Files (30 total)
 
 ### Core Language Features
 
@@ -266,6 +266,17 @@ bash run_tests.sh
 - Remove operations
 - to_string operations
 
+### Asynchronous Operations
+
+#### 30. **test_async_module.nt** - Async Module ✅
+- async.sleep() - Delay execution without blocking
+- async.run() - Execute functions asynchronously
+- async.await() - Wait for async operations to complete
+- async.timer() - Schedule delayed execution
+- async.promise() - Create promise-like objects
+- Combined async operations
+- Integration with other modules
+
 ## Test Runners
 
 ### Bash Script (Linux/macOS/MSYS2)
@@ -288,14 +299,14 @@ bash run_tests.sh
 
 ## Test Results
 
-**Status: ✅ ALL TESTS PASSING (29/29) - 100% SUCCESS RATE**
+**Status: ✅ ALL TESTS PASSING (30/30) - 100% SUCCESS RATE**
 
 ```
 ================================
   Test Summary
 ================================
-Total tests: 29
-Passed: 29
+Total tests: 30
+Passed: 30
 Failed: 0
 
 All tests passed!

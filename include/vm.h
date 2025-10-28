@@ -116,6 +116,7 @@ public:
     
     std::vector<ExceptionFrame> exceptionFrames;  // Stack of exception frames
     bool hasException;  // Flag to indicate if an exception is currently being handled
+    Value pendingException;  // The exception to be re-thrown after finally block
 
 private:
     bool call(Function* function, int argCount);

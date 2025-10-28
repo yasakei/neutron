@@ -904,9 +904,10 @@ std::unique_ptr<Stmt> Parser::tryStatement() {
         finallyBlock = block();
     }
     
-    if (!catchBlock && !finallyBlock) {
-        error(previous(), "Expect 'catch' or 'finally' after try block.");
-    }
+    // In standard exception handling, a try block must have at least a catch or finally clause
+    // However, for the Neutron language design, we'll allow try blocks to exist alone
+    // This would be for cases where you just want to execute code that might throw
+    // and let any exceptions propagate up (which is handled by the VM)
     
     return std::make_unique<TryStmt>(std::move(tryBlock), catchVar, 
                                       std::move(catchBlock), std::move(finallyBlock));

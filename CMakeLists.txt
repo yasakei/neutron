@@ -80,6 +80,7 @@ set(NEUTRON_BUILTIN_MODULE_SOURCES
     libs/http/native.cpp
     libs/time/native.cpp
     libs/arrays/native.cpp
+    libs/async/native.cpp
 )
 
 # All module-related sources (internal and built-in)

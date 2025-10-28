@@ -31,6 +31,10 @@ This directory contains comprehensive documentation for all built-in modules in 
 - **[Time Module](time_module.md)** - Time operations, formatting, and delays
   - **Functions:** `now`, `format`, `sleep`
 
+### Asynchronous Operations
+- **[Async Module](async_module.md)** - Asynchronous operations, timers, and non-blocking execution
+  - **Functions:** `run`, `await`, `sleep`, `timer`, `promise`
+
 ## Usage
 
 All modules can be imported using the `use` statement:
@@ -42,6 +46,7 @@ use json;
 use http;
 use time;
 use fmt;
+use async;
 
 // Use module functions
 var currentDir = sys.cwd();
@@ -50,6 +55,9 @@ var jsonStr = json.stringify({"key": "value"});
 var response = http.get("https://api.example.com");
 var timestamp = time.now();
 var type = fmt.type(42);        // Fmt functions for type conversion
+var task = async.run(fun() {    // Async functions for concurrent execution
+    return "async result";
+});
 ```
 
 ## Module Categories
@@ -69,6 +77,9 @@ var type = fmt.type(42);        // Fmt functions for type conversion
 
 ### **Time & Scheduling**
 - **time**: Timestamps, formatting, delays, performance timing
+
+### **Asynchronous Operations**
+- **async**: Non-blocking execution, timers, concurrent operations
 
 ## Documentation Features
 
@@ -91,7 +102,7 @@ sys.read("file.txt")
 sys.write("file.txt", "content")
 sys.exists("file.txt")
 
-// Math operations  Conver
+// Math operations
 math.add(a, b)
 math.pow(base, exponent)
 math.sqrt(number)
@@ -108,6 +119,11 @@ http.post(url, data)
 time.now()
 time.format(timestamp)
 time.sleep(milliseconds)
+
+// Async operations
+async.run(fun() { /* async function */ })
+async.await(task)
+async.timer(fun() { /* delayed function */ }, delay_ms)
 
 // String/conversion (available globally)
 string_length(text)

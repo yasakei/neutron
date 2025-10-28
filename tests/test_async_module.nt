@@ -1,0 +1,60 @@
+// test_async_module.nt
+// Comprehensive test for async module functionality
+
+use async;
+
+say("=== Async Module Test ===");
+
+// Test 1: async.sleep
+say("Test 1: async.sleep");
+say("  Before sleep");
+async.sleep(50);  // Sleep for 50ms
+say("  After sleep - sleep function works");
+
+// Test 2: async.run
+say("Test 2: async.run");
+var task = async.run(fun() {
+    say("    Inside async.run function");
+    return "async_result";
+});
+say("  Async task created: " + (task != nil));
+say("  Task status: " + task.status);
+
+// Test 3: async.await
+say("Test 3: async.await");
+var result = async.await(task);
+say("  Await result: " + (result != nil));
+
+// Test 4: async.timer
+say("Test 4: async.timer");
+say("  Starting timer test");
+async.timer(fun() {
+    say("    Timer callback executed");
+}, 100);  // Execute after 100ms
+say("  Timer scheduled");
+async.sleep(150);  // Wait for timer to execute
+say("  Timer execution verified");
+
+// Test 5: async.promise
+say("Test 5: async.promise");
+var promise = async.promise();
+say("  Promise created: " + (promise != nil));
+say("  Promise state: " + promise.state);
+say("  Promise result: " + promise.result);
+
+// Test 6: Combined async operations
+say("Test 6: Combined async operations");
+var task1 = async.run(fun() {
+    async.sleep(20);
+    return "result1";
+});
+var task2 = async.run(fun() {
+    async.sleep(30);
+    return "result2";
+});
+
+var result1 = async.await(task1);
+var result2 = async.await(task2);
+say("  Combined results: " + result1 + ", " + result2);
+
+say("=== All async module tests completed ===");

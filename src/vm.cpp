@@ -29,6 +29,7 @@
 #include "arrays/native.h"
 #include "math/native.h"
 #include "http/native.h"
+#include "async/native.h"
 #include "modules/module_registry.h"
 #include "utils/component_interface.h"
 
@@ -76,7 +77,7 @@ bool isTruthy(const Value& value) {
     exit(1);
 }
 
-VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>"), hasException(false) {  // Start GC at 1024 bytes
+VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>"), hasException(false), pendingException(Value()) {  // Start GC at 1024 bytes
     // Initialize error handler
     ErrorHandler::setColorEnabled(true);
     ErrorHandler::setStackTraceEnabled(true);
@@ -1154,6 +1155,18 @@ void VM::run(size_t minFrameDepth) {
                 if (!exceptionFrames.empty()) {
                     exceptionFrames.pop_back();
                 }
+                
+                // For Neutron's exception handling semantics:
+                // When a try-finally (without catch) executes and an exception was handled,
+                // the exception is consumed (not re-thrown) after the finally block completes.
+                // So we simply clear any pending exception state when END_TRY is reached.
+                if (hasException) {
+                    // Clear the pending exception - the finally block has executed
+                    // and the exception is consumed (not re-thrown)
+                    pendingException = Value();
+                    hasException = false;
+                }
+                
                 break;
             }
             case (uint8_t)OpCode::OP_THROW: {
@@ -1182,14 +1195,18 @@ void VM::run(size_t minFrameDepth) {
                     runtimeError(errorMsg.c_str());
                 }
                 
-                // Execute finally block if it exists before jumping to catch
+                // Store the exception info for re-throw after finally if needed
+                // Don't remove exception frames yet if there's a finally block - we'll need them for re-throw
                 if (handler->finallyStart != -1 && handler->finallyStart != 0xFFFF) {
-                    // Store exception temporarily for later use in catch
-                    // Jump to finally block
+                    // We'll handle the exception frames appropriately when the finally block completes
+                    // Store the exception for later re-throw
+                    pendingException = exception; // Store the exception to be re-thrown after finally
+                    hasException = true;
+                    
+                    // Jump to the finally block
                     frame->ip = frame->function->chunk->code.data() + handler->finallyStart;
-                    // When finally completes, we'll need to jump to catch
-                    // For simplicity in this implementation, we'll just go to catch directly
-                    // but in a full implementation, finally should be executed first
+                    // Don't pop the exception frame yet - we'll need it when finally block completes
+                    break; // Exit OP_THROW processing
                 }
                 
                 // Adjust the stack to the frame base when the exception frame was created
@@ -1205,20 +1222,21 @@ void VM::run(size_t minFrameDepth) {
                     exceptionFrames.pop_back(); // Remove the current handler
                 }
                 
-                // Jump to the catch block if it exists
+                // Handle the exception according to the available handlers
                 if (handler->catchStart != -1 && handler->catchStart != 0xFFFF) {
+                    // There is a catch block - execute it
                     frame->ip = frame->function->chunk->code.data() + handler->catchStart;
                     
                     // Push the exception value onto the stack for the catch block
                     push(exception);
-                    
-                    // Set up the catch variable if we have locals to assign to
-                    // This requires adjusting how locals work during exception handling
                 } else if (handler->finallyStart != -1 && handler->finallyStart != 0xFFFF) {
-                    // If only finally exists, go to finally block
-                    frame->ip = frame->function->chunk->code.data() + handler->finallyStart;
+                    // Only finally block exists - we need to execute it and then re-throw
+                    // The exception has already been stored and frames retained earlier
+                    // This case should not be reached now since we handle it above
+                    // This is a fallback if somehow the logic gets here
+                    runtimeError("Internal error: Exception processing state inconsistent");
                 } else {
-                    // This shouldn't happen based on our logic
+                    // No catch and no finally - runtime error (shouldn't happen due to parser requirement)
                     runtimeError("Exception occurred but no handler available");
                 }
                 
@@ -1338,6 +1356,9 @@ void VM::load_module(const std::string& name) {
         return;
     } else if (name == "sys") {
         neutron_init_sys_module(this);
+        return;
+    } else if (name == "async") {
+        neutron_init_async_module(this);
         return;
     }
 

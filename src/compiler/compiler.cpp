@@ -945,11 +945,18 @@ void Compiler::visitTryStmt(const TryStmt* stmt) {
         beginScope();
         if (stmt->catchVar.lexeme != "") {
             // Add the catch variable to locals 
-            // When an exception is caught, the exception value is on the stack
+            // When an exception is caught, the exception value is on the stack at this point
+            // So we need to store the exception value (which is on top of the stack)
+            // into the local slot for the catch variable
             locals.push_back(Local{stmt->catchVar, scopeDepth, std::nullopt});
+            
+            // The exception value is now on top of the stack
+            // We need to store it in the catch variable's local slot (which is the last slot added)
+            int slot = locals.size() - 1;
+            emitBytes((uint8_t)OpCode::OP_SET_LOCAL, slot);
         }
         
-        // Compile the catch block
+        // Compile the rest of the catch block
         compileStatement(stmt->catchBlock.get());
         endScope();
     } else {
