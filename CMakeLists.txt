@@ -203,8 +203,8 @@ set(NEUTRON_LIBRARY_SOURCES
     ${NEUTRON_ALL_MODULE_SOURCES}
 )
 
-# Platform-specific sources (updated variable name) - initialize before we might add to it
-set(NEUTRON_PLATFORM_SOURCES "")
+# Platform-specific sources - declare and initialize
+set(NEUTRON_PLATFORM_SOURCES_LIST "")
 
 set( DLFCN_WIN "")
 
@@ -217,16 +217,13 @@ if(WIN32)
     else()
         message(STATUS "dlfcn-win32 not found; using internal Windows shim for dlopen/dlsym/dlclose")
         # Add the shim implementation to the platform sources
-        list(APPEND NEUTRON_PLATFORM_SOURCES src/platform/dlfcn_compat_win.cpp)
+        list(APPEND NEUTRON_PLATFORM_SOURCES_LIST src/platform/dlfcn_compat_win.cpp)
     endif()
     find_package(jsoncpp CONFIG REQUIRED)
     set( JSONCPP_LIBRARIES JsonCpp::JsonCpp)
 endif()
 
-# Add platform sources to main sources AFTER the Windows-specific configuration
-if(NEUTRON_PLATFORM_SOURCES)
-    list(APPEND NEUTRON_CORE_SOURCES ${NEUTRON_PLATFORM_SOURCES})
-endif()
+# No need to manually add to core sources since NEUTRON_ALL_SOURCES already includes NEUTRON_PLATFORM_SOURCES_LIST
 
 # Create static runtime library for executable linking
 add_library(neutron_runtime STATIC
