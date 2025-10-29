@@ -1,66 +1,116 @@
 ---
-[NEUT-001] - Not-Equal Operator (!=) Produces Incorrect Results
-Status: Fixed
-Discoverd on: Wednesday, October 29, 2025 - Linux - Neutron-1.1.1-beta
-Description : The `!=` operator produces inverted/incorrect boolean results in comparisons, as it is compiled to the same bytecode as `==` (OP_EQUAL), causing logical errors in program execution.
+
+### [NEUT-001] - Not-Equal Operator (!=) Produces Incorrect Results
+**Status:** Fixed  
+**Discovered:** October 29, 2025  
+
+**Description:**  
+The `!=` operator produced inverted or incorrect boolean results, as it was compiled
+to the same bytecode as `==` (`OP_EQUAL`), causing logical errors in program execution.
+
 ---
+
+### [NEUT-002] - BANG_EQUAL Token Not Properly Implemented in VM
+**Status:** Fixed  
+**Discovered:** October 29, 2025  
+
+**Description:**  
+The `BANG_EQUAL` token was recognized by the scanner and parser, but there was no
+corresponding bytecode instruction or VM implementation for the `!=` operator.  
+The VM’s `OP_EQUAL` instruction incorrectly handled both `==` and `!=`.
+
 ---
-[NEUT-002] - BANG_EQUAL Token Not Properly Implemented in VM
-Status: Fixed
-Discoverd on: Wednesday, October 29, 2025 - Linux - Neutron-1.1.1-beta
-Description : The BANG_EQUAL token is recognized by scanner and parsed by the parser, but there's no corresponding bytecode instruction or VM implementation for the '!=' operator in the virtual machine. The VM's OP_EQUAL instruction handles both '==' and '!=' operations incorrectly.
+
+### [NEUT-003] - Potential Stack Overflow in Complex Expression Evaluation
+**Status:** Identified  
+**Discovered:** October 29, 2025  
+
+**Description:**  
+Complex nested expressions with multiple operations could cause stack overflow due
+to the fixed stack size limit of 256 entries and missing bounds checks during evaluation.
+
 ---
+
+### [NEUT-004] - Memory Management Issues with Object Heap
+**Status:** Fixed  
+**Discovered:** October 29, 2025  
+
+**Description:**  
+The garbage collector was incomplete — it performed basic marking and sweeping but
+lacked proper root discovery for nested object relationships.  
+This could lead to memory leaks or premature deallocation.  
+Fixed with improved recursive marking and automatic GC triggering.
+
 ---
-[NEUT-003] - Potential Stack Overflow in Complex Expression Evaluation
-Status: Identified
-Discoverd on: Wednesday, October 29, 2025 - Linux - Neutron-1.1.1-beta
-Description : Complex nested expressions with multiple operations could potentially cause stack overflow due to the fixed stack size limit of 256 entries without proper bounds checking in all evaluation paths.
+
+### [NEUT-005] - Exception Handling Implementation Inconsistency
+**Status:** Identified  
+**Discovered:** October 29, 2025  
+
+**Description:**  
+Exception handling (`TRY` / `THROW` / `CATCH`) had inconsistent frame management and
+lacked proper exception re-throwing behavior in `finally` blocks.
+
 ---
+
+### [NEUT-006] - Missing Symbol Operators for Common Operations
+**Status:** Partially Fixed  
+**Discovered:** October 29, 2025  
+
+**Description:**  
+C-style operators `&&`, `||`, `++`, and `--` were missing.  
+The `&&` and `||` operators are now implemented (aliasing `and` / `or`), but `++` and
+`--` remain pending due to required AST modifications.
+
 ---
-[NEUT-004] - Memory Management Issues with Object Heap
-Status: Fixed
-Discoverd on: Wednesday, October 29, 2025 - Linux - Neutron-1.1.1-beta
-Description : The garbage collector implementation is incomplete with basic marking and sweeping but lacks proper root finding for complex object relationships, which could lead to memory leaks or premature deallocation. Fixed with improved recursive marking of nested objects and automatic GC triggering.
+
+### [NEUT-007] - Array Index Out of Bounds Error Handling
+**Status:** Fixed  
+**Discovered:** October 29, 2025  
+
+**Description:**  
+Array index access had bounds checking but provided no detailed error context
+(array name or line number).  
+Enhanced error messages now include source details to aid debugging.
+
 ---
+
+### [NEUT-008] - Module Loading Performance Bottleneck
+**Status:** Identified  
+**Discovered:** October 29, 2025  
+
+**Description:**  
+Module loading re-scanned and re-parsed files on every import, leading to
+significant slowdowns when modules were reused across complex projects.
+
 ---
-[NEUT-005] - Exception Handling Implementation Inconsistency
-Status: Identified
-Discoverd on: Wednesday, October 29, 2025 - Linux - Neutron-1.1.1-beta
-Description : Exception handling has been added with TRY/THROW/CATCH opcodes but the implementation has inconsistent frame management and lacks proper exception re-throwing in finally blocks.
+
+### [NEUT-009] - Type Safety in Array Operations Not Enforced
+**Status:** Identified  
+**Discovered:** October 29, 2025  
+
+**Description:**  
+Array methods such as `push`, `slice`, and `indexOf` did not enforce type consistency
+when used with typed variables, potentially allowing runtime type violations.
+
 ---
+
+### [NEUT-010] - String Interpolation with Non-String Values
+**Status:** Identified  
+**Discovered:** October 29, 2025  
+
+**Description:**  
+String interpolation using `${...}` did not properly handle all value types,
+sometimes producing invalid or unintended string representations at runtime.
+
 ---
-[NEUT-006] - Missing Symbol Operators for Common Operations
-Status: Partially Fixed
-Discoverd on: Wednesday, October 29, 2025 - Linux - Neutron-1.1.1-beta
-Description : C-style operators `&&`, `||`, `++`, `--` are not implemented. The `&&` and `||` symbol operators have been implemented and work the same as `and` and `or` keywords. The `++` and `--` operators require more complex AST changes and remain to be implemented.
----
----
-[NEUT-007] - Array Index Out of Bounds Error Handling
-Status: Fixed
-Discoverd on: Wednesday, October 29, 2025 - Linux - Neutron-1.1.1-beta
-Description : Array index access has bounds checking but doesn't provide detailed error information about which array or line caused the error, making debugging difficult for users.
----
----
-[NEUT-008] - Module Loading Performance Bottleneck
-Status: Identified
-Discoverd on: Wednesday, October 29, 2025 - Linux - Neutron-1.1.1-beta
-Description : Module loading implementation re-scans and re-parses files each time, leading to performance degradation when modules are loaded multiple times in complex applications.
----
----
-[NEUT-009] - Type Safety in Array Operations Not Enforced
-Status: Identified
-Discoverd on: Wednesday, October 29, 2025 - Linux - Neutron-1.1.1-beta
-Description : Array methods like push, slice, indexOf do not enforce type consistency when used with typed variables, potentially allowing type violations.
----
----
-[NEUT-010] - String Interpolation with Non-String Values
-Status: Identified
-Discoverd on: Wednesday, October 29, 2025 - Linux - Neutron-1.1.1-beta
-Description : String interpolation using ${...} syntax may not properly handle all value types during expression evaluation, potentially causing runtime errors or unexpected string representations.
----
----
-[NEUT-011] - Equality Comparison Performance Optimization
-Status: Fixed
-Discoverd on: Wednesday, October 29, 2025 - Linux - Neutron-1.1.1-beta
-Description : The equality (==) and inequality (!=) operators were performing expensive string conversions for all comparisons. Optimized to perform type-specific comparisons first, only falling back to string comparison for complex types.
----
+
+### [NEUT-011] - Equality Comparison Performance Optimization
+**Status:** Fixed  
+**Discovered:** October 29, 2025  
+
+**Description:**  
+Equality (`==`) and inequality (`!=`) comparisons previously performed costly string
+conversions for all types.  
+Optimized to use type-specific comparisons first, falling back to string comparison
+only for complex types.
