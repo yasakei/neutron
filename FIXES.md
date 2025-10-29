@@ -1,5 +1,3 @@
----
-
 ### [NEUT-001] - Not-Equal Operator (!=) Produces Incorrect Results
 **Status:** Fixed  
 **Discovered:** October 29, 2025  
