@@ -1,16 +1,29 @@
-MIT License
+Neutron Public License 1.0
 
-Copyright (c) 2025 Yasakei
+Copyright (c) 2025 yasakei
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This software is dual-licensed under the following terms:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. For Open Source Projects (OSI-approved licenses):
+   - You may use, modify, and distribute this software in open source projects
+   - You must include the original copyright notice and this license in all copies
+   - You must prominently acknowledge "Portions of this software use Neutron Programming Language (c) yasakei"
+   - You must include a link to the original project: https://github.com/yasakei/neutron
+
+2. For Proprietary/Commercial Projects:
+   - You must obtain a separate commercial license for production use
+   - Contact: yas.studios.en (at) gmail (dot) com for licensing inquiries
+   - A visible attribution must be maintained in the software: "Powered by Neutron (c) yasakei"
+
+3. For All Uses:
+   - The copyright notice must be preserved in all source distributions
+   - Redistributions of source code must retain this license notice
+   - Redistributions in binary form must reproduce the above copyright notice, 
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution
+   - Neither the name of the copyright holder nor the names of its contributors 
+     may be used to endorse or promote products derived from this software 
+     without specific prior written permission
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,

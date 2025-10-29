@@ -1,3 +1,19 @@
+/*
+ * Neutron Programming Language
+ * Copyright (c) 2025 yasakei
+ * 
+ * This software is distributed under the Neutron Public License 1.0.
+ * For full license text, see LICENSE file in the root directory.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #ifndef NEUTRON_VM_H
 #define NEUTRON_VM_H
 
@@ -82,6 +98,12 @@ public:
     T* allocate(Args&&... args) {
         T* obj = new T(std::forward<Args>(args)...);
         heap.push_back(obj);
+        
+        // Check if we need to run garbage collection
+        if (heap.size() >= nextGC) {
+            collectGarbage();
+        }
+        
         return obj;
     }
 

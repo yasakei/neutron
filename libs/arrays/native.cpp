@@ -84,7 +84,9 @@ Value native_arrays_at(std::vector<Value> arguments) {
     int index = static_cast<int>(std::get<double>(arguments[1].as));
     
     if (index < 0 || index >= static_cast<int>(arr->size())) {
-        throw std::runtime_error("Array index out of bounds");
+        std::string range = arr->size() == 0 ? "[]" : "[0, " + std::to_string(arr->size()-1) + "]";
+        throw std::runtime_error("Array index out of bounds: index " + std::to_string(index) + 
+                                " is not within " + range);
     }
     
     return arr->at(index);
@@ -100,7 +102,9 @@ Value native_arrays_set(std::vector<Value> arguments) {
     int index = static_cast<int>(std::get<double>(arguments[1].as));
     
     if (index < 0 || index >= static_cast<int>(arr->size())) {
-        throw std::runtime_error("Array index out of bounds");
+        std::string range = arr->size() == 0 ? "[]" : "[0, " + std::to_string(arr->size()-1) + "]";
+        throw std::runtime_error("Array index out of bounds: index " + std::to_string(index) + 
+                                " is not within " + range);
     }
     
     arr->set(index, arguments[2]);
@@ -255,7 +259,9 @@ Value native_arrays_remove_at(std::vector<Value> arguments) {
     int index = static_cast<int>(std::get<double>(arguments[1].as));
     
     if (index < 0 || index >= static_cast<int>(arr->size())) {
-        throw std::runtime_error("Array index out of bounds");
+        std::string range = arr->size() == 0 ? "[]" : "[0, " + std::to_string(arr->size()-1) + "]";
+        throw std::runtime_error("Array index out of bounds: index " + std::to_string(index) + 
+                                " is not within " + range);
     }
     
     Value removed = arr->at(index);
@@ -487,7 +493,9 @@ Value native_array_remove_at(std::vector<Value> arguments) {
     int index = static_cast<int>(std::get<double>(arguments[1].as));
     
     if (index < 0 || index >= static_cast<int>(arr->size())) {
-        throw std::runtime_error("Array index out of bounds");
+        std::string range = arr->size() == 0 ? "[]" : "[0, " + std::to_string(arr->size()-1) + "]";
+        throw std::runtime_error("Array index out of bounds: index " + std::to_string(index) + 
+                                " is not within " + range);
     }
     
     Value removed = arr->at(index);

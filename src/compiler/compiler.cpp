@@ -216,6 +216,7 @@ void Compiler::visitBinaryExpr(const BinaryExpr* expr) {
         case TokenType::SLASH:         emitByte((uint8_t)OpCode::OP_DIVIDE); break;
         case TokenType::PERCENT:       emitByte((uint8_t)OpCode::OP_MODULO); break;
         case TokenType::EQUAL_EQUAL:   emitByte((uint8_t)OpCode::OP_EQUAL); break;
+        case TokenType::BANG_EQUAL:    emitByte((uint8_t)OpCode::OP_NOT_EQUAL); break;
         case TokenType::GREATER:       emitByte((uint8_t)OpCode::OP_GREATER); break;
         case TokenType::GREATER_EQUAL: emitBytes((uint8_t)OpCode::OP_LESS, (uint8_t)OpCode::OP_NOT); break;
         case TokenType::LESS:          emitByte((uint8_t)OpCode::OP_LESS); break;

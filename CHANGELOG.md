@@ -5,6 +5,28 @@ All notable changes to the Neutron programming language will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
+## [1.1.2-beta] - 2025-10-29
+
+### Added
+- Comprehensive copyright headers to all source files
+- Neutron Public License 1.0 with specific terms for open source and commercial use
+- Required attribution requirements for code usage
+
+### Fixed
+- != operator now correctly returns inverted boolean results instead of identical to == operator
+- Enhanced array bounds error messages with detailed index and range information
+- Optimized equality/inequality comparison performance by using type-specific comparisons
+- Improved garbage collection with better object marking and automatic triggering
+- Implemented && and || symbol operators alongside existing and/or keywords
+
+### Changed
+- Version updated from 1.1.1-beta to 1.1.2-beta
+- Updated license from MIT to Neutron Public License 1.0
+
+### Security
+- Added proper licensing terms requiring attribution
+- Defined clear terms for commercial vs open source usage
+
 ## [1.1.1-beta] - 2025-10-28
 
 ### Added

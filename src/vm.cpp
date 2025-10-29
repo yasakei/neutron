@@ -1,3 +1,19 @@
+/*
+ * Neutron Programming Language
+ * Copyright (c) 2025 yasakei
+ * 
+ * This software is distributed under the Neutron Public License 1.0.
+ * For full license text, see LICENSE file in the root directory.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include "vm.h"
 #include "runtime/native_functions.h"
 #include "sys/native.h"
@@ -943,7 +959,45 @@ void VM::run(size_t minFrameDepth) {
             case (uint8_t)OpCode::OP_EQUAL: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.type == b.type && a.toString() == b.toString()));
+                
+                bool result = false;
+                if (a.type != b.type) {
+                    result = false;
+                } else if (a.type == ValueType::NIL) {
+                    result = true;  // All nil values are equal
+                } else if (a.type == ValueType::BOOLEAN) {
+                    result = (std::get<bool>(a.as) == std::get<bool>(b.as));
+                } else if (a.type == ValueType::NUMBER) {
+                    result = (std::get<double>(a.as) == std::get<double>(b.as));
+                } else if (a.type == ValueType::STRING) {
+                    result = (std::get<std::string>(a.as) == std::get<std::string>(b.as));
+                } else {
+                    // For complex types (OBJECT, ARRAY, etc.), fall back to string comparison
+                    result = (a.toString() == b.toString());
+                }
+                push(Value(result));
+                break;
+            }
+            case (uint8_t)OpCode::OP_NOT_EQUAL: {
+                Value b = pop();
+                Value a = pop();
+                
+                bool result = false;
+                if (a.type != b.type) {
+                    result = true;
+                } else if (a.type == ValueType::NIL) {
+                    result = false;  // All nil values are equal
+                } else if (a.type == ValueType::BOOLEAN) {
+                    result = (std::get<bool>(a.as) != std::get<bool>(b.as));
+                } else if (a.type == ValueType::NUMBER) {
+                    result = (std::get<double>(a.as) != std::get<double>(b.as));
+                } else if (a.type == ValueType::STRING) {
+                    result = (std::get<std::string>(a.as) != std::get<std::string>(b.as));
+                } else {
+                    // For complex types (OBJECT, ARRAY, etc.), fall back to string comparison
+                    result = (a.toString() != b.toString());
+                }
+                push(Value(result));
                 break;
             }
             case (uint8_t)OpCode::OP_GREATER: {
@@ -1091,8 +1145,12 @@ void VM::run(size_t minFrameDepth) {
                     Array* array = std::get<Array*>(object.as);
                     
                                         if (idx < 0 || idx >= static_cast<int>(array->size())) {
-                        runtimeError("Array index out of bounds.");
-                                            return;
+                        std::string range = array->size() == 0 ? "[]" : "[0, " + std::to_string(array->size()-1) + "]";
+                        std::string errorMsg = "Array index out of bounds: index " + std::to_string(idx) + 
+                                              " is not within " + range;
+                        runtimeError(this, errorMsg, 
+                                    frames.empty() ? -1 : frames.back().currentLine);
+                        return;
                     }
                     
                                         push(array->at(idx));
@@ -1117,8 +1175,12 @@ void VM::run(size_t minFrameDepth) {
                     Array* array = std::get<Array*>(object.as);
                     
                                         if (idx < 0 || idx >= static_cast<int>(array->size())) {
-                        runtimeError("Array index out of bounds.");
-                                            return;
+                        std::string range = array->size() == 0 ? "[]" : "[0, " + std::to_string(array->size()-1) + "]";
+                        std::string errorMsg = "Array index out of bounds: index " + std::to_string(idx) + 
+                                              " is not within " + range;
+                        runtimeError(this, errorMsg, 
+                                    frames.empty() ? -1 : frames.back().currentLine);
+                        return;
                     }
                     
                                         array->set(idx, value);
@@ -1570,9 +1632,18 @@ void VM::markRoots() {
         markValue(pair.second);
     }
     
-    // Mark all objects in environments
-    // This would require recursively marking values in all environments
-    // For simplicity, we'll just mark the globals
+    // Mark objects in call frame functions (only functions since closures are part of them)
+    for (const auto& frame : frames) {
+        if (frame.function) {
+            // Mark the function itself
+            if (frame.function->chunk) {
+                // Mark constants in the function's chunk
+                for (const auto& constant : frame.function->chunk->constants) {
+                    markValue(constant);
+                }
+            }
+        }
+    }
 }
 
 void VM::markValue(const Value& value) {
@@ -1580,13 +1651,60 @@ void VM::markValue(const Value& value) {
         Object* obj = std::get<Object*>(value.as);
         if (obj && !obj->is_marked) {
             obj->mark();
+            
+            // For specific object types, mark their internal values
+            // Array - already handled below
+            // Instance
+            Instance* inst = dynamic_cast<Instance*>(obj);
+            if (inst) {
+                for (const auto& field : inst->fields) {
+                    markValue(field.second);
+                }
+            }
+            
+            // JsonObject
+            JsonObject* json_obj = dynamic_cast<JsonObject*>(obj);
+            if (json_obj) {
+                for (const auto& prop : json_obj->properties) {
+                    markValue(prop.second);
+                }
+            }
+            
+            // JsonArray
+            JsonArray* json_arr = dynamic_cast<JsonArray*>(obj);
+            if (json_arr) {
+                for (const auto& element : json_arr->elements) {
+                    markValue(element);
+                }
+            }
+            
+            // BoundArrayMethod - doesn't hold other values that need marking
         }
     } else if (value.type == ValueType::ARRAY) {
         Array* arr = std::get<Array*>(value.as);
         if (arr && !arr->is_marked) {
             arr->mark();
+            
+            // Mark all elements in the array recursively
+            for (const auto& element : arr->elements) {
+                markValue(element);
+            }
         }
-    }
+    } else if (value.type == ValueType::INSTANCE) {
+        // This case handles instances that might be stored as ValueType::INSTANCE
+        // but accessed directly (they should be handled in the OBJECT case)
+        Instance* inst = std::get<Instance*>(value.as);
+        if (inst && !inst->is_marked) {
+            inst->mark();
+            
+            // Mark all fields in the instance
+            for (const auto& field : inst->fields) {
+                markValue(field.second);
+            }
+        }
+    } 
+    // Note: Functions, Classes, and other Callables are not marked in this implementation
+    // as they don't inherit from Object and marking them requires more complex implementation
 }
 
 void VM::sweep() {

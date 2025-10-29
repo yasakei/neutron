@@ -25,21 +25,27 @@ Value Array::pop() {
 
 Value& Array::at(size_t index) {
     if (index >= elements.size()) {
-        throw std::runtime_error("Array index out of bounds");
+        std::string range = elements.empty() ? "[]" : "[0, " + std::to_string(elements.size()-1) + "]";
+        throw std::runtime_error("Array index out of bounds: index " + std::to_string(index) + 
+                                " is not within " + range);
     }
     return elements[index];
 }
 
 const Value& Array::at(size_t index) const {
     if (index >= elements.size()) {
-        throw std::runtime_error("Array index out of bounds");
+        std::string range = elements.empty() ? "[]" : "[0, " + std::to_string(elements.size()-1) + "]";
+        throw std::runtime_error("Array index out of bounds: index " + std::to_string(index) + 
+                                " is not within " + range);
     }
     return elements[index];
 }
 
 void Array::set(size_t index, const Value& value) {
     if (index >= elements.size()) {
-        throw std::runtime_error("Array index out of bounds");
+        std::string range = elements.empty() ? "[]" : "[0, " + std::to_string(elements.size()-1) + "]";
+        throw std::runtime_error("Array index out of bounds: index " + std::to_string(index) + 
+                                " is not within " + range);
     }
     elements[index] = value;
 }

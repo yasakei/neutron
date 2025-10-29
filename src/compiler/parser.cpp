@@ -349,7 +349,7 @@ std::unique_ptr<Expr> Parser::assignment() {
 std::unique_ptr<Expr> Parser::logic_or() {
     std::unique_ptr<Expr> expr = logic_and();
 
-    while (match({TokenType::OR})) {
+    while (match({TokenType::OR, TokenType::OR_SYM})) {
         Token op = previous();
         std::unique_ptr<Expr> right = logic_and();
         expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
@@ -361,7 +361,7 @@ std::unique_ptr<Expr> Parser::logic_or() {
 std::unique_ptr<Expr> Parser::logic_and() {
     std::unique_ptr<Expr> expr = equality();
 
-    while (match({TokenType::AND})) {
+    while (match({TokenType::AND, TokenType::AND_SYM})) {
         Token op = previous();
         std::unique_ptr<Expr> right = equality();
         expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));

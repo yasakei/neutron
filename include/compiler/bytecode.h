@@ -55,6 +55,7 @@ enum class OpCode : uint8_t {
     OP_TRY,
     OP_END_TRY,
     OP_THROW,
+    OP_NOT_EQUAL,
     OP_LOGICAL_AND,
     OP_LOGICAL_OR
 };

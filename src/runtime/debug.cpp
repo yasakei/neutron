@@ -84,6 +84,8 @@ size_t disassembleInstruction(const Chunk* chunk, size_t offset) {
             return simpleInstruction("OP_FALSE", offset);
         case OpCode::OP_POP:
             return simpleInstruction("OP_POP", offset);
+        case OpCode::OP_DUP:
+            return simpleInstruction("OP_DUP", offset);
         case OpCode::OP_GET_LOCAL:
             return constantInstruction("OP_GET_LOCAL", chunk, offset);
         case OpCode::OP_SET_LOCAL:
@@ -94,8 +96,16 @@ size_t disassembleInstruction(const Chunk* chunk, size_t offset) {
             return constantInstruction("OP_DEFINE_GLOBAL", chunk, offset);
         case OpCode::OP_SET_GLOBAL:
             return constantInstruction("OP_SET_GLOBAL", chunk, offset);
+        case OpCode::OP_SET_GLOBAL_TYPED:
+            return constantInstruction("OP_SET_GLOBAL_TYPED", chunk, offset);
+        case OpCode::OP_SET_LOCAL_TYPED:
+            return constantInstruction("OP_SET_LOCAL_TYPED", chunk, offset);
+        case OpCode::OP_DEFINE_TYPED_GLOBAL:
+            return constantInstruction("OP_DEFINE_TYPED_GLOBAL", chunk, offset);
         case OpCode::OP_EQUAL:
             return simpleInstruction("OP_EQUAL", offset);
+        case OpCode::OP_NOT_EQUAL:
+            return simpleInstruction("OP_NOT_EQUAL", offset);
         case OpCode::OP_GREATER:
             return simpleInstruction("OP_GREATER", offset);
         case OpCode::OP_LESS:
@@ -118,6 +128,16 @@ size_t disassembleInstruction(const Chunk* chunk, size_t offset) {
             return simpleInstruction("OP_SAY", offset);
         case OpCode::OP_GET_PROPERTY:
             return constantInstruction("OP_GET_PROPERTY", chunk, offset);
+        case OpCode::OP_SET_PROPERTY:
+            return constantInstruction("OP_SET_PROPERTY", chunk, offset);
+        case OpCode::OP_ARRAY:
+            return constantInstruction("OP_ARRAY", chunk, offset);
+        case OpCode::OP_INDEX_GET:
+            return simpleInstruction("OP_INDEX_GET", offset);
+        case OpCode::OP_INDEX_SET:
+            return simpleInstruction("OP_INDEX_SET", offset);
+        case OpCode::OP_THIS:
+            return simpleInstruction("OP_THIS", offset);
         case OpCode::OP_JUMP:
             return constantInstruction("OP_JUMP", chunk, offset);
         case OpCode::OP_JUMP_IF_FALSE:
@@ -126,6 +146,16 @@ size_t disassembleInstruction(const Chunk* chunk, size_t offset) {
             return constantInstruction("OP_LOOP", chunk, offset);
         case OpCode::OP_CALL:
             return constantInstruction("OP_CALL", chunk, offset);
+        case OpCode::OP_TRY:
+            return simpleInstruction("OP_TRY", offset);
+        case OpCode::OP_END_TRY:
+            return simpleInstruction("OP_END_TRY", offset);
+        case OpCode::OP_THROW:
+            return simpleInstruction("OP_THROW", offset);
+        case OpCode::OP_LOGICAL_AND:
+            return simpleInstruction("OP_LOGICAL_AND", offset);
+        case OpCode::OP_LOGICAL_OR:
+            return simpleInstruction("OP_LOGICAL_OR", offset);
         case OpCode::OP_CLOSURE:
             return constantInstruction("OP_CLOSURE", chunk, offset);
         case OpCode::OP_GET_UPVALUE:
