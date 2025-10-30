@@ -8,7 +8,7 @@ Neutron is a simple, modern, and lightweight interpreted programming language wr
 
 [![Discord](https://img.shields.io/discord/1418142678301806645?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/29f2w6jme8)
 
-## Support the Project
+## Support this Project
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/yasakei)
 
 
