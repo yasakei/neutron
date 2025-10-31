@@ -79,6 +79,16 @@ cmake --build build
 
 See [Test Suite Documentation](docs/guides/TEST_SUITE.md) for details.
 
+### Local Packaging
+
+You can create release packages locally using the package script:
+
+```bash
+./package.sh            # Creates a release package for your current OS
+```
+
+The package script automatically detects your operating system and architecture, builds the appropriate package, and creates a compressed archive similar to the GitHub releases.
+
 ## Documentation
 
 📖 **[Full Documentation Index](docs/README.md)**
