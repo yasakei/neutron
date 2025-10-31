@@ -99,7 +99,7 @@ All built-in modules are automatically available in compiled binaries:
 - `math`: Mathematical operations
 - `http`: HTTP client functionality
 - `time`: Time and date operations
-- `convert`: String and binary conversion utilities
+- `fmt`: Type conversion and formatting utilities
 
 **Example:**
 ```neutron

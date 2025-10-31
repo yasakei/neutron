@@ -30,8 +30,7 @@ Error handling system
 ### 📦 [modules/](modules/)
 Built-in module documentation
 - [arrays_module.md](modules/arrays_module.md) - Array manipulation and utility functions
-- [convert_module.md](modules/convert_module.md) - Legacy string and binary conversion utilities
-- [fmt_module.md](modules/fmt_module.md) - Dynamic type conversion and detection utilities
+- [fmt_module.md](modules/fmt_module.md) - Type conversion and formatting utilities
 - [http_module.md](modules/http_module.md) - HTTP client functionality
 - [json_module.md](modules/json_module.md) - JSON parsing and serialization
 - [math_module.md](modules/math_module.md) - Mathematical operations

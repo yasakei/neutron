@@ -529,11 +529,11 @@ var result = expr1 and expr2;
 Neutron provides module functions for explicit type conversion:
 
 ```neutron
-use convert;
+use fmt;
 
-var str = convert.to_string(42);      // "42"
-var num = convert.to_number("3.14");  // 3.14
-var bool = convert.to_boolean(1);     // true
+var str = fmt.to_str(42);      // "42"
+var num = fmt.to_float("3.14");  // 3.14
+var bool = fmt.to_int(1);        // 1 (the fmt module handles type conversion differently)
 ```
 
 ### Type Checking at Runtime

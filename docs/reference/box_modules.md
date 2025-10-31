@@ -423,8 +423,8 @@ These modules are compiled directly into the Neutron runtime and require explici
    - Located in: `libs/time/native.cpp`
    - Functions: `now`, `format`, `sleep`
 
-6. **`convert`** - String/binary conversion utilities
-   - Located in: `libs/convert/native.cpp`
+6. **`fmt`** - Type conversion and formatting utilities
+   - Located in: `libs/fmt/native.cpp`
    - Functions: `char_to_int`, `int_to_char`, `string_length`, `string_get_char_at`, etc.
 
 **Important:** All built-in modules use lazy loading - they're only initialized when explicitly imported with `use modulename;`.

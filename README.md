@@ -261,7 +261,7 @@ Neutron includes several built-in modules:
 - **[HTTP Module](docs/modules/http_module.md)** - HTTP client functionality
 - **[JSON Module](docs/modules/json_module.md)** - JSON parsing and generation
 - **[Time Module](docs/modules/time_module.md)** - Time and date functions
-- **[Convert Module](docs/modules/convert_module.md)** - Data type conversion utilities
+- **[Fmt Module](docs/modules/fmt_module.md)** - Type conversion and formatting utilities
 
 **Usage:**
 ```neutron

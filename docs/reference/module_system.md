@@ -22,7 +22,7 @@ The following modules are built into the Neutron runtime and require explicit im
 - **sys** - File I/O, directory operations, environment access, process control (fully implemented)
 - **json** - JSON parsing and stringification
 - **math** - Mathematical operations
-- **convert** - Type conversion utilities
+- **fmt** - Type conversion and formatting utilities
 - **time** - Time and date functions
 - **http** - HTTP client operations
 
@@ -42,8 +42,8 @@ var content = sys.read("data.txt");
 var obj = json.parse("{\"name\": \"test\"}");
 say(json.stringify(obj));
 
-// convert module
-var num = convert.int("42");
+// fmt module
+var num = fmt.to_int("42");
 say(num);
 ```
 
@@ -101,7 +101,7 @@ The files currently in `lib/` are wrapper files for the built-in modules. Since 
 
 ### Recommendation
 
-**Remove the lib/ folder** if you're only using built-in modules. The built-in modules (json, math, sys, convert, time, http) are now loaded directly from the runtime.
+**Remove the lib/ folder** if you're only using built-in modules. The built-in modules (json, math, sys, fmt, time, http) are now loaded directly from the runtime.
 
 If you want to keep custom `.nt` library files, you can:
 - Keep them in the project root
@@ -113,7 +113,7 @@ If you want to keep custom `.nt` library files, you can:
 1. **Import modules at the top of your file**
    ```neutron
    use json;
-   use convert;
+   use fmt;
    
    using 'utils.nt';
    using 'helpers.nt';

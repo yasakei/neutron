@@ -507,7 +507,7 @@ The sys module uses lazy loading - it's only initialized when you explicitly use
 3. Better memory management
 4. Clear module boundaries
 
-All built-in modules (`sys`, `math`, `json`, `http`, `time`, `convert`) follow this pattern.
+All built-in modules (`sys`, `math`, `json`, `http`, `time`, `fmt`) follow this pattern.
 
 ## Changes from Previous Versions
 

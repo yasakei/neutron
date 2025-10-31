@@ -1,6 +1,6 @@
 # Fmt Module Documentation
 
-The `fmt` module provides dynamic type conversion and type detection utilities for Neutron programs. This replaces the older `convert` module with an enhanced set of functions that perform automatic type detection before conversion.
+The `fmt` module provides dynamic type conversion and type detection utilities for Neutron programs. The older `convert` module has been deprecated and replaced by this enhanced module with an expanded set of functions that perform automatic type detection before conversion.
 
 ## Usage
 
@@ -189,9 +189,9 @@ try {
 
 The fmt module replaces the older convert module with the following changes:
 
-- `convert.int(string)` → `fmt.to_int(value)` (dynamic conversion)
-- `convert.str(number)` → `fmt.to_str(value)` (dynamic conversion)  
-- `convert.bin_to_int()` and `convert.int_to_bin()` → `fmt.to_bin(value)` (dynamic conversion)
+- `convert.int(string)` → `fmt.to_int(value)` (dynamic conversion) - REMOVED: convert module was deprecated
+- `convert.str(number)` → `fmt.to_str(value)` (dynamic conversion) - REMOVED: convert module was deprecated
+- `convert.bin_to_int()` and `convert.int_to_bin()` → `fmt.to_bin(value)` (dynamic conversion) - REMOVED: convert module was deprecated
 - Added `fmt.to_float()` for decimal number conversion
 - Removed character manipulation functions (use sys module for direct string operations)
 

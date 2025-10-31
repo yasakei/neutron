@@ -32,10 +32,10 @@ while (i < 10 and j > 0) {
 **Description:** Converting an empty string to an integer with `convert.int()` now returns `0` instead of throwing an error.
 
 ```neutron
-use convert;
+use fmt;
 
 var empty = "";
-var num = convert.int(empty);  // Returns 0
+var num = fmt.to_int(empty);  // Returns 0
 say(num);  // Output: 0
 ```
 
@@ -50,7 +50,7 @@ while (i < 1000000) {
     // do something
     i = i + 1;
 }
-say("Success! Completed " + convert.str(i) + " iterations.");
+say("Success! Completed " + fmt.to_str(i) + " iterations.");
 ```
 
 ### sys Module Functions
@@ -281,7 +281,7 @@ say(info.arch);
 ```neutron
 use sys;
 use json;
-use convert;
+use fmt;
 
 // Now you can use them
 sys.write("file.txt", "data");
@@ -291,7 +291,7 @@ sys.write("file.txt", "data");
 
 1. Always import required modules at the top of your file
 2. Use `and` and `or` keywords for logical operations
-3. Handle empty string inputs when using `convert.int()`
+3. Handle empty string inputs when using `fmt.to_int()`
 4. Use dot notation for object property access
 5. Keep else-if chains reasonable (<10 levels)
 6. Use environment variables instead of command line args for now

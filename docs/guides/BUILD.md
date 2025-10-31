@@ -6,16 +6,8 @@ This guide provides comprehensive instructions for building Neutron on all suppo
 - [Prerequisites](#prerequisites)
 - [Linux](#linux)
 - [macOS](#macos)
-- [Windows](#wi# 3. Install vcpkg
-git submodule add https://github.com/microsoft/vcpkg.git vcpkg
-./vcpkg/bootstrap-vcpkg.bat
-
-# 4. Install dependencies
-# Note: dlfcn-win32 is optional - Neutron includes a built-in Windows shim
-./vcpkg/vcpkg install curl:x64-windows jsoncpp:x64-windows
-# Optional: ./vcpkg/vcpkg install dlfcn-win32:x64-windows
-
-# 5. Generate Visual Studio solution [Build Options](#build-options)
+- [Windows](#windows)
+- [Build Options](#build-options)
 - [Troubleshooting](#troubleshooting)
 
 ## Prerequisites

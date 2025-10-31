@@ -63,9 +63,9 @@ jobs:
         path: release/
         retention-days: 7
 
-  build-macos:
-    name: Build on macOS
-    runs-on: macos-latest
+  build-macos-intel:
+    name: Build on macOS Intel
+    runs-on: macos-11  # macOS Big Sur (11.0+) - supports Intel
     
     steps:
     - name: Checkout code
@@ -109,6 +109,55 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: neutron-macos-x64
+        path: release/
+        retention-days: 7
+
+  build-macos-arm64:
+    name: Build on macOS ARM64
+    runs-on: macos-14  # macOS Sonoma with ARM64 runner (Apple Silicon)
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install dependencies
+      run: |
+        brew install cmake curl jsoncpp
+        
+    - name: Configure CMake
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+      
+    - name: Build
+      run: cmake --build build -j$(sysctl -n hw.ncpu)
+      
+    - name: Verify binary
+      run: |
+        ls -lh neutron
+        ./neutron --version
+        
+    - name: Run tests
+      run: ./run_tests.sh
+      
+    - name: Build nt-box
+      run: |
+        cd nt-box
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+        cmake --build build
+        cd ..
+      
+    - name: Package artifacts
+      run: |
+        mkdir -p release
+        cp neutron release/
+        cp libneutron_runtime.dylib* release/ 2>/dev/null || true
+        cp README.md LICENSE release/
+        cp -r docs release/
+        cp nt-box/build/box release/ 2>/dev/null || true
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: neutron-macos-arm64
         path: release/
         retention-days: 7
 
@@ -180,7 +229,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [build-linux, build-macos, build-windows-msys2]
+    needs: [build-linux, build-macos-intel, build-macos-arm64, build-windows-msys2]
     if: always()
     
     steps:
@@ -188,9 +237,14 @@ jobs:
       run: |
         echo "Build Summary:"
         echo "Linux: ${{ needs.build-linux.result }}"
-        echo "macOS: ${{ needs.build-macos.result }}"
+        echo "macOS Intel: ${{ needs.build-macos-intel.result }}"
+        echo "macOS ARM64: ${{ needs.build-macos-arm64.result }}"
         echo "Windows: ${{ needs.build-windows-msys2.result }}"
         
     - name: Fail if any build failed
-      if: needs.build-linux.result != 'success' || needs.build-macos.result != 'success' || needs.build-windows-msys2.result != 'success'
+      if: |
+        needs.build-linux.result != 'success' || 
+        needs.build-macos-intel.result != 'success' || 
+        needs.build-macos-arm64.result != 'success' || 
+        needs.build-windows-msys2.result != 'success'
       run: exit 1
