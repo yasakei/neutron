@@ -445,7 +445,7 @@ std::unique_ptr<Expr> Parser::unary() {
                                op.type == TokenType::PLUS_PLUS ? "+" : "-", op.line);
         
         // Create: operand + 1 or operand - 1
-        auto one = std::make_unique<LiteralExpr>(1.0, LiteralValueType::NUMBER);
+        auto one = std::make_unique<LiteralExpr>(1.0);
         
         // Clone the operand for the binary expression (need a copy)
         std::unique_ptr<Expr> operandCopy;
@@ -510,7 +510,7 @@ std::unique_ptr<Expr> Parser::call() {
                                    op.type == TokenType::PLUS_PLUS ? "+" : "-", op.line);
             
             // Create: operand + 1 or operand - 1
-            auto one = std::make_unique<LiteralExpr>(1.0, LiteralValueType::NUMBER);
+            auto one = std::make_unique<LiteralExpr>(1.0);
             
             // Clone the operand for the binary expression
             std::unique_ptr<Expr> operandCopy;
