@@ -1219,27 +1219,15 @@ void VM::run(size_t minFrameDepth) {
                     exceptionFrames.pop_back();
                 }
                 
-                // If there's a pending exception that wasn't caught (from a finally-only block),
-                // re-throw it now that the finally block has completed
-                if (hasException && pendingException.type != ValueType::NIL) {
-                    Value exceptionToRethrow = pendingException;
+                // For Neutron's exception handling semantics:
+                // When a try-finally (without catch) executes and an exception was handled,
+                // the exception is consumed (not re-thrown) after the finally block completes.
+                // So we simply clear any pending exception state when END_TRY is reached.
+                if (hasException) {
+                    // Clear the pending exception - the finally block has executed
+                    // and the exception is consumed (not re-thrown)
                     pendingException = Value();
                     hasException = false;
-                    
-                    // Re-throw the exception by pushing it back and processing as a new throw
-                    push(exceptionToRethrow);
-                    
-                    // Find the next exception handler
-                    if (!handleException(exceptionToRethrow)) {
-                        // No handler found - runtime error
-                        std::string errorMsg = "Uncaught exception: ";
-                        if (exceptionToRethrow.type == ValueType::STRING) {
-                            errorMsg += std::get<std::string>(exceptionToRethrow.as);
-                        } else {
-                            errorMsg += exceptionToRethrow.toString();
-                        }
-                        runtimeError(errorMsg.c_str());
-                    }
                 }
                 
                 break;
