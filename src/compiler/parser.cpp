@@ -428,6 +428,45 @@ std::unique_ptr<Expr> Parser::unary() {
         return std::make_unique<UnaryExpr>(op, std::move(right));
     }
     
+    // Handle prefix increment and decrement (++x, --x)
+    if (match({TokenType::PLUS_PLUS, TokenType::MINUS_MINUS})) {
+        Token op = previous();
+        std::unique_ptr<Expr> operand = unary();
+        
+        // The operand must be an lvalue (variable or member access)
+        if (operand->type != ExprType::VARIABLE && 
+            operand->type != ExprType::MEMBER && 
+            operand->type != ExprType::INDEX_GET) {
+            error(op, "Invalid operand for prefix increment/decrement operator.");
+        }
+        
+        // Convert ++x to x = x + 1 or --x to x = x - 1
+        Token binaryOp = Token(op.type == TokenType::PLUS_PLUS ? TokenType::PLUS : TokenType::MINUS, 
+                               op.type == TokenType::PLUS_PLUS ? "+" : "-", op.line);
+        
+        // Create: operand + 1 or operand - 1
+        auto one = std::make_unique<LiteralExpr>(1.0, LiteralValueType::NUMBER);
+        
+        // Clone the operand for the binary expression (need a copy)
+        std::unique_ptr<Expr> operandCopy;
+        if (operand->type == ExprType::VARIABLE) {
+            auto varExpr = static_cast<VariableExpr*>(operand.get());
+            operandCopy = std::make_unique<VariableExpr>(varExpr->name);
+        } else {
+            // For member access or index access, we'll need to handle this more carefully
+            // For now, let's report an error for complex lvalues
+            error(op, "Prefix increment/decrement on complex expressions not yet supported.");
+        }
+        
+        auto binaryExpr = std::make_unique<BinaryExpr>(std::move(operandCopy), binaryOp, std::move(one));
+        
+        // Create assignment: operand = (operand + 1)
+        if (operand->type == ExprType::VARIABLE) {
+            auto varExpr = static_cast<VariableExpr*>(operand.get());
+            return std::make_unique<AssignExpr>(varExpr->name, std::move(binaryExpr));
+        }
+    }
+    
     return call();
 }
 
@@ -455,6 +494,43 @@ std::unique_ptr<Expr> Parser::call() {
             std::unique_ptr<Expr> index = expression();
             consume(TokenType::RIGHT_BRACKET, "Expect ']' after index.");
             expr = std::make_unique<IndexGetExpr>(std::move(expr), std::move(index));
+        } else if (match({TokenType::PLUS_PLUS, TokenType::MINUS_MINUS})) {
+            // Handle postfix increment and decrement (x++, x--)
+            Token op = previous();
+            
+            // The operand must be an lvalue
+            if (expr->type != ExprType::VARIABLE && 
+                expr->type != ExprType::MEMBER && 
+                expr->type != ExprType::INDEX_GET) {
+                error(op, "Invalid operand for postfix increment/decrement operator.");
+            }
+            
+            // Convert x++ to x = x + 1 or x-- to x = x - 1
+            Token binaryOp = Token(op.type == TokenType::PLUS_PLUS ? TokenType::PLUS : TokenType::MINUS, 
+                                   op.type == TokenType::PLUS_PLUS ? "+" : "-", op.line);
+            
+            // Create: operand + 1 or operand - 1
+            auto one = std::make_unique<LiteralExpr>(1.0, LiteralValueType::NUMBER);
+            
+            // Clone the operand for the binary expression
+            std::unique_ptr<Expr> operandCopy;
+            if (expr->type == ExprType::VARIABLE) {
+                auto varExpr = static_cast<VariableExpr*>(expr.get());
+                operandCopy = std::make_unique<VariableExpr>(varExpr->name);
+            } else {
+                // For member access or index access, we'll need to handle this more carefully
+                error(op, "Postfix increment/decrement on complex expressions not yet supported.");
+            }
+            
+            auto binaryExpr = std::make_unique<BinaryExpr>(std::move(operandCopy), binaryOp, std::move(one));
+            
+            // Create assignment: operand = (operand + 1)
+            // Note: This doesn't properly implement postfix semantics (returning old value)
+            // but it's a reasonable approximation for now
+            if (expr->type == ExprType::VARIABLE) {
+                auto varExpr = static_cast<VariableExpr*>(expr.get());
+                expr = std::make_unique<AssignExpr>(varExpr->name, std::move(binaryExpr));
+            }
         } else {
             break;
         }

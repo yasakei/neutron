@@ -65,7 +65,7 @@ jobs:
 
   build-macos-intel:
     name: Build on macOS Intel
-    runs-on: macos-11  # macOS Big Sur (11.0+) - supports Intel
+    runs-on: macos-13  # Latest macOS with Intel support
     
     steps:
     - name: Checkout code

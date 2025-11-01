@@ -115,6 +115,7 @@ public:
     std::unordered_map<std::string, Value> globals;
     std::unordered_map<std::string, TokenType> globalTypes;  // Track type annotations for global variables
     std::vector<std::string> module_search_paths;
+    std::unordered_map<std::string, bool> loadedModuleCache;  // Cache for already loaded modules
     std::vector<Object*> heap;
     size_t nextGC;
     std::vector<std::string> commandLineArgs;  // Store command line arguments

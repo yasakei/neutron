@@ -53,6 +53,32 @@ var message = "Hello, world!";
 var multiline = "Line 1\nLine 2\tTabbed";
 ```
 
+#### String Interpolation
+
+Neutron supports string interpolation using the `${}` syntax. You can embed expressions inside strings, and they will be automatically evaluated and converted to strings.
+
+```neutron
+var name = "Alice";
+var age = 30;
+say("My name is ${name} and I am ${age} years old.");
+// Output: My name is Alice and I am 30 years old.
+
+// Works with any expression
+var x = 10;
+var y = 20;
+say("The sum of ${x} and ${y} is ${x + y}");
+// Output: The sum of 10 and 20 is 30
+
+// Works with arrays and objects
+var arr = [1, 2, 3];
+say("Array: ${arr}");
+// Output: Array: [1, 2, 3]
+
+var obj = {"name": "Bob", "age": 25};
+say("Object: ${obj}");
+// Output: Object: {name:25}
+```
+
 ### Nil
 
 The `nil` keyword represents the absence of a value. It is similar to `null` in other languages.
@@ -123,6 +149,21 @@ value = "hello";   // Now a string
 value = true;      // Now a boolean
 ```
 
+### Type Annotations (Optional)
+
+Neutron supports optional type annotations for variables. These annotations are checked at compile-time but are not enforced at runtime in the current version.
+
+```neutron
+var int x = 42;                    // Integer type annotation
+var string name = "Alice";         // String type annotation
+var bool isActive = true;          // Boolean type annotation
+var array numbers = [1, 2, 3];     // Array type annotation
+var object person = {"name": "Bob"}; // Object type annotation
+var any value = "anything";        // Any type (no restriction)
+```
+
+**Note:** Type annotations provide documentation and compile-time checking for initial assignments, but the variables can still be reassigned to values of different types at runtime since Neutron is dynamically typed.
+
 ## Operators
 
 Neutron supports a variety of operators for arithmetic, comparison, logical operations, and string manipulation.
@@ -133,17 +174,52 @@ Neutron supports a variety of operators for arithmetic, comparison, logical oper
 - `-`: Subtraction
 - `*`: Multiplication
 - `/`: Division
+- `%`: Modulo (remainder)
+- `++`: Increment (prefix or postfix)
+- `--`: Decrement (prefix or postfix)
 
 ```neutron
 var x = 10 + 5;  // 15
 var y = 20 - 10; // 10
 var z = 5 * 2;   // 10
 var w = 10 / 2;  // 5
+var r = 10 % 3;  // 1
 
 // String concatenation
 var greeting = "Hello, " + "world!"; // "Hello, world!"
 var message = "Value: " + 42;        // "Value: 42"
 ```
+
+#### Increment and Decrement Operators
+
+Neutron supports C-style increment (`++`) and decrement (`--`) operators in both prefix and postfix forms:
+
+```neutron
+var counter = 0;
+
+// Prefix increment: increment then use value
+++counter;  // counter is now 1
+say(counter);  // 1
+
+// Postfix increment: use value then increment
+counter++;  // counter is now 2
+say(counter);  // 2
+
+// Prefix decrement
+--counter;  // counter is now 1
+
+// Postfix decrement
+counter--;  // counter is now 0
+
+// Common usage in loops
+var i = 0;
+while (i < 5) {
+    say(i);
+    i++;  // Increment i
+}
+```
+
+**Note:** In the current implementation, both prefix and postfix forms have the same behavior (they modify the variable and return the new value). This is a known limitation that may be addressed in future versions.
 
 ### Comparison Operators
 
@@ -175,15 +251,21 @@ As a workaround, use explicit comparisons joined with logical operators:
 
 ### Logical Operators
 
-- `and`: Logical AND
-- `or`: Logical OR
+- `and` / `&&`: Logical AND
+- `or` / `||`: Logical OR
 - `!`: Logical NOT
 
-```python
+```neutron
 say(true and false); // false
 say(true or false);  // true
 say(!true);          // false
+
+// Symbol operators (equivalent to keyword operators)
+say(true && false);  // false
+say(true || false);  // true
 ```
+
+Both keyword forms (`and`, `or`) and symbol forms (`&&`, `||`) are supported and behave identically.
 
 ## Control Flow
 
