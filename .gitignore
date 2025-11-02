@@ -6,7 +6,7 @@ out/
 
 # Compiled binaries and libraries
 neutronc
-neutron
+/neutron
 *.exe
 *.dll
 *.so

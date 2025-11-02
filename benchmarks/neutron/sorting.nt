@@ -1,0 +1,29 @@
+// Sorting algorithms benchmark in Neutron
+
+fun bubbleSort(arr) {
+    var n = arr.length;
+    var i = 0;
+    while (i < n - 1) {
+        var j = 0;
+        while (j < n - i - 1) {
+            if (arr[j] > arr[j + 1]) {
+                // Swap
+                var temp = arr[j];
+                arr[j] = arr[j + 1];
+                arr[j + 1] = temp;
+            }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    return arr;
+}
+
+// Create test array  
+var arr = [64, 34, 25, 12, 22, 11, 90, 88, 45, 50, 33, 77, 99, 18, 7];
+
+// Bubble sort
+bubbleSort(arr);
+
+say("Sorting completed");
+say("First 5: ${arr[0]}, ${arr[1]}, ${arr[2]}, ${arr[3]}, ${arr[4]}");

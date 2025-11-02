@@ -1,0 +1,48 @@
+// Matrix operations benchmark in Neutron
+
+fun multiplyMatrices(a, b, size) {
+    var result = [];
+    var i = 0;
+    while (i < size) {
+        var row = [];
+        var j = 0;
+        while (j < size) {
+            var sum = 0;
+            var k = 0;
+            while (k < size) {
+                sum = sum + a[i][k] * b[k][j];
+                k = k + 1;
+            }
+            row.push(sum);
+            j = j + 1;
+        }
+        result.push(row);
+        i = i + 1;
+    }
+    return result;
+}
+
+fun createMatrix(size) {
+    var matrix = [];
+    var i = 0;
+    while (i < size) {
+        var row = [];
+        var j = 0;
+        while (j < size) {
+            row.push(i * size + j + 1);
+            j = j + 1;
+        }
+        matrix.push(row);
+        i = i + 1;
+    }
+    return matrix;
+}
+
+// Create 20x20 matrices
+var size = 20;
+var matrixA = createMatrix(size);
+var matrixB = createMatrix(size);
+
+// Multiply matrices
+var result = multiplyMatrices(matrixA, matrixB, size);
+say("Matrix ${result.length}x${result[0].length} = ${result[0][0]}");

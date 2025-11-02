@@ -1,0 +1,22 @@
+// Fibonacci benchmark in Neutron (iterative version)
+
+fun fibonacci(n) {
+    if (n <= 1) {
+        return n;
+    }
+    
+    var a = 0;
+    var b = 1;
+    var i = 2;
+    while (i <= n) {
+        var temp = a + b;
+        a = b;
+        b = temp;
+        i = i + 1;
+    }
+    return b;
+}
+
+// Calculate fibonacci of 35 (reasonable time for benchmarking)
+var result = fibonacci(35);
+say(result);

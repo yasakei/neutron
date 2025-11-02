@@ -1,0 +1,58 @@
+// String operations benchmark in Neutron
+
+fun reverseString(s) {
+    var result = "";
+    var len = s.length;
+    var i = 0;
+    while (i < len) {
+        result = s[i] + result;
+        i = i + 1;
+    }
+    return result;
+}
+
+fun countOccurrences(haystack, needle) {
+    // needle should be single character for this simple implementation
+    if (needle.length != 1) {
+        return 0;
+    }
+    
+    var count = 0;
+    var hayLen = haystack.length;
+    var needleChar = needle[0];
+    var i = 0;
+    while (i < hayLen) {
+        if (haystack[i] == needleChar) {
+            count = count + 1;
+        }
+        i = i + 1;
+    }
+    return count;
+}
+
+fun simpleConcatenate(base, addition, times) {
+    var result = base;
+    var i = 0;
+    while (i < times) {
+        result = result + addition;
+        i = i + 1;
+    }
+    return result;
+}
+
+// Create a long string for testing
+var longString = "";
+var j = 0;
+var iterations = 100;  // Reduced from 1000 for better performance
+while (j < iterations) {
+    longString = longString + "Neutron programming language is fast and efficient. ";
+    j = j + 1;
+}
+
+// Perform string operations
+var reversed = reverseString(longString);
+var charCount = countOccurrences(longString, "a");
+var concatenated = simpleConcatenate("", "Hello World from Neutron! ", 50);
+
+// Output results
+say("String ops: len=${longString.length} rev=${reversed.length} count=${charCount}");

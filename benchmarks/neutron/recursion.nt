@@ -1,0 +1,35 @@
+// Recursive algorithms benchmark in Neutron
+
+fun factorial(n) {
+    if (n <= 1) {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+fun ackermann(m, n) {
+    if (m == 0) {
+        return n + 1;
+    }
+    if (n == 0) {
+        return ackermann(m - 1, 1);
+    }
+    return ackermann(m - 1, ackermann(m, n - 1));
+}
+
+fun power(base, exp) {
+    if (exp == 0) {
+        return 1;
+    }
+    if (exp == 1) {
+        return base;
+    }
+    return base * power(base, exp - 1);
+}
+
+// Run recursive benchmarks
+var fact15 = factorial(15);
+var ack = ackermann(3, 6);
+var pow = power(2, 10);
+
+say("Recursion: fact=${fact15} ack=${ack} pow=${pow}");
