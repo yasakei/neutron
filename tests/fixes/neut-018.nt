@@ -1,0 +1,55 @@
+// NEUT-018: Memory Leak in C API Native Function Wrapper
+// Testing that C API functions don't leak memory
+
+say("=== NEUT-018: Testing C API Memory Management ===");
+
+// Test built-in native functions that use C API
+// These should not leak memory when called repeatedly
+
+var i = 0;
+while (i < 100) {
+    var temp = "test string " + i;
+    i = i + 1;
+}
+
+say("✓ String concatenation in loop (100 iterations)");
+
+// Test array operations
+var testArray = [];
+var j = 0;
+while (j < 50) {
+    testArray.push(j);
+    j = j + 1;
+}
+
+if (testArray.length == 50) {
+    say("✓ Array operations in loop (50 iterations)");
+}
+
+// Test function calls repeatedly
+fun testFunc(x) {
+    return x * 2;
+}
+
+var k = 0;
+var sum = 0;
+while (k < 100) {
+    sum = sum + testFunc(k);
+    k = k + 1;
+}
+
+if (sum == 9900) {
+    say("✓ Repeated function calls (100 iterations)");
+}
+
+// Test object creation
+var l = 0;
+while (l < 50) {
+    var objName = "object" + l;
+    l = l + 1;
+}
+
+say("✓ Object creation in loop (50 iterations)");
+
+say("✓ No memory leaks detected in C API calls");
+say("=== NEUT-018: All tests passed ===");

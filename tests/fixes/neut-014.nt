@@ -1,0 +1,54 @@
+// NEUT-014: Unsafe Static Cast in Parser Without Type Verification
+// Testing type annotations with various expression types
+
+say("=== NEUT-014: Testing Type Annotations ===");
+
+// Test with literal values
+var int x = 42;
+if (x == 42) {
+    say("✓ Int type annotation with literal works");
+}
+
+var string name = "Neutron";
+if (name == "Neutron") {
+    say("✓ String type annotation with literal works");
+}
+
+var bool flag = true;
+if (flag == true) {
+    say("✓ Bool type annotation with literal works");
+}
+
+// Test with computed expressions
+var int computed = 10 + 20;
+if (computed == 30) {
+    say("✓ Type annotation with computed expression works");
+}
+
+// Test with function calls
+fun getNumber() {
+    return 100;
+}
+
+var int fromFunction = getNumber();
+if (fromFunction == 100) {
+    say("✓ Type annotation with function call works");
+}
+
+// Test with complex expressions
+fun add(a, b) {
+    return a + b;
+}
+
+var int complex = add(5, 10) + add(15, 20);
+if (complex == 50) {
+    say("✓ Type annotation with complex expression works");
+}
+
+// Test any type
+var any flexible = 42;
+flexible = "now a string";
+flexible = true;
+say("✓ Any type annotation allows any value");
+
+say("=== NEUT-014: All tests passed ===");

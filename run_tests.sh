@@ -1,100 +1,81 @@
 #!/bin/bash
+# Neutron Test Runner v2.0 - Organized Test Suite
 
-# Neutron Test Runner
-# Runs all test files in the tests/ directory
-
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
 
-# Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Check if neutron binary exists (with or without .exe extension)
-NEUTRON_BIN=""
-if [ -f "./neutron" ]; then
-    NEUTRON_BIN="./neutron"
-elif [ -f "./neutron.exe" ]; then
-    NEUTRON_BIN="./neutron.exe"
-elif [ -f "./build/neutron.exe" ]; then
-    NEUTRON_BIN="./build/neutron.exe"
-else
+NEUTRON_BIN="./neutron"
+if [ ! -f "$NEUTRON_BIN" ]; then
     echo -e "${RED}Error: neutron binary not found${NC}"
-    echo "Please build the project first: cmake --build build"
     exit 1
 fi
 
-# Find all test files
-TEST_FILES=(tests/test_*.nt)
+TEST_DIRS=("tests/fixes" "tests/core" "tests/operators" "tests/control-flow" "tests/functions" "tests/classes" "tests/modules")
 
-if [ ${#TEST_FILES[@]} -eq 0 ]; then
-    echo -e "${YELLOW}No test files found in tests/ directory${NC}"
-    exit 0
-fi
-
-# Test results
-PASSED=0
-FAILED=0
+TOTAL_PASSED=0
+TOTAL_FAILED=0
 FAILED_TESTS=()
 
-echo "================================"
-echo "  Neutron Test Suite"
-echo "================================"
+echo -e "${BOLD}${CYAN}╔════════════════════════════════╗${NC}"
+echo -e "${BOLD}${CYAN}║  Neutron Test Suite v2.0       ║${NC}"
+echo -e "${BOLD}${CYAN}╚════════════════════════════════╝${NC}"
 echo ""
 
-# Run each test
-for test_file in "${TEST_FILES[@]}"; do
-    if [ ! -f "$test_file" ]; then
-        continue
-    fi
+for test_dir in "${TEST_DIRS[@]}"; do
+    [ ! -d "$test_dir" ] && continue
     
-    test_name=$(basename "$test_file")
-    echo -e "${YELLOW}Running: $test_name${NC}"
+    TEST_FILES=("$test_dir"/*.nt)
+    [ ! -f "${TEST_FILES[0]}" ] && continue
     
-    # Run the test and capture output
-    if $NEUTRON_BIN "$test_file" > /tmp/neutron_test_output.txt 2>&1; then
-        echo -e "${GREEN}✓ PASSED${NC}"
-        cat /tmp/neutron_test_output.txt
-        ((PASSED++))
-    else
-        echo -e "${RED}✗ FAILED${NC}"
-        cat /tmp/neutron_test_output.txt
-        FAILED_TESTS+=("$test_name")
-        ((FAILED++))
-    fi
+    DIR_NAME=$(basename "$test_dir")
+    echo -e "${BOLD}${BLUE}Testing: ${DIR_NAME}${NC}"
     
+    DIR_PASSED=0
+    DIR_FAILED=0
+    
+    for test_file in "${TEST_FILES[@]}"; do
+        [ ! -f "$test_file" ] && continue
+        
+        test_name=$(basename "$test_file" .nt)
+        
+        if $NEUTRON_BIN "$test_file" > /tmp/neutron_test.txt 2>&1; then
+            echo -e "  ${GREEN}✓${NC} ${test_name}"
+            ((DIR_PASSED++))
+            ((TOTAL_PASSED++))
+        else
+            echo -e "  ${RED}✗${NC} ${test_name}"
+            cat /tmp/neutron_test.txt | sed 's/^/    /'
+            FAILED_TESTS+=("$test_dir/$test_name")
+            ((DIR_FAILED++))
+            ((TOTAL_FAILED++))
+        fi
+    done
+    
+    echo -e "  Summary: ${GREEN}$DIR_PASSED passed${NC}, ${RED}$DIR_FAILED failed${NC}"
     echo ""
 done
 
-# Cleanup
-rm -f /tmp/neutron_test_output.txt
+rm -f /tmp/neutron_test.txt
 
-# Print summary
-echo "================================"
-echo "  Test Summary"
-echo "================================"
-echo -e "Total tests: $((PASSED + FAILED))"
-echo -e "${GREEN}Passed: $PASSED${NC}"
-echo -e "${RED}Failed: $FAILED${NC}"
+echo -e "${BOLD}════ FINAL SUMMARY ═══${NC}"
+echo -e "Total: $((TOTAL_PASSED + TOTAL_FAILED))"
+echo -e "${GREEN}Passed: $TOTAL_PASSED${NC}"
+echo -e "${RED}Failed: $TOTAL_FAILED${NC}"
 
-if [ $FAILED -gt 0 ]; then
-    echo ""
-    echo "Failed tests:"
+if [ $TOTAL_FAILED -gt 0 ]; then
+    echo -e "\n${RED}Failed tests:${NC}"
     for test in "${FAILED_TESTS[@]}"; do
-        echo -e "  ${RED}✗ $test${NC}"
+        echo -e "  ${RED}✗${NC} $test"
     done
-fi
-
-echo ""
-
-# Exit with appropriate code
-if [ $FAILED -eq 0 ]; then
-    echo -e "${GREEN}All tests passed!${NC}"
-    exit 0
-else
-    echo -e "${RED}Some tests failed!${NC}"
     exit 1
 fi
+
+echo -e "\n${GREEN}🎉 All tests passed! 🎉${NC}"
+exit 0

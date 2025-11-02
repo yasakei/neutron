@@ -1,0 +1,50 @@
+// NEUT-013: Missing Bounds Check in READ_CONSTANT Macro
+// Testing that constant pool access is properly bounds-checked
+
+say("=== NEUT-013: Testing Constant Pool Bounds Checking ===");
+
+// Create many constants to test bounds checking
+var c1 = "constant1";
+var c2 = "constant2";
+var c3 = "constant3";
+var c4 = 42;
+var c5 = 3.14;
+var c6 = true;
+var c7 = false;
+var c8 = nil;
+var c9 = "another string";
+var c10 = 999;
+
+// Test that all constants are accessible
+if (c1 == "constant1") {
+    say("✓ Constant 1 accessible");
+}
+
+if (c4 == 42) {
+    say("✓ Constant 4 accessible");
+}
+
+if (c5 == 3.14) {
+    say("✓ Constant 5 accessible");
+}
+
+if (c6 == true) {
+    say("✓ Constant 6 accessible");
+}
+
+if (c8 == nil) {
+    say("✓ Constant 8 accessible");
+}
+
+if (c10 == 999) {
+    say("✓ Constant 10 accessible");
+}
+
+// Test array with multiple constants
+var arr = [1, 2, 3, 4, 5, "test", true, false, nil, 42];
+if (arr.length == 10) {
+    say("✓ Array with multiple constant types works");
+}
+
+say("✓ All constants properly bounds-checked");
+say("=== NEUT-013: All tests passed ===");

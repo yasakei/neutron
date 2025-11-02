@@ -1,0 +1,33 @@
+// NEUT-002: BANG_EQUAL Token Not Properly Implemented in VM
+// Testing != operator implementation (related to NEUT-001)
+
+say("=== NEUT-002: Testing BANG_EQUAL Implementation ===");
+
+// Basic != tests
+var x = 5;
+var y = 10;
+
+if (x != y) {
+    say("✓ Basic != works: 5 != 10");
+}
+
+if (!(x != x)) {
+    say("✓ Negated != works: !(5 != 5)");
+}
+
+// String comparisons
+if ("hello" != "world") {
+    say("✓ String != works");
+}
+
+// Boolean comparisons
+if (true != false) {
+    say("✓ Boolean != works");
+}
+
+// Nil comparisons
+if (5 != nil) {
+    say("✓ Nil comparison works");
+}
+
+say("=== NEUT-002: All tests passed ===");

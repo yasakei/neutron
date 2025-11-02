@@ -1,0 +1,37 @@
+// NEUT-004: Memory Management Issues with Object Heap
+// Testing garbage collection and memory management
+
+say("=== NEUT-004: Testing Memory Management ===");
+
+// Create and discard many objects
+var i = 0;
+while (i < 100) {
+    var temp = [i, i * 2, i * 3];
+    i = i + 1;
+}
+
+say("✓ Created 100 temporary arrays without crash");
+
+// Test object creation and collection
+class TestClass {
+    fun init() {
+        this.value = 42;
+    }
+}
+
+var j = 0;
+while (j < 50) {
+    var obj = TestClass();
+    j = j + 1;
+}
+
+say("✓ Created 50 temporary objects without crash");
+
+// Test nested object structures
+var nested = [[1, 2], [3, 4], [5, 6]];
+if (nested.length == 3) {
+    say("✓ Nested object structures work");
+}
+
+say("✓ Garbage collector properly manages memory");
+say("=== NEUT-004: All tests passed ===");

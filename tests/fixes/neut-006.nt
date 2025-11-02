@@ -1,0 +1,48 @@
+// NEUT-006: Missing Symbol Operators for Common Operations
+// Testing &&, ||, ++, -- operators
+
+say("=== NEUT-006: Testing Symbol Operators ===");
+
+// Test && operator
+if (true && true) {
+    say("✓ && operator works (true && true)");
+}
+
+if (!(false && true)) {
+    say("✓ && operator works (false && true)");
+}
+
+// Test || operator
+if (true || false) {
+    say("✓ || operator works (true || false)");
+}
+
+if (false || true) {
+    say("✓ || operator works (false || true)");
+}
+
+// Test ++ operator
+var x = 5;
+x++;
+if (x == 6) {
+    say("✓ Postfix ++ operator works");
+}
+
+++x;
+if (x == 7) {
+    say("✓ Prefix ++ operator works");
+}
+
+// Test -- operator
+var y = 10;
+y--;
+if (y == 9) {
+    say("✓ Postfix -- operator works");
+}
+
+--y;
+if (y == 8) {
+    say("✓ Prefix -- operator works");
+}
+
+say("=== NEUT-006: All tests passed ===");

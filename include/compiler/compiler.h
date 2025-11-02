@@ -76,6 +76,7 @@ public:
     VM& vm;
     Chunk* chunk; // Current chunk being compiled
     int scopeDepth;
+    int currentLine; // Current line number being compiled
     std::vector<Local> locals;
     
     // Loop information for break/continue

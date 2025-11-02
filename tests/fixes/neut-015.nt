@@ -1,0 +1,67 @@
+// NEUT-015: Jump Offset Overflow Has No Error Handling
+// Testing that large code blocks with jumps work correctly
+
+say("=== NEUT-015: Testing Jump Offset Handling ===");
+
+// Test large if-else chain (creates multiple jumps)
+var value = 5;
+var result = "unknown";
+
+if (value == 1) {
+    result = "one";
+} elif (value == 2) {
+    result = "two";
+} elif (value == 3) {
+    result = "three";
+} elif (value == 4) {
+    result = "four";
+} elif (value == 5) {
+    result = "five";
+} elif (value == 6) {
+    result = "six";
+} elif (value == 7) {
+    result = "seven";
+} elif (value == 8) {
+    result = "eight";
+} elif (value == 9) {
+    result = "nine";
+} elif (value == 10) {
+    result = "ten";
+} else {
+    result = "other";
+}
+
+if (result == "five") {
+    say("✓ Large if-elif chain works correctly");
+}
+
+// Test nested loops (creates loop jumps)
+var sum = 0;
+var i = 0;
+while (i < 5) {
+    var j = 0;
+    while (j < 5) {
+        sum = sum + 1;
+        j = j + 1;
+    }
+    i = i + 1;
+}
+
+if (sum == 25) {
+    say("✓ Nested loops with jumps work correctly");
+}
+
+// Test for loop with breaks (creates multiple jump points)
+var count = 0;
+for (var k = 0; k < 100; k = k + 1) {
+    if (k == 10) {
+        break;
+    }
+    count = count + 1;
+}
+
+if (count == 10) {
+    say("✓ For loop with break jump works correctly");
+}
+
+say("=== NEUT-015: All tests passed ===");

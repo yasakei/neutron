@@ -7,14 +7,14 @@
 
 namespace neutron {
 
-Compiler::Compiler(VM& vm) : enclosing(nullptr), function(nullptr), vm(vm), chunk(nullptr), scopeDepth(0) {
+Compiler::Compiler(VM& vm) : enclosing(nullptr), function(nullptr), vm(vm), chunk(nullptr), scopeDepth(0), currentLine(1) {
     function = new Function(nullptr, std::make_shared<Environment>());
     function->name = "<script>";
     function->chunk = new Chunk();
     chunk = function->chunk;
 }
 
-Compiler::Compiler(Compiler* enclosing) : enclosing(enclosing), function(nullptr), vm(enclosing->vm), chunk(nullptr), scopeDepth(0) {
+Compiler::Compiler(Compiler* enclosing) : enclosing(enclosing), function(nullptr), vm(enclosing->vm), chunk(nullptr), scopeDepth(0), currentLine(1) {
     function = new Function(nullptr, std::make_shared<Environment>());
     function->chunk = new Chunk();
     chunk = function->chunk;
@@ -54,7 +54,7 @@ void Compiler::compileExpression(const Expr* expr) {
 }
 
 void Compiler::emitByte(uint8_t byte) {
-    chunk->write(byte, 0); // Placeholder for line number
+    chunk->write(byte, currentLine);
 }
 
 void Compiler::emitBytes(uint8_t byte1, uint8_t byte2) {
@@ -71,7 +71,7 @@ uint8_t Compiler::makeConstant(const Value& value) {
     int constant = chunk->addConstant(value);
     if (constant > UINT8_MAX) {
         // Handle error: too many constants
-        return 0;
+        throw std::runtime_error("Error: Too many constants in one chunk. Maximum of 256 constants allowed.");
     }
     return (uint8_t)constant;
 }
@@ -92,7 +92,7 @@ void Compiler::patchJump(int offset) {
     int jump = chunk->code.size() - offset - 2;
 
     if (jump > UINT16_MAX) {
-        // error("Too much code to jump over.");
+        throw std::runtime_error("Error: Too much code to jump over. Maximum jump distance is 65535 bytes.");
     }
 
     chunk->code[offset] = (jump >> 8) & 0xff;
@@ -104,7 +104,7 @@ void Compiler::emitLoop(int loopStart) {
 
     int offset = chunk->code.size() - loopStart + 2;
     if (offset > UINT16_MAX) {
-        // error("Loop body too large.");
+        throw std::runtime_error("Error: Loop body too large. Maximum loop size is 65535 bytes.");
     }
 
     emitByte((offset >> 8) & 0xff);
@@ -147,6 +147,9 @@ void Compiler::visitGroupingExpr(const GroupingExpr* expr) {
 }
 
 void Compiler::visitUnaryExpr(const UnaryExpr* expr) {
+    // Update current line from operator token
+    currentLine = expr->op.line;
+    
     compileExpression(expr->right.get());
 
     // Emit the operator instruction.
@@ -159,7 +162,10 @@ void Compiler::visitUnaryExpr(const UnaryExpr* expr) {
 }
 
 void Compiler::visitBinaryExpr(const BinaryExpr* expr) {
-    // Handle logical operators with short-circuit evaluation
+    // Update current line from operator token
+    currentLine = expr->op.line;
+    
+    // Handle logical operators separately (short-circuit evaluation)
     if (expr->op.type == TokenType::AND) {
         // Short-circuit AND: evaluate left, if falsy return left, else return right
         compileExpression(expr->left.get());
@@ -227,6 +233,9 @@ void Compiler::visitBinaryExpr(const BinaryExpr* expr) {
 }
 
 void Compiler::visitVariableExpr(const VariableExpr* expr) {
+    // Update current line from variable name token
+    currentLine = expr->name.line;
+    
     int arg = resolveLocal(expr->name);
     if (arg != -1) {
         emitBytes((uint8_t)OpCode::OP_GET_LOCAL, arg);
@@ -276,6 +285,9 @@ void Compiler::visitSayStmt(const SayStmt* stmt) {
 }
 
 void Compiler::visitVarStmt(const VarStmt* stmt) {
+    // Update current line from variable name token
+    currentLine = stmt->name.line;
+    
     if (scopeDepth > 0) {
         // Local variable
         for (int i = locals.size() - 1; i >= 0; i--) {

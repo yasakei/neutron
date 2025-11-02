@@ -18,8 +18,7 @@ neutron::Value CNativeFn::call(neutron::VM& vm, std::vector<neutron::Value> args
     // Call the C function
     NeutronValue* result = function(reinterpret_cast<NeutronVM*>(&vm), args.size(), c_args.data());
 
-    // Copy the result value (without taking ownership)
-    // This avoids cross-library memory deallocation issues
+    // Copy the result value to avoid cross-library memory deallocation issues
     neutron::Value cpp_result = *reinterpret_cast<neutron::Value*>(result);
     
     // Clean up our temporary argument allocations
@@ -27,9 +26,9 @@ neutron::Value CNativeFn::call(neutron::VM& vm, std::vector<neutron::Value> args
         delete ptr;
     }
     
-    // Note: The result pointer from the C function is not deleted here
-    // to prevent cross-library memory management issues
-    // This leads to a memory leak, but prevents crashes
+    // Clean up the result pointer allocated by the C function
+    // The value has been copied, so it's safe to delete the pointer
+    delete reinterpret_cast<neutron::Value*>(result);
     
     return cpp_result;
 }

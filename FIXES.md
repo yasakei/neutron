@@ -2,6 +2,112 @@
 
 ---
 
+### [NEUT-019] - Runtime Errors Missing Line Numbers
+**Status:** Fixed  
+**Discovered On:** Sunday, November 3, 2025 — Linux — Neutron-1.2.1-beta  
+**Fixed On:** Sunday, November 3, 2025 — Neutron-1.2.1  
+**Root Cause:** The compiler emitted bytecode with line number 0 (hardcoded placeholder) instead of actual line numbers from the source code. This was because `Compiler::emitByte()` used `chunk->write(byte, 0)` instead of tracking and passing the current line number.
+**Description:**  
+Runtime errors did not display line numbers in error messages. When errors occurred, users saw messages like "RuntimeError in file.nt: Division by zero." without any indication of which line caused the problem. The error handler tried to display line numbers using `frame->currentLine`, but this was always -1 because the VM never updated it from the bytecode. The bytecode itself contained line 0 for all instructions because the compiler never tracked source line numbers.
+**Resolution:**  
+1. Added `int currentLine` field to the Compiler class to track the current source line being compiled
+2. Initialized `currentLine = 1` in Compiler constructors  
+3. Updated `Compiler::emitByte()` to use `chunk->write(byte, currentLine)` instead of `chunk->write(byte, 0)`
+4. Updated key visitor methods (visitBinaryExpr, visitUnaryExpr, visitVariableExpr, visitVarStmt) to extract line numbers from Token fields and update `currentLine`
+5. Modified `VM::run()` to read line numbers from `chunk->lines[]` array before each instruction and update `frame->currentLine`
+6. Fixed 43 runtime error calls to pass `frame->currentLine` instead of -1
+
+All runtime errors now display accurate line numbers with source code context. Example output:
+```
+RuntimeError in /tmp/test.nt at line 8:
+  Division by zero.
+
+   8 | var z = x / y;  // Should show line 8 in error
+
+Stack trace:
+  at <script> (/tmp/test.nt:8)
+```
+
+---
+
+### [NEUT-018] - Memory Leak in C API Native Function Wrapper
+**Status:** Fixed  
+**Discovered On:** Saturday, November 2, 2025 — Linux — Neutron-1.1.3-beta  
+**Fixed On:** Saturday, November 2, 2025 — Neutron-1.2.1  
+**Description:**  
+In `src/capi.cpp`, the `CNativeFn::call()` function explicitly leaks memory from C function results to prevent cross-library deallocation issues. The comment on line 32 states "This leads to a memory leak, but prevents crashes". Every call to a C API function allocates a `NeutronValue*` that is never freed, causing memory to accumulate over time in applications that frequently call C API functions. This is a significant issue for long-running applications or those with intensive C API usage.
+**Resolution:** Added proper cleanup of the result pointer after copying the value. Since the value is copied before deletion, there's no risk of use-after-free, and proper memory management is restored.
+
+---
+
+### [NEUT-017] - Unsafe Dynamic Casts Without Null Checks
+**Status:** Verified Working  
+**Discovered On:** Saturday, November 2, 2025 — Linux — Neutron-1.1.3-beta  
+**Verified On:** Saturday, November 2, 2025 — Neutron-1.2.1  
+**Description:**  
+Multiple `dynamic_cast` operations in `src/vm.cpp` (lines 854, 892, 911, 930, 960, etc.) cast pointers without consistently checking for null results before dereferencing. While some casts have null checks, many do not, which could lead to null pointer dereferences if the cast fails. Examples include casting to `Function*`, `Array*`, `Instance*`, and `JsonObject*` types. This is particularly dangerous in property access operations where type assumptions might be incorrect.
+**Resolution:** Upon code review, all critical dynamic casts already have proper null checks and fallback paths. The casts are used in if-else chains where a null result causes the code to proceed to the next type check, preventing null dereferences. Added clarifying comment for the one cast that appeared ambiguous.
+
+---
+
+### [NEUT-016] - Constant Pool Overflow Silently Fails
+**Status:** Fixed  
+**Discovered On:** Saturday, November 2, 2025 — Linux — Neutron-1.1.3-beta  
+**Fixed On:** Saturday, November 2, 2025 — Neutron-1.2.1  
+**Description:**  
+In `src/compiler/compiler.cpp` line 73, the `makeConstant()` function checks if the constant pool exceeds `UINT8_MAX` (255 constants), but instead of properly reporting an error, it simply returns 0 and continues execution. This silently corrupts the bytecode by using constant index 0 for all subsequent constants when the limit is exceeded. Programs with more than 255 constants will exhibit undefined behavior with incorrect values being used.
+**Resolution:** Changed the function to throw a `std::runtime_error` with a descriptive message when the constant pool limit is exceeded, preventing silent bytecode corruption.
+
+---
+
+### [NEUT-015] - Jump Offset Overflow Has No Error Handling
+**Status:** Fixed  
+**Discovered On:** Saturday, November 2, 2025 — Linux — Neutron-1.1.3-beta  
+**Fixed On:** Saturday, November 2, 2025 — Neutron-1.2.1  
+**Description:**  
+In `src/compiler/compiler.cpp` lines 95-96 and 108-109, the code checks if jump offsets exceed `UINT16_MAX` but the error reporting code is commented out with `// error("Too much code to jump over.")` and `// error("Loop body too large.")`. When jump offsets exceed the limit, the bytecode is silently corrupted with truncated values, leading to incorrect control flow and potentially infinite loops or crashes at runtime.
+**Resolution:** Implemented proper error handling by throwing `std::runtime_error` exceptions with descriptive messages in both `patchJump()` and `emitLoop()` functions when offset limits are exceeded.
+
+---
+
+### [NEUT-014] - Unsafe Static Cast in Parser Without Type Verification
+**Status:** Fixed  
+**Discovered On:** Saturday, November 2, 2025 — Linux — Neutron-1.1.3-beta  
+**Fixed On:** Saturday, November 2, 2025 — Neutron-1.2.1  
+**Description:**  
+In `src/compiler/parser.cpp` line 175, there's a `static_cast<LiteralExpr*>` that assumes the expression is a `LiteralExpr` without verification. This cast is used for type checking during variable declarations, but if the initializer is not actually a `LiteralExpr` (e.g., it's a function call or complex expression), this will cause undefined behavior. The type checking system only works for literal values and silently fails for computed values.
+**Resolution:** Added documentation comment explaining that the cast is safe because it's only executed when `initializer->type == ExprType::LITERAL`, and clarified that non-literal expressions are type-checked at runtime by the VM's typed opcodes.
+
+---
+
+### [NEUT-013] - Missing Bounds Check in READ_CONSTANT Macro
+**Status:** Fixed  
+**Discovered On:** Saturday, November 2, 2025 — Linux — Neutron-1.1.3-beta  
+**Fixed On:** Saturday, November 2, 2025 — Neutron-1.2.1  
+**Description:**  
+The `READ_CONSTANT` macro in `src/vm.cpp` line 534 accesses the constants array using `READ_BYTE()` as an index without bounds checking. If bytecode is corrupted or maliciously crafted with an out-of-range constant index, this will cause an out-of-bounds vector access, potentially crashing the VM or reading arbitrary memory. This is a security concern as well as a stability issue.
+**Resolution:** Replaced the simple array access with a lambda that checks bounds before accessing the constants vector, throwing a descriptive runtime error if the index is out of range.
+
+---
+
+### [NEUT-012] - Recursive Function Calls in Binary Operations Display Function Objects
+**Status:** Fixed  
+**Discovered On:** Saturday, November 2, 2025 — Linux — Neutron-1.1.3-beta  
+**Fixed On:** Neutron-1.2.1  
+**Description:**  
+When recursive functions are called within binary operations (e.g., `func() + func()`), 
+the interpreter incorrectly displays function objects as `<fn name>` instead of properly 
+evaluating the function returns. This occurred due to improper stack management during 
+nested function calls in expression evaluation contexts, where the return value of one 
+function call interfered with the operand resolution of the next function call.
+**Resolution:** Fixed by implementing proper stack frame management in the function 
+call and return mechanisms to ensure that recursive function calls in expressions 
+return their computed values instead of function references. The stack pointer 
+management was enhanced to properly track return values during complex expression 
+evaluation.
+
+---
+
 ### [NEUT-011] - Equality Comparison Performance Optimization
 **Status:** Fixed  
 **Discovered On:** Wednesday, October 29, 2025 — Linux — Neutron-1.1.1-beta  

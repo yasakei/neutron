@@ -87,12 +87,6 @@ bool isTruthy(const Value& value) {
     exit(1);
 }
 
-// Simple overload for legacy error calls (backward compatibility)
-[[noreturn]] void runtimeError(const std::string& message) {
-    ErrorHandler::reportRuntimeError(message, "", -1, {});
-    exit(1);
-}
-
 VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>"), hasException(false), pendingException(Value()) {  // Start GC at 1024 bytes
     // Initialize error handler
     ErrorHandler::setColorEnabled(true);
@@ -358,7 +352,7 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
         } else if (methodName == "indexOf") {
             // indexOf(value) - return index of first occurrence or -1
             if (argCount != 1) {
-                runtimeError("indexOf() expects 1 argument.");
+                runtimeError(this, "indexOf() expects 1 argument.", frames.empty() ? -1 : frames.back().currentLine);
                 return false;
             }
             int index = -1;
@@ -372,7 +366,7 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
         } else if (methodName == "join") {
             // join(separator) - join array elements into string
             if (argCount != 1) {
-                runtimeError("join() expects 1 argument.");
+                runtimeError(this, "join() expects 1 argument.", frames.empty() ? -1 : frames.back().currentLine);
                 return false;
             }
             std::string separator = args[0].toString();
@@ -385,7 +379,7 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
         } else if (methodName == "reverse") {
             // reverse() - reverse array in place
             if (argCount != 0) {
-                runtimeError("reverse() expects 0 arguments.");
+                runtimeError(this, "reverse() expects 0 arguments.", frames.empty() ? -1 : frames.back().currentLine);
                 return false;
             }
             std::reverse(arr->elements.begin(), arr->elements.end());
@@ -393,7 +387,7 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
         } else if (methodName == "sort") {
             // sort() - sort array in place (numbers then strings)
             if (argCount != 0) {
-                runtimeError("sort() expects 0 arguments.");
+                runtimeError(this, "sort() expects 0 arguments.", frames.empty() ? -1 : frames.back().currentLine);
                 return false;
             }
             std::sort(arr->elements.begin(), arr->elements.end(), [](const Value& a, const Value& b) {
@@ -412,11 +406,11 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
         } else if (methodName == "map") {
             // map(function) - transform each element
             if (argCount != 1) {
-                runtimeError("map() expects 1 argument (function).");
+                runtimeError(this, "map() expects 1 argument (function).", frames.empty() ? -1 : frames.back().currentLine);
                 return false;
             }
             if (args[0].type != ValueType::CALLABLE) {
-                runtimeError("map() argument must be a function.");
+                runtimeError(this, "map() argument must be a function.", frames.empty() ? -1 : frames.back().currentLine);
                 return false;
             }
             
@@ -444,11 +438,11 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
         } else if (methodName == "filter") {
             // filter(function) - filter elements by predicate
             if (argCount != 1) {
-                runtimeError("filter() expects 1 argument (function).");
+                runtimeError(this, "filter() expects 1 argument (function).", frames.empty() ? -1 : frames.back().currentLine);
                 return false;
             }
             if (args[0].type != ValueType::CALLABLE) {
-                runtimeError("filter() argument must be a function.");
+                runtimeError(this, "filter() argument must be a function.", frames.empty() ? -1 : frames.back().currentLine);
                 return false;
             }
             
@@ -478,11 +472,11 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
         } else if (methodName == "find") {
             // find(function) - find first element matching predicate
             if (argCount != 1) {
-                runtimeError("find() expects 1 argument (function).");
+                runtimeError(this, "find() expects 1 argument (function).", frames.empty() ? -1 : frames.back().currentLine);
                 return false;
             }
             if (args[0].type != ValueType::CALLABLE) {
-                runtimeError("find() argument must be a function.");
+                runtimeError(this, "find() argument must be a function.", frames.empty() ? -1 : frames.back().currentLine);
                 return false;
             }
             
@@ -510,7 +504,7 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
                 }
             }
         } else {
-            runtimeError("Unknown array method: " + methodName);
+            runtimeError(this, "Unknown array method: " + methodName, frames.empty() ? -1 : frames.back().currentLine);
             return false;
         }
         
@@ -520,7 +514,7 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
         return true;
         
     } catch (const std::runtime_error& e) {
-        runtimeError(e.what());
+        runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
         return false;
     }
 }
@@ -531,10 +525,25 @@ void VM::run(size_t minFrameDepth) {
 #define READ_BYTE() (*frame->ip++)
 #define READ_SHORT() \
     (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
-#define READ_CONSTANT() (frame->function->chunk->constants[READ_BYTE()])
+#define READ_CONSTANT() \
+    ([&]() -> Value& { \
+        uint8_t index = READ_BYTE(); \
+        if (index >= frame->function->chunk->constants.size()) { \
+            runtimeError(this, "Constant index out of bounds: " + std::to_string(index) + \
+                        " (max: " + std::to_string(frame->function->chunk->constants.size() - 1) + ")", \
+                        frame->currentLine); \
+        } \
+        return frame->function->chunk->constants[index]; \
+    }())
 #define READ_STRING() (std::get<std::string>(READ_CONSTANT().as))
 
     for (;;) {
+        // Update currentLine from bytecode before processing instruction
+        size_t offset = frame->ip - frame->function->chunk->code.data();
+        if (offset < frame->function->chunk->lines.size()) {
+            frame->currentLine = frame->function->chunk->lines[offset];
+        }
+        
         uint8_t instruction;
         switch (instruction = READ_BYTE()) {
             case (uint8_t)OpCode::OP_RETURN: {
@@ -567,7 +576,7 @@ void VM::run(size_t minFrameDepth) {
                 if (constant.type == ValueType::CALLABLE) {
                     push(constant);
                 } else {
-                    runtimeError("OP_CLOSURE constant must be a function.");
+                    runtimeError(this, "OP_CLOSURE constant must be a function.", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 break;
             }
@@ -609,9 +618,11 @@ void VM::run(size_t minFrameDepth) {
                     // Check if it looks like a module name (common module names)
                     if (name == "json" || name == "math" || name == "sys" || name == "http" || 
                         name == "time" || name == "fmt" || name == "arrays") {
-                        runtimeError("Undefined variable '" + name + "'. Did you forget to import it? Use 'use " + name + ";' at the top of your file.");
+                        runtimeError(this, "Undefined variable '" + name + "'. Did you forget to import it? Use 'use " + name + ";' at the top of your file.", 
+                                    frames.empty() ? -1 : frames.back().currentLine);
                     } else {
-                        runtimeError("Undefined variable '" + name + "'.");
+                        runtimeError(this, "Undefined variable '" + name + "'.", 
+                                    frames.empty() ? -1 : frames.back().currentLine);
                     }
                 }
                 push(globals[name]);
@@ -636,7 +647,8 @@ void VM::run(size_t minFrameDepth) {
                 std::string name = READ_STRING();
                 auto it = globals.find(name);
                 if (it == globals.end()) {
-                    runtimeError("Undefined variable '" + name + "'.");
+                    runtimeError(this, "Undefined variable '" + name + "'.", 
+                                frames.empty() ? -1 : frames.back().currentLine);
                 }
                 globals[name] = stack.back();
                 break;
@@ -646,7 +658,8 @@ void VM::run(size_t minFrameDepth) {
                 
                 auto it = globals.find(name);
                 if (it == globals.end()) {
-                    runtimeError("Undefined variable '" + name + "'.");
+                    runtimeError(this, "Undefined variable '" + name + "'.", 
+                                frames.empty() ? -1 : frames.back().currentLine);
                 }
                 
                 // Look up the expected type for this global variable
@@ -722,8 +735,9 @@ void VM::run(size_t minFrameDepth) {
                                                   value.type == ValueType::OBJECT ? "object" :
                                                   "callable";
                     
-                    runtimeError("Type mismatch: Cannot assign value of type '" + actualTypeName + 
-                                "' to variable of type '" + expectedTypeName + "'");
+                    runtimeError(this, "Type mismatch: Cannot assign value of type '" + actualTypeName + 
+                                "' to variable of type '" + expectedTypeName + "'",
+                                frames.empty() ? -1 : frames.back().currentLine);
                 }
                 
                 globals[name] = value;
@@ -797,8 +811,9 @@ void VM::run(size_t minFrameDepth) {
                                                   value.type == ValueType::OBJECT ? "object" :
                                                   "callable";
                     
-                    runtimeError("Type mismatch: Cannot assign value of type '" + actualTypeName + 
-                                "' to variable of type '" + expectedTypeName + "'");
+                    runtimeError(this, "Type mismatch: Cannot assign value of type '" + actualTypeName + 
+                                "' to variable of type '" + expectedTypeName + "'",
+                                frames.empty() ? -1 : frames.back().currentLine);
                 }
                 
                 stack[frame->slot_offset + slot] = value;
@@ -815,7 +830,8 @@ void VM::run(size_t minFrameDepth) {
                         stack.pop_back();
                         push(property);
                     } catch (const std::runtime_error& e) {
-                        runtimeError(std::string(e.what()) + " Make sure the module is properly imported with 'use' statement.");
+                        runtimeError(this, std::string(e.what()) + " Make sure the module is properly imported with 'use' statement.",
+                                    frames.empty() ? -1 : frames.back().currentLine);
                     }
                 } else if (object.type == ValueType::ARRAY) {
                     // Handle array properties and methods
@@ -833,7 +849,8 @@ void VM::run(size_t minFrameDepth) {
                         stack.pop_back();
                         push(Value(new BoundArrayMethod(arr, propertyName)));
                     } else {
-                        runtimeError("Array does not have property '" + propertyName + "'.");
+                        runtimeError(this, "Array does not have property '" + propertyName + "'.",
+                                    frames.empty() ? -1 : frames.back().currentLine);
                     }
                 } else if (object.type == ValueType::INSTANCE) {
                     // Handle instance properties and methods
@@ -856,6 +873,7 @@ void VM::run(size_t minFrameDepth) {
                                     stack.pop_back();
                                     push(Value(new BoundMethod(object, func)));
                                 } else {
+                                    // Not a Function, but still a callable - use as-is
                                     stack.pop_back();
                                     push(methodValue);
                                 }
@@ -864,8 +882,28 @@ void VM::run(size_t minFrameDepth) {
                                 push(methodValue);
                             }
                         } else {
-                            runtimeError("Property '" + propertyName + "' not found on instance.");
+                            runtimeError(this, "Property '" + propertyName + "' not found on instance.",
+                                        frames.empty() ? -1 : frames.back().currentLine);
                         }
+                    }
+                } else if (object.type == ValueType::STRING) {
+                    // Handle string properties
+                    std::string str = std::get<std::string>(object.as);
+                    
+                    if (propertyName == "length") {
+                        stack.pop_back();
+                        push(Value(static_cast<double>(str.length())));
+                    } else if (propertyName == "chars") {
+                        // Return an array of individual characters
+                        Array* charArray = new Array();
+                        for (char c : str) {
+                            charArray->push(Value(std::string(1, c)));
+                        }
+                        stack.pop_back();
+                        push(Value(charArray));
+                    } else {
+                        runtimeError(this, "String does not have property '" + propertyName + "'.",
+                                    frames.empty() ? -1 : frames.back().currentLine);
                     }
                 } else if (object.type == ValueType::OBJECT) {
                     Object* objPtr = std::get<Object*>(object.as);
@@ -886,7 +924,8 @@ void VM::run(size_t minFrameDepth) {
                             stack.pop_back();
                             push(Value(new BoundArrayMethod(arr, propertyName)));
                         } else {
-                            runtimeError("Array does not have property '" + propertyName + "'.");
+                            runtimeError(this, "Array does not have property '" + propertyName + "'.",
+                                        frames.empty() ? -1 : frames.back().currentLine);
                         }
                     } else {
                         // Check if it's an Instance
@@ -904,7 +943,8 @@ void VM::run(size_t minFrameDepth) {
                                     stack.pop_back();
                                     push(methIt->second);
                                 } else {
-                                    runtimeError("Property '" + propertyName + "' not found on instance.");
+                                    runtimeError(this, "Property '" + propertyName + "' not found on instance.",
+                                                frames.empty() ? -1 : frames.back().currentLine);
                                 }
                             }
                         } else {
@@ -916,15 +956,15 @@ void VM::run(size_t minFrameDepth) {
                                     stack.pop_back();
                                     push(it->second);
                                 } else {
-                                    runtimeError("Property '" + propertyName + "' not found on object.");
+                                    runtimeError(this, "Property '" + propertyName + "' not found on object.", frames.empty() ? -1 : frames.back().currentLine);
                                 }
                             } else {
-                                runtimeError("Object does not support property access.");
+                                runtimeError(this, "Object does not support property access.", frames.empty() ? -1 : frames.back().currentLine);
                             }
                         }
                     }
                 } else {
-                    runtimeError("Only modules, arrays, and objects have properties. Cannot use dot notation on this value type.");
+                    runtimeError(this, "Only modules, arrays, strings, and objects have properties. Cannot use dot notation on this value type.", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 break;
             }
@@ -944,10 +984,10 @@ void VM::run(size_t minFrameDepth) {
                         jsonObj->properties[propertyName] = value;
                         push(value);
                     } else {
-                        runtimeError("Cannot set property on this object type.");
+                        runtimeError(this, "Cannot set property on this object type.", frames.empty() ? -1 : frames.back().currentLine);
                     }
                 } else {
-                    runtimeError("Only instances and objects support property assignment.");
+                    runtimeError(this, "Only instances and objects support property assignment.", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 break;
             }
@@ -1003,7 +1043,7 @@ void VM::run(size_t minFrameDepth) {
             }
             case (uint8_t)OpCode::OP_GREATER: {
                 if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
-                    runtimeError("Operands must be numbers.");
+                    runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 double b = std::get<double>(pop().as);
                 double a = std::get<double>(pop().as);
@@ -1012,7 +1052,7 @@ void VM::run(size_t minFrameDepth) {
             }
             case (uint8_t)OpCode::OP_LESS: {
                 if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
-                    runtimeError("Operands must be numbers.");
+                    runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 double b = std::get<double>(pop().as);
                 double a = std::get<double>(pop().as);
@@ -1036,7 +1076,7 @@ void VM::run(size_t minFrameDepth) {
             }
             case (uint8_t)OpCode::OP_SUBTRACT: {
                 if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
-                    runtimeError("Operands must be numbers.");
+                    runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 double b = std::get<double>(pop().as);
                 double a = std::get<double>(pop().as);
@@ -1045,7 +1085,7 @@ void VM::run(size_t minFrameDepth) {
             }
             case (uint8_t)OpCode::OP_MULTIPLY: {
                 if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
-                    runtimeError("Operands must be numbers.");
+                    runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 double b = std::get<double>(pop().as);
                 double a = std::get<double>(pop().as);
@@ -1054,24 +1094,24 @@ void VM::run(size_t minFrameDepth) {
             }
             case (uint8_t)OpCode::OP_DIVIDE: {
                 if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
-                    runtimeError("Operands must be numbers.");
+                    runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 double b = std::get<double>(pop().as);
                 double a = std::get<double>(pop().as);
                 if (b == 0) {
-                    runtimeError("Division by zero.");
+                    runtimeError(this, "Division by zero.", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 push(Value(a / b));
                 break;
             }
             case (uint8_t)OpCode::OP_MODULO: {
                 if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
-                    runtimeError("Operands must be numbers.");
+                    runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 double b = std::get<double>(pop().as);
                 double a = std::get<double>(pop().as);
                 if (b == 0) {
-                    runtimeError("Modulo by zero.");
+                    runtimeError(this, "Modulo by zero.", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 push(Value(fmod(a, b)));
                 break;
@@ -1083,7 +1123,7 @@ void VM::run(size_t minFrameDepth) {
             }
             case (uint8_t)OpCode::OP_NEGATE: {
                 if (stack.back().type != ValueType::NUMBER) {
-                    runtimeError("Operand must be a number.");
+                    runtimeError(this, "Operand must be a number.", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 double value = std::get<double>(pop().as);
                 push(Value(-value));
@@ -1113,7 +1153,10 @@ void VM::run(size_t minFrameDepth) {
             }
                         case (uint8_t)OpCode::OP_CALL: {
                                 uint8_t argCount = READ_BYTE();
-                                if (!callValue(stack[stack.size() - argCount - 1], argCount)) {
+                                // The function object should be at position [stack.size() - argCount - 1]
+                                // Arguments are at positions [stack.size() - argCount] to [stack.size() - 1]
+                                Value callee = stack[stack.size() - argCount - 1];
+                                if (!callValue(callee, argCount)) {
                                         return;
                 }
                                 frame = &frames.back();
@@ -1138,7 +1181,7 @@ void VM::run(size_t minFrameDepth) {
                 
                                 if (object.type == ValueType::ARRAY) {
                                         if (index.type != ValueType::NUMBER) {
-                        runtimeError("Array index must be a number.");
+                        runtimeError(this, "Array index must be a number.", frames.empty() ? -1 : frames.back().currentLine);
                                             return;
                     }
                     
@@ -1155,9 +1198,29 @@ void VM::run(size_t minFrameDepth) {
                     }
                     
                                         push(array->at(idx));
-                }                 else {
-                    runtimeError("Only arrays support index access.");
-                                        return;
+                } else if (object.type == ValueType::STRING) {
+                    if (index.type != ValueType::NUMBER) {
+                        runtimeError(this, "String index must be a number.", frames.empty() ? -1 : frames.back().currentLine);
+                        return;
+                    }
+                    
+                    int idx = static_cast<int>(std::get<double>(index.as));
+                    std::string str = std::get<std::string>(object.as);
+                    
+                    if (idx < 0 || idx >= static_cast<int>(str.length())) {
+                        std::string range = str.length() == 0 ? "[]" : "[0, " + std::to_string(str.length()-1) + "]";
+                        std::string errorMsg = "String index out of bounds: index " + std::to_string(idx) + 
+                                              " is not within " + range;
+                        runtimeError(this, errorMsg, 
+                                    frames.empty() ? -1 : frames.back().currentLine);
+                        return;
+                    }
+                    
+                    // Return the character at the index as a string
+                    push(Value(std::string(1, str[idx])));
+                } else {
+                    runtimeError(this, "Only arrays and strings support index access.", frames.empty() ? -1 : frames.back().currentLine);
+                    return;
                 }
                                 break;
             }
@@ -1168,7 +1231,7 @@ void VM::run(size_t minFrameDepth) {
                 
                                 if (object.type == ValueType::ARRAY) {
                                         if (index.type != ValueType::NUMBER) {
-                        runtimeError("Array index must be a number.");
+                        runtimeError(this, "Array index must be a number.", frames.empty() ? -1 : frames.back().currentLine);
                                             return;
                     }
                     
@@ -1187,7 +1250,7 @@ void VM::run(size_t minFrameDepth) {
                                         array->set(idx, value);
                     push(value); // Return the assigned value
                 }                 else {
-                    runtimeError("Only arrays support index assignment.");
+                    runtimeError(this, "Only arrays support index assignment.", frames.empty() ? -1 : frames.back().currentLine);
                                         return;
                 }
                                 break;
@@ -1255,7 +1318,7 @@ void VM::run(size_t minFrameDepth) {
                     } else {
                         errorMsg += exception.toString();
                     }
-                    runtimeError(errorMsg.c_str());
+                    runtimeError(this, errorMsg, frames.empty() ? -1 : frames.back().currentLine);
                 }
                 
                 // Store the exception info for re-throw after finally if needed
@@ -1297,10 +1360,10 @@ void VM::run(size_t minFrameDepth) {
                     // The exception has already been stored and frames retained earlier
                     // This case should not be reached now since we handle it above
                     // This is a fallback if somehow the logic gets here
-                    runtimeError("Internal error: Exception processing state inconsistent");
+                    runtimeError(this, "Internal error: Exception processing state inconsistent", frames.empty() ? -1 : frames.back().currentLine);
                 } else {
                     // No catch and no finally - runtime error (shouldn't happen due to parser requirement)
-                    runtimeError("Exception occurred but no handler available");
+                    runtimeError(this, "Exception occurred but no handler available", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 
                 break;
@@ -1541,7 +1604,8 @@ void VM::load_module(const std::string& name) {
         void (*init_func)(VM*) = (void (*)(VM*))dlsym(handle, "neutron_module_init");
         if (!init_func) {
             dlclose(handle);
-            runtimeError("Module '" + name + "' is not a valid Neutron module: missing neutron_module_init function.");
+            runtimeError(this, "Module '" + name + "' is not a valid Neutron module: missing neutron_module_init function.",
+                        frames.empty() ? -1 : frames.back().currentLine);
         }
         init_func(this);
         
@@ -1560,7 +1624,8 @@ void VM::load_module(const std::string& name) {
         return;
     } else {
         // Handle error: module not found
-        runtimeError("Module '" + name + "' not found. Make sure to use 'use " + name + ";' before accessing it.");
+        runtimeError(this, "Module '" + name + "' not found. Make sure to use 'use " + name + ";' before accessing it.",
+                    frames.empty() ? -1 : frames.back().currentLine);
     }
 }
 
@@ -1578,7 +1643,8 @@ void VM::load_file(const std::string& filepath) {
         }
         
         if (!file.is_open()) {
-            runtimeError("File '" + filepath + "' not found.");
+            runtimeError(this, "File '" + filepath + "' not found.",
+                        frames.empty() ? -1 : frames.back().currentLine);
             return;
         }
     }

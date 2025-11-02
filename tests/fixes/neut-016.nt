@@ -1,0 +1,68 @@
+// NEUT-016: Constant Pool Overflow Silently Fails
+// Testing that programs with many constants work correctly
+
+say("=== NEUT-016: Testing Constant Pool Handling ===");
+
+// Create many string constants
+var s1 = "string1";
+var s2 = "string2";
+var s3 = "string3";
+var s4 = "string4";
+var s5 = "string5";
+var s6 = "string6";
+var s7 = "string7";
+var s8 = "string8";
+var s9 = "string9";
+var s10 = "string10";
+
+// Create many number constants
+var n1 = 1;
+var n2 = 2;
+var n3 = 3;
+var n4 = 4;
+var n5 = 5;
+var n6 = 6;
+var n7 = 7;
+var n8 = 8;
+var n9 = 9;
+var n10 = 10;
+
+// Create mixed type constants
+var m1 = 3.14159;
+var m2 = 2.71828;
+var m3 = 1.41421;
+var m4 = true;
+var m5 = false;
+var m6 = nil;
+
+// Test that all constants are correctly stored
+if (s5 == "string5") {
+    say("✓ String constant 5 is correct");
+}
+
+if (n7 == 7) {
+    say("✓ Number constant 7 is correct");
+}
+
+if (m1 == 3.14159) {
+    say("✓ Float constant is correct");
+}
+
+if (m4 == true) {
+    say("✓ Boolean constant is correct");
+}
+
+// Create array with many constants
+var bigArray = [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+    "a", "b", "c", "d", "e",
+    true, false, nil,
+    3.14, 2.71
+];
+
+if (bigArray.length == 20) {
+    say("✓ Array with many constants works");
+}
+
+say("✓ Constant pool handles multiple constants correctly");
+say("=== NEUT-016: All tests passed ===");

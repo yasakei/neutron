@@ -1,0 +1,74 @@
+// NEUT-011: Equality Comparison Performance Optimization
+// Testing that == and != work efficiently with various types
+
+say("=== NEUT-011: Testing Equality Comparison ===");
+
+// Number comparisons
+var n1 = 42;
+var n2 = 42;
+var n3 = 100;
+
+if (n1 == n2) {
+    say("✓ Number equality works: 42 == 42");
+} else {
+    say("✗ FAILED: 42 should equal 42");
+}
+
+if (n1 != n3) {
+    say("✓ Number inequality works: 42 != 100");
+} else {
+    say("✗ FAILED: 42 should not equal 100");
+}
+
+// String comparisons
+var s1 = "test";
+var s2 = "test";
+var s3 = "other";
+
+if (s1 == s2) {
+    say("✓ String equality works: 'test' == 'test'");
+} else {
+    say("✗ FAILED: 'test' should equal 'test'");
+}
+
+if (s1 != s3) {
+    say("✓ String inequality works: 'test' != 'other'");
+} else {
+    say("✗ FAILED: 'test' should not equal 'other'");
+}
+
+// Boolean comparisons
+var b1 = true;
+var b2 = true;
+var b3 = false;
+
+if (b1 == b2) {
+    say("✓ Boolean equality works: true == true");
+} else {
+    say("✗ FAILED: true should equal true");
+}
+
+if (b1 != b3) {
+    say("✓ Boolean inequality works: true != false");
+} else {
+    say("✗ FAILED: true should not equal false");
+}
+
+// Nil comparisons
+var nil1 = nil;
+var nil2 = nil;
+
+if (nil1 == nil2) {
+    say("✓ Nil equality works: nil == nil");
+} else {
+    say("✗ FAILED: nil should equal nil");
+}
+
+// Mixed type comparisons (should be false)
+if (42 != "42") {
+    say("✓ Type mismatch inequality works: 42 != '42'");
+} else {
+    say("✗ FAILED: number 42 should not equal string '42'");
+}
+
+say("=== NEUT-011: All tests passed ===");

@@ -1,0 +1,26 @@
+// NEUT-009: Type Safety in Array Operations Not Enforced
+// Testing array operations (deferred - runtime type checking not implemented)
+
+say("=== NEUT-009: Testing Array Operations ===");
+
+// Note: Type safety is compile-time only, not enforced at runtime
+var array numbers = [1, 2, 3, 4, 5];
+
+numbers.push(6);
+if (numbers.length == 6) {
+    say("✓ Array push works");
+}
+
+var sliced = numbers.slice(0, 3);
+if (sliced.length == 3) {
+    say("✓ Array slice works");
+}
+
+var idx = numbers.indexOf(4);
+if (idx == 3) {
+    say("✓ Array indexOf works");
+}
+
+say("⚠ Runtime type checking for arrays is deferred");
+say("✓ Array operations work without type enforcement");
+say("=== NEUT-009: Tests completed ===");

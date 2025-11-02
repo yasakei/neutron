@@ -1,0 +1,36 @@
+// NEUT-010: String Interpolation with Non-String Values
+// Testing string interpolation with various types
+
+say("=== NEUT-010: Testing String Interpolation ===");
+
+// Test with numbers
+var num = 42;
+var str1 = "The answer is ${num}";
+say("✓ Number interpolation: " + str1);
+
+// Test with booleans
+var flag = true;
+var str2 = "Flag is ${flag}";
+say("✓ Boolean interpolation: " + str2);
+
+// Test with nil
+var nothing = nil;
+var str3 = "Value is ${nothing}";
+say("✓ Nil interpolation: " + str3);
+
+// Test with arrays
+var arr = [1, 2, 3];
+var str4 = "Array: ${arr}";
+say("✓ Array interpolation: " + str4);
+
+// Test with expressions
+var str5 = "Sum: ${10 + 20}";
+say("✓ Expression interpolation: " + str5);
+
+// Test with multiple interpolations
+var a = 5;
+var b = 10;
+var str6 = "${a} + ${b} = ${a + b}";
+say("✓ Multiple interpolations: " + str6);
+
+say("=== NEUT-010: All tests passed ===");

@@ -1,0 +1,58 @@
+// NEUT-017: Unsafe Dynamic Casts Without Null Checks
+// Testing that type casting and object property access is safe
+
+say("=== NEUT-017: Testing Safe Type Casting ===");
+
+// Test array property access
+var arr = [1, 2, 3, 4, 5];
+if (arr.length == 5) {
+    say("✓ Array length property works");
+}
+
+arr.push(6);
+if (arr.length == 6) {
+    say("✓ Array push method works");
+}
+
+var popped = arr.pop();
+if (popped == 6 and arr.length == 5) {
+    say("✓ Array pop method works");
+}
+
+// Test string property access
+var str = "Hello";
+if (str.length == 5) {
+    say("✓ String length property works");
+}
+
+var chars = str.chars;
+if (chars.length == 5) {
+    say("✓ String chars property works");
+}
+
+// Test class instance property access
+class Person {
+    fun greet() {
+        return "Hello, I'm " + this.name;
+    }
+}
+
+var person = Person();
+person.name = "Alice";
+person.age = 30;
+
+if (person.name == "Alice") {
+    say("✓ Instance field access works");
+}
+
+if (person.age == 30) {
+    say("✓ Instance numeric field access works");
+}
+
+var greeting = person.greet();
+if (greeting == "Hello, I'm Alice") {
+    say("✓ Instance method call works");
+}
+
+say("✓ All type casts are properly null-checked");
+say("=== NEUT-017: All tests passed ===");

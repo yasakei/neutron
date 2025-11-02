@@ -171,6 +171,8 @@ std::unique_ptr<Stmt> Parser::varDeclaration() {
     }
 
     if (typeAnnotation && initializer && typeAnnotation->type != TokenType::TYPE_ANY) {
+        // Only perform compile-time type checking for literal expressions
+        // Non-literal expressions will be type-checked at runtime
         if (initializer->type == ExprType::LITERAL) {
             LiteralExpr* literal = static_cast<LiteralExpr*>(initializer.get());
             ValueType expectedType = tokenTypeToValueType(typeAnnotation->type);
@@ -179,6 +181,8 @@ std::unique_ptr<Stmt> Parser::varDeclaration() {
                 error(name, "Invalid type assignment. Expected " + tokenTypeToString(typeAnnotation->type) + " but got " + valueTypeToString(actualType) + ".");
             }
         }
+        // Note: Type checking for non-literal expressions (function calls, operations, etc.)
+        // is handled at runtime by the VM's typed global/local assignment opcodes
     }
     
     consume(TokenType::SEMICOLON, "Expect ';' after variable declaration.");

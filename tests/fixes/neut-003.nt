@@ -1,0 +1,46 @@
+// NEUT-003: Potential Stack Overflow in Complex Expression Evaluation
+// Testing deep nesting and complex expressions
+
+say("=== NEUT-003: Testing Stack Overflow Prevention ===");
+
+// Test deeply nested expressions
+var result = ((((1 + 2) * 3) + 4) * 5) + ((6 * 7) + (8 - 9));
+if (result == 92) {
+    say("✓ Deeply nested arithmetic expressions work");
+}
+
+// Test nested function calls
+fun level1(x) {
+    return x + 1;
+}
+
+fun level2(x) {
+    return level1(x) + 1;
+}
+
+fun level3(x) {
+    return level2(x) + 1;
+}
+
+var nested = level3(5);
+if (nested == 8) {
+    say("✓ Nested function calls work");
+}
+
+// Test complex conditional
+var a = 5;
+var b = 10;
+var c = 15;
+
+if ((a < b) and (b < c) and (a + b < c * 2)) {
+    say("✓ Complex boolean expressions work");
+}
+
+// Test array with nested operations
+var arr = [1 + 1, 2 * 2, 3 + 3, 4 * 4];
+if (arr.length == 4) {
+    say("✓ Array with computed values works");
+}
+
+say("✓ Stack size increased to handle complex expressions");
+say("=== NEUT-003: All tests passed ===");

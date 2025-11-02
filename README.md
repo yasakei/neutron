@@ -196,6 +196,16 @@ var message = greet("Neutron");
 say(message);
 ```
 
+## Performance Benchmarks
+
+Neutron includes a comprehensive benchmark suite that compares performance with Python:
+
+```bash
+./run_benchmark.sh
+```
+
+The benchmark suite tests various algorithms including Fibonacci calculation, prime number generation, matrix operations, string operations, and loop performance. Results are displayed in a comparative table showing execution time for each language.
+
 **Importing Other Files**
 
 ```neutron

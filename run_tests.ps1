@@ -1,11 +1,19 @@
-﻿# Neutron Test Runner
+﻿# Neutron Test Suite v2.0 - PowerShell Version
 param([switch]$Verbose)
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = $PSScriptRoot
 
+# Colors
+$Red = "`e[31m"
+$Green = "`e[32m"
+$Yellow = "`e[33m"
+$Cyan = "`e[36m"
+$Bold = "`e[1m"
+$Reset = "`e[0m"
+
 if (-not (Test-Path (Join-Path $ProjectRoot "CMakeLists.txt"))) {
-    Write-Host "Error: CMakeLists.txt not found"
+    Write-Host "${Red}Error: CMakeLists.txt not found${Reset}"
     exit 1
 }
 
@@ -25,35 +33,101 @@ foreach ($Path in $ExePaths) {
 }
 
 if (-not $ExePath) {
-    Write-Host "Error: neutron.exe not found"
+    Write-Host "${Red}Error: neutron.exe not found${Reset}"
     exit 1
 }
 
-Write-Host "Using: $ExePath"
+# Print header
+Write-Host "${Cyan}╔════════════════════════════════╗${Reset}"
+Write-Host "${Cyan}║  Neutron Test Suite v2.0       ║${Reset}"
+Write-Host "${Cyan}╚════════════════════════════════╝${Reset}"
+Write-Host ""
 
-$TestFiles = Get-ChildItem "$ProjectRoot\tests\test_*.nt" -ErrorAction SilentlyContinue
-if (-not $TestFiles) {
-    Write-Host "No tests found"
-    exit 0
+$TotalPassed = 0
+$TotalFailed = 0
+
+# Test directories in order
+$TestDirs = @(
+    "fixes",
+    "core",
+    "operators",
+    "control-flow",
+    "functions",
+    "classes",
+    "modules"
+)
+
+foreach ($Dir in $TestDirs) {
+    $DirPath = Join-Path $ProjectRoot "tests\$Dir"
+    if (-not (Test-Path $DirPath)) {
+        continue
+    }
+
+    $TestFiles = Get-ChildItem "$DirPath\*.nt" -ErrorAction SilentlyContinue
+    if (-not $TestFiles) {
+        continue
+    }
+
+    Write-Host "${Bold}Testing: $Dir${Reset}"
+    
+    $DirPassed = 0
+    $DirFailed = 0
+
+    foreach ($Test in $TestFiles) {
+        $TestName = [System.IO.Path]::GetFileNameWithoutExtension($Test.Name)
+        
+        # Run test and capture output
+        $TempFile = [System.IO.Path]::GetTempFileName()
+        $Output = & $ExePath $Test.FullName 2>&1 | Out-String
+        $Output | Out-File -FilePath $TempFile -Encoding UTF8
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "  ${Green}✓${Reset} $TestName"
+            $DirPassed++
+            $TotalPassed++
+        } else {
+            Write-Host "  ${Red}✗${Reset} $TestName"
+            if ($Verbose -or $true) {
+                Get-Content $TempFile | ForEach-Object { Write-Host "    $_" }
+            }
+            $DirFailed++
+            $TotalFailed++
+        }
+        
+        Remove-Item $TempFile -ErrorAction SilentlyContinue
+    }
+    
+    Write-Host "  Summary: $DirPassed passed, $DirFailed failed"
+    Write-Host ""
 }
 
-$Passed = 0
-$Failed = 0
-
-foreach ($Test in $TestFiles) {
-    Write-Host "Running: $($Test.Name) ... " -NoNewline
-    $Output = & $ExePath $Test.FullName 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "PASS"
-        $Passed++
-    } else {
-        Write-Host "FAIL"
-        if ($Verbose) { Write-Host $Output }
-        $Failed++
+# Print summary
+Write-Host "${Cyan}════ FINAL SUMMARY ═══${Reset}"
+Write-Host "Total: $($TotalPassed + $TotalFailed)"
+Write-Host "${Green}Passed: $TotalPassed${Reset}"
+if ($TotalFailed -gt 0) {
+    Write-Host "${Red}Failed: $TotalFailed${Reset}"
+    Write-Host ""
+    Write-Host "${Red}Failed tests:${Reset}"
+    # Re-run to list failed tests
+    foreach ($Dir in $TestDirs) {
+        $DirPath = Join-Path $ProjectRoot "tests\$Dir"
+        if (-not (Test-Path $DirPath)) { continue }
+        $TestFiles = Get-ChildItem "$DirPath\*.nt" -ErrorAction SilentlyContinue
+        foreach ($Test in $TestFiles) {
+            $null = & $ExePath $Test.FullName 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "  ${Red}✗${Reset} tests\$Dir\$($Test.Name)"
+            }
+        }
     }
 }
 
 Write-Host ""
-Write-Host "Passed: $Passed, Failed: $Failed"
-if ($Failed -gt 0) { exit 1 }
-exit 0
+
+if ($TotalFailed -eq 0) {
+    Write-Host "${Green}🎉 All tests passed! 🎉${Reset}"
+    exit 0
+} else {
+    exit 1
+}
