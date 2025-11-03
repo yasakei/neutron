@@ -160,17 +160,27 @@ run_benchmark "Matrix Operations" \
     "$BENCH_DIR/neutron/matrix.nt" \
     "$BENCH_DIR/python/matrix.py"
 
-# Recursion benchmark disabled - has issues with recursive multiplication
-# run_benchmark "Recursion" \
-#     "$BENCH_DIR/neutron/recursion.nt" \
-#     "$BENCH_DIR/python/recursion.py"
+echo ""
+echo -e "${BOLD}Benchmarking: Recursion & Function Calls${NC}"
+
+run_benchmark "Deep Recursion" \
+    "$BENCH_DIR/neutron/ackermann.nt" \
+    "$BENCH_DIR/python/ackermann.py"
 
 echo ""
-echo -e "${BOLD}Benchmarking: Sorting & Data Structures${NC}"
+echo -e "${BOLD}Benchmarking: Data Structures${NC}"
 
 run_benchmark "Sorting Algorithms" \
     "$BENCH_DIR/neutron/sorting.nt" \
     "$BENCH_DIR/python/sorting.py"
+
+run_benchmark "Array/List Operations" \
+    "$BENCH_DIR/neutron/list_ops.nt" \
+    "$BENCH_DIR/python/list_ops.py"
+
+run_benchmark "Object/Dictionary Operations" \
+    "$BENCH_DIR/neutron/dict_ops.nt" \
+    "$BENCH_DIR/python/dict_ops.py"
 
 echo ""
 echo -e "${BOLD}Benchmarking: Math Operations${NC}"
@@ -186,12 +196,20 @@ run_benchmark "String Manipulation" \
     "$BENCH_DIR/neutron/strings.nt" \
     "$BENCH_DIR/python/strings.py"
 
+run_benchmark "Advanced String Operations" \
+    "$BENCH_DIR/neutron/string_ops.nt" \
+    "$BENCH_DIR/python/string_ops.py"
+
 echo ""
 echo -e "${BOLD}Benchmarking: Loop Performance${NC}"
 
 run_benchmark "Loop Operations" \
     "$BENCH_DIR/neutron/loops.nt" \
     "$BENCH_DIR/python/loops.py"
+
+run_benchmark "Nested Loops" \
+    "$BENCH_DIR/neutron/nested_loops.nt" \
+    "$BENCH_DIR/python/nested_loops.py"
 
 # Print summary
 echo ""

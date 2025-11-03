@@ -1,0 +1,37 @@
+// Deep recursion benchmark - Factorial and Power functions
+// Tests function call overhead and stack management
+
+fun factorial(n) {
+    if (n <= 1) {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+fun power(base, exp) {
+    if (exp == 0) {
+        return 1;
+    }
+    return base * power(base, exp - 1);
+}
+
+// Test factorial (deep recursion)
+var result = factorial(10);
+say("Factorial(10) = " + result);
+
+result = factorial(12);
+say("Factorial(12) = " + result);
+
+result = factorial(15);
+say("Factorial(15) = " + result);
+
+// Test power function
+result = power(2, 10);
+say("Power(2, 10) = " + result);
+
+result = power(3, 8);
+say("Power(3, 8) = " + result);
+
+result = power(5, 7);
+say("Power(5, 7) = " + result);
+

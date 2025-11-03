@@ -63,8 +63,9 @@ struct CallFrame {
     size_t slot_offset;
     std::string fileName;  // Source file name for error reporting
     int currentLine;       // Current line number for error reporting
+    bool isBoundMethod;    // True if this is a method call (receiver at slot 0)
     
-    CallFrame() : function(nullptr), ip(nullptr), slot_offset(0), fileName(""), currentLine(-1) {}
+    CallFrame() : function(nullptr), ip(nullptr), slot_offset(0), fileName(""), currentLine(-1), isBoundMethod(false) {}
 };
 
 class Return {

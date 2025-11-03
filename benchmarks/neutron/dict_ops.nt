@@ -1,0 +1,73 @@
+// Dictionary/Object operations benchmark
+// Tests object creation, property access, and manipulation
+
+use arrays;
+
+class Person {
+    var name;
+    var age;
+    var city;
+    
+    fun initialize(n, a, c) {
+        this.name = n;
+        this.age = a;
+        this.city = c;
+    }
+    
+    fun getInfo() {
+        return this.name + " is " + this.age + " years old from " + this.city;
+    }
+}
+
+// Create many objects using arrays module
+var people = arrays.new();
+var i = 0;
+while (i < 1000) {
+    var person = Person();
+    person.initialize("Person" + i, 20 + (i % 50), "City" + (i % 10));
+    arrays.push(people, person);
+    i = i + 1;
+}
+say("Created 1000 person objects");
+
+// Access properties
+var total_age = 0;
+var j = 0;
+while (j < 1000) {
+    var person = arrays.at(people, j);
+    total_age = total_age + person.age;
+    j = j + 1;
+}
+say("Total age: " + total_age);
+
+// Call methods
+var count = 0;
+var k = 0;
+while (k < 100) {
+    var person = arrays.at(people, k);
+    var info = person.getInfo();
+    count = count + 1;
+    k = k + 1;
+}
+say("Called getInfo() " + count + " times");
+
+// Modify properties
+var m = 0;
+while (m < 500) {
+    var person = arrays.at(people, m);
+    person.age = person.age + 1;
+    m = m + 1;
+}
+say("Modified 500 objects");
+
+// Count by city
+var city_counts = 0;
+var n = 0;
+while (n < 1000) {
+    var person = arrays.at(people, n);
+    if (person.city == "City0") {
+        city_counts = city_counts + 1;
+    }
+    n = n + 1;
+}
+say("People in City0: " + city_counts);

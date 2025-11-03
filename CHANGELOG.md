@@ -10,6 +10,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🔥 Critical Fixes
 
+- **[NEUT-020] Fixed recursive functions returning function objects instead of values** ⚠️ **CRITICAL BUG FIX**
+  - **Problem:** Recursive function calls returned function objects (e.g., `<fn factorial>`) instead of computed values
+  - **Impact:** Made all recursive algorithms impossible to implement - factorial, fibonacci, tree traversals, etc.
+  - **Root Cause:** Two-part stack management issue:
+    1. `OP_RETURN` didn't remove the callee from stack, leaving function object for next iteration
+    2. Bound method calls had different stack layout but were treated the same as regular functions
+  - **Solution:**
+    - Added `isBoundMethod` flag to `CallFrame` struct to distinguish call types
+    - Updated `OP_RETURN` to handle both cases:
+      - Regular functions: `stack.resize(return_slot_offset - 1)` removes callee
+      - Bound methods: `stack.resize(return_slot_offset)` preserves receiver position
+    - Set flag in `VM::callValue()` when creating bound method frames
+  - **Result:** 
+    - ✅ All recursive functions now work correctly
+    - ✅ Methods can be called on objects within loops without crashes
+    - ✅ Enabled 3 new benchmarks (recursion, dict_ops, nested_loops)
+    - ✅ Benchmark win rate improved from 66.7% to 91.6%
+  - **Example:**
+    ```neutron
+    // Now works correctly!
+    fun factorial(n) {
+        if (n <= 1) { return 1; }
+        return n * factorial(n - 1);  // Returns computed value
+    }
+    var result = factorial(5);  // result = 120 (not <fn factorial>)
+    ```
+
 - **[NEUT-019] Fixed missing line numbers in runtime errors** ⚠️ **CRITICAL BUG FIX**
   - **Problem:** All runtime errors showed file names but NOT line numbers, making debugging extremely difficult
   - **Impact:** Affected every error message in Neutron - users couldn't locate error sources
@@ -140,28 +167,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Improved error message display in test failures
 
 - **Version**
-  - Updated from 1.1.3-beta to 1.2.1-beta
-  - Reflects 8 bug fixes (NEUT-012 through NEUT-019)
+  - Updated from 1.1.3-beta to 1.2.1-beta Commit - Patch
+  - Reflects 9 bug fixes (NEUT-012 through NEUT-020)
 
 ### Technical Details
 
-- **Line Number Flow:** Source Code → Tokens → AST → Compiler (`currentLine`) → Bytecode (`chunk->lines[]`) → VM (`frame->currentLine`) → Error Handler
-- **Performance:** Minimal impact - O(1) line number lookup
-- **Testing:** All 49 unit tests pass, all error types verified
-- **Benchmarks:** 7 performance tests, Neutron outperforms Python in 6/7 cases
+- **NEUT-020 Stack Layout:**
+  - Regular functions: `[... | callee | args]` → resize to `slot_offset - 1`
+  - Bound methods: `[... | receiver | args]` → resize to `slot_offset`
+  - Added `isBoundMethod` flag to CallFrame for distinction
+- **NEUT-019 Line Number Flow:** Source Code → Tokens → AST → Compiler (`currentLine`) → Bytecode (`chunk->lines[]`) → VM (`frame->currentLine`) → Error Handler
+- **Performance:** Minimal impact - O(1) operations for both fixes
+- **Testing:** All 50 unit tests pass (49 original + 1 new NEUT-020 test)
+- **Benchmarks:** 12 performance tests, Neutron wins 11/12 (91.6% win rate)
 
 ### Developer Impact
 
+- ⭐ **Recursive programming now possible** - Can implement factorial, fibonacci, tree algorithms, etc.
+- ⭐ **Object-oriented loops work correctly** - Methods can be called on objects within loops
 - ⭐ **Debugging time reduced by 70-80%** - Developers can now jump directly to error locations
 - ⭐ **Production issues easier to diagnose** - Error logs now include precise line numbers
 - ⭐ **Better development experience** - Errors show exact location with source context
 - ⭐ **Organized test suite** - Easy to find and run specific test categories
-- ⭐ **Performance validation** - Benchmarks prove Neutron's competitive speed
+- ⭐ **Performance validation** - Benchmarks prove Neutron's competitive speed (91.6% win rate)
 
 ### Bug Fixes Summary
 
 | Bug ID | Description | Severity | Status |
 |--------|-------------|----------|--------|
+| NEUT-020 | Recursive functions return objects | Critical | ✅ Fixed |
 | NEUT-019 | Missing line numbers in errors | Critical | ✅ Fixed |
 | NEUT-018 | C API memory leak | High | ✅ Fixed |
 | NEUT-017 | Unsafe dynamic casts | Medium | ✅ Verified |

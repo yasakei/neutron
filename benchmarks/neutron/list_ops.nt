@@ -1,0 +1,50 @@
+// Array/List operations benchmark
+// Tests array creation, access, and manipulation
+
+use arrays;
+
+// Create and populate a large array
+var numbers = arrays.new();
+for (var i = 0; i < 1000; i = i + 1) {
+    arrays.push(numbers, i);
+}
+say("Created array with 1000 elements");
+
+// Access elements
+var sum = 0;
+var len = arrays.length(numbers);
+for (var i = 0; i < len; i = i + 1) {
+    var val = arrays.at(numbers, i);
+    sum = sum + val;
+}
+say("Sum of all numbers: " + sum);
+
+// Count even numbers (manual filter)
+var even_count = 0;
+for (var i = 0; i < len; i = i + 1) {
+    var val = arrays.at(numbers, i);
+    if (val % 2 == 0) {
+        even_count = even_count + 1;
+    }
+}
+say("Filtered " + even_count + " even numbers");
+
+// Find specific element (manual find)
+var found = -1;
+for (var i = 0; i < len; i = i + 1) {
+    var val = arrays.at(numbers, i);
+    if (val == 500) {
+        found = val;
+        break;
+    }
+}
+say("Found element: " + found);
+
+// Sorting
+var unsorted = [64, 34, 25, 12, 22, 11, 90];
+var sorted_arr = arrays.sort(unsorted);
+say("Sorted array: " + arrays.join(sorted_arr, ", "));
+
+// Reverse
+var reversed = arrays.reverse(sorted_arr);
+say("Reversed array: " + arrays.join(reversed, ", "));

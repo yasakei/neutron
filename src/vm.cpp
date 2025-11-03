@@ -170,7 +170,7 @@ bool VM::call(Function* function, int argCount) {
     } else {
         frame->ip = function->chunk->code.data();
     }
-    frame->slot_offset = stack.size() - argCount;  // Store offset instead of pointer
+    frame->slot_offset = stack.size() - argCount;  // Point to first argument position
     frame->fileName = currentFileName;
     frame->currentLine = -1;
 
@@ -223,6 +223,7 @@ bool VM::callValue(Value callee, int argCount) {
             frame->slot_offset = stack.size() - argCount - 1;
             frame->fileName = currentFileName;
             frame->currentLine = -1;
+            frame->isBoundMethod = true;  // Mark as bound method call
             return true;
         } else if (Function* function = dynamic_cast<Function*>(callable)) {
             return call(function, argCount);
@@ -548,20 +549,32 @@ void VM::run(size_t minFrameDepth) {
         switch (instruction = READ_BYTE()) {
             case (uint8_t)OpCode::OP_RETURN: {
                 Value result = pop();
-                size_t return_slot_offset = frame->slot_offset;  // Save before popping
+                size_t return_slot_offset = frame->slot_offset;  // Points to first argument
+                bool was_bound_method = frame->isBoundMethod;
                 frames.pop_back();
                 if (frames.empty() || frames.size() <= minFrameDepth) {
                     // We are done executing - either the main script or we've returned to target depth
                     if (!frames.empty()) {
                         // Returning to a specific frame depth (from array method)
-                        stack.resize(return_slot_offset);
+                        if (return_slot_offset > 0) {
+                            stack.resize(return_slot_offset - 1);  // Remove callee too (NEUT-020 fix)
+                        }
                         push(result);
                     }
                     return;
                 }
 
                 frame = &frames.back();
-                stack.resize(return_slot_offset);
+                // For bound methods, receiver is at slot_offset, so resize to slot_offset
+                // For regular functions, callee is at slot_offset-1, so resize to slot_offset-1
+                if (was_bound_method) {
+                    stack.resize(return_slot_offset);  // Keep everything before receiver
+                } else if (return_slot_offset > 0) {
+                    stack.resize(return_slot_offset - 1);  // Remove callee + arguments (NEUT-020 fix)
+                } else {
+                    // Edge case: top-level script or no arguments
+                    stack.clear();
+                }
                 push(result);
                 break;
             }

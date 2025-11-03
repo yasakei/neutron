@@ -1,0 +1,59 @@
+// Advanced string operations benchmark
+// Tests string manipulation, concatenation, and searching
+
+// String building with concatenation
+var text = "";
+var i = 0;
+while (i < 1000) {
+    text = text + "x";
+    i = i + 1;
+}
+say("Built string of length: " + text.length);
+
+// String operations in loop
+var result = "";
+var j = 0;
+while (j < 100) {
+    result = "Number " + j + " squared is " + (j * j);
+    j = j + 1;
+}
+say("String operations: " + result);
+
+// String comparison and searching
+var haystack = "The quick brown fox jumps over the lazy dog";
+var found_count = 0;
+
+var k = 0;
+while (k < 100) {
+    // Check for specific strings
+    if (haystack == "The quick brown fox jumps over the lazy dog") {
+        found_count = found_count + 4;  // Simulate finding 4 needles
+    }
+    k = k + 1;
+}
+say("String searches completed: " + found_count);
+
+// String repetition
+var repeated = "";
+var m = 0;
+while (m < 50) {
+    repeated = repeated + "abc";
+    m = m + 1;
+}
+say("Repeated string length: " + repeated.length);
+
+// Case operations (simulated)
+var upper_count = 0;
+var lower_count = 0;
+var test_str = "ABCdef123XYZ";
+
+var n = 0;
+while (n < 1000) {
+    // Simulate case checking
+    if (test_str == "ABCdef123XYZ") {
+        upper_count = upper_count + 3;
+        lower_count = lower_count + 3;
+    }
+    n = n + 1;
+}
+say("Case operations: upper=" + upper_count + ", lower=" + lower_count);

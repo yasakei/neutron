@@ -2,6 +2,73 @@
 
 ---
 
+### [NEUT-020] - Recursive Functions Return Function Objects Instead of Values
+**Status:** Fixed  
+**Discovered On:** Sunday, November 3, 2025 — Linux — Neutron-1.2.1-beta  
+**Fixed On:** Sunday, November 3, 2025 — Neutron-1.2.1  
+**Root Cause:** Two-part issue in stack management during function returns:
+1. **Regular Functions**: `OP_RETURN` resized the stack to `return_slot_offset` which pointed to the first argument, leaving the callee (function object) on the stack. This caused recursive calls to return the function object instead of the computed value.
+2. **Bound Methods in Loops**: After fixing regular functions, bound method calls in loops crashed because they have a different stack layout (receiver acts as first argument at slot_offset position).
+
+**Description:**  
+When a function called itself recursively, the return value was a function object (e.g., `<fn factorial>`) instead of the computed numeric value. This made all recursive algorithms impossible to implement. Example:
+```neutron
+fun factorial(n) {
+    if (n <= 1) {
+        return 1;
+    }
+    var sub_result = factorial(n - 1);  // Returns <fn factorial> instead of number
+    return n * sub_result;  // RuntimeError: Operands must be numbers
+}
+```
+After the initial fix for regular functions, calling methods on objects within loops caused segfaults:
+```neutron
+var i = 0;
+while (i < 10) {
+    var p = Person();
+    p.initialize("Name");  // Segfault - stack corruption
+    i = i + 1;
+}
+```
+
+**Resolution:**  
+1. **Added `isBoundMethod` flag to CallFrame** (`include/vm.h`):
+   - New boolean field to distinguish between regular function calls and bound method calls
+   - Initialized to `false` by default in CallFrame constructor
+   
+2. **Mark bound method calls** (`src/vm.cpp` line ~227):
+   - Set `frame->isBoundMethod = true` when calling bound methods in `VM::callValue()`
+   - Regular function calls leave it as `false`
+
+3. **Fixed OP_RETURN stack cleanup** (`src/vm.cpp` line ~549):
+   - For **bound methods**: `stack.resize(return_slot_offset)` - keeps everything before receiver
+   - For **regular functions**: `stack.resize(return_slot_offset - 1)` - removes callee + arguments
+   - Added safety check for `return_slot_offset == 0` case
+
+**Stack Layout Analysis:**
+```
+Regular Function Call:
+  Before: [outer_vars | callee | arg1 | arg2]
+                        ^slot_offset points to arg1
+  After:  [outer_vars | result]
+          Resize to (slot_offset - 1) to remove callee
+
+Bound Method Call:
+  Before: [outer_vars | receiver | arg1 | arg2]  
+                        ^slot_offset points to receiver (acts as arg0)
+  After:  [outer_vars | result]
+          Resize to (slot_offset) to keep outer_vars intact
+```
+
+**Impact:**
+- ✅ Recursive functions now work correctly (factorial, fibonacci, power, etc.)
+- ✅ Methods can be called on objects within loops without crashes
+- ✅ All 49 unit tests pass
+- ✅ Enabled 3 new benchmarks (recursion, dict_ops, nested_loops)
+- ✅ Benchmark win rate improved from 66.7% to 91.6% (11 out of 12 benchmarks)
+
+---
+
 ### [NEUT-019] - Runtime Errors Missing Line Numbers
 **Status:** Fixed  
 **Discovered On:** Sunday, November 3, 2025 — Linux — Neutron-1.2.1-beta  

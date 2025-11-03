@@ -1,0 +1,130 @@
+// NEUT-020: Recursive Functions Return Function Objects Instead of Values
+// Tests that recursive function calls return computed values, not function objects
+// Also tests that method calls on objects within loops work correctly
+
+use arrays;
+
+say("Testing NEUT-020: Recursive Functions");
+
+// Test 1: Simple recursive factorial
+fun factorial(n) {
+    if (n <= 1) {
+        return 1;
+    }
+    var sub = factorial(n - 1);
+    return n * sub;
+}
+
+var fact5 = factorial(5);
+if (fact5 == 120) {
+    say("✓ Recursive factorial works: 5! = 120");
+} else {
+    say("✗ FAILED: factorial(5) = " + fact5 + ", expected 120");
+}
+
+// Test 2: Recursive power function
+fun power(base, exp) {
+    if (exp == 0) {
+        return 1;
+    }
+    return base * power(base, exp - 1);
+}
+
+var pow2_10 = power(2, 10);
+if (pow2_10 == 1024) {
+    say("✓ Recursive power works: 2^10 = 1024");
+} else {
+    say("✗ FAILED: power(2, 10) = " + pow2_10 + ", expected 1024");
+}
+
+// Test 3: Nested recursive calls (fibonacci)
+fun fib(n) {
+    if (n <= 1) {
+        return n;
+    }
+    var a = fib(n - 1);
+    var b = fib(n - 2);
+    return a + b;
+}
+
+var fib7 = fib(7);
+if (fib7 == 13) {
+    say("✓ Nested recursion works: fib(7) = 13");
+} else {
+    say("✗ FAILED: fib(7) = " + fib7 + ", expected 13");
+}
+
+// Test 4: Classes with methods in loops (bound method calls)
+class Counter {
+    var value;
+    
+    fun initialize(v) {
+        this.value = v;
+    }
+    
+    fun increment() {
+        this.value = this.value + 1;
+        return this.value;
+    }
+    
+    fun getValue() {
+        return this.value;
+    }
+}
+
+var counters = arrays.new();
+var i = 0;
+while (i < 5) {
+    var c = Counter();
+    c.initialize(i * 10);
+    arrays.push(counters, c);
+    i = i + 1;
+}
+
+// Test that we created 5 counters
+var counterLen = arrays.length(counters);
+if (counterLen == 5) {
+    say("✓ Created objects in loop: 5 counters");
+} else {
+    say("✗ FAILED: Expected 5 counters, got " + counterLen);
+}
+
+// Test 5: Call methods on objects created in loop
+var sum = 0;
+var j = 0;
+while (j < 5) {
+    var counter = arrays.at(counters, j);
+    var val = counter.getValue();
+    sum = sum + val;
+    j = j + 1;
+}
+
+if (sum == 100) {
+    say("✓ Method calls in loop work: sum = 100");
+} else {
+    say("✗ FAILED: Expected sum = 100, got " + sum);
+}
+
+// Test 6: Modify objects through methods in loop
+var k = 0;
+while (k < 5) {
+    var counter = arrays.at(counters, k);
+    counter.increment();
+    k = k + 1;
+}
+
+var newSum = 0;
+var m = 0;
+while (m < 5) {
+    var counter = arrays.at(counters, m);
+    newSum = newSum + counter.getValue();
+    m = m + 1;
+}
+
+if (newSum == 105) {
+    say("✓ Object modification in loop works: new sum = 105");
+} else {
+    say("✗ FAILED: Expected new sum = 105, got " + newSum);
+}
+
+say("NEUT-020 test completed successfully!");
