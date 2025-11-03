@@ -69,7 +69,7 @@ Benchmarking: Recursion & Function Calls
 Benchmarking: Data Structures
   Sorting Algorithms        Python: 0.175s     Neutron: 0.053s     Neutron 3.26x faster
   Array/List Operations     Python: 0.089s     Neutron: 0.045s     Neutron 1.98x faster
-  Object/Dictionary Operations Python: 0.102s  Neutron: 0.051s     Neutron 2.00x faster
+  Object/Dictionary Operations  Python: 0.102s  Neutron: 0.051s     Neutron 2.00x faster
 
 Benchmarking: Math Operations
   Mathematical Functions    Python: 0.107s     Neutron: 0.026s     Neutron 4.05x faster
