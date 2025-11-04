@@ -287,6 +287,34 @@ use fmt;
 sys.write("file.txt", "data");
 ```
 
+## Binary Conversion Issues
+
+### 1. Missing Build Directory in Some Release Packages
+**Status:** ⚠️ KNOWN BUG  
+**Severity:** High  
+**Description:** The `-b` flag for binary conversion requires the static library `libneutron_runtime.a` to be in a `build/` directory. If this directory is missing from the release package, binary conversion will fail with "cannot find build/libneutron_runtime.a" error.
+
+**Example:**
+```bash
+./neutron -b myscript.nt
+# Output: /usr/bin/ld: cannot find build/libneutron_runtime.a: No such file or directory
+```
+
+**Workaround:** Ensure the `build/` directory with the static library is included in release packages.
+
+**Status:** Fix requires updating release workflow to include build directory in all release packages.
+
+## Box Package Manager Issues
+
+### 1. Windows API Compatibility
+**Status:** ⚠️ KNOWN BUG  
+**Severity:** High  
+**Description:** The box package manager does not work properly on Windows, and cannot build external libraries when used locally. This affects module development and distribution on Windows platforms.
+
+**Workaround:** Use alternative build methods on Windows or use WSL.
+
+**Status:** Fix requires addressing Windows API compatibility in box module build system.
+
 ## Best Practices
 
 1. Always import required modules at the top of your file

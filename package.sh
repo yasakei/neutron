@@ -241,6 +241,8 @@ if [[ "$OS_TYPE" == "windows" ]]; then
     # Windows specific: copy binaries from build directory
     cp build/neutron.exe "$TARGET_NAME/"
     cp build/*.dll "$TARGET_NAME/" 2>/dev/null || true  # Copy any DLL files, ignore if none exist
+    cp build/*.lib "$TARGET_NAME/" 2>/dev/null || true  # Copy static libraries for -b flag functionality
+    cp build/*.a "$TARGET_NAME/" 2>/dev/null || true  # Copy static libraries for MinGW builds
     cp nt-box/build/box.exe "$TARGET_NAME/"
 else
     # Unix-like systems: copy from build directory
@@ -249,6 +251,8 @@ else
     cp build/libneutron_runtime.so* "$TARGET_NAME/" 2>/dev/null || true
     cp build/libneutron_runtime.dylib* "$TARGET_NAME/" 2>/dev/null || true
     cp build/libneutron_runtime.dll* "$TARGET_NAME/" 2>/dev/null || true
+    # Copy build directory for -b flag functionality
+    cp -r build "$TARGET_NAME/" 2>/dev/null || true
     cp nt-box/build/box "$TARGET_NAME/"
 fi
 
