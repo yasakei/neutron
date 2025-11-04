@@ -1,1 +1,0 @@
-using "test_module.nt"; hello_from_test();
