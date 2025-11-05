@@ -331,17 +331,28 @@ if (NOT WIN32)
     add_custom_command(TARGET neutron POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neutron> ${CMAKE_SOURCE_DIR}/$<TARGET_FILE_NAME:neutron>
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neutron_runtime_shared> ${CMAKE_SOURCE_DIR}/$<TARGET_FILE_NAME:neutron_runtime_shared>
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/build/libneutron_runtime.a ${CMAKE_SOURCE_DIR}/libneutron_runtime.a
         COMMENT "Copying binaries to project root"
     )
 elseif(WIN32 AND MINGW)
     # Copy MinGW runtime DLLs to build directory so the executable works outside MSYS
+    # Also copy neutron executable and static library to project root
     add_custom_command(TARGET neutron POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neutron> ${CMAKE_SOURCE_DIR}/$<TARGET_FILE_NAME:neutron>
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${CMAKE_CXX_COMPILER}/../libgcc_s_seh-1.dll
             ${CMAKE_CXX_COMPILER}/../libwinpthread-1.dll
             ${CMAKE_CXX_COMPILER}/../libstdc++-6.dll
             $<TARGET_FILE_DIR:neutron>
-        COMMENT "Copying MinGW runtime DLLs to build directory"
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/build/libneutron_runtime.a ${CMAKE_SOURCE_DIR}/libneutron_runtime.a
+        COMMENT "Copying MinGW runtime DLLs and binaries to project root"
+    )
+elseif(WIN32)
+    # For MSVC Windows, just copy the executable and static library to project root
+    add_custom_command(TARGET neutron POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neutron> ${CMAKE_SOURCE_DIR}/$<TARGET_FILE_NAME:neutron>
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/build/neutron_runtime.lib ${CMAKE_SOURCE_DIR}/neutron_runtime.lib
+        COMMENT "Copying binaries to project root"
     )
 endif()
 

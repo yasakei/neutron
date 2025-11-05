@@ -21,6 +21,7 @@
 #include <vector>
 #include <sstream>
 #include <iomanip>
+#include <filesystem>
 #include "compiler/scanner.h"
 #include "compiler/parser.h"
 #include "vm.h"
@@ -33,7 +34,7 @@
 void run(const std::string& source, neutron::VM& vm);
 void runFile(const std::string& path, neutron::VM& vm);
 void runPrompt(neutron::VM& vm);
-void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& outputPath, const std::string& sourcePath);
+void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& outputPath, const std::string& sourcePath, const std::string& executablePath);
 
 void run(const std::string& source, neutron::VM& vm) {
     // Split source into lines for error reporting
@@ -111,7 +112,7 @@ void runPrompt(neutron::VM& vm) {
     }
 }
 
-void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& outputPath, const std::string& sourcePath) {
+void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& outputPath, const std::string& sourcePath, const std::string& executablePath) {
     // Detect platform
 #if defined(_WIN32)
     bool isWindows = true;
@@ -126,6 +127,13 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
     bool isMingw = false;
     bool isMacOS = false;
 #endif
+
+    // Get the directory where the executable is located
+    std::filesystem::path exePath(executablePath);
+    std::string executableDir = exePath.parent_path().string();
+    if (executableDir.empty()) {
+        executableDir = "."; // Use current directory if executable path has no parent
+    }
 
     // Adjust output path extension based on platform
     std::string finalOutputPath = outputPath;
@@ -258,21 +266,21 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
         // MSVC
         compiler = "cl";
         objExt = ".obj";
-        mkdirCmd = "if not exist build\\box mkdir build\\box";
-        linkFlags = "/link /LIBPATH:build CURL::libcurl.lib JsonCpp::JsonCpp.lib";
+        mkdirCmd = "if not exist \"" + executableDir + "/box\" mkdir \"" + executableDir + "\\box\"";
+        linkFlags = "/link /LIBPATH:\"" + executableDir + "\" CURL::libcurl.lib JsonCpp::JsonCpp.lib";
         picFlag = "";
     } else if (isWindows && isMingw) {
         // MINGW64
         compiler = "g++";
         objExt = ".o";
-        mkdirCmd = "mkdir -p build/box";
+        mkdirCmd = "mkdir -p \"" + executableDir + "/box\"";
         linkFlags = "-lcurl -ljsoncpp";
         picFlag = "-fPIC";
     } else {
         // Linux/macOS
         compiler = "g++";
         objExt = ".o";
-        mkdirCmd = "mkdir -p build/box";
+        mkdirCmd = "mkdir -p \"" + executableDir + "/box\"";
         if (isMacOS) {
             linkFlags = "-lcurl -ljsoncpp -framework CoreFoundation";
         } else {
@@ -289,13 +297,13 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
         compileCommand = compiler + " /std:c++17 /EHsc /W4 /O2 /I include /I . /I libs " +
                         executableSourcePath + " ";
         // Link with static library instead of individual object files on Windows
-        compileCommand += "build/neutron_runtime.lib ";
+        compileCommand += "\"" + executableDir + "/neutron_runtime.lib\" ";
     } else {
         // GCC/Clang compile command
         compileCommand = compiler + " -std=c++17 -Wall -Wextra -O2 -Iinclude -I. -Ilibs " +
                         executableSourcePath + " ";
         // Link with static library
-        compileCommand += "build/libneutron_runtime.a ";
+        compileCommand += "\"" + executableDir + "/libneutron_runtime.a\" ";
     }
     
     // Check for and compile native modules that are used
@@ -305,7 +313,7 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
         
         if (std::ifstream(nativeCppPath).good()) {
             // Compile native.cpp for this module
-            std::string moduleObj = "build/box/" + moduleName + objExt;
+            std::string moduleObj = executableDir + "/box/" + moduleName + objExt;
             
             // Create the build directory if it doesn't exist
             system(mkdirCmd.c_str());
@@ -314,15 +322,15 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
             std::string objCmd;
             if (isWindows && !isMingw) {
                 objCmd = compiler + " /std:c++17 /EHsc /W4 /O2 /I include /I . /I libs /I box /c " +
-                        nativeCppPath + " /Fo:" + moduleObj;
+                        nativeCppPath + " /Fo:\"" + moduleObj + "\"";
             } else {
                 objCmd = compiler + " -std=c++17 -Wall -Wextra -O2 " + picFlag + " -Iinclude -I. -Ilibs -Ibox -c " +
-                        nativeCppPath + " -o " + moduleObj;
+                        nativeCppPath + " -o \"" + moduleObj + "\"";
             }
             
             int objResult = system(objCmd.c_str());
             if (objResult == 0) {
-                compileCommand += moduleObj + " ";
+                compileCommand += "\"" + moduleObj + "\" ";
                 std::cout << "Compiled native module: " << moduleName << std::endl;
             } else {
                 std::cerr << "Failed to compile native module: " << moduleName << std::endl;
@@ -330,7 +338,7 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
             }
         } else if (std::ifstream(nativeCPath).good()) {
             // Compile native.c for this module
-            std::string moduleObj = "build/box/" + moduleName + objExt;
+            std::string moduleObj = executableDir + "/box/" + moduleName + objExt;
             
             // Create the build directory if it doesn't exist
             system(mkdirCmd.c_str());
@@ -339,15 +347,15 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
             std::string objCmd;
             if (isWindows && !isMingw) {
                 objCmd = compiler + " /std:c++17 /EHsc /W4 /O2 /I include /I . /I libs /I box /c " +
-                        nativeCPath + " /Fo:" + moduleObj;
+                        nativeCPath + " /Fo:\"" + moduleObj + "\"";
             } else {
                 objCmd = compiler + " -std=c++17 -Wall -Wextra -O2 " + picFlag + " -Iinclude -I. -Ilibs -Ibox -c " +
-                        nativeCPath + " -o " + moduleObj;
+                        nativeCPath + " -o \"" + moduleObj + "\"";
             }
             
             int objResult = system(objCmd.c_str());
             if (objResult == 0) {
-                compileCommand += moduleObj + " ";
+                compileCommand += "\"" + moduleObj + "\" ";
                 std::cout << "Compiled native module: " << moduleName << std::endl;
             } else {
                 std::cerr << "Failed to compile native module: " << moduleName << std::endl;
@@ -426,7 +434,7 @@ int main(int argc, char* argv[]) {
             file.close();
             
             // Save source code to standalone executable
-            saveBytecodeToExecutable(source, outputPath, inputPath);
+            saveBytecodeToExecutable(source, outputPath, inputPath, argv[0]);
             
             return 0;
         }
