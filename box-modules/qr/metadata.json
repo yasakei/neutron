@@ -1,7 +1,0 @@
-{
-  "name": "qr",
-  "version": "1.0.0",
-  "description": "qr native module for Neutron",
-  "platform": "Linux",
-  "library": "qr.so"
-}
