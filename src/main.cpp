@@ -291,19 +291,94 @@ void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& 
     
     // Build native modules if needed and prepare the compilation command
     std::string compileCommand;
-    
+
+    // Start with common flags and the generated source file
     if (isWindows && !isMingw) {
         // MSVC compile command
-        compileCommand = compiler + " /std:c++17 /EHsc /W4 /O2 /I include /I . /I libs " +
-                        executableSourcePath + " ";
-        // Link with static library instead of individual object files on Windows
-        compileCommand += "\"" + executableDir + "/neutron_runtime.lib\" ";
+        compileCommand = compiler + " /std:c++17 /EHsc /W4 /O2 /I include /I . /I libs " + executableSourcePath + " ";
     } else {
         // GCC/Clang compile command
-        compileCommand = compiler + " -std=c++17 -Wall -Wextra -O2 -Iinclude -I. -Ilibs " +
-                        executableSourcePath + " ";
-        // Link with static library
-        compileCommand += "\"" + executableDir + "/libneutron_runtime.a\" ";
+        compileCommand = compiler + " -std=c++17 -Wall -Wextra -O2 -Iinclude -I. -Ilibs " + executableSourcePath + " ";
+    }
+
+    // Try to find a static runtime archive next to the current executable or in a few common locations.
+    auto fileExists = [](const std::string& p)->bool {
+        std::ifstream f(p);
+        return f.good();
+    };
+
+    std::string foundRuntimeLib;
+    if (isWindows) {
+        std::vector<std::string> candidates = {
+            executableDir + "/neutron_runtime.lib",
+            executableDir + "/..\neutron_runtime.lib",
+            "neutron_runtime.lib",
+        };
+        for (const auto& c : candidates) {
+            if (fileExists(c)) { foundRuntimeLib = c; break; }
+        }
+    } else {
+        std::vector<std::string> candidates = {
+            executableDir + "/libneutron_runtime.a",
+            executableDir + "/../lib/libneutron_runtime.a",
+            std::string("./libneutron_runtime.a"),
+            std::string("libneutron_runtime.a")
+        };
+        for (const auto& c : candidates) {
+            if (fileExists(c)) { foundRuntimeLib = c; break; }
+        }
+    }
+
+    if (!foundRuntimeLib.empty()) {
+        // Link with the discovered static runtime library
+        if (isWindows) {
+            compileCommand += "\"" + foundRuntimeLib + "\" ";
+        } else {
+            compileCommand += "\"" + foundRuntimeLib + "\" ";
+        }
+    } else {
+        // Fallback: if static lib isn't available, compile runtime sources directly into the generated executable.
+        // This bundles the runtime code into the final binary so it doesn't need external runtime files.
+        // We look for runtime sources relative to the executable directory or current directory.
+        std::vector<std::string> runtimeSources = {
+            "src/vm.cpp",
+            "src/token.cpp",
+            "src/capi.cpp",
+            "src/compiler/scanner.cpp",
+            "src/compiler/parser.cpp",
+            "src/compiler/compiler.cpp",
+            "src/compiler/bytecode.cpp",
+            "src/types/value.cpp",
+            "src/types/array.cpp",
+            "src/types/json_object.cpp",
+            "src/types/json_array.cpp",
+            "src/types/return.cpp",
+            "src/types/version.cpp",
+            "src/runtime/environment.cpp",
+            "src/runtime/error_handler.cpp",
+            "src/runtime/runtime.cpp",
+            "src/runtime/debug.cpp",
+            "src/modules/module.cpp",
+            "src/modules/module_loader.cpp",
+            "src/modules/module_registry.cpp",
+            "src/modules/module_utils.cpp",
+            "src/platform/platform.cpp",
+            "src/utils/component_interface.cpp"
+        };
+
+        bool addedAny = false;
+        for (const auto& rel : runtimeSources) {
+            // check relative to executableDir, then CWD
+            std::string p1 = executableDir + "/" + rel;
+            std::string p2 = rel;
+            if (fileExists(p1)) { compileCommand += "\"" + p1 + "\" "; addedAny = true; }
+            else if (fileExists(p2)) { compileCommand += "\"" + p2 + "\" "; addedAny = true; }
+        }
+
+        if (!addedAny) {
+            std::cerr << "Warning: could not find static runtime library or runtime sources to compile into the executable.\n";
+            std::cerr << "The generated executable may depend on shared runtime libraries at runtime." << std::endl;
+        }
     }
     
     // Check for and compile native modules that are used

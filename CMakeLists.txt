@@ -228,18 +228,7 @@ add_library(neutron_runtime STATIC
     ${NEUTRON_LIBRARY_SOURCES}
 )
 
-# Create shared runtime library for module developers
-add_library(neutron_runtime_shared SHARED
-    ${NEUTRON_LIBRARY_SOURCES}
-)
-
 target_link_libraries(neutron_runtime
-    CURL::libcurl
-    ${JSONCPP_LIBRARIES}
-    ${DLFCN_WIN}
-)
-
-target_link_libraries(neutron_runtime_shared
     CURL::libcurl
     ${JSONCPP_LIBRARIES}
     ${DLFCN_WIN}
@@ -249,20 +238,10 @@ target_include_directories(neutron_runtime PUBLIC
     ${JSONCPP_INCLUDE_DIRS}
 )
 
-target_include_directories(neutron_runtime_shared PUBLIC
-    ${JSONCPP_INCLUDE_DIRS}
-)
-
 # Set output names
 set_target_properties(neutron_runtime PROPERTIES
     OUTPUT_NAME neutron_runtime
     PREFIX "lib"
-)
-
-set_target_properties(neutron_runtime_shared PROPERTIES
-    OUTPUT_NAME neutron_runtime
-    PREFIX "lib"
-    POSITION_INDEPENDENT_CODE ON
 )
 
 # Create executable
@@ -283,7 +262,6 @@ endif()
 # Platform-specific settings
 if(UNIX AND NOT APPLE)
     target_link_libraries(neutron_runtime dl)
-    target_link_libraries(neutron_runtime_shared dl)
     # Export symbols from the executable so modules can access C API functions
     target_link_options(neutron PRIVATE "-Wl,--export-dynamic")
     set_target_properties(neutron PROPERTIES
@@ -291,35 +269,21 @@ if(UNIX AND NOT APPLE)
         INSTALL_RPATH "$ORIGIN"
         ENABLE_EXPORTS ON
     )
-    set_target_properties(neutron_runtime_shared PROPERTIES
-        VERSION 1.1.2
-        SOVERSION 1
-    )
 elseif(APPLE)
     target_link_libraries(neutron_runtime "-framework CoreFoundation")
-    target_link_libraries(neutron_runtime_shared "-framework CoreFoundation")
-    # Ensure jsoncpp library is explicitly linked for macOS shared library
-    # Use the full LDFLAGS from pkg-config to ensure proper linking on macOS
-    target_link_libraries(neutron_runtime_shared ${JSONCPP_LDFLAGS})
     set_target_properties(neutron PROPERTIES
         BUILD_RPATH "@executable_path"
         INSTALL_RPATH "@executable_path"
     )
-    set_target_properties(neutron_runtime_shared PROPERTIES
-        VERSION 1.1.2
-        SOVERSION 1
-    )
 elseif(WIN32)
     # Windows-specific settings
     target_compile_definitions(neutron_runtime PRIVATE _CRT_SECURE_NO_WARNINGS)
-    target_compile_definitions(neutron_runtime_shared PRIVATE _CRT_SECURE_NO_WARNINGS)
     # Link with Windows library for dynamic loading (LoadLibrary, GetProcAddress, etc.)
     target_link_libraries(neutron_runtime "-lkernel32")
-    target_link_libraries(neutron_runtime_shared "-lkernel32")
 endif()
 
 # Install targets
-install(TARGETS neutron neutron_runtime neutron_runtime_shared
+install(TARGETS neutron neutron_runtime
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
@@ -330,7 +294,6 @@ install(TARGETS neutron neutron_runtime neutron_runtime_shared
 if (NOT WIN32)
     add_custom_command(TARGET neutron POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neutron> ${CMAKE_SOURCE_DIR}/$<TARGET_FILE_NAME:neutron>
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neutron_runtime_shared> ${CMAKE_SOURCE_DIR}/$<TARGET_FILE_NAME:neutron_runtime_shared>
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/build/libneutron_runtime.a ${CMAKE_SOURCE_DIR}/libneutron_runtime.a
         COMMENT "Copying binaries to project root"
     )
