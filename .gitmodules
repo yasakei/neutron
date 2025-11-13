@@ -1,3 +1,6 @@
 [submodule "vcpkg"]
 	path = vcpkg
 	url = https://github.com/microsoft/vcpkg.git
+[submodule "nt-box"]
+	path = nt-box
+	url = https://github.com/yasakei/nt-box.git
