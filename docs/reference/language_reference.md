@@ -1,984 +1,708 @@
 # Neutron Language Reference
 
-This document provides a comprehensive reference for the Neutron programming language. It covers syntax, data types, operators, control flow, functions, built-in functions, modules, classes, and all other features of the language.
+> [!NOTE]
+> This is the complete language reference for Neutron. For a quick introduction, see the [Quick Start Guide](../guides/quickstart.md).
 
-## Comments
+## Table of Contents
+- [Lexical Structure](#lexical-structure)
+- [Data Types](#data-types)
+- [Variables and Declarations](#variables-and-declarations)
+- [Operators](#operators)
+- [Control Flow](#control-flow)
+- [Functions](#functions)
+- [Classes and Objects](#classes-and-objects)
+- [Modules](#modules)
+- [Arrays](#arrays)
+- [Built-in Functions](#built-in-functions)
 
-Comments in Neutron start with `//`. Everything from `//` to the end of the line is ignored by the interpreter.
+---
 
-```neutron
-// This is a comment
-var x = 10; // This is also a comment
+## Lexical Structure
+
+### Comments
+
+Single-line comments begin with `//` and continue to the end of the line.
+
+```js
+// This is a single-line comment
+var x = 10; // Inline comment
 ```
+
+> [!NOTE]
+> Multi-line comments are not currently supported.
+
+---
 
 ## Data Types
 
-Neutron is a dynamically typed language. It has the following built-in data types:
+Neutron is dynamically typed. Variables can hold values of any type, and types are determined at runtime.
 
-- **Number:** Represents floating-point numbers (doubles).
-- **Boolean:** Represents `true` or `false`.
-- **String:** Represents a sequence of characters.
-- **Nil:** Represents the absence of a value.
-- **Object:** Represents collections of key-value pairs.
-- **Array:** Represents collections of values (via JSON arrays).
-- **Function:** Represents callable functions.
-- **Module:** Represents imported modules.
+### Primitive Types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| **Number** | 64-bit floating-point | `42`, `3.14`, `-17` |
+| **Boolean** | Logical values | `true`, `false` |
+| **String** | Character sequences | `"Hello"`, `"World"` |
+| **Nil** | Absence of value | `nil` |
+
+### Complex Types
+
+| Type | Description |
+|------|-------------|
+| **Array** | Ordered collections | `[1, 2, 3]` |
+| **Object** | Key-value pairs | `{"key": "value"}` |
+| **Function** | Callable functions |
+| **Module** | Imported modules |
 
 ### Numbers
 
-Numbers are represented as 64-bit floating-point values.
+All numeric values are 64-bit floating-point numbers (IEEE 754 double-precision).
 
-```neutron
-var x = 10;      // An integer
-var y = 3.14;    // A floating-point number
-var z = -42;     // A negative number
+```js
+var integer = 42;
+var decimal = 3.14159;
+var negative = -17;
+var scientific = 1.5e10;  // Scientific notation
 ```
 
 ### Booleans
 
-Booleans are represented by the keywords `true` and `false`.
+Boolean values represent logical truth.
 
-```neutron
-var is_active = true;
-var is_admin = false;
+```js
+var active = true;
+var disabled = false;
 ```
 
 ### Strings
 
-Strings are sequences of characters enclosed in double quotes (`"`).
+Strings are sequences of UTF-8 characters enclosed in double quotes.
 
-```neutron
-var name = "Neutron";
-var message = "Hello, world!";
-var multiline = "Line 1\nLine 2\tTabbed";
+```js
+var greeting = "Hello, World!";
+var escaped = "Line 1\nLine 2\tTabbed";
 ```
 
 #### String Interpolation
 
-Neutron supports string interpolation using the `${}` syntax. You can embed expressions inside strings, and they will be automatically evaluated and converted to strings.
+Embed expressions within strings using `${expression}` syntax:
 
-```neutron
+```js
 var name = "Alice";
 var age = 30;
-say("My name is ${name} and I am ${age} years old.");
-// Output: My name is Alice and I am 30 years old.
+say("Name: ${name}, Age: ${age}");
+// Output: Name: Alice, Age: 30
 
-// Works with any expression
-var x = 10;
-var y = 20;
-say("The sum of ${x} and ${y} is ${x + y}");
-// Output: The sum of 10 and 20 is 30
-
-// Works with arrays and objects
-var arr = [1, 2, 3];
-say("Array: ${arr}");
-// Output: Array: [1, 2, 3]
-
-var obj = {"name": "Bob", "age": 25};
-say("Object: ${obj}");
-// Output: Object: {name:25}
+var x = 5, y = 10;
+say("Sum: ${x + y}");
+// Output: Sum: 15
 ```
+
+> [!TIP]
+> String interpolation works with any expression, including function calls and array access.
 
 ### Nil
 
-The `nil` keyword represents the absence of a value. It is similar to `null` in other languages.
+The `nil` value represents the absence of a value (equivalent to `null` in other languages).
 
-```neutron
-var x = nil;
+```js
+var empty = nil;
 ```
 
-## Object Literals
+### Objects
 
-Object literals are collections of key-value pairs enclosed in curly braces (`{}`). Keys must be string literals, and values can be any valid expression.
+Objects are collections of key-value pairs, similar to dictionaries or maps in other languages.
 
-```neutron
+```js
 var person = {
   "name": "John Doe",
   "age": 30,
-  "city": "New York"
+  "email": "john@example.com"
 };
 
-// Access object properties
-say(person["name"]); // John Doe
+// Property access
+say(person["name"]);  // John Doe
+say(person["age"]);   // 30
 
-// Objects can be nested
+// Nested objects
 var config = {
   "database": {
     "host": "localhost",
     "port": 5432
-  },
-  "api": {
-    "version": "v1",
-    "timeout": 30
   }
 };
+say(config["database"]["host"]);  // localhost
 ```
 
-Object literals work seamlessly with the JSON module:
+> [!NOTE]
+> Objects integrate seamlessly with the `json` module for serialization and parsing.
 
-```neutron
-use json;
+---
 
-var data = {
-  "name": "John Doe",
-  "age": 30,
-  "city": "New York"
-};
+## Variables and Declarations
 
-// Convert object to JSON string
-var jsonString = json.stringify(data);
-say(jsonString); // {"name":"John Doe","age":30,"city":"New York"}
+### Variable Declaration
 
-// Parse JSON string back to object
-var parsed = json.parse(jsonString);
-say(parsed["name"]); // John Doe
+Variables are declared with the `var` keyword and can be initialized immediately or assigned later.
+
+```js
+var x;           // Declared (value is nil)
+var y = 42;      // Declared and initialized
+x = 100;         // Assignment
 ```
 
-## Variables
+### Dynamic Typing
 
-Variables are declared using the `var` keyword. They can be assigned a value when they are declared, or they can be assigned a value later.
+Variables can hold values of any type and change types during runtime:
 
-```neutron
-var x;          // Declare a variable without a value (it will be nil)
-var y = 10;     // Declare a variable with a value
-x = 20;         // Assign a new value to x
-
-// Variables are dynamically typed
-var value = 42;    // Number
-value = "hello";   // Now a string
-value = true;      // Now a boolean
+```js
+var value = 42;       // Number
+value = "hello";      // Now a string
+value = true;         // Now a boolean
+value = [1, 2, 3];    // Now an array
 ```
 
-### Type Annotations (Optional)
+### Optional Type Annotations
 
-Neutron supports optional type annotations for variables. These annotations are checked at compile-time but are not enforced at runtime in the current version.
+Type annotations provide documentation and compile-time hints but are not enforced at runtime:
 
-```neutron
-var int x = 42;                    // Integer type annotation
-var string name = "Alice";         // String type annotation
-var bool isActive = true;          // Boolean type annotation
-var array numbers = [1, 2, 3];     // Array type annotation
-var object person = {"name": "Bob"}; // Object type annotation
-var any value = "anything";        // Any type (no restriction)
+```js
+var int x = 42;
+var string name = "Alice";
+var bool flag = true;
+var array list = [1, 2, 3];
+var object data = {"key": "value"};
+var any flexible = "anything";
 ```
 
-**Note:** Type annotations provide documentation and compile-time checking for initial assignments, but the variables can still be reassigned to values of different types at runtime since Neutron is dynamically typed.
+> [!WARNING]
+> Type annotations are currently for documentation purposes only. Variables can still be reassigned to values of different types.
+
+---
 
 ## Operators
 
-Neutron supports a variety of operators for arithmetic, comparison, logical operations, and string manipulation.
-
 ### Arithmetic Operators
 
-- `+`: Addition (also string concatenation)
-- `-`: Subtraction
-- `*`: Multiplication
-- `/`: Division
-- `%`: Modulo (remainder)
-- `++`: Increment (prefix or postfix)
-- `--`: Decrement (prefix or postfix)
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `+` | Addition / String concatenation | `5 + 3` → `8` |
+| `-` | Subtraction | `10 - 4` → `6` |
+| `*` | Multiplication | `6 * 7` → `42` |
+| `/` | Division | `15 / 3` → `5` |
+| `%` | Modulo (remainder) | `10 % 3` → `1` |
+| `++` | Increment | `x++` |
+| `--` | Decrement | `x--` |
 
-```neutron
-var x = 10 + 5;  // 15
-var y = 20 - 10; // 10
-var z = 5 * 2;   // 10
-var w = 10 / 2;  // 5
-var r = 10 % 3;  // 1
+```js
+var sum = 10 + 5;           // 15
+var product = 4 * 3;        // 12
+var remainder = 17 % 5;     // 2
 
 // String concatenation
-var greeting = "Hello, " + "world!"; // "Hello, world!"
-var message = "Value: " + 42;        // "Value: 42"
+var message = "Hello, " + "World!";  // "Hello, World!"
 ```
 
-#### Increment and Decrement Operators
+#### Increment/Decrement
 
-Neutron supports C-style increment (`++`) and decrement (`--`) operators in both prefix and postfix forms:
-
-```neutron
-var counter = 0;
-
-// Prefix increment: increment then use value
-++counter;  // counter is now 1
-say(counter);  // 1
-
-// Postfix increment: use value then increment
-counter++;  // counter is now 2
-say(counter);  // 2
-
-// Prefix decrement
---counter;  // counter is now 1
-
-// Postfix decrement
-counter--;  // counter is now 0
-
-// Common usage in loops
-var i = 0;
-while (i < 5) {
-    say(i);
-    i++;  // Increment i
-}
+```js
+var x = 5;
+x++;    // x is now 6
+++x;    // x is now 7
+x--;    // x is now 6
+--x;    // x is now 5
 ```
 
-**Note:** In the current implementation, both prefix and postfix forms have the same behavior (they modify the variable and return the new value). This is a known limitation that may be addressed in future versions.
+> [!NOTE]
+> Currently, both prefix and postfix forms behave identically (they modify the variable and return the new value).
 
 ### Comparison Operators
 
-- `==`: Equal
-- `!=`: Not equal
-- `<`: Less than
-- `<=`: Less than or equal to
-- `>`: Greater than
-- `>=`: Greater than or equal to
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `==` | Equal to | `5 == 5` → `true` |
+| `!=` | Not equal to | `5 != 3` → `true` |
+| `<` | Less than | `3 < 5` → `true` |
+| `<=` | Less than or equal | `5 <= 5` → `true` |
+| `>` | Greater than | `7 > 3` → `true` |
+| `>=` | Greater than or equal | `5 >= 4` → `true` |
 
-```python
-say(10 == 10); // true
-say(10 != 5);  // true
-say(5 < 10);   // true
+```js
+say(10 == 10);  // true
+say(5 < 10);    // true
+say(7 >= 7);    // true
 ```
 
-**Note on Chained Comparisons:**
-Currently, the Neutron language does not fully support chained comparison operators in the form `a < b < c`. 
-While the parser may accept such expressions, they do not behave as expected (i.e., not equivalent to `(a < b) and (b < c)`).
-
-This is a known limitation that requires more sophisticated bytecode generation to implement properly with single evaluation semantics.
-
-As a workaround, use explicit comparisons joined with logical operators:
-
-```neutron
-// Instead of: a < b < c  (currently not working properly)
-// Use:        a < b and b < c  (recommended)
-```
+> [!WARNING]
+> Chained comparisons like `a < b < c` are not currently supported. Use `a < b and b < c` instead.
 
 ### Logical Operators
 
-- `and` / `&&`: Logical AND
-- `or` / `||`: Logical OR
-- `!`: Logical NOT
+| Operator | Alternative | Description | Example |
+|----------|-------------|-------------|---------|
+| `and` | `&&` | Logical AND | `true and false` → `false` |
+| `or` | `\|\|` | Logical OR | `true or false` → `true` |
+| `!` | | Logical NOT | `!true` → `false` |
 
-```neutron
-say(true and false); // false
-say(true or false);  // true
-say(!true);          // false
-
-// Symbol operators (equivalent to keyword operators)
-say(true && false);  // false
-say(true || false);  // true
+```js
+var result = (x > 5) and (x < 10);
+var valid = (status == "ready") or (status == "running");
+var inactive = !active;
 ```
 
-Both keyword forms (`and`, `or`) and symbol forms (`&&`, `||`) are supported and behave identically.
+---
 
 ## Control Flow
 
-Neutron provides several control flow statements.
+### Conditional Statements
 
-### If-Else Statements
+#### If-Else
 
-The `if` statement executes a block of code if a condition is true. The `else` statement can be used to execute a block of code if the condition is false.
-
-```python
-if (x > 10) {
-    say("x is greater than 10");
+```js
+if (condition) {
+    // Execute if condition is true
+} else if (otherCondition) {
+    // Execute if other condition is true
 } else {
-    say("x is not greater than 10");
+    // Execute if no conditions are true
 }
 ```
 
-### While Loops
+**Example:**
+```js
+var score = 85;
+if (score >= 90) {
+    say("Grade: A");
+} else if (score >= 80) {
+    say("Grade: B");
+} else if (score >= 70) {
+    say("Grade: C");
+} else {
+    say("Grade: F");
+}
+```
 
-The `while` loop executes a block of code as long as a condition is true.
+### Loops
 
-```python
+#### While Loop
+
+Executes a block while a condition remains true.
+
+```js
 var i = 0;
 while (i < 5) {
     say(i);
-    i = i + 1;
+    i++;
 }
 ```
 
-### For Loops
+#### For Loop
 
-The `for` loop is a more convenient way to write loops with a clear initializer, condition, and increment.
+Provides initialization, condition, and increment in a compact syntax.
 
-```python
-for (var i = 0; i < 5; i = i + 1) {
+```js
+for (var i = 0; i < 10; i++) {
     say(i);
 }
-```
 
-### Match Statements
-
-The `match` statement provides pattern matching for cleaner conditional logic. It evaluates an expression and executes the code block corresponding to the matching case.
-
-```neutron
-var day = 3;
-match (day) {
-    case 1 => say("Monday");
-    case 2 => say("Tuesday");
-    case 3 => say("Wednesday");
-    default => say("Other day");
+// Iterate over array indices
+var items = ["a", "b", "c"];
+for (var i = 0; i < 3; i++) {
+    say(items[i]);
 }
 ```
 
-Match statements can also use block statements:
+### Match Statement
 
-```neutron
+Pattern matching for cleaner conditional logic (similar to switch statements).
+
+```js
 var status = 2;
 match (status) {
-    case 1 => {
-        say("Status is 1");
-        say("Ready");
-    }
-    case 2 => {
-        say("Status is 2");
-        say("Running");
-    }
-    default => say("Unknown status");
+    case 1 => say("Initializing");
+    case 2 => say("Running");
+    case 3 => say("Completed");
+    default => say("Unknown");
 }
 ```
 
-The `default` case is optional. If no case matches and there's no default, execution continues normally.
-
-```neutron
-// Match with strings
-var command = "start";
+**With block statements:**
+```js
 match (command) {
-    case "start" => say("Starting...");
-    case "stop" => say("Stopping...");
-    case "restart" => say("Restarting...");
+    case "start" => {
+        say("Starting system...");
+        say("System online");
+    }
+    case "stop" => {
+        say("Stopping system...");
+        say("System offline");
+    }
+    default => say("Invalid command");
 }
 ```
+
+> [!TIP]
+> The `default` case is optional. If omitted and no case matches, execution continues normally.
+
+---
 
 ## Functions
 
-Functions are defined using the `fun` keyword.
+### Function Declaration
 
-### Defining Functions
+Functions are declared using the `fun` keyword.
 
-```python
+```js
 fun greet(name) {
     say("Hello, " + name + "!");
 }
+
+greet("World");  // Hello, World!
 ```
 
-### Calling Functions
+### Return Values
 
-```python
-greet("Neutron"); // Prints "Hello, Neutron!"
-```
+Use `return` to return a value from a function. Without an explicit return, functions return `nil`.
 
-### Return Statement
-
-The `return` statement is used to return a value from a function. If no value is specified, the function returns `nil`.
-
-```python
+```js
 fun add(a, b) {
     return a + b;
 }
 
-var result = add(5, 10);
-say(result); // 15
-```
-
-Functions can also return without a value:
-
-```python
-fun print_message(message) {
-    if (message == "") {
-        return; // Returns nil
-    }
-    say(message);
+fun multiply(x, y) {
+    return x * y;
 }
+
+say(add(5, 3));       // 8
+say(multiply(4, 7));  // 28
 ```
 
-### Lambda Functions (Anonymous Functions)
+### Lambda Functions
 
-Lambda functions allow you to create anonymous functions inline. They are defined using the `fun` keyword with parameters and a body, but without a function name.
+Anonymous functions can be created inline and assigned to variables or passed as arguments.
 
-```neutron
-// Lambda assigned to a variable
-var add = fun(a, b) {
-    return a + b;
-};
-say(add(5, 3));  // 8
-```
-
-Lambdas with single parameter:
-
-```neutron
+```js
+// Lambda assigned to variable
 var square = fun(x) {
     return x * x;
 };
-say(square(4));  // 16
-```
+say(square(5));  // 25
 
-Lambdas with no parameters:
-
-```neutron
-var greet = fun() {
-    return "Hello!";
-};
-say(greet());  // Hello!
-```
-
-Lambdas can be stored in arrays:
-
-```neutron
+// Lambda as array element
 var operations = [
     fun(x) { return x + 10; },
-    fun(x) { return x * 2; },
-    fun(x) { return x * x; }
+    fun(x) { return x * 2; }
 ];
 say(operations[0](5));  // 15
 say(operations[1](5));  // 10
-say(operations[2](5));  // 25
 ```
 
-Lambdas can be passed as arguments:
+#### Higher-Order Functions
 
-```neutron
+Functions can accept other functions as parameters:
+
+```js
 fun applyTwice(f, value) {
     return f(f(value));
 }
+
 var double = fun(x) { return x * 2; };
-say(applyTwice(double, 5));  // 20
+say(applyTwice(double, 3));  // 12
 ```
 
-Immediately invoked lambdas:
+#### Immediately Invoked Functions
 
-```neutron
+```js
 var result = fun(x) { return x + 1; }(5);
 say(result);  // 6
 ```
 
+---
+
 ## Built-in Functions
 
-Neutron provides several built-in functions that are available in the global scope without needing to import any modules.
+### Output
 
-### Output Functions
+**`say(value)`** - Prints a value to console with newline
 
-- `say(value)`: Prints a value to the console followed by a newline.
-
-```neutron
-say("Hello, world!");           // Output: Hello, world!
-say(42);                       // Output: 42
-say(true);                     // Output: true
-say(nil);                      // Output: 
+```js
+say("Hello, World!");
+say(42);
+say(true);
+say([1, 2, 3]);
 ```
 
-### Type Conversion Functions
+> [!NOTE]
+> All other functions are provided through modules. Use `use modulename;` to import them.
 
-Neutron provides type conversion capabilities through the `fmt` module. These functions perform dynamic type conversion with appropriate error handling:
-
-**Available Functions in `fmt` Module:**
-- `fmt.to_str(value)`: Converts a value to its string representation.
-- `fmt.to_int(value)`: Converts a value to an integer.
-- `fmt.to_float(value)`: Converts a value to a float.
-- `fmt.to_bin(value)`: Converts a value to its binary string representation.
-- `fmt.type(value)`: Returns the type of the value as a string.
-
-```neutron
-use fmt;
-
-var num = 42;
-var text = fmt.to_str(num);           // "42"
-say("Number as string: " + text);
-
-var numberText = "123";
-var number = fmt.to_int(numberText);  // 123
-say("String as number: " + number);
-
-// Type detection
-var type = fmt.type(42);              // "number"
-say("Type of 42: " + type);
-
-// Float conversion
-var floatNum = fmt.to_float("3.14");  // 3.14
-say("Float: " + floatNum);
-
-// Binary conversion
-var binary = fmt.to_bin(10);          // "1010"
-say("10 in binary: " + binary);
-```
-
-#### String Manipulation
-
-When working with strings, Neutron provides methods that can be accessed on string values directly or through array operations (since strings can be treated as character arrays in certain contexts):
-
-```neutron
-// String length using array method (strings support array-like operations)
-var text = "Hello";
-var length = text.length;             // 5
-say("Length of 'Hello': " + length);
-
-// For character access, you can use array indexing
-say("First character: " + text[0]);   // "H"
-say("Last character: " + text[4]);    // "o"
-```
-
-**Note:** The `char_to_int`, `int_to_char`, `string_length`, and `string_get_char_at` functions are available in the `fmt` module rather than as global functions:
-
-```neutron
-use fmt;
-
-// These functions are provided in the fmt module
-// For character/ASCII operations, you can use fmt.to_int and fmt.to_str
-var type = fmt.type("A");                   // "string"
-var intVal = fmt.to_int(65.0);              // 65
-var strVal = fmt.to_str("Hello");           // "Hello"
-
-say("Type detection: " + type);
-say("Converted int: " + intVal);
-say("Converted string: " + strVal);
-```
+---
 
 ## Modules
 
-Neutron supports two types of imports:
+Neutron supports two import mechanisms:
 
-1. **Module imports** using `use modulename;` - for built-in and native modules
-2. **File imports** using `using 'filename.nt';` - for importing other Neutron source files
+| Statement | Purpose | Example |
+|-----------|---------|---------|
+| `use` | Import built-in/native modules | `use sys;` |
+| `using` | Import Neutron source files | `using 'utils.nt';` |
 
-**Important:** As of the latest version, all built-in modules use lazy loading and must be explicitly imported with `use modulename;` before use.
+### Importing Modules
 
-### Module Imports
+Import built-in modules with `use`:
 
-The `use` statement is used to import built-in or native modules. Modules must be imported before they can be used.
-
-```neutron
+```js
 use sys;
 use json;
 use math;
 
-// Now you can use these modules
 sys.write("data.txt", "Hello!");
 var data = json.parse('{"name": "John"}');
-var result = math.sqrt(16);
+say(math.sqrt(16));
 ```
 
-**Built-in Modules:**
-- `sys` - File I/O, directory operations, environment access, process control (fully implemented)
-- `json` - JSON parsing and stringification
+**Available Built-in Modules:**
+- `sys` - File I/O, environment, process control
+- `json` - JSON parsing and serialization
 - `math` - Mathematical operations
-- `fmt` - Type conversion and formatting utilities
-- `arrays` - Array manipulation and utility functions
-- `time` - Time and date functions
-- `http` - HTTP client operations
+- `http` - HTTP client
+- `fmt` - Type conversion and formatting
+- `arrays` - Array manipulation
+- `time` - Time and date operations
+- `async` - Asynchronous operations
 
-**Module Loading:**
-All modules use lazy loading - they're only initialized when you explicitly use `use modulename;`. This provides:
-- Faster startup time
-- Explicit dependencies
-- Better memory management
+> [!NOTE]
+> Modules use lazy loading - they're only initialized when imported, providing faster startup and better memory usage.
 
-**Error Messages:**
-If you try to use a module without importing it, you'll get a helpful error:
-```
-Runtime error: Undefined variable 'sys'. Did you forget to import it? Use 'use sys;' at the top of your file.
-```
+### Importing Files
 
-### File Imports
+Import Neutron source files with `using`:
 
-The `using` statement is used to import other Neutron source files. All functions and variables defined in the imported file become available in the current scope.
-
-```neutron
+```js
 using 'utils.nt';
 using 'lib/helpers.nt';
-
-// Use functions from imported files
-say(greet("World"));
 ```
 
-**File Search Paths:**
-Files are searched in the following order:
-1. Current directory (`.`).
+**File Search Order:**
+1. Current directory
 2. `lib/` directory
-3. `.box/modules/` directory (for installed modules)
+3. `.box/modules/` directory
 
 **Example:**
 
-**utils.nt:**
-```neutron
-fun greet(name) {
-    return "Hello, " + name + "!";
+`utils.nt`:
+```js
+fun add(a, b) {
+    return a + b;
 }
-
-var VERSION = "1.0.0";
 ```
 
-**main.nt:**
-```neutron
+`main.nt`:
+```js
 using 'utils.nt';
-
-say(greet("Neutron"));  // Output: Hello, Neutron!
-say(VERSION);           // Output: 1.0.0
+say(add(5, 3));  // 8
 ```
 
-**Best Practices:**
-- Import modules at the top of your file
-- Use `use` for built-in modules
-- Use `using` for your own `.nt` files
-- Only import what you need
+---
 
-## Core Modules
+## Standard Library Modules
 
-Neutron provides several built-in modules that extend the language's capabilities.
+### Math Module
 
-### The `math` Module
+Mathematical operations and functions.
 
-The `math` module provides basic mathematical functions.
-
-```neutron
+```js
 use math;
 
-var sum = math.add(5, 3);           // 8
-var diff = math.subtract(10, 4);    // 6
-var product = math.multiply(6, 7);  // 42
-var quotient = math.divide(15, 3);  // 5
-var power = math.pow(2, 3);         // 8
-var root = math.sqrt(16);           // 4
-var absolute = math.abs(-5);        // 5
+say(math.sqrt(16));           // 4
+say(math.pow(2, 3));          // 8
+say(math.abs(-5));            // 5
 ```
 
-**Available Functions:**
-- `math.add(a, b)`: Addition
-- `math.subtract(a, b)`: Subtraction
-- `math.multiply(a, b)`: Multiplication
-- `math.divide(a, b)`: Division (throws error on division by zero)
-- `math.pow(base, exponent)`: Power/exponentiation
-- `math.sqrt(number)`: Square root
-- `math.abs(number)`: Absolute value
+**Functions:** `add`, `subtract`, `multiply`, `divide`, `pow`, `sqrt`, `abs`
 
-### The `sys` Module
+> [!TIP]
+> See [Math Module Documentation](../modules/math_module.md) for complete API reference.
 
-The `sys` module provides system-level operations including file I/O, directory operations, environment access, and process control.
+### Sys Module
 
-```neutron
+File I/O, environment access, and process control.
+
+```js
 use sys;
 
 // File operations
-sys.write("hello.txt", "Hello, world!");
-var content = sys.read("hello.txt");
-say(content); // "Hello, world!"
+sys.write("data.txt", "Hello!");
+var content = sys.read("data.txt");
 
 // Directory operations
 sys.mkdir("mydir");
-var exists = sys.exists("mydir");  // true
-sys.rmdir("mydir");
+sys.exists("mydir");
 
-// Environment and system info
-var currentDir = sys.cwd();
-var userHome = sys.env("HOME");
-var systemInfo = sys.info();
+// Environment
+var home = sys.env("HOME");
+var args = sys.args();
 ```
 
-**File System Functions:**
-- `sys.read(path)`: Read entire file contents as string
-- `sys.write(path, content)`: Write content to file (overwrites)
-- `sys.append(path, content)`: Append content to file
-- `sys.cp(source, destination)`: Copy file
-- `sys.mv(source, destination)`: Move/rename file
-- `sys.rm(path)`: Remove file
-- `sys.mkdir(path)`: Create directory
-- `sys.rmdir(path)`: Remove directory
-- `sys.exists(path)`: Check if file/directory exists
-- `sys.cwd()`: Get current working directory
-- `sys.chdir(path)`: Change current directory
+**Categories:** File system, environment variables, process control, command execution
 
-**Environment & System Functions:**
-- `sys.env(name)`: Get environment variable value
-- `sys.info()`: Get system information object
-- `sys.args()`: Get command line arguments (returns array)
-- `sys.input([prompt])`: Read line from stdin with optional prompt
+> [!TIP]
+> See [Sys Module Documentation](../modules/sys_module.md) for complete API reference.
 
-**Process Control Functions:**
-- `sys.exit([code])`: Exit program with optional exit code
-- `sys.exec(command)`: Execute shell command and return output
+### JSON Module
 
-### The `json` Module
+JSON parsing and serialization.
 
-The `json` module provides JSON parsing and serialization capabilities.
-
-```neutron
+```js
 use json;
 
-// Create an object
-var data = {
-  "name": "Alice",
-  "age": 30,
-  "active": true
-};
-
-// Convert to JSON string
+var data = {"name": "Alice", "age": 30};
 var jsonStr = json.stringify(data);
-say(jsonStr); // {"name":"Alice","age":30,"active":true}
-
-// Pretty print JSON
-var prettyJson = json.stringify(data, true);
-say(prettyJson);
-/*
-{
-  "name": "Alice",
-  "age": 30,
-  "active": true
-}
-*/
-
-// Parse JSON string
 var parsed = json.parse(jsonStr);
-say(parsed["name"]); // "Alice"
-
-// Get specific property
-var name = json.get(parsed, "name"); // "Alice"
+say(parsed["name"]);
 ```
 
-**Available Functions:**
-- `json.stringify(value, [pretty])`: Convert value to JSON string. Set `pretty` to `true` for formatted output
-- `json.parse(jsonString)`: Parse JSON string into object/array
-- `json.get(object, key)`: Get property value from object, returns `nil` if not found
+**Functions:** `stringify`, `parse`, `get`
 
-### The `fmt` Module
+> [!TIP]
+> See [JSON Module Documentation](../modules/json_module.md) for complete API reference.
 
-The `fmt` module provides advanced type conversion and formatting utilities that must be imported before use.
+### Fmt Module
 
-```neutron
+Type conversion and formatting utilities.
+
+```js
 use fmt;
 
-// Type conversion functions
-var numStr = fmt.to_str(42);              // "42"
-var intVal = fmt.to_int("123");           // 123
-var floatVal = fmt.to_float("3.14");      // 3.14
-var binVal = fmt.to_bin(10);              // "1010"
-var typeStr = fmt.type(42);               // "number"
-
-say("Number as string: " + numStr);
-say("String as integer: " + intVal);
-say("Float value: " + floatVal);
-say("Binary representation: " + binVal);
-say("Type: " + typeStr);
+var str = fmt.to_str(42);        // "42"
+var num = fmt.to_int("123");     // 123
+var type = fmt.type([1, 2, 3]);  // "array"
 ```
 
-**Available Functions:**
-- `fmt.to_str(value)`: Converts a value to its string representation
-- `fmt.to_int(value)`: Converts a value to an integer
-- `fmt.to_float(value)`: Converts a value to a float
-- `fmt.to_bin(value)`: Converts a value to its binary string representation  
-- `fmt.type(value)`: Returns the type of the value as a string
+**Functions:** `to_str`, `to_int`, `to_float`, `to_bin`, `type`
 
-**Type Conversion Behavior:**
-- `fmt.to_int()` converts numbers to integers (truncates decimal parts), strings to integers via parsing, booleans to 0/1, and nil to 0
-- `fmt.to_str()` converts values to their string representation
-- `fmt.to_float()` converts values to floating-point numbers
-- `fmt.to_bin()` converts values to their binary representation
-- `fmt.type()` returns type names like "number", "string", "bool", "array", "object", etc.
+> [!TIP]
+> See [Fmt Module Documentation](../modules/fmt_module.md) for complete API reference.
 
-### The `arrays` Module
+### Arrays Module
 
-The `arrays` module provides comprehensive array manipulation and utility functions that must be imported before use.
+Comprehensive array manipulation.
 
-```neutron
+```js
 use arrays;
 
-// Create and manipulate arrays
 var arr = arrays.new();
-arrays.push(arr, 1);
-arrays.push(arr, 2);
-arrays.push(arr, 3);
-
-var length = arrays.length(arr);    // 3
-var element = arrays.at(arr, 0);    // 1
-var last = arrays.pop(arr);         // 3
-arrays.set(arr, 0, 10);             // Set first element to 10
-
-// Array operations
-arrays.reverse(arr);
+arrays.push(arr, 10);
+arrays.push(arr, 20);
+say(arrays.length(arr));  // 2
 arrays.sort(arr);
-var index = arrays.index_of(arr, 10); // Find index of value
-var hasValue = arrays.contains(arr, 10); // Check if array contains value
-var joined = arrays.join(arr, ", ");    // Join elements with separator
-var sliced = arrays.slice(arr, 0, 2);   // Get subarray
 ```
 
-**Available Functions:**
-- `arrays.new()`: Creates a new empty array
-- `arrays.length(array)`: Returns the length of the array
-- `arrays.push(array, value)`: Adds element to the end of the array
-- `arrays.pop(array)`: Removes and returns the last element
-- `arrays.at(array, index)`: Returns element at the specified index
-- `arrays.set(array, index, value)`: Sets element at the specified index
-- `arrays.reverse(array)`: Reverses the array in place
-- `arrays.sort(array)`: Sorts the array in place
-- `arrays.index_of(array, value)`: Returns index of first occurrence
-- `arrays.contains(array, value)`: Checks if array contains the value
-- `arrays.join(array, separator)`: Joins elements into a string with separator
-- `arrays.slice(array, start, end)`: Returns a subarray
-- `arrays.clear(array)`: Removes all elements from the array
-- `arrays.clone(array)`: Creates a shallow copy of the array
-- `arrays.remove(array, value)`: Removes first occurrence of a value
-- `arrays.remove_at(array, index)`: Removes element at specified index
-- `arrays.to_string(array)`: Converts array to string representation
-- `arrays.flat(array)`: Flattens nested arrays
-- `arrays.fill(array, value, start, end)`: Fills array with value
-- `arrays.range(start, end, step)`: Creates array of numbers in range
-- `arrays.shuffle(array)`: Randomly shuffles the array elements
+**Functions:** `new`, `push`, `pop`, `length`, `at`, `set`, `sort`, `reverse`, `slice`, `join`, `contains`, and more
 
-### The `http` Module
+> [!TIP]
+> See [Arrays Module Documentation](../modules/arrays_module.md) for complete API reference.
 
-The `http` module provides HTTP client functionality for making web requests.
+### HTTP Module
 
-```neutron
+HTTP client for making web requests.
+
+```js
 use http;
 
-// GET request
 var response = http.get("https://api.example.com/data");
-say("Status: " + response["status"]);
-say("Body: " + response["body"]);
+say(response["status"]);
+say(response["body"]);
 
-// POST request with data
-var postData = json.stringify({"key": "value"});
-var postResponse = http.post("https://api.example.com/submit", postData);
-
-// Other HTTP methods
-var putResponse = http.put("https://api.example.com/update", data);
-var deleteResponse = http.delete("https://api.example.com/remove");
-var headResponse = http.head("https://api.example.com/check");
-var patchResponse = http.patch("https://api.example.com/partial", patchData);
+var data = {"key": "value"};
+http.post("https://api.example.com/submit", json.stringify(data));
 ```
 
-**Available Functions:**
-- `http.get(url, [headers])`: Make HTTP GET request
-- `http.post(url, [data], [headers])`: Make HTTP POST request
-- `http.put(url, [data], [headers])`: Make HTTP PUT request
-- `http.delete(url, [headers])`: Make HTTP DELETE request
-- `http.head(url, [headers])`: Make HTTP HEAD request
-- `http.patch(url, [data], [headers])`: Make HTTP PATCH request
+**Methods:** `get`, `post`, `put`, `delete`, `patch`, `head`
 
-**Response Object:**
-All HTTP functions return a response object with:
-- `status`: HTTP status code (number)
-- `body`: Response body (string)
-- `headers`: Response headers object
+> [!TIP]
+> See [HTTP Module Documentation](../modules/http_module.md) for complete API reference.
 
-### The `time` Module
+### Time Module
 
-The `time` module provides time-related functions for timestamps, formatting, and delays.
+Time and date operations.
 
-```neutron
+```js
 use time;
 
-// Get current timestamp in milliseconds
 var now = time.now();
-say("Current timestamp: " + now);
-
-// Format timestamp as string
 var formatted = time.format(now);
-say("Formatted time: " + formatted); // 2024-01-15 14:30:25
-
-// Custom format
-var customFormat = time.format(now, "%Y-%m-%d");
-say("Date only: " + customFormat); // 2024-01-15
-
-// Sleep for 1000 milliseconds (1 second)
-time.sleep(1000);
-say("Waited 1 second");
+time.sleep(1000);  // Sleep 1 second
 ```
 
-**Available Functions:**
-- `time.now()`: Get current timestamp in milliseconds since epoch
-- `time.format(timestamp, [format])`: Format timestamp as string using strftime format
-- `time.sleep(milliseconds)`: Sleep/pause execution for specified milliseconds
+**Functions:** `now`, `format`, `sleep`
 
-**Default Time Format:** `%Y-%m-%d %H:%M:%S` (e.g., "2024-01-15 14:30:25")
+> [!TIP]
+> See [Time Module Documentation](../modules/time_module.md) for complete API reference.
 
-## Classes
+---
 
-Neutron supports object-oriented programming with classes, methods, and the `this` keyword.
+## Classes and Objects
 
-### Defining Classes
+### Class Declaration
 
-Classes are defined using the `class` keyword. Classes can contain methods and properties.
+Define classes with properties and methods using the `class` keyword.
 
-```neutron
+```js
 class Person {
     var name;
     var age;
     
-    fun initialize(name, age) {
+    fun init(name, age) {
         this.name = name;
         this.age = age;
     }
     
     fun greet() {
-        say("Hello, my name is " + this.name + " and I am " + this.age + " years old.");
-    }
-    
-    fun setAge(newAge) {
-        this.age = newAge;
-    }
-    
-    fun getAge() {
-        return this.age;
+        say("Hello, I'm " + this.name);
     }
 }
 ```
 
 ### Creating Instances
 
-To create an instance of a class, you call the class like a function.
-
-```neutron
+```js
 var person = Person();
-person.initialize("Alice", 30);
-person.greet(); // "Hello, my name is Alice and I am 30 years old."
-
-// Update properties
-person.setAge(31);
-say("Age: " + person.getAge()); // "Age: 31"
+person.init("Alice", 30);
+person.greet();  // Hello, I'm Alice
 ```
 
 ### The `this` Keyword
 
-The `this` keyword refers to the current instance of the class and is used to access instance properties and methods.
+Use `this` to access instance properties and methods.
 
-```neutron
+```js
 class Counter {
     var count;
     
-    fun initialize() {
+    fun init() {
         this.count = 0;
     }
     
     fun increment() {
-        this.count = this.count + 1;
-        return this.count;
-    }
-    
-    fun decrement() {
-        this.count = this.count - 1;
-        return this.count;
-    }
-    
-    fun getValue() {
+        this.count++;
         return this.count;
     }
 }
 
 var counter = Counter();
-counter.initialize();
-say(counter.increment()); // 1
-say(counter.increment()); // 2
-say(counter.getValue());  // 2
+counter.init();
+say(counter.increment());  // 1
 ```
 
-### Class Methods and Properties
+### Complete Example
 
-Classes can have both methods (functions) and properties (variables). Properties are accessed using dot notation.
-
-```neutron
+```js
 class Rectangle {
     var width;
     var height;
     
-    fun initialize(w, h) {
+    fun init(w, h) {
         this.width = w;
         this.height = h;
     }
@@ -990,272 +714,148 @@ class Rectangle {
     fun perimeter() {
         return 2 * (this.width + this.height);
     }
-    
-    fun toString() {
-        return "Rectangle(" + this.width + "x" + this.height + ")";
-    }
 }
 
 var rect = Rectangle();
-rect.initialize(5, 3);
-say("Area: " + rect.area());         // "Area: 15"
-say("Perimeter: " + rect.perimeter()); // "Perimeter: 16"
-say(rect.toString());                // "Rectangle(5x3)"
+rect.init(5, 3);
+say(rect.area());       // 15
+say(rect.perimeter());  // 16
 ```
 
-## Control Flow Structures
+---
 
-### Conditional Statements
 
-Neutron supports `if` and `else` statements for conditional execution.
 
-```python
-var score = 85;
+## Exception Handling
 
-if (score >= 90) {
-    say("Grade: A");
-} else if (score >= 80) {
-    say("Grade: B");
-} else if (score >= 70) {
-    say("Grade: C");
-} else if (score >= 60) {
-    say("Grade: D");
-} else {
-    say("Grade: F");
-}
-```
+Handle errors gracefully with `try`, `catch`, `finally`, and `throw` statements.
 
-### Exception Handling
+### Basic Try-Catch
 
-Neutron provides comprehensive exception handling with `try`, `catch`, `finally`, and `throw` statements to handle errors gracefully and prevent program crashes.
-
-**Basic Try-Catch:**
-```neutron
+```js
 try {
-    // Code that might throw an exception
     var result = riskyOperation();
-    say("Operation completed successfully: " + result);
+    say("Success: " + result);
 } catch (error) {
-    // Handle the exception
-    say("An error occurred: " + error);
+    say("Error: " + error);
 }
 ```
 
-**Try-Catch-Finally:**
-```neutron
-var fileHandle = openFile("data.txt");
+### Try-Catch-Finally
+
+```js
 try {
-    // Risky operation with file
-    var content = readFile(fileHandle);
-    processContent(content);
+    processData();
 } catch (error) {
-    // Handle specific error
-    say("File operation failed: " + error);
+    say("Error: " + error);
 } finally {
-    // Always execute cleanup code
-    closeFile(fileHandle);
-    say("File handle closed");
+    cleanup();  // Always runs
 }
 ```
 
-**Try-Finally (cleanup only):**
-```neutron
-try {
-    // Main operation
-    performOperation();
-} finally {
-    // Cleanup code that always runs
-    cleanupResources();
-}
-```
+### Throwing Exceptions
 
-**Throwing Exceptions:**
-```neutron
+```js
 fun validateAge(age) {
     if (age < 0) {
         throw "Age cannot be negative";
-    }
-    if (age > 150) {
-        throw "Age seems unrealistic: " + age;
     }
     return true;
 }
 
 try {
     validateAge(-5);
-} catch (errorMsg) {
-    say("Validation error: " + errorMsg);
+} catch (error) {
+    say("Validation error: " + error);
 }
 ```
 
-**Exception Types:**
-You can throw any value as an exception:
-```neutron
-throw "Error message";           // String exception
-throw 404;                      // Number exception  
-throw true;                     // Boolean exception
-throw ["error", "details"];     // Array exception
-throw {"code": 500, "msg": "Internal error"};  // Object exception
+> [!NOTE]
+> You can throw any value type: strings, numbers, booleans, arrays, or objects.
+
+---
+
+
+
+## Arrays
+
+Arrays are ordered collections with literal syntax and comprehensive manipulation functions.
+
+### Array Literals
+
+```js
+var numbers = [1, 2, 3, 4, 5];
+var mixed = [1, "two", true, nil];
+var nested = [[1, 2], [3, 4]];
 ```
 
-**Nested Exception Handling:**
-```neutron
-try {
-    say("Outer try");
-    try {
-        say("Inner try");
-        throw "Inner exception";
-        say("This won't execute");
-    } catch (innerError) {
-        say("Caught in inner: " + innerError);
-    }
-    say("Back to outer after inner catch");
-} catch (outerError) {
-    say("Caught in outer: " + outerError);
-} finally {
-    say("Outer finally always runs");
-}
+### Array Access
+
+```js
+var items = ["apple", "banana", "cherry"];
+say(items[0]);     // "apple"
+items[1] = "orange";
+say(items);        // ["apple", "orange", "cherry"]
 ```
 
-**Exception Flow:**
-- When an exception is thrown, the runtime searches for the nearest matching `catch` block
-- If found, execution jumps to the `catch` block and the exception value is assigned to the catch variable
-- The `finally` block runs regardless of whether an exception occurred
-- If no `catch` block handles an exception, it propagates up the call stack
-- If an exception reaches the top level without being caught, the program terminates with an error
+### Array Manipulation
 
-### While Loops
+```js
+use arrays;
 
-The `while` loop executes a block of code as long as a condition is true.
-
-```python
-var i = 0;
-while (i < 5) {
-    say("Count: " + i);
-    i = i + 1;
-}
-
-// Infinite loop with break condition
-var running = true;
-var counter = 0;
-while (running) {
-    say("Loop iteration: " + counter);
-    counter = counter + 1;
-    if (counter >= 3) {
-        running = false;
-    }
-}
+var arr = [1, 2, 3];
+arrays.push(arr, 4);
+say(arrays.length(arr));  // 4
+arrays.reverse(arr);
+say(arr);                 // [4, 3, 2, 1]
 ```
 
-### For Loops
+> [!TIP]
+> See [Arrays Module Documentation](../modules/arrays_module.md) for all available functions.
 
-The `for` loop provides a more compact way to write loops with initialization, condition, and increment.
+---
 
-```python
-for (var i = 0; i < 10; i = i + 1) {
-    say("Number: " + i);
-}
+## Binary Compilation
 
-// Counting down
-for (var j = 10; j > 0; j = j - 1) {
-    say("Countdown: " + j);
-}
-```
-
-## Advanced Features
-
-### Module System
-
-Neutron supports two types of modules:
-
-1. **Neutron Modules** (`.nt` files): Written in Neutron language
-2. **Native Modules** (`.so`/`.dll`/`.dylib` files): Written in C++ for performance or system integration
-
-```python
-// Import built-in modules
-use sys;
-use json;
-use math;
-
-// Import custom Neutron modules
-use mymodule;  // Loads mymodule.nt
-
-// Import native modules from Box
-use base64;     // Loads from .box/modules/base64/
-use websocket;  // Loads from .box/modules/websocket/
-```
-
-**Managing Native Modules:**
-
-Use the Box package manager to install and manage native modules:
-
-```sh
-box install base64     # Install from NUR
-box list              # List installed modules
-box remove base64     # Remove a module
-```
-
-**Creating Native Modules:**
-
-See the comprehensive Box documentation:
-- [Module Development Guide](../nt-box/docs/MODULE_DEVELOPMENT.md)
-- [Box Commands](../nt-box/docs/COMMANDS.md)
-- [Cross-Platform Guide](../nt-box/docs/CROSS_PLATFORM.md)
-
-### Binary Compilation
-
-Neutron scripts can be compiled to standalone executables using the `-b` flag:
+Compile Neutron scripts to standalone executables.
 
 ```bash
-# Compile script to binary
-./neutron -b script.nt
+# Compile script
+./neutron -b script.nt output
 
-# Run the compiled binary
-./script.nt.out
+# Run the executable
+./output
 ```
 
-This creates optimized, standalone executables that don't require the Neutron interpreter to run.
+> [!NOTE]
+> Binary compilation includes all used modules, creating a fully standalone executable.
 
-### Error Handling
+See [Binary Compilation Guide](binary-compilation.md) for details.
 
-Neutron provides runtime error reporting with descriptive messages:
+---
 
-```python
-// Division by zero
-var result = 10 / 0;  // Runtime error: Division by zero.
-
-// Undefined variable
-say(undefinedVar);    // Runtime error: Undefined variable 'undefinedVar'.
-
-// Invalid function call
-var num = 42;
-num();                // Runtime error: Only functions and classes are callable.
-```
+## Language Semantics
 
 ### Truthiness
 
-Neutron follows these truthiness rules:
-- `nil` is falsy
-- `false` is falsy  
-- Everything else is truthy (including `0`, empty strings, etc.)
+| Value | Truthy/Falsy |
+|-------|-------------|
+| `nil` | Falsy |
+| `false` | Falsy |
+| `0` | Truthy |
+| `""` (empty string) | Truthy |
+| Everything else | Truthy |
 
-```python
-if (nil) {
-    say("This won't print");
-}
+### Error Reporting
 
-if (false) {
-    say("This won't print either");
-}
+Neutron provides detailed error messages with source context:
 
-if (0) {
-    say("This WILL print - 0 is truthy");
-}
-
-if ("" ) {
-    say("This WILL print - empty string is truthy");
-}
+```js
+var result = 10 / 0;  // Runtime error: Division by zero
+say(undefined);       // Runtime error: Undefined variable 'undefined'
 ```
+
+---
 
 ## Complete Example Programs
 
@@ -1421,29 +1021,27 @@ For production use or performance-critical applications, compile your Neutron sc
 ./myapp.nt.out
 ```
 
-### Best Practices
+## Additional Resources
 
-1. **Use appropriate modules**: Import only the modules you need
-2. **Minimize string operations**: String concatenation can be expensive in loops
-3. **Leverage native functions**: Built-in functions are optimized
-4. **Use binary compilation**: For production deployments
-5. **Profile your code**: Use timing functions to identify bottlenecks
+### Documentation
+- [Module System Guide](module-system.md) - Detailed module loading and usage
+- [Binary Compilation Guide](binary-compilation.md) - Creating standalone executables
+- [Box Package Manager](../../nt-box/docs/BOX_GUIDE.md) - Managing native modules
 
-## Conclusion
+### Module API References
+- [Sys Module](../modules/sys_module.md) - File I/O and system operations
+- [JSON Module](../modules/json_module.md) - JSON parsing and serialization
+- [HTTP Module](../modules/http_module.md) - HTTP client functionality
+- [Math Module](../modules/math_module.md) - Mathematical operations
+- [Arrays Module](../modules/arrays_module.md) - Array manipulation
+- [Time Module](../modules/time_module.md) - Time and date operations
+- [Fmt Module](../modules/fmt_module.md) - Type conversion and formatting
 
-Neutron provides a comprehensive programming environment with:
+### Getting Started
+- [Quick Start Guide](../guides/quickstart.md) - Get up and running in 5 minutes
+- [Build Guide](../guides/build.md) - Building Neutron from source
+- [Test Suite](../guides/test-suite.md) - Running and writing tests
 
-- **Simple, familiar syntax** similar to C/JavaScript
-- **Dynamic typing** with strong runtime type checking  
-- **Object-oriented programming** with classes and methods
-- **Rich standard library** covering math, file I/O, JSON, HTTP, and time operations
-- **Module system** supporting both Neutron and native C++ extensions
-- **Binary compilation** for production deployment
-- **Built-in functions** for common operations
+---
 
-The language is designed to be approachable for beginners while providing the power and flexibility needed for real-world applications. Whether you're building system utilities, web clients, data processing tools, or learning programming concepts, Neutron provides the tools you need.
-
-For more information, see:
-- [Box Modules Documentation](box_modules.md) - Creating native extensions
-- [Binary Conversion Guide](binary_conversion.md) - Compilation and deployment
-- [Known Issues](known_issues.md) - Current limitations and workarounds
+*Neutron Language Reference - Version 1.2+*
