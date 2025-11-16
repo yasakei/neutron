@@ -8,12 +8,13 @@
 [![Release](https://github.com/yasakei/neutron/actions/workflows/release.yml/badge.svg)](https://github.com/yasakei/neutron/actions/workflows/release.yml)
 [![Discord](https://img.shields.io/discord/1418142678301806645?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/29f2w6jme8)
 
-**[Quick Start](docs/guides/quickstart.md)** • **[Documentation](docs/readme.md)** • **[Examples](#quick-start-example)** • **[Download](https://github.com/yasakei/neutron/releases)**
-
->[!IMPORTANT]
->**Solo Developer Project:** Neutron is actively developed by a single developer and currently lacks many advanced features and libraries found in mature languages. The ecosystem is small with no established community yet. Contributions are highly encouraged to help grow the language and its ecosystem!
-
+**[Quick Start](docs/guides/quickstart.md)** • **[Documentation](docs/readme.md)** •  **[Download](https://github.com/yasakei/neutron/releases)**
 </div>
+
+> [!IMPORTANT]
+> **Solo Developer Project:** Neutron is actively developed by a single developer and currently lacks many advanced features and libraries found in mature languages. The ecosystem is small with no established community yet. Contributions are highly encouraged to help grow the language and its ecosystem!
+
+
 
 ---
 
