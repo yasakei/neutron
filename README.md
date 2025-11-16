@@ -10,8 +10,8 @@
 
 **[Quick Start](docs/guides/quickstart.md)** • **[Documentation](docs/readme.md)** • **[Examples](#quick-start-example)** • **[Download](https://github.com/yasakei/neutron/releases)**
 
-> [!IMPORTANT]
-> **Solo Developer Project:** Neutron is actively developed by a single developer and currently lacks many advanced features and libraries found in mature languages. The ecosystem is small with no established community yet. Contributions are highly encouraged to help grow the language and its ecosystem!
+>[!IMPORTANT]
+>**Solo Developer Project:** Neutron is actively developed by a single developer and currently lacks many advanced features and libraries found in mature languages. The ecosystem is small with no established community yet. Contributions are highly encouraged to help grow the language and its ecosystem!
 
 </div>
 
