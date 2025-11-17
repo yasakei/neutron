@@ -145,4 +145,4 @@ Neutron supports two types of modules:
 - **Native Modules** (C++): Built-in modules compiled into the runtime (`sys`, `math`, `json`, `http`, `time`, `fmt`)
 - **Neutron Modules** (.nt files): User-created modules written in Neutron language
 
-All built-in modules are automatically available and work in both interpreter and compiled binary modes.
+All built-in modules are automatically available and work in interpreter mode.

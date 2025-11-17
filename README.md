@@ -27,7 +27,6 @@
 | Feature | Description |
 |---------|-------------|
 | **High Performance** | C++ bytecode VM - significantly faster than Python for computational tasks |
-| **Native Compilation** | Compile scripts to standalone executables with zero dependencies |
 | **Modern Package Manager** | Box package manager for native C++ modules with automatic platform detection |
 | **Cross-Platform** | Write once, run anywhere - Linux, macOS, and Windows support |
 | **Extensible** | Easy C++ integration for performance-critical operations |
@@ -168,10 +167,6 @@ Timestamps, formatting, and delays
 
 **Box Package Manager**  
 `box install module` - Native C++ modules with zero configuration
->[!IMPORTANT]
-> Binary Compilation isn't fully implemented
-**Binary Compilation**  
-`neutron -b script.nt` - Create standalone executables
 
 **Comprehensive Errors**  
 Detailed stack traces with source code context and helpful suggestions
@@ -360,16 +355,6 @@ say("  Warnings: ${warnings}");
 ```
 </details>
 
-### Create Standalone Executables
-
-```bash
-# Compile to binary
-./neutron -b fibonacci.nt fib
-
-# Run the compiled executable (no Neutron needed!)
-./fib
-```
-
 > [!TIP]
 > See the [Quick Start Guide](docs/guides/quickstart.md) for more examples and the [Language Reference](docs/reference/language-reference.md) for complete syntax.
 
@@ -380,7 +365,6 @@ say("  Warnings: ${warnings}");
 ### Essential Guides
 - [Language Reference](docs/reference/language-reference.md) - Complete syntax and features
 - [Module System](docs/reference/module-system.md) - Using and creating modules
-- [Binary Compilation](docs/reference/binary-compilation.md) - Creating standalone executables
 
 ### Module Documentation
 - [Sys Module](docs/modules/sys_module.md) - File I/O and system operations
@@ -422,9 +406,6 @@ Automatically finds and configures your system's C++ compiler (GCC, Clang, MSVC,
 
 **Version Control**  
 Pin specific versions with `box install module@1.2.3`
-
-**Binary Integration**  
-Box modules automatically link into executables compiled with `-b` flag
 
 </td>
 <td width="50%">
@@ -578,21 +559,6 @@ Neutron significantly outperforms Python in computational tasks thanks to its C+
 - C++ smart pointers with deterministic destruction
 - No stop-the-world garbage collection pauses
 - Efficient reference counting for complex types
-
-### Binary Compilation Advantage
-
-Compile scripts to native executables for even better performance:
-
-```bash
-./neutron -b script.nt
-# Creates optimized standalone binary with all dependencies included
-```
-
-**Benefits:**
-- Faster startup time (no script parsing)
-- Better CPU cache utilization
-- Protection of source code
-- Single-file deployment
 
 ## Contributing
 

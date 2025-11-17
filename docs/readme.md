@@ -12,9 +12,6 @@
 
 **[reference/language-reference.md](reference/language_reference.md)** - Complete language syntax and features  
 **[reference/module-system.md](reference/module-system.md)** - Module loading and usage patterns  
-**[reference/binary-compilation.md](reference/binary-compilation.md)** - Creating standalone executables  
-**[reference/box-modules.md](reference/box-modules.md)** - Native C++ module system  
-**[reference/box-binary-compilation.md](reference/box-binary-compilation.md)** - Box modules with binary compilation  
 **[reference/cross-platform.md](reference/cross-platform.md)** - Platform-specific details
 
 ### Module API Documentation

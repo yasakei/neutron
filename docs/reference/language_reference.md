@@ -815,25 +815,6 @@ say(arr);                 // [4, 3, 2, 1]
 
 ---
 
-## Binary Compilation
-
-Compile Neutron scripts to standalone executables.
-
-```bash
-# Compile script
-./neutron -b script.nt output
-
-# Run the executable
-./output
-```
-
-> [!NOTE]
-> Binary compilation includes all used modules, creating a fully standalone executable.
-
-See [Binary Compilation Guide](binary-compilation.md) for details.
-
----
-
 ## Language Semantics
 
 ### Truthiness
@@ -1007,25 +988,10 @@ var createResponse = client.post("/users", newUser);
 say("Create response status: " + createResponse["status"]);
 ```
 
-## Performance and Optimization
-
-### Binary Compilation
-
-For production use or performance-critical applications, compile your Neutron scripts to native binaries:
-
-```bash
-# Compile to optimized binary
-./neutron -b myapp.nt
-
-# Run the compiled binary (faster execution)
-./myapp.nt.out
-```
-
 ## Additional Resources
 
 ### Documentation
 - [Module System Guide](module-system.md) - Detailed module loading and usage
-- [Binary Compilation Guide](binary-compilation.md) - Creating standalone executables
 - [Box Package Manager](../../nt-box/docs/BOX_GUIDE.md) - Managing native modules
 
 ### Module API References

@@ -287,19 +287,6 @@ use fmt;
 sys.write("file.txt", "data");
 ```
 
-## Binary Conversion Issues
-
-### 1. Missing Build Directory in Some Release Packages
-**Status:** ⚠️ KNOWN BUG  
-**Severity:** High  
-**Description:** The `-b` flag for binary conversion requires the static library `libneutron_runtime.a` to be in a `build/` directory. If this directory is missing from the release package, binary conversion will fail with "cannot find build/libneutron_runtime.a" error.
-
-**Example:**
-```bash
-./neutron -b myscript.nt
-# Output: /usr/bin/ld: cannot find build/libneutron_runtime.a: No such file or directory
-```
-
 **Workaround:** Ensure the `build/` directory with the static library is included in release packages.
 
 **Status:** Fix requires updating release workflow to include build directory in all release packages.
