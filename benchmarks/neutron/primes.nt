@@ -34,4 +34,4 @@ fun generatePrimes(limit) {
 
 // Generate primes up to 1000 (reduced from 5000 to avoid stack issues)
 var result = generatePrimes(1000);
-say("Found ${result.length} primes");
+say("Found ${result.length()} primes");

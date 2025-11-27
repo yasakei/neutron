@@ -72,4 +72,15 @@ std::string Value::toString() const {
     return "";
 }
 
+bool Value::isModule() const {
+    return type == ValueType::MODULE;
+}
+
+Module* Value::asModule() const {
+    if (isModule()) {
+        return std::get<Module*>(as);
+    }
+    return nullptr;
+}
+
 }

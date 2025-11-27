@@ -3,8 +3,8 @@
 ## Overview
 Comprehensive test suite for the Neutron programming language covering all major features, bug fixes, and regression tests.
 
-**Status:** ✅ All 49 tests passing (100% success rate)  
-**Last Updated:** November 2, 2025
+**Status:** ✅ All 53 tests passing (100% success rate)  
+**Last Updated:** November 27, 2025
 
 ## Test Organization
 
@@ -12,12 +12,12 @@ The test suite is organized into categorized directories for easy navigation and
 
 ```
 tests/
-├── fixes/         (18 tests) - Bug fix regression tests (NEUT-001 to NEUT-018)
-├── core/          (11 tests) - Basic language features
+├── fixes/         (19 tests) - Bug fix regression tests (NEUT-001 to NEUT-020)
+├── core/          (13 tests) - Basic language features
 ├── operators/     (3 tests)  - Operator behavior
 ├── control-flow/  (7 tests)  - Control structures (if/for/match/break)
 ├── functions/     (2 tests)  - Functions and lambdas
-├── classes/       (2 tests)  - Object-oriented programming
+├── classes/       (3 tests)  - Object-oriented programming
 └── modules/       (6 tests)  - Built-in module system
 ```
 
@@ -74,7 +74,7 @@ Failed: 0
 
 ## Test Categories
 
-### 1. Bug Fix Regression Tests (`tests/fixes/`) - 18 tests
+### 1. Bug Fix Regression Tests (`tests/fixes/`) - 19 tests
 
 These tests verify that previously discovered bugs remain fixed:
 
@@ -150,7 +150,7 @@ These tests verify that previously discovered bugs remain fixed:
 - Tests constant pool bounds checking
 - Verifies no out-of-bounds access in bytecode execution
 
-### 2. Core Language Features (`tests/core/`) - 11 tests
+### 2. Core Language Features (`tests/core/`) - 13 tests
 
 ### 2. Core Language Features (`tests/core/`) - 11 tests
 
@@ -232,6 +232,15 @@ These tests verify that previously discovered bugs remain fixed:
 - sys.args() array access
 - Script path retrieval
 - Argument parsing
+
+#### 12. **test_string_methods.nt** - String Methods ✅
+- String.length()
+- String.contains()
+- String.split()
+
+#### 13. **test_multiple_vars.nt** - Multiple Variable Declarations ✅
+- Single line multiple declarations
+- Typed multiple declarations
 
 ### 3. Operators (`tests/operators/`) - 3 tests
 
@@ -326,7 +335,7 @@ These tests verify that previously discovered bugs remain fixed:
 - Multiple lambdas with different operations
 - Nested lambdas
 
-### 6. Classes and OOP (`tests/classes/`) - 2 tests
+### 6. Classes and OOP (`tests/classes/`) - 3 tests
 
 #### 11. **test_classes.nt** - Classes and OOP ✅
 - Class definition and instantiation
@@ -342,6 +351,10 @@ These tests verify that previously discovered bugs remain fixed:
 - JSON stringify
 - JSON parse
 - JSON with arrays
+
+#### 13. **test_init_syntax.nt** - Class Init Syntax ✅
+- `init()` constructor without `fun` keyword
+- Backward compatibility with `fun init()`
 
 ### 7. Built-in Modules (`tests/modules/`) - 6 tests
 
@@ -401,7 +414,7 @@ These tests verify that previously discovered bugs remain fixed:
 
 ## Test Results
 
-**Status: ✅ ALL TESTS PASSING (49/49) - 100% SUCCESS RATE**
+**Status: ✅ ALL TESTS PASSING (53/53) - 100% SUCCESS RATE**
 
 ```
 ════ FINAL SUMMARY ═══
@@ -412,7 +425,7 @@ Failed: 0
 🎉 All tests passed! 🎉
 ```
 
-**Last Test Run:** November 2, 2025
+**Last Test Run:** November 27, 2025
 
 ## Coverage
 
@@ -608,6 +621,6 @@ Run tests after:
 
 ---
 
-**Total Test Coverage: 49/49 tests passing (100%)**  
-**Regression Coverage: 18/18 bug fixes tested (100%)**  
+**Total Test Coverage: 53/53 tests passing (100%)**  
+**Regression Coverage: 19/19 bug fixes tested (100%)**  
 **Module Coverage: 6/6 modules tested (100%)**

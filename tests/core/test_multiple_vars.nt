@@ -1,0 +1,38 @@
+say("=== Test Multiple Variable Declarations ===");
+
+var x = 10, y = 20;
+if (x == 10 and y == 20) {
+    say("✓ Basic multiple declaration passed");
+} else {
+    say("✗ Basic multiple declaration failed");
+}
+
+var a = 1, b = 2, c = 3;
+if (a + b + c == 6) {
+    say("✓ Three variables declaration passed");
+} else {
+    say("✗ Three variables declaration failed");
+}
+
+// Test with types (if supported in parser for multiple, assuming yes based on loop)
+// var int i = 5, int j = 10; 
+// Note: My parser change supports type annotation before the loop, so `var int x = 1, y = 2;` 
+// would mean both are ints? Or just x?
+// Looking at parser code:
+// if (match(TYPE...)) typeAnnotation = previous();
+// do { ... } while (match(COMMA));
+// The type annotation is parsed ONCE before the loop.
+// So `var int x = 1, y = 2;` applies `int` to `x`. 
+// Does it apply to `y`? 
+// The parser uses `typeAnnotation` inside the loop:
+// `statements.push_back(std::make_unique<VarStmt>(name, std::move(initializer), typeAnnotation));`
+// Yes, it applies to ALL variables in the list.
+
+var int n = 100, m = 200;
+if (n == 100 and m == 200) {
+    say("✓ Typed multiple declaration passed");
+} else {
+    say("✗ Typed multiple declaration failed");
+}
+
+say("=== All tests passed ===");

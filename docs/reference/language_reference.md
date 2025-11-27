@@ -94,13 +94,32 @@ var age = 30;
 say("Name: ${name}, Age: ${age}");
 // Output: Name: Alice, Age: 30
 
-var x = 5, y = 10;
+var x = 5;
+var y = 10;
 say("Sum: ${x + y}");
 // Output: Sum: 15
 ```
 
 > [!TIP]
 > String interpolation works with any expression, including function calls and array access.
+
+#### String Methods
+
+Strings provide built-in methods for common operations:
+
+| Method | Description | Example |
+|--------|-------------|---------|
+| `length()` | Returns number of characters | `"abc".length()` → `3` |
+| `contains(substr)` | Checks if string contains substring | `"hello".contains("ll")` → `true` |
+| `split(delimiter)` | Splits string into array | `"a,b".split(",")` → `["a", "b"]` |
+
+```js
+var text = "Hello, World!";
+say(text.length());          // 13
+say(text.contains("World")); // true
+var parts = text.split(", "); 
+say(parts[0]);               // "Hello"
+```
 
 ### Nil
 
@@ -150,6 +169,13 @@ Variables are declared with the `var` keyword and can be initialized immediately
 var x;           // Declared (value is nil)
 var y = 42;      // Declared and initialized
 x = 100;         // Assignment
+```
+
+You can also declare multiple variables in a single statement:
+
+```js
+var a = 1, b = 2, c = 3;
+var name = "Alice", age = 30;
 ```
 
 ### Dynamic Typing
@@ -503,6 +529,54 @@ using 'utils.nt';
 say(add(5, 3));  // 8
 ```
 
+### Selective Imports
+
+Import specific symbols from modules or files using the `from` keyword:
+
+```js
+// Import specific functions from a module
+use (now, sleep) = from time;
+now();     // Available
+sleep(100); // Available
+// format() is NOT available
+
+// Import specific functions from a file
+using (add, multiply) = from "math_utils.nt";
+add(2, 3);      // Available
+multiply(4, 5); // Available
+// subtract() is NOT available (if defined in the file)
+```
+
+**Benefits:**
+- **Namespace clarity**: Only import what you need
+- **Avoid conflicts**: Prevent name collisions
+- **Better performance**: Smaller global scope
+
+**Syntax:**
+```js
+use (symbol1, symbol2, ...) = from module_name;
+using (symbol1, symbol2, ...) = from "file_path.nt";
+```
+
+**Example:**
+
+`lib.nt`:
+```js
+fun helper1() { return "Helper 1"; }
+fun helper2() { return "Helper 2"; }
+fun internal() { return "Internal"; }
+```
+
+`main.nt`:
+```js
+// Only import helper1 and helper2
+using (helper1, helper2) = from "lib.nt";
+
+say(helper1());  // Works
+say(helper2());  // Works
+say(internal()); // Error: undefined variable
+```
+
 ---
 
 ## Standard Library Modules
@@ -653,7 +727,8 @@ class Person {
     var name;
     var age;
     
-    fun init(name, age) {
+    // Constructor
+    init(name, age) {
         this.name = name;
         this.age = age;
     }
@@ -663,6 +738,9 @@ class Person {
     }
 }
 ```
+
+> [!NOTE]
+> The constructor method is named `init`. It can be declared with or without the `fun` keyword (e.g., `init(...)` or `fun init(...)`).
 
 ### Creating Instances
 
@@ -797,6 +875,22 @@ say(items[0]);     // "apple"
 items[1] = "orange";
 say(items);        // ["apple", "orange", "cherry"]
 ```
+
+### Array Methods
+
+Arrays provide built-in methods:
+
+| Method | Description | Example |
+|--------|-------------|---------|
+| `length()` | Returns number of elements | `[1, 2].length()` → `2` |
+
+```js
+var list = [10, 20, 30];
+say(list.length());  // 3
+```
+
+> [!TIP]
+> For more advanced array operations (push, pop, sort, etc.), use the `arrays` module.
 
 ### Array Manipulation
 

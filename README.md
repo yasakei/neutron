@@ -27,6 +27,8 @@
 | Feature | Description |
 |---------|-------------|
 | **High Performance** | C++ bytecode VM - significantly faster than Python for computational tasks |
+| **Project System** | Built-in project management with `.quark` configs - init, build, and run with ease |
+| **Native Executables** | Build standalone binaries with all dependencies bundled |
 | **Modern Package Manager** | Box package manager for native C++ modules with automatic platform detection |
 | **Cross-Platform** | Write once, run anywhere - Linux, macOS, and Windows support |
 | **Extensible** | Easy C++ integration for performance-critical operations |
@@ -250,6 +252,22 @@ See [scripts/README.md](scripts/README.md) for detailed installation instruction
 
 ## Quick Start
 
+### Project-Based Development
+
+```bash
+# Create a new project
+./neutron init my-app
+
+# Run your project
+./neutron run
+
+# Build to standalone native executable (bundles all dependencies)
+./neutron build
+
+# Install Box package manager
+./neutron install box
+```
+
 ### Hello World
 
 ```js
@@ -258,7 +276,7 @@ say("Hello, World!");
 ```
 
 ```bash
-./neutron hello.nt  # Run it
+./neutron hello.nt  # Run it directly
 ```
 
 ### Real-World Examples
@@ -309,22 +327,26 @@ say("Computed in ${elapsed}ms");
 ```js
 // person.nt - Object-oriented programming
 class Person {
-    init(name, age) {
+    var name;
+    var age;
+
+    fun init(name, age) {
         this.name = name;
         this.age = age;
     }
 
-    greet() {
+    fun greet() {
         return "Hi, I'm ${this.name}, ${this.age} years old";
     }
 
-    birthday() {
+    fun birthday() {
         this.age = this.age + 1;
         say("Happy birthday! Now ${this.age}!");
     }
 }
 
-var alice = Person("Alice", 25);
+var alice = Person();
+alice.init("Alice", 25);
 say(alice.greet());
 alice.birthday();
 ```
@@ -337,19 +359,37 @@ alice.birthday();
 // analyzer.nt - Analyze log files
 use sys;
 
+// Note: String methods like split() and contains() are not available in current version
+// This example shows basic file reading and simple character-based analysis
 var content = sys.read_file("server.log");
-var lines = content.split("\n");
 
+// Manual character counting approach for demonstration
 var errors = 0;
 var warnings = 0;
 
-for (var i = 0; i < lines.length(); i = i + 1) {
-    var line = lines[i];
-    if (line.contains("ERROR")) errors = errors + 1;
-    if (line.contains("WARN")) warnings = warnings + 1;
+// Simple approach: count occurrences of "ERROR" and "WARN" by scanning
+var pos = 0;
+while (pos < string_length(content)) {
+    // A simplified implementation to count "ERROR" occurrences
+    if (pos + 4 < string_length(content) and
+        content[pos] == "E" and content[pos+1] == "R" and
+        content[pos+2] == "R" and content[pos+3] == "O" and content[pos+4] == "R") {
+        errors = errors + 1;
+        pos = pos + 4;  // Skip to avoid overlapping matches
+    }
+    // A simplified implementation to count "WARN" occurrences
+    else if (pos + 3 < string_length(content) and
+             content[pos] == "W" and content[pos+1] == "A" and
+             content[pos+2] == "R" and content[pos+3] == "N") {
+        warnings = warnings + 1;
+        pos = pos + 3;  // Skip to avoid overlapping matches
+    }
+    else {
+        pos = pos + 1;
+    }
 }
 
-say("Log Analysis:");
+say("Log Analysis (approximate):");
 say("  Errors: ${errors}");
 say("  Warnings: ${warnings}");
 ```
@@ -363,6 +403,7 @@ say("  Warnings: ${warnings}");
 **[Complete Documentation Index](docs/README.md)**
 
 ### Essential Guides
+- [Project System Guide](docs/guides/project-system.md) - Project management, building, and deployment
 - [Language Reference](docs/reference/language-reference.md) - Complete syntax and features
 - [Module System](docs/reference/module-system.md) - Using and creating modules
 
@@ -375,12 +416,12 @@ say("  Warnings: ${warnings}");
 
 ## Box Package Manager
 
-> **Native C++ modules for Neutron** - Install, manage, and use high-performance native extensions with zero configuration.
+> **Native C++ modules for Neutron** - Install, manage, and use high-performance native extensions with zero configuration. Box automatically detects Neutron projects and installs modules locally.
 
 ### Installation Example
 
 ```bash
-# Install a native module from NUR (Neutron Universe Registry)
+# Install a native module (auto-installs to .box/modules/ in projects)
 box install base64
 ```
 

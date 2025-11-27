@@ -122,6 +122,13 @@ set(NEUTRON_MODULE_SOURCES
     src/modules/module_utils.cpp
 )
 
+# Project system source files
+set(NEUTRON_PROJECT_SOURCES
+    src/project/project_config.cpp
+    src/project/project_manager.cpp
+    src/project/project_builder.cpp
+)
+
 # Platform abstraction source files
 set(NEUTRON_PLATFORM_SOURCES_LIST
     src/platform/platform.cpp
@@ -136,6 +143,7 @@ set(NEUTRON_CORE_SOURCES
     ${NEUTRON_TYPES_SOURCES}
     ${NEUTRON_RUNTIME_SOURCES}
     ${NEUTRON_MODULE_SOURCES}
+    ${NEUTRON_PROJECT_SOURCES}
     ${NEUTRON_PLATFORM_SOURCES_LIST}
 )
 

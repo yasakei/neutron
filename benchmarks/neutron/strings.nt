@@ -2,7 +2,7 @@
 
 fun reverseString(s) {
     var result = "";
-    var len = s.length;
+    var len = s.length();
     var i = 0;
     while (i < len) {
         result = s[i] + result;
@@ -13,12 +13,12 @@ fun reverseString(s) {
 
 fun countOccurrences(haystack, needle) {
     // needle should be single character for this simple implementation
-    if (needle.length != 1) {
+    if (needle.length() != 1) {
         return 0;
     }
     
     var count = 0;
-    var hayLen = haystack.length;
+    var hayLen = haystack.length();
     var needleChar = needle[0];
     var i = 0;
     while (i < hayLen) {
@@ -55,4 +55,4 @@ var charCount = countOccurrences(longString, "a");
 var concatenated = simpleConcatenate("", "Hello World from Neutron! ", 50);
 
 // Output results
-say("String ops: len=${longString.length} rev=${reversed.length} count=${charCount}");
+say("String ops: len=${longString.length()} rev=${reversed.length()} count=${charCount}");

@@ -245,6 +245,11 @@ void Compiler::visitVariableExpr(const VariableExpr* expr) {
 }
 
 void Compiler::visitAssignExpr(const AssignExpr* expr) {
+    // Check if trying to assign to a static variable
+    if (staticVariables.count(expr->name.lexeme)) {
+        throw std::runtime_error("Cannot assign to static variable '" + expr->name.lexeme + "' on line " + std::to_string(expr->name.line));
+    }
+    
     // Check if the variable has a type annotation
     int arg = resolveLocal(expr->name);
     if (arg != -1) {
@@ -269,8 +274,7 @@ void Compiler::visitAssignExpr(const AssignExpr* expr) {
         
         // For global variables, use the type-safe assignment which will check against stored type at runtime
         compileExpression(expr->value.get());
-        // Use the type-safe assignment which will check against the stored type
-        emitBytes((uint8_t)OpCode::OP_SET_GLOBAL_TYPED, makeConstant(Value(expr->name.lexeme)));
+        emitBytes((uint8_t)OpCode::OP_SET_GLOBAL, makeConstant(Value(expr->name.lexeme)));
     }
 }
 
@@ -320,6 +324,11 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
         }
 
         locals.push_back(Local{stmt->name, scopeDepth, stmt->typeAnnotation});
+        
+        // Track static variables
+        if (stmt->isStatic) {
+            staticVariables.insert(stmt->name.lexeme);
+        }
 
         if (stmt->initializer) {
             compileExpression(stmt->initializer.get());
@@ -331,6 +340,11 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
     }
 
     // Global variable
+    // Track static variables
+    if (stmt->isStatic) {
+        staticVariables.insert(stmt->name.lexeme);
+    }
+    
     if (stmt->initializer) {
         compileExpression(stmt->initializer.get());
     } else {
@@ -348,11 +362,11 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
 }
 
 void Compiler::visitBlockStmt(const BlockStmt* stmt) {
-    beginScope();
+    if (stmt->createsScope) beginScope();
     for (const auto& statement : stmt->statements) {
         compileStatement(statement.get());
     }
-    endScope();
+    if (stmt->createsScope) endScope();
 }
 
 void Compiler::visitIfStmt(const IfStmt* stmt) {
@@ -518,12 +532,54 @@ void Compiler::visitClassStmt(const ClassStmt* stmt) {
 }
 
 void Compiler::visitUseStmt(const UseStmt* stmt) {
-    if (stmt->isFilePath) {
-        // Import a .nt file
-        vm.load_file(stmt->library.lexeme);
+    if (stmt->importedSymbols.empty()) {
+        // Standard import (import everything)
+        if (stmt->isFilePath) {
+            // Import a .nt file
+            vm.load_file(stmt->library.lexeme);
+        } else {
+            // Import a module
+            vm.load_module(stmt->library.lexeme);
+        }
     } else {
-        // Import a module
-        vm.load_module(stmt->library.lexeme);
+        // Selective import
+        Module* module = nullptr;
+        
+        if (stmt->isFilePath) {
+            // Load file as module (isolated)
+            module = vm.load_file_as_module(stmt->library.lexeme);
+        } else {
+            // Load module
+            vm.load_module(stmt->library.lexeme);
+            // Retrieve the module object from globals
+            // load_module defines the module in globals with its name
+            auto it = vm.globals.find(stmt->library.lexeme);
+            if (it != vm.globals.end() && it->second.isModule()) {
+                module = it->second.asModule();
+            }
+        }
+        
+        if (module) {
+            // Import requested symbols
+            for (const auto& token : stmt->importedSymbols) {
+                std::string name = token.lexeme;
+                Value val = module->get(name);
+                if (val.type != ValueType::NIL) {
+                    // Define in current global scope
+                    emitBytes((uint8_t)OpCode::OP_CONSTANT, makeConstant(val));
+                    emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(name)));
+                } else {
+                    // Symbol not found warning/error?
+                    // For now, maybe just ignore or let runtime handle it if accessed?
+                    // But we are defining it, so we need a value.
+                    // If not found, module->get returns NIL.
+                    // Let's define it as NIL or error.
+                    // Better to error if strict, but for now let's allow it (will be nil).
+                     emitBytes((uint8_t)OpCode::OP_CONSTANT, makeConstant(val));
+                     emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(name)));
+                }
+            }
+        }
     }
 }
 

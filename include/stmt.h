@@ -65,9 +65,10 @@ public:
     Token name;
     std::optional<Token> typeAnnotation;  // Optional type annotation (e.g., int, string, bool)
     std::unique_ptr<Expr> initializer;
+    bool isStatic;  // True if declared with 'static' keyword
     
-    VarStmt(Token name, std::unique_ptr<Expr> initializer, std::optional<Token> typeAnnotation = std::nullopt)
-        : Stmt(StmtType::VAR), name(name), typeAnnotation(typeAnnotation), initializer(std::move(initializer)) {}
+    VarStmt(Token name, std::unique_ptr<Expr> initializer, std::optional<Token> typeAnnotation = std::nullopt, bool isStatic = false)
+        : Stmt(StmtType::VAR), name(name), typeAnnotation(typeAnnotation), initializer(std::move(initializer)), isStatic(isStatic) {}
         
     void accept(Compiler* compiler) const override;
 };
@@ -88,9 +89,10 @@ public:
 class BlockStmt : public Stmt {
 public:
     std::vector<std::unique_ptr<Stmt>> statements;
+    bool createsScope;
     
-    BlockStmt(std::vector<std::unique_ptr<Stmt>> statements)
-        : Stmt(StmtType::BLOCK), statements(std::move(statements)) {}
+    BlockStmt(std::vector<std::unique_ptr<Stmt>> statements, bool createsScope = true)
+        : Stmt(StmtType::BLOCK), statements(std::move(statements)), createsScope(createsScope) {}
         
     void accept(Compiler* compiler) const override;
 };
@@ -135,9 +137,10 @@ class UseStmt : public Stmt {
 public:
     Token library;
     bool isFilePath;  // true if importing a .nt file, false if importing a module
+    std::vector<Token> importedSymbols; // Symbols to import (empty = import all/standard behavior)
     
-    UseStmt(Token library, bool isFilePath = false) 
-        : Stmt(StmtType::USE), library(library), isFilePath(isFilePath) {}
+    UseStmt(Token library, bool isFilePath = false, std::vector<Token> importedSymbols = {}) 
+        : Stmt(StmtType::USE), library(library), isFilePath(isFilePath), importedSymbols(std::move(importedSymbols)) {}
         
     void accept(Compiler* compiler) const override;
 };

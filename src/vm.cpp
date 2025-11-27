@@ -27,6 +27,7 @@
 #include "types/instance.h"
 #include "types/bound_method.h"
 #include "types/bound_array_method.h"
+#include "types/bound_string_method.h"
 #include <iostream>
 #include <stdexcept>
 #include <fstream>
@@ -178,12 +179,13 @@ bool VM::call(Function* function, int argCount) {
 }
 
 bool VM::callValue(Value callee, int argCount) {
-    // Handle BoundArrayMethod
+    // Handle BoundArrayMethod and BoundStringMethod
     if (callee.type == ValueType::OBJECT) {
         Object* obj = std::get<Object*>(callee.as);
-        BoundArrayMethod* arrayMethod = dynamic_cast<BoundArrayMethod*>(obj);
-        if (arrayMethod != nullptr) {
+        if (BoundArrayMethod* arrayMethod = dynamic_cast<BoundArrayMethod*>(obj)) {
             return callArrayMethod(arrayMethod, argCount);
+        } else if (BoundStringMethod* stringMethod = dynamic_cast<BoundStringMethod*>(obj)) {
+            return callStringMethod(stringMethod, argCount);
         }
     }
     
@@ -309,7 +311,15 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
     Value result;
     
     try {
-        if (methodName == "push") {
+        if (methodName == "length") {
+            // length() - return array size
+            if (argCount != 0) {
+                ErrorHandler::argumentError(0, argCount, "Array.length", currentFileName, 
+                                          frames.empty() ? -1 : frames.back().currentLine);
+                exit(1);
+            }
+            result = Value(static_cast<double>(arr->size()));
+        } else if (methodName == "push") {
             // push(value) - add element to end
             if (argCount != 1) {
                 ErrorHandler::argumentError(1, argCount, "Array.push", currentFileName, 
@@ -506,6 +516,80 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
             }
         } else {
             runtimeError(this, "Unknown array method: " + methodName, frames.empty() ? -1 : frames.back().currentLine);
+            return false;
+        }
+        
+        // Restore stack to original size and push result
+        stack.resize(stackBase);
+        push(result);
+        return true;
+        
+    } catch (const std::runtime_error& e) {
+        runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
+        return false;
+    }
+}
+
+bool VM::callStringMethod(BoundStringMethod* method, int argCount) {
+    std::string str = method->stringValue;
+    std::string methodName = method->methodName;
+    
+    // Save original stack size (before method and args)
+    size_t stackBase = stack.size() - argCount - 1;
+    
+    // Get arguments from stack
+    std::vector<Value> args;
+    for (int i = 0; i < argCount; i++) {
+        args.push_back(stack[stackBase + 1 + i]);
+    }
+    
+    Value result;
+    
+    try {
+        if (methodName == "length") {
+            // length() - return string length
+            if (argCount != 0) {
+                runtimeError(this, "length() expects 0 arguments.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
+            }
+            result = Value(static_cast<double>(str.length()));
+        } else if (methodName == "contains") {
+            // contains(substring)
+            if (argCount != 1) {
+                runtimeError(this, "contains() expects 1 argument.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
+            }
+            std::string substr = args[0].toString();
+            bool found = str.find(substr) != std::string::npos;
+            result = Value(found);
+        } else if (methodName == "split") {
+            // split(delimiter)
+            if (argCount != 1) {
+                runtimeError(this, "split() expects 1 argument.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
+            }
+            std::string delimiter = args[0].toString();
+            std::vector<Value> parts;
+            
+            if (delimiter.empty()) {
+                // Split by character
+                for (char c : str) {
+                    parts.push_back(Value(std::string(1, c)));
+                }
+            } else {
+                size_t pos = 0;
+                std::string token;
+                std::string s = str; // Make a copy to modify
+                while ((pos = s.find(delimiter)) != std::string::npos) {
+                    token = s.substr(0, pos);
+                    parts.push_back(Value(token));
+                    s.erase(0, pos + delimiter.length());
+                }
+                parts.push_back(Value(s));
+            }
+            result = Value(new Array(parts));
+        } else {
+            runtimeError(this, "Unknown string method: " + methodName, frames.empty() ? -1 : frames.back().currentLine);
             return false;
         }
         
@@ -850,10 +934,7 @@ void VM::run(size_t minFrameDepth) {
                     // Handle array properties and methods
                     Array* arr = std::get<Array*>(object.as);
                     
-                    if (propertyName == "length") {
-                        stack.pop_back();
-                        push(Value(static_cast<double>(arr->size())));
-                    } else if (propertyName == "push" || propertyName == "pop" || 
+                    if (propertyName == "length" || propertyName == "push" || propertyName == "pop" || 
                                propertyName == "slice" || propertyName == "map" ||
                                propertyName == "filter" || propertyName == "find" ||
                                propertyName == "indexOf" || propertyName == "join" ||
@@ -863,6 +944,18 @@ void VM::run(size_t minFrameDepth) {
                         push(Value(new BoundArrayMethod(arr, propertyName)));
                     } else {
                         runtimeError(this, "Array does not have property '" + propertyName + "'.",
+                                    frames.empty() ? -1 : frames.back().currentLine);
+                    }
+                } else if (object.type == ValueType::STRING) {
+                    // Handle string properties and methods
+                    std::string str = std::get<std::string>(object.as);
+                    
+                    if (propertyName == "length" || propertyName == "contains" || propertyName == "split") {
+                        // Return a bound method that captures the string
+                        stack.pop_back();
+                        push(Value(new BoundStringMethod(str, propertyName)));
+                    } else {
+                        runtimeError(this, "String does not have property '" + propertyName + "'.",
                                     frames.empty() ? -1 : frames.back().currentLine);
                     }
                 } else if (object.type == ValueType::INSTANCE) {
@@ -1642,30 +1735,55 @@ void VM::load_module(const std::string& name) {
     }
 }
 
+void VM::addEmbeddedFile(const std::string& path, const std::string& content) {
+    embeddedFiles[path] = content;
+}
+
 void VM::load_file(const std::string& filepath) {
-    // Try to open the file
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        // Try with module search paths
-        for (const auto& search_path : module_search_paths) {
-            std::string full_path = search_path + filepath;
-            file.open(full_path);
-            if (file.is_open()) {
-                break;
+    std::string source;
+    bool found = false;
+
+    // Check embedded files first
+    auto it = embeddedFiles.find(filepath);
+    if (it != embeddedFiles.end()) {
+        source = it->second;
+        found = true;
+    } else {
+        // Try to open the file
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            // Try with module search paths
+            for (const auto& search_path : module_search_paths) {
+                std::string full_path = search_path + filepath;
+                
+                // Check embedded files in search paths
+                auto it2 = embeddedFiles.find(full_path);
+                if (it2 != embeddedFiles.end()) {
+                    source = it2->second;
+                    found = true;
+                    break;
+                }
+
+                file.open(full_path);
+                if (file.is_open()) {
+                    break;
+                }
             }
         }
         
-        if (!file.is_open()) {
-            runtimeError(this, "File '" + filepath + "' not found.",
-                        frames.empty() ? -1 : frames.back().currentLine);
-            return;
+        if (file.is_open()) {
+            source = std::string((std::istreambuf_iterator<char>(file)),
+                               std::istreambuf_iterator<char>());
+            file.close();
+            found = true;
         }
     }
-    
-    // Read the file content
-    std::string source((std::istreambuf_iterator<char>(file)),
-                       std::istreambuf_iterator<char>());
-    file.close();
+
+    if (!found) {
+        runtimeError(this, "File '" + filepath + "' not found.",
+                    frames.empty() ? -1 : frames.back().currentLine);
+        return;
+    }
     
     // Parse the file
     Scanner scanner(source);
@@ -1681,6 +1799,74 @@ void VM::load_file(const std::string& filepath) {
         interpret(file_function);
         delete file_function;
     }
+}
+
+Module* VM::load_file_as_module(const std::string& filepath) {
+    std::string source;
+    bool found = false;
+
+    // Check embedded files first
+    auto it = embeddedFiles.find(filepath);
+    if (it != embeddedFiles.end()) {
+        source = it->second;
+        found = true;
+    } else {
+        // Try to open the file
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            // Try with module search paths
+            for (const auto& search_path : module_search_paths) {
+                std::string full_path = search_path + filepath;
+                
+                // Check embedded files in search paths
+                auto it2 = embeddedFiles.find(full_path);
+                if (it2 != embeddedFiles.end()) {
+                    source = it2->second;
+                    found = true;
+                    break;
+                }
+
+                file.open(full_path);
+                if (file.is_open()) {
+                    break;
+                }
+            }
+        }
+        
+        if (file.is_open()) {
+            source = std::string((std::istreambuf_iterator<char>(file)),
+                               std::istreambuf_iterator<char>());
+            file.close();
+            found = true;
+        }
+    }
+
+    if (!found) {
+        runtimeError(this, "File '" + filepath + "' not found.",
+                    frames.empty() ? -1 : frames.back().currentLine);
+        return nullptr;
+    }
+    
+    // Parse the file
+    Scanner scanner(source);
+    std::vector<Token> tokens = scanner.scanTokens();
+    Parser parser(tokens);
+    std::vector<std::unique_ptr<Stmt>> statements = parser.parse();
+    
+    // Create a new environment for the module
+    auto module_env = std::make_shared<Environment>();
+    
+    // Save current globals
+    auto saved_globals = globals;
+    
+    // Create a temporary VM state with the module environment as globals
+    // Note: We can't easily swap globals map with Environment, so we'll 
+    // use a different approach: interpret_module helper
+    
+    interpret_module(statements, module_env);
+    
+    // Create the module
+    return new Module(filepath, module_env);
 }
 
 void VM::registerComponent(std::shared_ptr<ComponentInterface> component) {
@@ -1864,6 +2050,94 @@ bool VM::handleException(const Value& exception) {
     
     // No exception handler found
     return false;
+}
+
+void VM::interpret_module(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> module_env) {
+    // Compile
+    Compiler compiler(*this);
+    Function* function = compiler.compile(statements);
+    if (!function) return;
+
+    // Save current globals
+    auto saved_globals = globals;
+    
+    // Prepare module globals
+    globals.clear();
+    // Copy existing module environment values to globals
+    for (const auto& pair : module_env->values) {
+        globals[pair.first] = pair.second;
+    }
+    
+    // Also need to ensure standard library functions are available if they are not in module_env?
+    // Usually modules should have access to standard globals like 'say', 'print', etc.
+    // But if we clear globals, they won't have access unless we copy them.
+    // However, 'say' is defined in VM constructor.
+    // If we want the module to have access to standard globals, we should copy them from saved_globals.
+    // But we want to isolate the module's definitions from polluting the main globals.
+    // So we should copy saved_globals to globals (so module can use them), 
+    // execute, and then ONLY copy NEW definitions back to module_env.
+    // But how do we distinguish new definitions?
+    // We can check if they existed before.
+    
+    // Better approach:
+    // 1. Start with globals = saved_globals (so module can use 'say', etc.)
+    // 2. Execute module.
+    // 3. Iterate globals. If a key was NOT in saved_globals (or value changed?), add to module_env.
+    //    But wait, if module redefines 'say', it shouldn't affect main 'say'.
+    //    This suggests we should copy.
+    
+    globals = saved_globals; 
+    
+    // But if we just use globals = saved_globals, then OP_DEFINE_GLOBAL will modify 'globals', 
+    // which IS the map we are using.
+    // So we are modifying the copy.
+    // Wait, 'globals' is a member variable: std::unordered_map<std::string, Value> globals;
+    // So 'globals = saved_globals' copies the map.
+    // Modifications to 'globals' won't affect 'saved_globals'.
+    // So this is safe!
+    
+    try {
+        push(Value(function));
+        call(function, 0);
+        run();
+    } catch (...) {
+        globals = saved_globals;
+        throw;
+    }
+    
+    // Extract definitions from the module execution
+    // We want to capture everything that is now in 'globals' but wasn't in 'saved_globals',
+    // OR was updated.
+    // But typically modules define new things.
+    // If we want to capture *everything* the module sees as global, we copy all globals to module_env.
+    // But that would include 'say', etc.
+    // Do we want 'say' in the module export?
+    // Probably not.
+    // We only want things defined IN the module.
+    
+    // This is hard to track without a separate "module scope".
+    // But for now, let's just copy everything that is NOT in the initial standard globals?
+    // Or maybe we accept that module_env will contain standard globals too.
+    // If we import (a) from module, and module has 'say', we might import 'say'.
+    // That's probably fine.
+    
+    // However, to be cleaner, we could track what was added.
+    for (const auto& pair : globals) {
+        // If it wasn't in saved_globals, it's definitely new.
+        if (saved_globals.find(pair.first) == saved_globals.end()) {
+            module_env->define(pair.first, pair.second);
+        } else {
+            // It was in saved_globals. Did it change?
+            // If it changed, we might want to export it?
+            // Or maybe we just export everything.
+            // If we export everything, then `use (say) = from module` works even if module didn't define say but inherited it.
+            // That seems acceptable.
+            module_env->define(pair.first, pair.second);
+        }
+    }
+    
+    // Restore original globals
+    globals = saved_globals;
 }
 
 } // namespace neutron

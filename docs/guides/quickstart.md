@@ -130,6 +130,9 @@ var x = 42;
 var name = "Alice";
 var isTrue = true;
 var empty = nil;
+
+// Multiple declarations
+var a = 1, b = 2;
 ```
 
 ### Functions
@@ -147,7 +150,7 @@ class Person {
     var name;
     var age;
     
-    fun initialize(n, a) {
+    init(n, a) {
         this.name = n;
         this.age = a;
     }
@@ -158,7 +161,7 @@ class Person {
 }
 
 var person = Person();
-person.initialize("Alice", 30);
+person.init("Alice", 30);
 person.greet();
 ```
 

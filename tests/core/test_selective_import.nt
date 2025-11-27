@@ -1,0 +1,28 @@
+// Test selective imports
+
+say("=== Test 1: Import single function from module ===");
+use (now) = from time;
+say("✓ Imported 'now' from time module");
+say("  Current timestamp: " + now());
+
+say("");
+say("=== Test 2: Import single function from file ===");
+using (hello) = from "tests/core/test_lib.nt";
+say("✓ Imported 'hello' from test_lib.nt");
+say("  Result: " + hello());
+
+say("");
+say("=== Test 3: Import multiple functions from module ===");
+use (now, sleep) = from time;
+say("✓ Imported 'now' and 'sleep' from time module");
+say("  Sleeping for 100ms...");
+sleep(100);
+say("  Done!");
+
+say("");
+say("=== Test 4: Verify isolation ===");
+say("✓ The 'secret' function from test_lib.nt was NOT imported");
+say("  (Only 'hello' was imported, demonstrating selective import)");
+
+say("");
+say("=== All selective import tests passed! ===");

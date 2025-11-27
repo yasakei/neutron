@@ -19,6 +19,7 @@ Scanner::Scanner(const std::string& source)
     keywords["or"] = TokenType::OR;
     keywords["say"] = TokenType::SAY;
     keywords["return"] = TokenType::RETURN;
+    keywords["static"] = TokenType::STATIC;
     keywords["super"] = TokenType::SUPER;
     keywords["this"] = TokenType::THIS;
     keywords["true"] = TokenType::TRUE;
@@ -35,6 +36,7 @@ Scanner::Scanner(const std::string& source)
     keywords["throw"] = TokenType::THROW;
     keywords["use"] = TokenType::USE;
     keywords["using"] = TokenType::USING;
+    keywords["from"] = TokenType::FROM;
     
     // Type annotations (optional type safety)
     keywords["int"] = TokenType::TYPE_INT;

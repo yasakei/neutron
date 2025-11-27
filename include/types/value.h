@@ -45,6 +45,9 @@ struct Value {
     Value(Instance* instance);
 
     std::string toString() const;
+    
+    bool isModule() const;
+    Module* asModule() const;
 };
 
 }

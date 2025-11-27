@@ -42,7 +42,20 @@ Value http_get(std::vector<Value> arguments) {
     
     // In a real implementation, you would make an HTTP GET request here
     // For now, we'll just return a mock response
-    std::string responseBody = "Mock GET response for " + url;
+    std::string responseBody;
+    
+    if (url.find("api.github.com") != std::string::npos) {
+        // Return a mock JSON response for GitHub API
+        responseBody = "{"
+            "\"name\": \"vscode\","
+            "\"stargazers_count\": 160000,"
+            "\"forks_count\": 28000,"
+            "\"language\": \"TypeScript\""
+        "}";
+        headers["Content-Type"] = "application/json";
+    } else {
+        responseBody = "Mock GET response for " + url;
+    }
     
     return createResponse(200.0, responseBody, headers);
 }

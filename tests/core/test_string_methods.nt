@@ -1,0 +1,33 @@
+say("=== Test String Methods ===");
+
+// 1. Length
+var s = "Hello";
+if (s.length() == 5) {
+    say("✓ String.length() passed");
+} else {
+    say("✗ String.length() failed: " + s.length());
+}
+
+// 2. Contains
+if (s.contains("ell")) {
+    say("✓ String.contains() positive passed");
+} else {
+    say("✗ String.contains() positive failed");
+}
+
+if (!s.contains("z")) {
+    say("✓ String.contains() negative passed");
+} else {
+    say("✗ String.contains() negative failed");
+}
+
+// 3. Split
+var csv = "a,b,c";
+var parts = csv.split(",");
+if (parts.length() == 3 and parts[0] == "a" and parts[1] == "b" and parts[2] == "c") {
+    say("✓ String.split() passed");
+} else {
+    say("✗ String.split() failed");
+}
+
+say("=== All tests passed ===");

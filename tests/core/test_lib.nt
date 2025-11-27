@@ -1,0 +1,7 @@
+fun hello() {
+    return "Hello";
+}
+
+fun secret() {
+    return "Secret";
+}

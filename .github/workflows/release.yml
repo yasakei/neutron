@@ -85,11 +85,13 @@ jobs:
       run: |
         mkdir -p neutron-linux-x64
         cp neutron neutron-linux-x64/
+        cp libneutron_runtime.a neutron-linux-x64/ 2>/dev/null || true
         cp libneutron_runtime.so* neutron-linux-x64/ 2>/dev/null || true
-        cp -r build neutron-linux-x64/ 2>/dev/null || true  # Include build directory for -b flag functionality
         cp README.md LICENSE neutron-linux-x64/
         cp -r docs neutron-linux-x64/
         cp -r include neutron-linux-x64/
+        cp -r src neutron-linux-x64/
+        cp -r libs neutron-linux-x64/
         cp scripts/install.sh neutron-linux-x64/
         cp nt-box/build/box neutron-linux-x64/ 2>/dev/null || true
         tar -czf neutron-${{ needs.create-release.outputs.version }}-linux-x64.tar.gz neutron-linux-x64
@@ -161,11 +163,13 @@ jobs:
       run: |
         mkdir -p neutron-linux-arm64
         cp neutron neutron-linux-arm64/
+        cp libneutron_runtime.a neutron-linux-arm64/ 2>/dev/null || true
         cp libneutron_runtime.so* neutron-linux-arm64/ 2>/dev/null || true
-        cp -r build neutron-linux-arm64/ 2>/dev/null || true  # Include build directory for -b flag functionality
         cp README.md LICENSE neutron-linux-arm64/
         cp -r docs neutron-linux-arm64/
         cp -r include neutron-linux-arm64/
+        cp -r src neutron-linux-arm64/
+        cp -r libs neutron-linux-arm64/
         cp scripts/install.sh neutron-linux-arm64/
         cp nt-box/build/box neutron-linux-arm64/ 2>/dev/null || true
         tar -czf neutron-${{ needs.create-release.outputs.version }}-linux-arm64.tar.gz neutron-linux-arm64
@@ -210,11 +214,13 @@ jobs:
       run: |
         mkdir -p neutron-macos-intel
         cp neutron neutron-macos-intel/
+        cp libneutron_runtime.a neutron-macos-intel/ 2>/dev/null || true
         cp libneutron_runtime.dylib* neutron-macos-intel/ 2>/dev/null || true
-        cp -r build neutron-macos-intel/ 2>/dev/null || true  # Include build directory for -b flag functionality
         cp README.md LICENSE neutron-macos-intel/
         cp -r docs neutron-macos-intel/
         cp -r include neutron-macos-intel/
+        cp -r src neutron-macos-intel/
+        cp -r libs neutron-macos-intel/
         cp scripts/install.sh neutron-macos-intel/
         cp nt-box/build/box neutron-macos-intel/ 2>/dev/null || true
         tar -czf neutron-${{ needs.create-release.outputs.version }}-macos-intel.tar.gz neutron-macos-intel
@@ -259,11 +265,13 @@ jobs:
       run: |
         mkdir -p neutron-macos-arm64
         cp neutron neutron-macos-arm64/
+        cp libneutron_runtime.a neutron-macos-arm64/ 2>/dev/null || true
         cp libneutron_runtime.dylib* neutron-macos-arm64/ 2>/dev/null || true
-        cp -r build neutron-macos-arm64/ 2>/dev/null || true  # Include build directory for -b flag functionality
         cp README.md LICENSE neutron-macos-arm64/
         cp -r docs neutron-macos-arm64/
         cp -r include neutron-macos-arm64/
+        cp -r src neutron-macos-arm64/
+        cp -r libs neutron-macos-arm64/
         cp scripts/install.sh neutron-macos-arm64/
         cp nt-box/build/box neutron-macos-arm64/ 2>/dev/null || true
         tar -czf neutron-${{ needs.create-release.outputs.version }}-macos-arm64.tar.gz neutron-macos-arm64
@@ -321,12 +329,14 @@ jobs:
       run: |
         mkdir -p neutron-windows-x64
         cp build/neutron.exe neutron-windows-x64/
+        cp neutron_runtime.lib neutron-windows-x64/ 2>/dev/null || true
+        cp libneutron_runtime.a neutron-windows-x64/ 2>/dev/null || true
         cp build/*.dll neutron-windows-x64/ 2>/dev/null || true
-        cp build/*.lib neutron-windows-x64/ 2>/dev/null || true  # Include static library for -b flag functionality
-        cp build/*.a neutron-windows-x64/ 2>/dev/null || true  # Include static library for -b flag functionality (MinGW)
         cp README.md LICENSE neutron-windows-x64/
         cp -r docs neutron-windows-x64/
         cp -r include neutron-windows-x64/
+        cp -r src neutron-windows-x64/
+        cp -r libs neutron-windows-x64/
         cp scripts/install.sh neutron-windows-x64/
         cp nt-box/build/box.exe neutron-windows-x64/ 2>/dev/null || true
         cd neutron-windows-x64

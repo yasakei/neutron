@@ -121,12 +121,35 @@ sudo cp -r "./include/." "$INCLUDE_DIR/"
 
 # Install library files (runtime libraries and other library files)
 echo "Installing library files..."
-# Copy any runtime library files (handling different extensions)
+# Copy static runtime library
+if [ -f "./libneutron_runtime.a" ]; then
+    sudo cp "./libneutron_runtime.a" "$LIB_DIR/"
+fi
+
+# Copy any shared runtime library files (handling different extensions)
 for lib_file in libneutron_runtime.so* libneutron_runtime.dylib* libneutron_runtime.dll*; do
     if [ -f "./$lib_file" ]; then
         sudo cp "./$lib_file" "$LIB_DIR/"
     fi
 done
+
+# Install source files for fallback compilation
+if [ -d "./src" ]; then
+    sudo mkdir -p "$SHARE_DIR/neutron/src"
+    sudo cp -r "./src/." "$SHARE_DIR/neutron/src/"
+fi
+
+# Install library source files
+if [ -d "./libs" ]; then
+    sudo mkdir -p "$SHARE_DIR/neutron/libs"
+    sudo cp -r "./libs/." "$SHARE_DIR/neutron/libs/"
+fi
+
+# Set NEUTRON_HOME environment variable hint
+echo ""
+echo "Note: For global installations, set NEUTRON_HOME:"
+echo "  export NEUTRON_HOME=\"$SHARE_DIR/neutron\""
+echo "  Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.)"
 
 # Install documentation
 if [ -d "./docs" ]; then

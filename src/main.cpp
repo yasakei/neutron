@@ -30,11 +30,13 @@
 #include "modules/module_loader.h"
 #include "types/version.h"
 #include "runtime/error_handler.h"
+#include "project/project_manager.h"
+#include "project/project_config.h"
+#include "project/project_builder.h"
 
 void run(const std::string& source, neutron::VM& vm);
 void runFile(const std::string& path, neutron::VM& vm);
 void runPrompt(neutron::VM& vm);
-void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& outputPath, const std::string& sourcePath, const std::string& executablePath);
 
 void run(const std::string& source, neutron::VM& vm) {
     // Split source into lines for error reporting
@@ -112,409 +114,139 @@ void runPrompt(neutron::VM& vm) {
     }
 }
 
-void saveBytecodeToExecutable(const std::string& sourceCode, const std::string& outputPath, const std::string& sourcePath, const std::string& executablePath) {
-    // Detect platform
-#if defined(_WIN32)
-    bool isWindows = true;
-    bool isMingw = (std::getenv("MSYSTEM") != nullptr);
-    bool isMacOS = false;
-#elif defined(__APPLE__)
-    bool isWindows = false;
-    bool isMingw = false;
-    bool isMacOS = true;
-#else
-    bool isWindows = false;
-    bool isMingw = false;
-    bool isMacOS = false;
-#endif
-
-    // Get the directory where the executable is located
-    std::filesystem::path exePath(executablePath);
-    std::string executableDir = exePath.parent_path().string();
-    if (executableDir.empty()) {
-        executableDir = "."; // Use current directory if executable path has no parent
-    }
-
-    // Adjust output path extension based on platform
-    std::string finalOutputPath = outputPath;
-    if (isWindows && finalOutputPath.find(".exe") == std::string::npos) {
-        finalOutputPath += ".exe";
-    }
-
-    // Create a C++ source file with embedded source code
-    std::string executableSourcePath = finalOutputPath + "_main.cpp";
-    std::ofstream executableFile(executableSourcePath);
-    
-    if (!executableFile.is_open()) {
-        std::cerr << "Could not create executable source file: " << executableSourcePath << std::endl;
-        exit(1);
-    }
-    
-    executableFile << "// Auto-generated executable for " << sourcePath << "\n";
-    executableFile << "#include <iostream>\n";
-    executableFile << "#include <string>\n";
-    executableFile << "#include <vector>\n";
-    executableFile << "#include <map>\n";
-    executableFile << "#include \"compiler/scanner.h\"\n";
-    executableFile << "#include \"compiler/parser.h\"\n";
-    executableFile << "#include \"vm.h\"\n";
-    executableFile << "#include \"compiler/compiler.h\"\n";
-    executableFile << "#include \"modules/module_loader.h\"\n\n";
-    
-    // Get used modules
-    std::vector<std::string> usedModules = neutron::getUsedModules(sourceCode);
-    
-    // Embed module source code (for Neutron modules only)
-    for (const auto& moduleName : usedModules) {
-        std::string libModulePath = "lib/" + moduleName + ".nt";
-        std::ifstream moduleFile(libModulePath);
-        
-        if (!moduleFile.is_open()) {
-            // Check if it's a neutron module in the box directory (not native)
-            std::string boxModulePath = "box/" + moduleName + "/" + moduleName + ".nt";
-            std::ifstream boxModuleFile(boxModulePath);
-            
-            if (boxModuleFile.is_open()) {
-                // It's a neutron module in the box directory
-                std::string moduleSource((std::istreambuf_iterator<char>(boxModuleFile)), std::istreambuf_iterator<char>());
-                executableFile << "const char* " << moduleName << "_source = R\"neutron_source(\n";
-                executableFile << moduleSource;
-                executableFile << "\n)neutron_source\";\n\n";
-                boxModuleFile.close();
-            } else {
-                // It might be a native module - we'll handle it differently when compiling
-                continue; // Don't embed native module source
-            }
-        } else {
-            // It's a lib module
-            std::string moduleSource((std::istreambuf_iterator<char>(moduleFile)), std::istreambuf_iterator<char>());
-            executableFile << "const char* " << moduleName << "_source = R\"neutron_source(\n";
-            executableFile << moduleSource;
-            executableFile << "\n)neutron_source\";\n\n";
-            moduleFile.close();
-        }
-    }
-    
-    // Write the source code as a string literal
-    executableFile << "const char* embedded_source = R\"neutron_source(\n";
-    executableFile << sourceCode;
-    executableFile << "\n)neutron_source\";\n\n";
-    
-    // Write main function that uses the embedded source code
-    executableFile << "int main() {\n";
-    executableFile << "    // Initialize the VM\n";
-    executableFile << "    neutron::VM vm;\n\n";
-    
-    // Load Neutron modules (not native ones)
-    for (const auto& moduleName : usedModules) {
-        std::string libModulePath = "lib/" + moduleName + ".nt";
-        std::ifstream moduleFile(libModulePath);
-        
-        if (!moduleFile.is_open()) {
-            // Check if it's a neutron module in the box directory
-            std::string boxModulePath = "box/" + moduleName + "/" + moduleName + ".nt";
-            std::ifstream boxModuleFile(boxModulePath);
-            
-            if (boxModuleFile.is_open()) {
-                // It's a neutron module in the box directory
-                executableFile << "    {\n";
-                executableFile << "        neutron::Scanner scanner(" << moduleName << "_source);\n";
-                executableFile << "        std::vector<neutron::Token> tokens = scanner.scanTokens();\n";
-                executableFile << "        neutron::Parser parser(tokens);\n";
-                executableFile << "        std::vector<std::unique_ptr<neutron::Stmt>> statements = parser.parse();\n";
-                executableFile << "        neutron::Compiler compiler(vm);\n";
-                executableFile << "        neutron::Function* function = compiler.compile(statements);\n";
-                executableFile << "        vm.interpret(function);\n";
-                executableFile << "    }\n";
-                boxModuleFile.close();
-            } else {
-                // This is a native module - it will be linked statically, so no need to load here
-                continue;
-            }
-        } else {
-            // It's a lib module
-            executableFile << "    {\n";
-            executableFile << "        neutron::Scanner scanner(" << moduleName << "_source);\n";
-            executableFile << "        std::vector<neutron::Token> tokens = scanner.scanTokens();\n";
-            executableFile << "        neutron::Parser parser(tokens);\n";
-            executableFile << "        std::vector<std::unique_ptr<neutron::Stmt>> statements = parser.parse();\n";
-            executableFile << "        neutron::Compiler compiler(vm);\n";
-            executableFile << "        neutron::Function* function = compiler.compile(statements);\n";
-            executableFile << "        vm.interpret(function);\n";
-            executableFile << "    }\n";
-            moduleFile.close();
-        }
-    }
-    
-    executableFile << "    // Run the embedded source code\n";
-    executableFile << "    neutron::Scanner scanner(embedded_source);\n";
-    executableFile << "    std::vector<neutron::Token> tokens = scanner.scanTokens();\n\n";
-    executableFile << "    neutron::Parser parser(tokens);\n";
-    executableFile << "    std::vector<std::unique_ptr<neutron::Stmt>> statements = parser.parse();\n\n";
-    executableFile << "    neutron::Compiler compiler(vm);\n";
-    executableFile << "    neutron::Function* function = compiler.compile(statements);\n\n";
-    executableFile << "    vm.interpret(function);\n\n";
-    executableFile << "    return 0;\n";
-    executableFile << "}\n";
-    
-    executableFile.close();
-    
-    // Determine compiler and flags based on platform
-    std::string compiler, objExt, mkdirCmd, linkFlags, picFlag;
-    
-    if (isWindows && !isMingw) {
-        // MSVC
-        compiler = "cl";
-        objExt = ".obj";
-        mkdirCmd = "if not exist \"" + executableDir + "/box\" mkdir \"" + executableDir + "\\box\"";
-        linkFlags = "/link /LIBPATH:\"" + executableDir + "\" CURL::libcurl.lib JsonCpp::JsonCpp.lib";
-        picFlag = "";
-    } else if (isWindows && isMingw) {
-        // MINGW64
-        compiler = "g++";
-        objExt = ".o";
-        mkdirCmd = "mkdir -p \"" + executableDir + "/box\"";
-        linkFlags = "-lcurl -ljsoncpp";
-        picFlag = "-fPIC";
-    } else {
-        // Linux/macOS
-        compiler = "g++";
-        objExt = ".o";
-        mkdirCmd = "mkdir -p \"" + executableDir + "/box\"";
-        if (isMacOS) {
-            linkFlags = "-lcurl -ljsoncpp -framework CoreFoundation";
-        } else {
-            linkFlags = "-lcurl -ljsoncpp -ldl";
-        }
-        picFlag = "-fPIC";
-    }
-    
-    // Build native modules if needed and prepare the compilation command
-    std::string compileCommand;
-
-    // Start with common flags and the generated source file
-    if (isWindows && !isMingw) {
-        // MSVC compile command
-        compileCommand = compiler + " /std:c++17 /EHsc /W4 /O2 /I include /I . /I libs " + executableSourcePath + " ";
-    } else {
-        // GCC/Clang compile command
-        compileCommand = compiler + " -std=c++17 -Wall -Wextra -O2 -Iinclude -I. -Ilibs " + executableSourcePath + " ";
-    }
-
-    // Try to find a static runtime archive next to the current executable or in a few common locations.
-    auto fileExists = [](const std::string& p)->bool {
-        std::ifstream f(p);
-        return f.good();
-    };
-
-    std::string foundRuntimeLib;
-    if (isWindows) {
-        std::vector<std::string> candidates = {
-            executableDir + "/neutron_runtime.lib",
-            executableDir + "/..\neutron_runtime.lib",
-            "neutron_runtime.lib",
-        };
-        for (const auto& c : candidates) {
-            if (fileExists(c)) { foundRuntimeLib = c; break; }
-        }
-    } else {
-        std::vector<std::string> candidates = {
-            executableDir + "/libneutron_runtime.a",
-            executableDir + "/../lib/libneutron_runtime.a",
-            std::string("./libneutron_runtime.a"),
-            std::string("libneutron_runtime.a")
-        };
-        for (const auto& c : candidates) {
-            if (fileExists(c)) { foundRuntimeLib = c; break; }
-        }
-    }
-
-    if (!foundRuntimeLib.empty()) {
-        // Link with the discovered static runtime library
-        if (isWindows) {
-            compileCommand += "\"" + foundRuntimeLib + "\" ";
-        } else {
-            compileCommand += "\"" + foundRuntimeLib + "\" ";
-        }
-    } else {
-        // Fallback: if static lib isn't available, compile runtime sources directly into the generated executable.
-        // This bundles the runtime code into the final binary so it doesn't need external runtime files.
-        // We look for runtime sources relative to the executable directory or current directory.
-        std::vector<std::string> runtimeSources = {
-            "src/vm.cpp",
-            "src/token.cpp",
-            "src/capi.cpp",
-            "src/compiler/scanner.cpp",
-            "src/compiler/parser.cpp",
-            "src/compiler/compiler.cpp",
-            "src/compiler/bytecode.cpp",
-            "src/types/value.cpp",
-            "src/types/array.cpp",
-            "src/types/json_object.cpp",
-            "src/types/json_array.cpp",
-            "src/types/return.cpp",
-            "src/types/version.cpp",
-            "src/runtime/environment.cpp",
-            "src/runtime/error_handler.cpp",
-            "src/runtime/runtime.cpp",
-            "src/runtime/debug.cpp",
-            "src/modules/module.cpp",
-            "src/modules/module_loader.cpp",
-            "src/modules/module_registry.cpp",
-            "src/modules/module_utils.cpp",
-            "src/platform/platform.cpp",
-            "src/utils/component_interface.cpp"
-        };
-
-        bool addedAny = false;
-        for (const auto& rel : runtimeSources) {
-            // check relative to executableDir, then CWD
-            std::string p1 = executableDir + "/" + rel;
-            std::string p2 = rel;
-            if (fileExists(p1)) { compileCommand += "\"" + p1 + "\" "; addedAny = true; }
-            else if (fileExists(p2)) { compileCommand += "\"" + p2 + "\" "; addedAny = true; }
-        }
-
-        if (!addedAny) {
-            std::cerr << "Warning: could not find static runtime library or runtime sources to compile into the executable.\n";
-            std::cerr << "The generated executable may depend on shared runtime libraries at runtime." << std::endl;
-        }
-    }
-    
-    // Check for and compile native modules that are used
-    for (const auto& moduleName : usedModules) {
-        std::string nativeCppPath = "box/" + moduleName + "/native.cpp";
-        std::string nativeCPath = "box/" + moduleName + "/native.c";
-        
-        if (std::ifstream(nativeCppPath).good()) {
-            // Compile native.cpp for this module
-            std::string moduleObj = executableDir + "/box/" + moduleName + objExt;
-            
-            // Create the build directory if it doesn't exist
-            system(mkdirCmd.c_str());
-            
-            // Compile the native module to an object file
-            std::string objCmd;
-            if (isWindows && !isMingw) {
-                objCmd = compiler + " /std:c++17 /EHsc /W4 /O2 /I include /I . /I libs /I box /c " +
-                        nativeCppPath + " /Fo:\"" + moduleObj + "\"";
-            } else {
-                objCmd = compiler + " -std=c++17 -Wall -Wextra -O2 " + picFlag + " -Iinclude -I. -Ilibs -Ibox -c " +
-                        nativeCppPath + " -o \"" + moduleObj + "\"";
-            }
-            
-            int objResult = system(objCmd.c_str());
-            if (objResult == 0) {
-                compileCommand += "\"" + moduleObj + "\" ";
-                std::cout << "Compiled native module: " << moduleName << std::endl;
-            } else {
-                std::cerr << "Failed to compile native module: " << moduleName << std::endl;
-                exit(1);
-            }
-        } else if (std::ifstream(nativeCPath).good()) {
-            // Compile native.c for this module
-            std::string moduleObj = executableDir + "/box/" + moduleName + objExt;
-            
-            // Create the build directory if it doesn't exist
-            system(mkdirCmd.c_str());
-            
-            // Compile the native module to an object file
-            std::string objCmd;
-            if (isWindows && !isMingw) {
-                objCmd = compiler + " /std:c++17 /EHsc /W4 /O2 /I include /I . /I libs /I box /c " +
-                        nativeCPath + " /Fo:\"" + moduleObj + "\"";
-            } else {
-                objCmd = compiler + " -std=c++17 -Wall -Wextra -O2 " + picFlag + " -Iinclude -I. -Ilibs -Ibox -c " +
-                        nativeCPath + " -o \"" + moduleObj + "\"";
-            }
-            
-            int objResult = system(objCmd.c_str());
-            if (objResult == 0) {
-                compileCommand += "\"" + moduleObj + "\" ";
-                std::cout << "Compiled native module: " << moduleName << std::endl;
-            } else {
-                std::cerr << "Failed to compile native module: " << moduleName << std::endl;
-                exit(1);
-            }
-        }
-    }
-    
-    // Add output and link flags
-    if (isWindows && !isMingw) {
-        compileCommand += "/Fe:" + finalOutputPath + " " + linkFlags;
-    } else {
-        compileCommand += linkFlags + " -o " + finalOutputPath;
-    }
-    
-    std::cout << "Compiling to executable: " << finalOutputPath << std::endl;
-    int result = system(compileCommand.c_str());
-    
-    // Clean up the temporary source file
-    std::remove(executableSourcePath.c_str());
-    
-    if (result == 0) {
-        std::cout << "Executable created: " << finalOutputPath << std::endl;
-        // Make the file executable on Unix systems
-#ifndef _WIN32
-        std::string chmodCommand = "chmod +x " + finalOutputPath;
-        if (system(chmodCommand.c_str()) != 0) {
-            std::cerr << "Failed to make file executable" << std::endl;
-        }
-#endif
-    } else {
-        std::cerr << "Failed to create executable" << std::endl;
-        exit(1);
-    }
-}
-
 
 int main(int argc, char* argv[]) {
     if (argc > 1) {
         std::string arg = argv[1];
+        
+        // Version command
         if (arg == "--version" || arg == "-v") {
             std::cout << neutron::Version::getFullVersion() << std::endl;
             std::cout << "Build: " << neutron::Version::getBuildDate() << std::endl;
             return 0;
-        } else if (arg == "--build-box" && argc > 2) {
-                        std::string module_name = argv[2];
-                        std::string command = "make build-box MODULE=" + module_name;
-                        int result = system(command.c_str());
-                        if (result != 0) {
-                            std::cerr << "Failed to build box module: " << module_name << std::endl;
-                        }
-                        return result;
-        } else if (arg == "-b" && argc > 2) {
-            // Binary conversion mode - create standalone executable
-            std::string inputPath = argv[2];
-            std::string outputPath = inputPath + ".out";
-            
-            if (argc > 3) {
-                outputPath = argv[3];
+        }
+        
+        // Project commands
+        else if (arg == "init") {
+            std::string projectName = argc > 2 ? argv[2] : "";
+            return neutron::ProjectManager::initProject(projectName) ? 0 : 1;
+        }
+        
+        else if (arg == "run") {
+            // Check if we're in a Neutron project
+            std::string projectRoot = neutron::ProjectManager::findProjectRoot(".");
+            if (projectRoot.empty()) {
+                std::cerr << "Error: Not in a Neutron project. Run './neutron init' to create one." << std::endl;
+                return 1;
             }
             
-            // Read the source file
-            std::ifstream file(inputPath);
+            // Load config and run the entry file
+            auto config = neutron::ProjectManager::loadConfig(projectRoot);
+            if (!config) {
+                std::cerr << "Error: Failed to load project configuration" << std::endl;
+                return 1;
+            }
+            
+            std::string entryFile = projectRoot + "/" + config->entry;
+            std::cout << "Running: " << config->name << " v" << config->version << std::endl;
+            std::cout << "Entry: " << config->entry << "\n" << std::endl;
+            
+            neutron::VM vm;
+            vm.commandLineArgs.push_back(entryFile);
+            runFile(entryFile, vm);
+            return 0;
+        }
+        
+        else if (arg == "build") {
+            // Check if we're in a Neutron project
+            std::string projectRoot = neutron::ProjectManager::findProjectRoot(".");
+            if (projectRoot.empty()) {
+                std::cerr << "Error: Not in a Neutron project. Run './neutron init' to create one." << std::endl;
+                return 1;
+            }
+            
+            // Load config
+            auto config = neutron::ProjectManager::loadConfig(projectRoot);
+            if (!config) {
+                std::cerr << "Error: Failed to load project configuration" << std::endl;
+                return 1;
+            }
+            
+            std::string entryFile = projectRoot + "/" + config->entry;
+            
+            std::cout << "Building: " << config->name << " v" << config->version << std::endl;
+            std::cout << "Entry: " << config->entry << std::endl;
+            
+            // Create build directory
+            std::string buildDir = projectRoot + "/build";
+            std::filesystem::create_directories(buildDir);
+            
+            // Output executable name
+            std::string outputName = config->name;
+#ifdef _WIN32
+            outputName += ".exe";
+#endif
+            std::string outputPath = buildDir + "/" + outputName;
+            
+            std::cout << "Output: " << outputPath << "\n" << std::endl;
+            
+            // Read the entry file
+            std::ifstream file(entryFile);
             if (!file.is_open()) {
-                std::cerr << "Could not open file: " << inputPath << std::endl;
-                exit(1);
+                std::cerr << "Error: Could not open entry file: " << entryFile << std::endl;
+                return 1;
             }
             
             std::string line;
             std::string source;
-            
             while (std::getline(file, line)) {
                 source += line + "\n";
             }
-            
             file.close();
             
-            // Save source code to standalone executable
-            saveBytecodeToExecutable(source, outputPath, inputPath, argv[0]);
+            // Build using project-aware builder
+            bool success = neutron::ProjectBuilder::buildProjectExecutable(
+                projectRoot,
+                source,
+                entryFile,
+                outputPath,
+                argv[0]
+            );
             
-            return 0;
+            return success ? 0 : 1;
         }
+        
+        else if (arg == "install") {
+            if (argc < 3) {
+                std::cerr << "Usage: neutron install <package>" << std::endl;
+                std::cerr << "Available packages: box" << std::endl;
+                return 1;
+            }
+            
+            std::string package = argv[2];
+            if (package == "box") {
+                return neutron::ProjectManager::installBox() ? 0 : 1;
+            } else {
+                std::cerr << "Error: Unknown package: " << package << std::endl;
+                std::cerr << "Available packages: box" << std::endl;
+                return 1;
+            }
+        }
+        
+        // Legacy box build command
+        else if (arg == "--build-box" && argc > 2) {
+            std::string module_name = argv[2];
+            std::string command = "make build-box MODULE=" + module_name;
+            int result = system(command.c_str());
+            if (result != 0) {
+                std::cerr << "Failed to build box module: " << module_name << std::endl;
+            }
+            return result;
+        }
+
     }
 
+    // Default behavior: run file or REPL
     neutron::VM vm;
     if (argc >= 2) {
         std::string filePath = argv[1];

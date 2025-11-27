@@ -5,6 +5,7 @@
 ### Getting Started
 
 **[guides/quickstart.md](guides/quickstart.md)** - Get up and running in 5 minutes  
+**[guides/project-system.md](guides/project-system.md)** - Project management and native builds  
 **[guides/build.md](guides/build.md)** - Complete build instructions for all platforms  
 **[guides/test-suite.md](guides/test-suite.md)** - Running and writing tests
 
@@ -12,6 +13,7 @@
 
 **[reference/language-reference.md](reference/language_reference.md)** - Complete language syntax and features  
 **[reference/module-system.md](reference/module-system.md)** - Module loading and usage patterns  
+**[reference/box-project-integration.md](reference/box-project-integration.md)** - Box integration with Neutron projects  
 **[reference/cross-platform.md](reference/cross-platform.md)** - Platform-specific details
 
 ### Module API Documentation

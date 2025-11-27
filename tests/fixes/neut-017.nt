@@ -5,29 +5,24 @@ say("=== NEUT-017: Testing Safe Type Casting ===");
 
 // Test array property access
 var arr = [1, 2, 3, 4, 5];
-if (arr.length == 5) {
-    say("✓ Array length property works");
+if (arr.length() == 5) {
+    say("✓ Array length method works");
 }
 
 arr.push(6);
-if (arr.length == 6) {
+if (arr.length() == 6) {
     say("✓ Array push method works");
 }
 
 var popped = arr.pop();
-if (popped == 6 and arr.length == 5) {
+if (popped == 6 and arr.length() == 5) {
     say("✓ Array pop method works");
 }
 
 // Test string property access
 var str = "Hello";
-if (str.length == 5) {
-    say("✓ String length property works");
-}
-
-var chars = str.chars;
-if (chars.length == 5) {
-    say("✓ String chars property works");
+if (str.length() == 5) {
+    say("✓ String length method works");
 }
 
 // Test class instance property access

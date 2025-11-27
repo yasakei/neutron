@@ -6,6 +6,112 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ---
 
+---
+
+## [2.0.0-beta] - 2025-11-27
+
+### 🎉 Major Features
+
+- **Selective Imports** 🆕
+  - Import specific symbols from modules and files using `from` keyword
+  - Syntax: `use (symbol1, symbol2) = from module;` and `using (symbol1, symbol2) = from "file.nt";`
+  - Benefits: Namespace clarity, avoid conflicts, better performance
+  - Example:
+    ```neutron
+    use (now, sleep) = from time;
+    using (hello) = from "lib.nt";
+    ```
+  - Implementation:
+    - Added `FROM` keyword token to scanner
+    - Updated parser to handle selective import syntax
+    - Extended `UseStmt` AST node with `importedSymbols` vector
+    - Implemented `VM::load_file_as_module()` for isolated file loading
+    - Implemented `VM::interpret_module()` for isolated execution
+    - Added `Value::isModule()` and `Value::asModule()` helper methods
+  - Test: `tests/core/test_selective_import.nt`
+
+- **Quark Project System** 🆕
+  - Complete project management system for Neutron
+  - Commands:
+    - `neutron init [path]` - Initialize new Neutron project with `.quark` config
+    - `neutron build` - Build standalone executable from project
+    - `neutron run` - Run project without building
+  - Features:
+    - Project configuration via `.quark` file (TOML-like format)
+    - Automatic dependency detection and linking
+    - Native module integration (Quark modules in `libs/`)
+    - Box module integration (external modules in `.box/modules/`)
+    - Standalone executable generation with embedded resources
+    - Cross-platform build support (Linux, macOS, Windows)
+  - Configuration:
+    ```toml
+    [project]
+    name = "myproject"
+    version = "1.0.0"
+    entry = "main.nt"
+    description = "My Neutron project"
+    ```
+  - Build output: `build/<project_name>` executable
+  - Documentation: `docs/guides/project-system.md`
+
+### Fixed
+
+- **File Embedding in Built Projects**
+  - Files imported via `using "filename.nt"` are now embedded in binaries
+  - Build system recursively finds and embeds all imported files
+  - Executables are now truly standalone (no external .nt files needed)
+  - Implementation:
+    - Added `VM::addEmbeddedFile()` to store file content in memory
+    - Updated `VM::load_file()` to check embedded files first
+    - Modified `ProjectBuilder` to recursively scan for `using` statements
+    - Embedded file content as C-style string literals in generated code
+
+- **Box Module Shared Library Linking**
+  - Box modules with pre-compiled shared libraries now link correctly
+  - Build system detects `.so`/`.dylib`/`.dll` files instead of looking for source
+  - Proper `-L`, `-l`, and `-rpath` flags for shared library linking
+  - Fixes `neutron build` failures for Box modules
+
+### Added
+
+- **Enhanced Test Suite**
+  - Total tests: 56 (all passing ✅)
+  - New test: `test_selective_import.nt`
+  - Comprehensive coverage of selective imports with multiple scenarios
+
+### Documentation
+
+- **Updated Language Reference** (`docs/reference/language_reference.md`)
+  - Added selective imports section with syntax and examples
+  - Benefits and use cases documented
+
+- **Updated Module System Guide** (`docs/reference/module-system.md`)
+  - Comprehensive selective imports documentation
+  - Comparison between traditional and selective imports
+  - Best practices and examples
+
+
+### Technical Details
+
+- **Selective Imports Architecture:**
+  - Parser creates `UseStmt` with optional `importedSymbols` list
+  - Compiler checks if symbols list is empty (traditional) or populated (selective)
+  - For selective imports from files: `load_file_as_module()` creates isolated environment
+  - For selective imports from modules: retrieve module object from globals
+  - Extract requested symbols from module environment and define in current scope
+
+- **File Embedding Flow:**
+  - Build time: Scan source → Find `using` statements → Recursively find imports → Embed content
+  - Runtime: `load_file()` checks `embeddedFiles` map before disk access
+  - Supports nested imports (files that import other files)
+
+### Version
+
+- Updated from 1.2.1-beta to 2.0.0-beta
+- Major version bump due to significant new feature (selective imports)
+
+---
+
 ## [1.2.1-beta] - 2025-11-03
 
 ### 🔥 Critical Fixes

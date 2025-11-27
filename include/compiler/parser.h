@@ -43,7 +43,7 @@ private:
     std::unique_ptr<Stmt> statement();
     std::unique_ptr<Stmt> sayStatement();
     std::unique_ptr<Stmt> expressionStatement();
-    std::unique_ptr<Stmt> varDeclaration();
+    std::unique_ptr<Stmt> varDeclaration(bool isStatic = false);
     std::unique_ptr<Stmt> ifStatement();
     std::unique_ptr<Stmt> whileStatement();
     std::unique_ptr<Stmt> forStatement();

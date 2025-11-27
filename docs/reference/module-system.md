@@ -82,7 +82,72 @@ say(greet("World"));  // Output: Hello, World!
 say(VERSION);         // Output: 1.0.0
 ```
 
-## Error Handling
+## Selective Imports
+
+Import only specific symbols from modules or files using the `from` keyword:
+
+### Syntax
+```neutron
+// From modules
+use (symbol1, symbol2) = from modulename;
+
+// From files
+using (symbol1, symbol2) = from 'filepath.nt';
+```
+
+### Examples
+
+**Import specific functions from a module:**
+```neutron
+use (now, sleep) = from time;
+
+say(now());    // Available
+sleep(100);    // Available
+// format() is NOT available
+```
+
+**Import specific functions from a file:**
+
+**math_helpers.nt:**
+```neutron
+fun add(a, b) { return a + b; }
+fun subtract(a, b) { return a - b; }
+fun multiply(a, b) { return a * b; }
+```
+
+**main.nt:**
+```neutron
+using (add, multiply) = from 'math_helpers.nt';
+
+say(add(5, 3));      // Works: 8
+say(multiply(4, 2)); // Works: 8
+say(subtract(5, 2)); // Error: undefined variable
+```
+
+### Benefits
+
+- **Namespace clarity**: Only import what you need
+- **Avoid conflicts**: Prevent name collisions when importing from multiple sources
+- **Better performance**: Smaller global scope
+- **Explicit dependencies**: Clear which symbols come from which module
+
+### Comparison
+
+```neutron
+// Traditional import (imports everything)
+use time;
+time.now();
+time.sleep(100);
+time.format(timestamp, "%Y-%m-%d");
+
+// Selective import (imports only what you need)
+use (now, sleep) = from time;
+now();
+sleep(100);
+// format() is not available
+```
+
+---
 
 If you try to use a module without importing it, you'll get a helpful error message:
 

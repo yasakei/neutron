@@ -85,6 +85,7 @@ public:
     void define(const std::string& name, const Value& value);
     void load_module(const std::string& name);
     void load_file(const std::string& filepath);
+    Module* load_file_as_module(const std::string& filepath);
     Value call(const Value& callee, const std::vector<Value>& arguments);
     Value execute_string(const std::string& source);
     void add_module_search_path(const std::string& path);
@@ -123,6 +124,11 @@ public:
     std::string currentFileName;  // Current source file being executed
     std::vector<std::string> sourceLines;  // Source code lines for error reporting
     std::vector<std::shared_ptr<ComponentInterface>> loadedComponents;  // Loaded components
+    
+    // Embedded files support (for standalone executables)
+    std::unordered_map<std::string, std::string> embeddedFiles;
+    void addEmbeddedFile(const std::string& path, const std::string& content);
+    
     // Exception handling support
     struct ExceptionFrame {
         int tryStart;         // Start of try block
@@ -146,6 +152,8 @@ private:
     bool call(Function* function, int argCount);
     bool callValue(Value callee, int argCount);
     bool callArrayMethod(class BoundArrayMethod* method, int argCount);
+    bool callStringMethod(class BoundStringMethod* method, int argCount);
+    
     void run(size_t minFrameDepth = 0);  // Run until frames.size() <= minFrameDepth (0 = run completely)
     void interpret_module(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> module_env);
     

@@ -79,6 +79,14 @@ std::unique_ptr<Stmt> Parser::statement() {
         return sayStatement();
     }
     
+    // Check for static var
+    if (match({TokenType::STATIC})) {
+        if (!match({TokenType::VAR})) {
+            error(previous(), "Expect 'var' after 'static'.");
+        }
+        return varDeclaration(true);  // Pass isStatic = true
+    }
+    
     if (match({TokenType::VAR})) {
         return varDeclaration();
     }
@@ -154,7 +162,7 @@ std::unique_ptr<Stmt> Parser::expressionStatement() {
     return std::make_unique<ExpressionStmt>(std::move(expr));
 }
 
-std::unique_ptr<Stmt> Parser::varDeclaration() {
+std::unique_ptr<Stmt> Parser::varDeclaration(bool isStatic) {
     // Check for optional type annotation
     std::optional<Token> typeAnnotation = std::nullopt;
     if (match({TokenType::TYPE_INT, TokenType::TYPE_FLOAT, TokenType::TYPE_STRING, 
@@ -163,30 +171,47 @@ std::unique_ptr<Stmt> Parser::varDeclaration() {
         typeAnnotation = previous();
     }
     
-    Token name = consume(TokenType::IDENTIFIER, "Expect variable name.");
+    std::vector<std::unique_ptr<Stmt>> statements;
     
-    std::unique_ptr<Expr> initializer = nullptr;
-    if (match({TokenType::EQUAL})) {
-        initializer = expression();
-    }
-
-    if (typeAnnotation && initializer && typeAnnotation->type != TokenType::TYPE_ANY) {
-        // Only perform compile-time type checking for literal expressions
-        // Non-literal expressions will be type-checked at runtime
-        if (initializer->type == ExprType::LITERAL) {
-            LiteralExpr* literal = static_cast<LiteralExpr*>(initializer.get());
-            ValueType expectedType = tokenTypeToValueType(typeAnnotation->type);
-            ValueType actualType = literalValueTypeToValueType(literal->valueType);
-            if (actualType != expectedType) {
-                error(name, "Invalid type assignment. Expected " + tokenTypeToString(typeAnnotation->type) + " but got " + valueTypeToString(actualType) + ".");
-            }
+    do {
+        Token name = consume(TokenType::IDENTIFIER, "Expect variable name.");
+        
+        std::unique_ptr<Expr> initializer = nullptr;
+        if (match({TokenType::EQUAL})) {
+            initializer = expression();
         }
-        // Note: Type checking for non-literal expressions (function calls, operations, etc.)
-        // is handled at runtime by the VM's typed global/local assignment opcodes
-    }
+        
+        // Static variables must have an initializer
+        if (isStatic && !initializer) {
+            error(name, "Static variables must be initialized.");
+        }
+
+        if (typeAnnotation && initializer && typeAnnotation->type != TokenType::TYPE_ANY) {
+            // Only perform compile-time type checking for literal expressions
+            // Non-literal expressions will be type-checked at runtime
+            if (initializer->type == ExprType::LITERAL) {
+                LiteralExpr* literal = static_cast<LiteralExpr*>(initializer.get());
+                ValueType expectedType = tokenTypeToValueType(typeAnnotation->type);
+                ValueType actualType = literalValueTypeToValueType(literal->valueType);
+                if (actualType != expectedType) {
+                    error(name, "Invalid type assignment. Expected " + tokenTypeToString(typeAnnotation->type) + " but got " + valueTypeToString(actualType) + ".");
+                }
+            }
+            // Note: Type checking for non-literal expressions (function calls, operations, etc.)\n            // is handled at runtime by the VM's typed global/local assignment opcodes
+        }
+        
+        statements.push_back(std::make_unique<VarStmt>(name, std::move(initializer), typeAnnotation, isStatic));
+        
+    } while (match({TokenType::COMMA}));
     
     consume(TokenType::SEMICOLON, "Expect ';' after variable declaration.");
-    return std::make_unique<VarStmt>(name, std::move(initializer), typeAnnotation);
+    
+    if (statements.size() == 1) {
+        return std::move(statements[0]);
+    } else {
+        // Return a block that doesn't create a new scope, so variables are declared in the current scope
+        return std::make_unique<BlockStmt>(std::move(statements), false);
+    }
 }
 
 std::unique_ptr<Stmt> Parser::ifStatement() {
@@ -278,7 +303,30 @@ std::unique_ptr<Stmt> Parser::classDeclaration() {
 
     std::vector<std::unique_ptr<Stmt>> body;
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
-        body.push_back(statement());
+        // Check for 'init' method without 'fun' keyword
+        if (check(TokenType::IDENTIFIER) && peek().lexeme == "init") {
+            Token initToken = advance();
+            consume(TokenType::LEFT_PAREN, "Expect '(' after 'init'.");
+            std::vector<Token> params;
+            if (!check(TokenType::RIGHT_PAREN)) {
+                do {
+                    params.push_back(consume(TokenType::IDENTIFIER, "Expect parameter name."));
+                } while (match({TokenType::COMMA}));
+            }
+            consume(TokenType::RIGHT_PAREN, "Expect ')' after parameters.");
+            consume(TokenType::LEFT_BRACE, "Expect '{' before init body.");
+            
+            // Parse body statements
+            std::vector<std::unique_ptr<Stmt>> funcBody;
+            while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+                funcBody.push_back(statement());
+            }
+            consume(TokenType::RIGHT_BRACE, "Expect '}' after init body.");
+            
+            body.push_back(std::make_unique<FunctionStmt>(initToken, std::move(params), std::move(funcBody)));
+        } else {
+            body.push_back(statement());
+        }
     }
 
     consume(TokenType::RIGHT_BRACE, "Expect '}' after class body.");
@@ -287,16 +335,30 @@ std::unique_ptr<Stmt> Parser::classDeclaration() {
 }
 
 std::unique_ptr<Stmt> Parser::useStatement() {
-    // Check if this is 'using' syntax for file imports
-    if (previous().type == TokenType::USING) {
+    bool isUsing = previous().type == TokenType::USING;
+    std::vector<Token> importedSymbols;
+    
+    // Check for selective import: use (a, b) = from ...
+    if (match({TokenType::LEFT_PAREN})) {
+        if (!check(TokenType::RIGHT_PAREN)) {
+            do {
+                importedSymbols.push_back(consume(TokenType::IDENTIFIER, "Expect identifier in import list."));
+            } while (match({TokenType::COMMA}));
+        }
+        consume(TokenType::RIGHT_PAREN, "Expect ')' after import list.");
+        consume(TokenType::EQUAL, "Expect '=' after import list.");
+        consume(TokenType::FROM, "Expect 'from' after import list.");
+    }
+
+    if (isUsing) {
         Token filePath = consume(TokenType::STRING, "Expect file path after 'using'.");
         consume(TokenType::SEMICOLON, "Expect ';' after using statement.");
-        return std::make_unique<UseStmt>(filePath, true);
+        return std::make_unique<UseStmt>(filePath, true, importedSymbols);
+    } else {
+        Token moduleName = consume(TokenType::IDENTIFIER, "Expect module name.");
+        consume(TokenType::SEMICOLON, "Expect ';' after use statement.");
+        return std::make_unique<UseStmt>(moduleName, false, importedSymbols);
     }
-    // Otherwise it's 'use' syntax for module imports
-    Token moduleName = consume(TokenType::IDENTIFIER, "Expect module name.");
-    consume(TokenType::SEMICOLON, "Expect ';' after use statement.");
-    return std::make_unique<UseStmt>(moduleName, false);
 }
 
 std::unique_ptr<Stmt> Parser::block() {

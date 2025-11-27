@@ -1,0 +1,42 @@
+say("=== Test Class Init Syntax ===");
+
+class Person {
+    var name;
+    
+    // New syntax: init without fun
+    init(n) {
+        this.name = n;
+    }
+    
+    fun greet() {
+        return "Hello, " + this.name;
+    }
+}
+
+var p = Person();
+p.init("Neutron");
+
+if (p.greet() == "Hello, Neutron") {
+    say("✓ Class init() without fun keyword passed");
+} else {
+    say("✗ Class init() without fun keyword failed");
+}
+
+class OldStyle {
+    var val;
+    
+    // Standard syntax: fun init
+    fun init(v) {
+        this.val = v;
+    }
+}
+
+var o = OldStyle();
+o.init(42);
+if (o.val == 42) {
+    say("✓ Class fun init() passed");
+} else {
+    say("✗ Class fun init() failed");
+}
+
+say("=== All tests passed ===");

@@ -26,18 +26,18 @@ enum class TokenType {
 
     // Keywords
     AND, CLASS, ELSE, ELIF, FALSE, FUN, FOR, IF, NIL, OR,
-    SAY, RETURN, SUPER, THIS, TRUE, VAR, WHILE,
+    SAY, RETURN, STATIC, SUPER, THIS, TRUE, VAR, WHILE,
     BREAK, CONTINUE,
     MATCH, CASE, DEFAULT,  // Match statement
     TRY, CATCH, FINALLY, THROW,  // Exception handling
     
+    // Library features
+    USE, USING, FROM,
+
     // Type annotations (optional type safety)
     TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_BOOL, 
     TYPE_ARRAY, TYPE_OBJECT, TYPE_ANY,
     
-    // Library features
-    USE, USING,
-
     END_OF_FILE
 };
 
