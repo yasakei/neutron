@@ -189,9 +189,9 @@ value = true;         // Now a boolean
 value = [1, 2, 3];    // Now an array
 ```
 
-### Optional Type Annotations
+### Static Type Annotations
 
-Type annotations provide documentation and compile-time hints but are not enforced at runtime:
+Neutron supports **optional static type annotations** that provide runtime type safety. When you declare a variable with a type annotation, Neutron enforces that type at runtime.
 
 ```js
 var int x = 42;
@@ -202,8 +202,80 @@ var object data = {"key": "value"};
 var any flexible = "anything";
 ```
 
-> [!WARNING]
-> Type annotations are currently for documentation purposes only. Variables can still be reassigned to values of different types.
+#### Available Type Keywords
+
+- `int` - Integer numbers
+- `float` - Floating-point numbers  
+- `string` - Text strings
+- `bool` - Boolean values
+- `array` - Arrays
+- `object` - Objects
+- `any` - Any type (no restriction)
+
+#### Runtime Type Checking
+
+Type annotations are **enforced at runtime**. Attempting to assign a value of the wrong type will result in a runtime error:
+
+```js
+var int count = 42;
+count = "hello";  // ❌ Runtime error: Type mismatch
+
+var string name = "Alice";
+name = 123;       // ❌ Runtime error: Type mismatch
+
+var any value = 42;
+value = "hello";  // ✅ OK - 'any' accepts all types
+```
+
+#### Benefits
+
+- **Self-Documenting**: Type annotations make code intent clear
+- **Runtime Safety**: Catch type errors during execution
+- **Optional**: Mix typed and untyped variables as needed
+- **Future-Proof**: Enables potential static analysis and IDE support
+
+> [!TIP]
+> Use type annotations for function parameters and important variables to make your code more maintainable and catch errors early.
+
+### Static Variables
+
+Static variables are **immutable constants** declared with the `static var` keyword. Once initialized, they cannot be reassigned.
+
+```js
+static var PI = 3.14159;
+static var MAX_SIZE = 100;
+static var APP_NAME = "Neutron";
+static var DEBUG = true;
+```
+
+#### Features
+
+- **Immutable**: Cannot be reassigned after initialization
+- **Global Scope**: Accessible throughout the program
+- **Type Annotations**: Can be combined with type annotations
+
+```js
+static var int LIMIT = 1000;
+static var string VERSION = "2.0.0";
+static var bool PRODUCTION = false;
+```
+
+#### Example
+
+```js
+static var MAX_USERS = 100;
+
+fun checkLimit(count) {
+    if (count > MAX_USERS) {
+        say("Limit exceeded!");
+    }
+}
+
+// MAX_USERS = 200;  // ❌ Error: Cannot reassign static variable
+```
+
+> [!NOTE]
+> Static variables are perfect for configuration values, constants, and application-wide settings that should never change during runtime.
 
 ---
 

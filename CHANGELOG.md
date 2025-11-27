@@ -30,6 +30,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Added `Value::isModule()` and `Value::asModule()` helper methods
   - Test: `tests/core/test_selective_import.nt`
 
+- **Static Type Annotations** 🆕
+  - Optional type annotations for variables
+  - Syntax: `var <type> name = value;`
+  - Available types: `int`, `float`, `string`, `bool`, `array`, `object`, `any`
+  - Runtime type checking enforced for typed variables
+  - Example:
+    ```neutron
+    var int count = 42;
+    var string name = "Alice";
+    var bool isActive = true;
+    var array numbers = [1, 2, 3];
+    ```
+  - Benefits:
+    - Self-documenting code
+    - Catch type errors at runtime
+    - Better IDE support (future)
+  - Test: `tests/fixes/neut-014.nt`
+
 - **Quark Project System** 🆕
   - Complete project management system for Neutron
   - Commands:
