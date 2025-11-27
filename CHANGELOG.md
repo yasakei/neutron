@@ -48,6 +48,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Better IDE support (future)
   - Test: `tests/fixes/neut-014.nt`
 
+- **Static Variables** 🆕
+  - Immutable constants declared with `static var`
+  - Cannot be reassigned after initialization
+  - Global scope throughout the program
+  - Can be combined with type annotations
+  - Example:
+    ```neutron
+    static var PI = 3.14159;
+    static var int MAX_SIZE = 100;
+    static var string APP_NAME = "Neutron";
+    ```
+  - Perfect for configuration values and constants
+  - Test: `tests/core/test_static_vars.nt`
+
 - **Quark Project System** 🆕
   - Complete project management system for Neutron
   - Commands:
