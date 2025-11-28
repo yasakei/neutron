@@ -85,9 +85,6 @@ public:
     std::vector<int> continueTargets;  // Stack of continue target positions (for for-loop increments)
     std::vector<std::vector<int>> breakJumps;  // Stack of break jump positions for each loop
     std::vector<std::vector<int>> continueJumps;  // Stack of continue jump positions for each loop
-    
-    // Static (immutable) variables
-    std::set<std::string> staticVariables;  // Track static variable names for immutability enforcement
 };
 } // namespace neutron
 

@@ -237,46 +237,6 @@ value = "hello";  // ✅ OK - 'any' accepts all types
 > [!TIP]
 > Use type annotations for function parameters and important variables to make your code more maintainable and catch errors early.
 
-### Static Variables
-
-Static variables are **immutable constants** declared with the `static var` keyword. Once initialized, they cannot be reassigned.
-
-```js
-static var PI = 3.14159;
-static var MAX_SIZE = 100;
-static var APP_NAME = "Neutron";
-static var DEBUG = true;
-```
-
-#### Features
-
-- **Immutable**: Cannot be reassigned after initialization
-- **Global Scope**: Accessible throughout the program
-- **Type Annotations**: Can be combined with type annotations
-
-```js
-static var int LIMIT = 1000;
-static var string VERSION = "2.0.0";
-static var bool PRODUCTION = false;
-```
-
-#### Example
-
-```js
-static var MAX_USERS = 100;
-
-fun checkLimit(count) {
-    if (count > MAX_USERS) {
-        say("Limit exceeded!");
-    }
-}
-
-// MAX_USERS = 200;  // ❌ Error: Cannot reassign static variable
-```
-
-> [!NOTE]
-> Static variables are perfect for configuration values, constants, and application-wide settings that should never change during runtime.
-
 ---
 
 ## Operators

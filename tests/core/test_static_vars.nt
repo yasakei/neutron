@@ -21,4 +21,8 @@ if (LIMIT == 1000) {
     say("✓ Static with type annotation works");
 }
 
+// Note: Testing immutability requires a separate test file that expects an error
+// since trying to reassign will cause compilation to fail
+// See test_static_immutable.nt for immutability verification
+
 say("=== All tests passed ===");

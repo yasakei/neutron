@@ -52,16 +52,21 @@ void run(const std::string& source, neutron::VM& vm) {
     neutron::ErrorHandler::setColorEnabled(true);
     neutron::ErrorHandler::setStackTraceEnabled(true);
     
-    neutron::Scanner scanner(source);
-    std::vector<neutron::Token> tokens = scanner.scanTokens();
-    
-    neutron::Parser parser(tokens);
-    std::vector<std::unique_ptr<neutron::Stmt>> statements = parser.parse();
-    
-    neutron::Compiler compiler(vm);
-    neutron::Function* function = compiler.compile(statements);
-    
-    vm.interpret(function);
+    try {
+        neutron::Scanner scanner(source);
+        std::vector<neutron::Token> tokens = scanner.scanTokens();
+        
+        neutron::Parser parser(tokens);
+        std::vector<std::unique_ptr<neutron::Stmt>> statements = parser.parse();
+        
+        neutron::Compiler compiler(vm);
+        neutron::Function* function = compiler.compile(statements);
+        
+        vm.interpret(function);
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        exit(1);
+    }
 }
 
 void runFile(const std::string& path, neutron::VM& vm) {

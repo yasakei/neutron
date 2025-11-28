@@ -41,6 +41,7 @@
 #include <string>
 #include <stack>
 #include <utility>
+#include <set>
 
 // Forward declarations only for types defined elsewhere
 namespace neutron {
@@ -147,6 +148,9 @@ public:
     std::vector<ExceptionFrame> exceptionFrames;  // Stack of exception frames
     bool hasException;  // Flag to indicate if an exception is currently being handled
     Value pendingException;  // The exception to be re-thrown after finally block
+    
+    // Static (immutable) variables - tracked in VM so they persist across REPL statements
+    std::set<std::string> staticVariables;
 
 private:
     bool call(Function* function, int argCount);

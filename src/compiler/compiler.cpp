@@ -245,9 +245,9 @@ void Compiler::visitVariableExpr(const VariableExpr* expr) {
 }
 
 void Compiler::visitAssignExpr(const AssignExpr* expr) {
-    // Check if trying to assign to a static variable
-    if (staticVariables.count(expr->name.lexeme)) {
-        throw std::runtime_error("Cannot assign to static variable '" + expr->name.lexeme + "' on line " + std::to_string(expr->name.line));
+    // Check if trying to assign to a static variable (tracked in VM for REPL persistence)
+    if (vm.staticVariables.count(expr->name.lexeme)) {
+        throw std::runtime_error("Cannot assign to static variable '" + expr->name.lexeme + "'");
     }
     
     // Check if the variable has a type annotation
@@ -325,9 +325,9 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
 
         locals.push_back(Local{stmt->name, scopeDepth, stmt->typeAnnotation});
         
-        // Track static variables
+        // Track static variables in VM (persistence across REPL statements)
         if (stmt->isStatic) {
-            staticVariables.insert(stmt->name.lexeme);
+            vm.staticVariables.insert(stmt->name.lexeme);
         }
 
         if (stmt->initializer) {
@@ -340,9 +340,9 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
     }
 
     // Global variable
-    // Track static variables
+    // Track static variables in VM (persistence across REPL statements)
     if (stmt->isStatic) {
-        staticVariables.insert(stmt->name.lexeme);
+        vm.staticVariables.insert(stmt->name.lexeme);
     }
     
     if (stmt->initializer) {
@@ -569,15 +569,36 @@ void Compiler::visitUseStmt(const UseStmt* stmt) {
                     emitBytes((uint8_t)OpCode::OP_CONSTANT, makeConstant(val));
                     emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(name)));
                 } else {
-                    // Symbol not found warning/error?
-                    // For now, maybe just ignore or let runtime handle it if accessed?
-                    // But we are defining it, so we need a value.
-                    // If not found, module->get returns NIL.
-                    // Let's define it as NIL or error.
-                    // Better to error if strict, but for now let's allow it (will be nil).
                      emitBytes((uint8_t)OpCode::OP_CONSTANT, makeConstant(val));
                      emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(name)));
                 }
+            }
+            
+            // CRITICAL FIX: If this was a module import (not file), load_module() defined the module
+            // in globals. We must remove it to ensure selective import doesn't leak the module itself.
+            if (!stmt->isFilePath) {
+                // We can't easily remove from globals at compile time because globals are runtime state.
+                // But we can emit code to undefine it!
+                // Wait, VM::load_module runs at COMPILE TIME for the compiler to see it?
+                // No, vm.load_module is called here in the compiler, which runs during compilation.
+                // So the module IS in vm.globals right now.
+                
+                // We should remove it from vm.globals so subsequent compilation doesn't see it.
+                vm.globals.erase(stmt->library.lexeme);
+                vm.loadedModuleCache.erase(stmt->library.lexeme); // Also remove from cache so it can be re-imported if needed
+                
+                // However, load_module ALSO emits code or defines it in the runtime environment?
+                // Let's check vm.load_module again. It calls neutron_init_X_module(this).
+                // Those functions usually do vm->define_module("name", module).
+                // vm->define_module does globals["name"] = module.
+                
+                // So removing it from vm.globals here affects the COMPILER's view of the VM.
+                // But does it affect the RUNTIME?
+                // The compiler is running on the SAME VM instance that will execute the code (in REPL)
+                // or a VM that is being prepared.
+                
+                // If we are compiling a script, we are populating the VM's globals.
+                // So erasing it here is exactly what we want!
             }
         }
     }
