@@ -99,3 +99,5 @@ box
 releases/libneutron_runtime.so.*
 releases/
 *.backup
+nt-box
+*.diff

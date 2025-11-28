@@ -384,15 +384,30 @@ bool ProjectBuilder::buildProjectExecutable(
     }
     
     // Normalize path
-    neutronSrcDir = std::filesystem::absolute(neutronSrcDir).string();
+    try {
+        neutronSrcDir = std::filesystem::absolute(neutronSrcDir).string();
+    } catch (...) {
+        // Keep as is if absolute fails
+    }
     
     std::string includeDir = neutronSrcDir + "/include";
     std::string libsDir = neutronSrcDir + "/libs";
     
+    // Check for system install layout (libs in share/neutron/libs)
+    if (!std::filesystem::exists(libsDir)) {
+        std::string systemLibs = neutronSrcDir + "/share/neutron/libs";
+        if (std::filesystem::exists(systemLibs)) {
+            libsDir = systemLibs;
+        }
+    }
+    
     // Validate directories
     if (!std::filesystem::exists(includeDir) || !std::filesystem::exists(libsDir)) {
         std::cerr << "Warning: Could not find Neutron include or libs directories." << std::endl;
-        std::cerr << "Checked: " << neutronSrcDir << std::endl;
+        std::cerr << "Executable Dir: " << executableDir << std::endl;
+        std::cerr << "Checked Neutron Home: " << neutronSrcDir << std::endl;
+        std::cerr << "Expected include: " << includeDir << std::endl;
+        std::cerr << "Expected libs: " << libsDir << std::endl;
         std::cerr << "Please set NEUTRON_HOME environment variable or run from a valid installation." << std::endl;
     }
     

@@ -33,6 +33,7 @@
 #include "project/project_manager.h"
 #include "project/project_config.h"
 #include "project/project_builder.h"
+#include "platform/platform.h"
 
 void run(const std::string& source, neutron::VM& vm);
 void runFile(const std::string& path, neutron::VM& vm);
@@ -215,7 +216,7 @@ int main(int argc, char* argv[]) {
                 source,
                 entryFile,
                 outputPath,
-                argv[0]
+                neutron::platform::getExecutablePath()
             );
             
             return success ? 0 : 1;

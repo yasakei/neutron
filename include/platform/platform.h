@@ -22,6 +22,7 @@ std::string getEnv(const std::string& name);
 void setEnv(const std::string& name, const std::string& value);
 int execute(const std::string& command);
 void exitProcess(int code);
+std::string getExecutablePath();
 
 // System info
 std::string getPlatform();

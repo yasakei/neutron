@@ -3,6 +3,7 @@
 #include "compiler/scanner.h" // For the Scanner class
 #include "compiler/bytecode.h"
 #include "runtime/debug.h"
+#include "runtime/error_handler.h"
 #include <iostream>
 
 namespace neutron {
@@ -247,7 +248,9 @@ void Compiler::visitVariableExpr(const VariableExpr* expr) {
 void Compiler::visitAssignExpr(const AssignExpr* expr) {
     // Check if trying to assign to a static variable (tracked in VM for REPL persistence)
     if (vm.staticVariables.count(expr->name.lexeme)) {
-        throw std::runtime_error("Cannot assign to static variable '" + expr->name.lexeme + "'");
+        std::string errorMsg = "Cannot assign to static variable '" + expr->name.lexeme + "'. Static variables are immutable.";
+        ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, expr->name.line);
+        exit(1);
     }
     
     // Check if the variable has a type annotation

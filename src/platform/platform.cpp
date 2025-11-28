@@ -17,6 +17,9 @@
     #include <sys/types.h>
     #include <dirent.h>
     #include <pwd.h>
+    #ifdef __APPLE__
+    #include <mach-o/dyld.h>
+    #endif
     #define PATH_SEP "/"
 #endif
 
@@ -164,6 +167,31 @@ int execute(const std::string& command) {
 
 void exitProcess(int code) {
     std::exit(code);
+}
+
+std::string getExecutablePath() {
+#ifdef _WIN32
+    char buffer[MAX_PATH];
+    GetModuleFileNameA(NULL, buffer, MAX_PATH);
+    return std::string(buffer);
+#elif defined(__linux__)
+    char buffer[4096];
+    ssize_t count = readlink("/proc/self/exe", buffer, 4096);
+    if (count != -1) {
+        buffer[count] = '\0';
+        return std::string(buffer);
+    }
+    return "";
+#elif defined(__APPLE__)
+    char buffer[4096];
+    uint32_t size = sizeof(buffer);
+    if (_NSGetExecutablePath(buffer, &size) == 0) {
+        return std::string(buffer);
+    }
+    return "";
+#else
+    return "";
+#endif
 }
 
 std::string getPlatform() {
