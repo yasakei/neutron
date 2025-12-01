@@ -288,7 +288,8 @@ elseif(WIN32)
     # Windows-specific settings
     target_compile_definitions(neutron_runtime PRIVATE _CRT_SECURE_NO_WARNINGS)
     # Link with Windows library for dynamic loading (LoadLibrary, GetProcAddress, etc.)
-    target_link_libraries(neutron_runtime "-lkernel32")
+    # Also link with Ws2_32 for socket functions
+    target_link_libraries(neutron_runtime "-lkernel32" "-lws2_32")
 endif()
 
 # Install targets
