@@ -943,12 +943,10 @@ void VM::run(size_t minFrameDepth) {
                                     frames.empty() ? -1 : frames.back().currentLine);
                     }
                 } else if (object.type == ValueType::ARRAY) {
+                    // Handle array properties and methods
                     Array* arr = std::get<Array*>(object.as);
                     
-                    if (propertyName == "length") {
-                        stack.pop_back();
-                        push(Value(static_cast<double>(arr->size())));
-                    } else if (propertyName == "push" || propertyName == "pop" || 
+                    if (propertyName == "length" || propertyName == "push" || propertyName == "pop" || 
                                propertyName == "slice" || propertyName == "map" ||
                                propertyName == "filter" || propertyName == "find" ||
                                propertyName == "indexOf" || propertyName == "join" ||
@@ -964,18 +962,7 @@ void VM::run(size_t minFrameDepth) {
                     // Handle string properties and methods
                     std::string str = std::get<std::string>(object.as);
                     
-                    if (propertyName == "length") {
-                        stack.pop_back();
-                        push(Value(static_cast<double>(str.length())));
-                    } else if (propertyName == "chars") {
-                        // Return an array of individual characters
-                        Array* charArray = new Array();
-                        for (char c : str) {
-                            charArray->push(Value(std::string(1, c)));
-                        }
-                        stack.pop_back();
-                        push(Value(charArray));
-                    } else if (propertyName == "contains" || propertyName == "split") {
+                    if (propertyName == "length" || propertyName == "contains" || propertyName == "split") {
                         // Return a bound method that captures the string
                         stack.pop_back();
                         push(Value(new BoundStringMethod(str, propertyName)));
@@ -1017,21 +1004,82 @@ void VM::run(size_t minFrameDepth) {
                                         frames.empty() ? -1 : frames.back().currentLine);
                         }
                     }
+                } else if (object.type == ValueType::STRING) {
+                    // Handle string properties
+                    std::string str = std::get<std::string>(object.as);
+                    
+                    if (propertyName == "length") {
+                        stack.pop_back();
+                        push(Value(static_cast<double>(str.length())));
+                    } else if (propertyName == "chars") {
+                        // Return an array of individual characters
+                        Array* charArray = new Array();
+                        for (char c : str) {
+                            charArray->push(Value(std::string(1, c)));
+                        }
+                        stack.pop_back();
+                        push(Value(charArray));
+                    } else {
+                        runtimeError(this, "String does not have property '" + propertyName + "'.",
+                                    frames.empty() ? -1 : frames.back().currentLine);
+                    }
                 } else if (object.type == ValueType::OBJECT) {
                     Object* objPtr = std::get<Object*>(object.as);
                     
-                    // Check if it's a JsonObject
-                    JsonObject* obj = dynamic_cast<JsonObject*>(objPtr);
-                    if (obj != nullptr) {
-                        auto it = obj->properties.find(propertyName);
-                        if (it != obj->properties.end()) {
+                    // Check if it's an Array
+                    Array* arr = dynamic_cast<Array*>(objPtr);
+                    if (arr != nullptr) {
+                        // Handle array methods
+                        if (propertyName == "length") {
                             stack.pop_back();
-                            push(it->second);
+                            push(Value(static_cast<double>(arr->size())));
+                        } else if (propertyName == "push" || propertyName == "pop" || 
+                                   propertyName == "slice" || propertyName == "map" ||
+                                   propertyName == "filter" || propertyName == "find" ||
+                                   propertyName == "indexOf" || propertyName == "join" ||
+                                   propertyName == "reverse" || propertyName == "sort") {
+                            // Return a bound method that captures the array
+                            stack.pop_back();
+                            push(Value(new BoundArrayMethod(arr, propertyName)));
                         } else {
-                            runtimeError(this, "Property '" + propertyName + "' not found on object.", frames.empty() ? -1 : frames.back().currentLine);
+                            runtimeError(this, "Array does not have property '" + propertyName + "'.",
+                                        frames.empty() ? -1 : frames.back().currentLine);
                         }
                     } else {
-                        runtimeError(this, "Object does not support property access.", frames.empty() ? -1 : frames.back().currentLine);
+                        // Check if it's an Instance
+                        Instance* inst = dynamic_cast<Instance*>(objPtr);
+                        if (inst != nullptr) {
+                            // Check fields first
+                            auto it = inst->fields.find(propertyName);
+                            if (it != inst->fields.end()) {
+                                stack.pop_back();
+                                push(it->second);
+                            } else {
+                                // Check methods in the class
+                                auto methIt = inst->klass->methods.find(propertyName);
+                                if (methIt != inst->klass->methods.end()) {
+                                    stack.pop_back();
+                                    push(methIt->second);
+                                } else {
+                                    runtimeError(this, "Property '" + propertyName + "' not found on instance.",
+                                                frames.empty() ? -1 : frames.back().currentLine);
+                                }
+                            }
+                        } else {
+                            // Check if it's a JsonObject
+                            JsonObject* obj = dynamic_cast<JsonObject*>(objPtr);
+                            if (obj != nullptr) {
+                                auto it = obj->properties.find(propertyName);
+                                if (it != obj->properties.end()) {
+                                    stack.pop_back();
+                                    push(it->second);
+                                } else {
+                                    runtimeError(this, "Property '" + propertyName + "' not found on object.", frames.empty() ? -1 : frames.back().currentLine);
+                                }
+                            } else {
+                                runtimeError(this, "Object does not support property access.", frames.empty() ? -1 : frames.back().currentLine);
+                            }
+                        }
                     }
                 } else {
                     runtimeError(this, "Only modules, arrays, strings, and objects have properties. Cannot use dot notation on this value type.", frames.empty() ? -1 : frames.back().currentLine);
@@ -2076,7 +2124,7 @@ void VM::interpret_module(const std::vector<std::unique_ptr<Stmt>>& statements, 
     // Usually modules should have access to standard globals like 'say', 'print', etc.
     // But if we clear globals, they won't have access unless we copy them.
     // However, 'say' is defined in VM constructor.
-    // If we want the module to have access to standard globals, we should copy from saved_globals.
+    // If we want the module to have access to standard globals, we should copy them from saved_globals.
     // But we want to isolate the module's definitions from polluting the main globals.
     // So we should copy saved_globals to globals (so module can use them), 
     // execute, and then ONLY copy NEW definitions back to module_env.
@@ -2142,4 +2190,6 @@ void VM::interpret_module(const std::vector<std::unique_ptr<Stmt>>& statements, 
     
     // Restore original globals
     globals = saved_globals;
-}}
+}
+
+} // namespace neutron

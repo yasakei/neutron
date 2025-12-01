@@ -29,12 +29,8 @@
 #include <cstring>
 #include <array>
 #include <memory>
-#include <filesystem>
-#include <chrono>
-#include <iomanip>
 
 using namespace neutron;
-namespace fs = std::filesystem;
 
 // File Operations
 
@@ -194,149 +190,20 @@ static Value sys_mkdir(const std::vector<Value>& args) {
 }
 
 static Value sys_rmdir(const std::vector<Value>& args) {
-    if (args.size() < 1 || args.size() > 2) {
-        throw std::runtime_error("sys.rmdir() expects 1 or 2 arguments (path, optional recursive)");
+    if (args.size() != 1) {
+        throw std::runtime_error("sys.rmdir() expects 1 argument (path)");
     }
     if (args[0].type != ValueType::STRING) {
         throw std::runtime_error("sys.rmdir() expects a string path");
     }
     
-    std::string pathStr = std::get<std::string>(args[0].as);
-    bool recursive = false;
-    
-    // Check if recursive flag is provided
-    if (args.size() == 2) {
-        if (args[1].type != ValueType::BOOLEAN) {
-            throw std::runtime_error("sys.rmdir() recursive flag must be a boolean");
-        }
-        recursive = std::get<bool>(args[1].as);
-    }
-    
-    fs::path path(pathStr);
-    fs::path cwd = fs::current_path();
-    
-    if (!fs::exists(path)) {
-        throw std::runtime_error("Directory not found: " + pathStr);
-    }
-    
-    if (!fs::is_directory(path)) {
-        throw std::runtime_error("Not a directory: " + pathStr);
-    }
-    
-    // Safety check: ensure the path is within or relative to current directory
-    fs::path absPath = fs::absolute(path);
-    fs::path absCwd = fs::absolute(cwd);
-    
-    // Check if trying to delete parent directory or outside cwd
-    auto [root_end, nothing] = std::mismatch(absCwd.begin(), absCwd.end(), absPath.begin(), absPath.end());
-    if (root_end != absCwd.end()) {
-        throw std::runtime_error("Cannot delete directory outside current working directory: " + pathStr);
-    }
-    
-    try {
-        if (recursive) {
-            // Remove directory and all contents recursively
-            fs::remove_all(path);
-        } else {
-            // Remove only if empty
-            if (!platform::removeDirectory(pathStr)) {
-                throw std::runtime_error("Failed to remove directory (may not be empty): " + pathStr);
-            }
-        }
-    } catch (const fs::filesystem_error& e) {
-        throw std::runtime_error("Failed to remove directory: " + std::string(e.what()));
-    }
-    
-    return Value(true);
-}
-
-static Value sys_listdir(const std::vector<Value>& args) {
-    if (args.size() != 1) {
-        throw std::runtime_error("sys.listdir() expects 1 argument (path)");
-    }
-    if (args[0].type != ValueType::STRING) {
-        throw std::runtime_error("sys.listdir() expects a string path");
-    }
-    
     std::string path = std::get<std::string>(args[0].as);
-    std::vector<std::string> files = platform::listDirectory(path);
     
-    auto array = new Array();
-    for (const auto& file : files) {
-        array->elements.push_back(Value(file));
+    if (!platform::removeDirectory(path)) {
+        throw std::runtime_error("Failed to remove directory: " + path);
     }
-    return Value(array);
-}
-
-static Value sys_stat(const std::vector<Value>& args) {
-    if (args.size() != 1) {
-        throw std::runtime_error("sys.stat() expects 1 argument (path)");
-    }
-    if (args[0].type != ValueType::STRING) {
-        throw std::runtime_error("sys.stat() expects a string path");
-    }
-    
-    std::string pathStr = std::get<std::string>(args[0].as);
-    fs::path path(pathStr);
-    
-    if (!fs::exists(path)) {
-        throw std::runtime_error("File not found: " + pathStr);
-    }
-    
-    auto info = new JsonObject();
-    info->properties["size"] = Value(static_cast<double>(fs::file_size(path)));
-    
-    // Handle time conversion safely
-    auto ftime = fs::last_write_time(path);
-    auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-        ftime - fs::file_time_type::clock::now() + std::chrono::system_clock::now()
-    );
-    std::time_t cftime = std::chrono::system_clock::to_time_t(sctp);
-    
-    std::stringstream ss;
-    ss << std::put_time(std::localtime(&cftime), "%Y-%m-%d %H:%M:%S");
-    info->properties["mtime"] = Value(ss.str());
-    
-    info->properties["is_directory"] = Value(fs::is_directory(path));
-    info->properties["is_file"] = Value(fs::is_regular_file(path));
-    
-    return Value(info);
-}
-
-static Value sys_chmod(const std::vector<Value>& args) {
-    if (args.size() != 2) {
-        throw std::runtime_error("sys.chmod() expects 2 arguments (path, mode)");
-    }
-    if (args[0].type != ValueType::STRING) {
-        throw std::runtime_error("sys.chmod() expects a string path");
-    }
-    if (args[1].type != ValueType::NUMBER) {
-        throw std::runtime_error("sys.chmod() expects a number mode");
-    }
-    
-    std::string pathStr = std::get<std::string>(args[0].as);
-    int mode = static_cast<int>(std::get<double>(args[1].as));
-    
-    // Cast integer mode to permissions
-    fs::permissions(pathStr, static_cast<fs::perms>(mode), fs::perm_options::replace);
     
     return Value(true);
-}
-
-static Value sys_tmpfile(const std::vector<Value>& args) {
-    if (args.size() != 0) {
-        throw std::runtime_error("sys.tmpfile() expects 0 arguments");
-    }
-    
-    auto tmp_dir = fs::temp_directory_path();
-    
-    // Generate a unique name using timestamp and random number
-    auto now = std::chrono::system_clock::now().time_since_epoch().count();
-    int rand_val = std::rand();
-    std::string filename = "neutron_tmp_" + std::to_string(now) + "_" + std::to_string(rand_val);
-    fs::path tmp_path = tmp_dir / filename;
-    
-    return Value(tmp_path.string());
 }
 
 // System Information
@@ -485,12 +352,6 @@ namespace neutron {
         // Directory Operations
         env->define("mkdir", Value(new NativeFn(sys_mkdir, 1)));
         env->define("rmdir", Value(new NativeFn(sys_rmdir, 1)));
-        env->define("listdir", Value(new NativeFn(sys_listdir, 1)));
-        
-        // File Info & Permissions
-        env->define("stat", Value(new NativeFn(sys_stat, 1)));
-        env->define("chmod", Value(new NativeFn(sys_chmod, 2)));
-        env->define("tmpfile", Value(new NativeFn(sys_tmpfile, 0)));
         
         // System Information
         env->define("cwd", Value(new NativeFn(sys_cwd, 0)));

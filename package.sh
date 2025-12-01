@@ -248,6 +248,7 @@ else
     # Unix-like systems: copy from build directory
     cp build/neutron "$TARGET_NAME/"
     # Copy library files with different extensions for different systems
+    cp build/libneutron_runtime.a "$TARGET_NAME/" 2>/dev/null || true
     cp build/libneutron_runtime.so* "$TARGET_NAME/" 2>/dev/null || true
     cp build/libneutron_runtime.dylib* "$TARGET_NAME/" 2>/dev/null || true
     cp build/libneutron_runtime.dll* "$TARGET_NAME/" 2>/dev/null || true
@@ -260,6 +261,8 @@ fi
 cp README.md LICENSE "$TARGET_NAME/" 2>/dev/null || true
 cp -r docs "$TARGET_NAME/" 2>/dev/null || true
 cp -r include "$TARGET_NAME/" 2>/dev/null || true
+cp -r src "$TARGET_NAME/" 2>/dev/null || true
+cp -r libs "$TARGET_NAME/" 2>/dev/null || true
 cp scripts/install.sh "$TARGET_NAME/" 2>/dev/null || true
 
 # Create the compressed archive

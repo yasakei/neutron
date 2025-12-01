@@ -1,0 +1,34 @@
+Neutron Public License 1.0
+
+Copyright (c) 2025 yasakei
+
+This software is dual-licensed under the following terms:
+
+1. For Open Source Projects (OSI-approved licenses):
+   - You may use, modify, and distribute this software in open source projects
+   - You must include the original copyright notice and this license in all copies
+   - You must prominently acknowledge "Portions of this software use Neutron Programming Language (c) yasakei"
+   - You must include a link to the original project: https://github.com/yasakei/neutron
+
+2. For Proprietary/Commercial Projects:
+   - You must obtain a separate commercial license for production use
+   - Contact: yas.studios.en (at) gmail (dot) com for licensing inquiries
+   - A visible attribution must be maintained in the software: "Powered by Neutron (c) yasakei"
+
+3. For All Uses:
+   - The copyright notice must be preserved in all source distributions
+   - Redistributions of source code must retain this license notice
+   - Redistributions in binary form must reproduce the above copyright notice, 
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution
+   - Neither the name of the copyright holder nor the names of its contributors 
+     may be used to endorse or promote products derived from this software 
+     without specific prior written permission
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

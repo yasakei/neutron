@@ -195,117 +195,24 @@ sys.write("data/file.txt", "Content in subdirectory");
 
 ---
 
-### `sys.rmdir(path, recursive?)`
-Removes a directory.
+### `sys.rmdir(path)`
+Removes an empty directory.
 
 **Parameters:**
 - `path` (string): Path of the directory to remove
-- `recursive` (boolean, optional): If `true`, removes directory and all contents recursively. Default is `false` (only removes empty directories)
 
 **Returns:** `true` if directory was removed
 
-**Examples:**
+**Example:**
 ```neutron
 use sys;
 
-// Remove empty directory
 sys.mkdir("temp_dir");
 sys.rmdir("temp_dir");
-
-// Remove directory with contents (recursive)
-sys.mkdir("data");
-sys.write("data/file.txt", "content");
-sys.rmdir("data", true);  // Removes directory and all files inside
+say("Directory removed");
 ```
 
-**Safety:** Cannot delete directories outside the current working directory. Attempts to delete parent directories or absolute paths outside cwd will throw an error.
-
-**Throws:** Runtime error if directory removal fails or if trying to delete outside current working directory
-
-## Advanced File Operations
-
-### `sys.listdir(path)`
-Lists files and directories in the specified path.
-
-**Parameters:**
-- `path` (string): Path to the directory to list
-
-**Returns:** Array of strings containing file/directory names
-
-**Example:**
-```neutron
-use sys;
-
-var files = sys.listdir(".");
-for (var i = 0; i < files.length; i = i + 1) {
-    say(files[i]);
-}
-```
-
-**Throws:** Runtime error if listing fails
-
----
-
-### `sys.stat(path)`
-Gets information about a file or directory.
-
-**Parameters:**
-- `path` (string): Path to the file/directory
-
-**Returns:** Object with properties:
-- `size` (number): Size in bytes
-- `mtime` (string): Last modification time
-- `is_file` (boolean): True if it is a regular file
-- `is_directory` (boolean): True if it is a directory
-
-**Example:**
-```neutron
-use sys;
-
-var info = sys.stat("file.txt");
-say("Size: " + info.size);
-say("Modified: " + info.mtime);
-```
-
-**Throws:** Runtime error if file not found
-
----
-
-### `sys.chmod(path, mode)`
-Changes the permissions of a file or directory.
-
-**Parameters:**
-- `path` (string): Path to the file/directory
-- `mode` (number): Permission mode (integer representation of permissions, e.g., 420 for 0644)
-
-**Returns:** `true` on success
-
-**Example:**
-```neutron
-use sys;
-
-// Set read/write for owner, read for others (0644 octal = 420 decimal)
-sys.chmod("file.txt", 420); 
-```
-
-**Throws:** Runtime error if operation fails
-
----
-
-### `sys.tmpfile()`
-Creates a temporary file path.
-
-**Returns:** String containing a unique temporary file path
-
-**Example:**
-```neutron
-use sys;
-
-var tmp = sys.tmpfile();
-sys.write(tmp, "temp data");
-```
-
-**Throws:** Runtime error if fails
+**Throws:** Runtime error if directory removal fails
 
 ## System Information
 

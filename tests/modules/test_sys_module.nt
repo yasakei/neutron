@@ -45,7 +45,41 @@ if (args[0] != "") {
     say("✗ sys.args failed");
 }
 
+// Test 6: Temporary file
+var tmp = sys.tmpfile();
+if (tmp != "") {
+    say("✓ sys.tmpfile works");
+} else {
+    say("✗ sys.tmpfile failed");
+}
+
+// Test 7: File stat
+sys.write(tmp, "Hello, World!");
+var fileInfo = sys.stat(tmp);
+if (fileInfo.size == 13 and fileInfo.is_file) {
+    say("✓ sys.stat works");
+} else {
+    say("✗ sys.stat failed");
+}
+
+// Test 8: chmod
+sys.chmod(tmp, 420);
+say("✓ sys.chmod works");
+
+// Test 9: Directory listing
+var files = sys.listdir(".");
+var found_files = false;
+if (files.length > 0) {
+    found_files = true;
+}
+if (found_files) {
+    say("✓ sys.listdir works");
+} else {
+    say("✗ sys.listdir failed");
+}
+
 // Cleanup
+sys.rm(tmp);
 sys.rm(testFile);
 say("✓ sys.rm works");
 
