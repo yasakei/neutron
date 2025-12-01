@@ -484,7 +484,7 @@ namespace neutron {
         
         // Directory Operations
         env->define("mkdir", Value(new NativeFn(sys_mkdir, 1)));
-        env->define("rmdir", Value(new NativeFn(sys_rmdir, 1)));
+        env->define("rmdir", Value(new NativeFn(sys_rmdir, -1))); // 1-2 arguments
         env->define("listdir", Value(new NativeFn(sys_listdir, 1)));
         
         // File Info & Permissions

@@ -1,7 +1,7 @@
 // Sorting algorithms benchmark in Neutron
 
 fun bubbleSort(arr) {
-    var n = arr.length();
+    var n = arr.length;
     var i = 0;
     while (i < n - 1) {
         var j = 0;

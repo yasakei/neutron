@@ -1,6 +1,6 @@
 # JSON Module Documentation
 
-The `json` module provides JSON parsing and serialization functionality for Neutron programs, allowing you to work with JSON data structures.
+The `json` module provides JSON parsing, serialization, file I/O, and object manipulation functionality for Neutron programs. All file operations use real filesystem I/O with proper error handling.
 
 ## Usage
 
@@ -13,6 +13,8 @@ var parsed = json.parse(jsonString);
 ```
 
 ## Functions
+
+### Core Functions
 
 ### `json.stringify(value, [pretty])`
 Converts a Neutron value to a JSON string representation.
@@ -311,6 +313,231 @@ var invalidUser = "{\"name\":\"Bob\"}";
 validateUser(validUser);   // Validation passes
 validateUser(invalidUser); // Validation fails
 ```
+
+## File I/O Functions
+
+### `json.readFile(filepath)`
+Reads and parses a JSON file from the filesystem.
+
+**Parameters:**
+- `filepath` (string): Path to the JSON file to read
+
+**Returns:** Parsed JSON object
+
+**Features:**
+- Uses real filesystem I/O with `std::ifstream`
+- Automatically parses the file contents as JSON
+- Throws descriptive errors for missing files or invalid JSON
+
+**Example:**
+```neutron
+use json;
+
+// Read configuration from file
+var config = json.readFile("config.json");
+say("App name: " + json.get(config, "appName"));
+say("Version: " + json.get(config, "version"));
+
+// Read user data
+var users = json.readFile("data/users.json");
+var user1 = json.get(users, "0");
+say("First user: " + json.get(user1, "name"));
+```
+
+**Throws:**
+- Runtime error if file doesn't exist
+- Runtime error if file cannot be opened
+- Runtime error if JSON is malformed
+
+---
+
+### `json.writeFile(filepath, data, [pretty])`
+Writes a value to a JSON file.
+
+**Parameters:**
+- `filepath` (string): Path to write the JSON file
+- `data` (any): Data to serialize and write
+- `pretty` (boolean, optional): Format with indentation (default: `false`)
+
+**Returns:** `true` on success
+
+**Features:**
+- Uses real filesystem I/O with `std::ofstream`
+- Automatically stringifies the data
+- Creates or overwrites the file
+- Optional pretty formatting with indentation
+
+**Example:**
+```neutron
+use json;
+
+// Save configuration
+var config = json.parse("{}");
+json.set(config, "appName", "MyApp");
+json.set(config, "version", "1.0.0");
+json.set(config, "debug", true);
+
+json.writeFile("config.json", config);
+say("Configuration saved!");
+
+// Save with pretty formatting
+var userData = json.parse("{\"name\": \"Alice\", \"age\": 30}");
+json.writeFile("user.json", userData, true);
+say("User data saved (pretty formatted)!");
+```
+
+**Throws:**
+- Runtime error if file cannot be opened for writing
+- Runtime error if directory doesn't exist
+
+---
+
+## Advanced Object Manipulation
+
+### `json.set(object, key, value)`
+Sets a property on a JSON object.
+
+**Parameters:**
+- `object` (object): JSON object to modify
+- `key` (string): Property key
+- `value` (any): Value to set
+
+**Returns:** The modified object
+
+**Example:**
+```neutron
+use json;
+
+var obj = json.parse("{\"name\": \"Alice\"}");
+json.set(obj, "age", 30);
+say(json.stringify(obj)); // {"name":"Alice","age":30}
+```
+
+---
+
+### `json.has(object, key)`
+Checks if an object has a specific key.
+
+**Parameters:**
+- `object` (object): JSON object to check
+- `key` (string): Property key to look for
+
+**Returns:** `true` if key exists, `false` otherwise
+
+**Example:**
+```neutron
+use json;
+
+var obj = json.parse("{\"name\": \"Alice\"}");
+if (json.has(obj, "name")) {
+    say("Name exists");
+}
+```
+
+---
+
+### `json.keys(object)`
+Returns an array of all keys in an object.
+
+**Parameters:**
+- `object` (object): JSON object
+
+**Returns:** Array of key strings
+
+**Example:**
+```neutron
+use json;
+
+var obj = json.parse("{\"name\": \"Alice\", \"age\": 30}");
+var keys = json.keys(obj);
+for (var i = 0; i < keys.length; i = i + 1) {
+    say(keys[i]); // name, age
+}
+```
+
+---
+
+### `json.values(object)`
+Returns an array of all values in an object.
+
+**Parameters:**
+- `object` (object): JSON object
+
+**Returns:** Array of values
+
+**Example:**
+```neutron
+use json;
+
+var obj = json.parse("{\"name\": \"Alice\", \"age\": 30}");
+var values = json.values(obj);
+say(values[0]); // Alice
+say(values[1]); // 30
+```
+
+---
+
+### `json.merge(obj1, obj2)`
+Merges two objects, with obj2 properties overwriting obj1.
+
+**Parameters:**
+- `obj1` (object): First object
+- `obj2` (object): Second object (takes precedence)
+
+**Returns:** New merged object
+
+**Example:**
+```neutron
+use json;
+
+var obj1 = json.parse("{\"name\": \"Alice\", \"age\": 30}");
+var obj2 = json.parse("{\"age\": 31, \"city\": \"NYC\"}");
+var merged = json.merge(obj1, obj2);
+say(json.stringify(merged)); // {"name":"Alice","age":31,"city":"NYC"}
+```
+
+---
+
+### `json.delete(object, key)`
+Removes a property from an object.
+
+**Parameters:**
+- `object` (object): JSON object to modify
+- `key` (string): Property key to remove
+
+**Returns:** The modified object
+
+**Example:**
+```neutron
+use json;
+
+var obj = json.parse("{\"name\": \"Alice\", \"age\": 30}");
+json.delete(obj, "age");
+say(json.stringify(obj)); // {"name":"Alice"}
+```
+
+---
+
+### `json.clone(value)`
+Creates a deep copy of a value.
+
+**Parameters:**
+- `value` (any): Value to clone
+
+**Returns:** Deep copy of the value
+
+**Example:**
+```neutron
+use json;
+
+var obj1 = json.parse("{\"name\": \"Alice\"}");
+var obj2 = json.clone(obj1);
+json.set(obj2, "name", "Bob");
+say(obj1.name); // Alice (unchanged)
+say(obj2.name); // Bob
+```
+
+---
 
 ## Error Handling
 

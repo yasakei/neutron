@@ -1,6 +1,6 @@
 # HTTP Module Documentation
 
-The `http` module provides HTTP client functionality for making web requests in Neutron programs. It supports all major HTTP methods and returns structured response objects.
+The `http` module provides HTTP client and server functionality for Neutron programs. It uses **libcurl** for real HTTP client operations and **POSIX sockets** for real HTTP server functionality. All network operations are fully implemented - no mock implementations.
 
 ## Usage
 
@@ -498,40 +498,190 @@ var statusMessage = handleStatusCode(response["status"]);
 say(statusMessage);
 ```
 
-## Important Notes
+## Utility Functions
 
-### Current Implementation
-The HTTP module currently provides **mock responses** rather than making actual HTTP requests. This means:
+### `http.request(method, url, [data], [headers])`
+Makes a custom HTTP request with specified method.
 
-- All requests return status 200
-- Response bodies are mock strings describing the request
-- Headers include basic mock values
+**Parameters:**
+- `method` (string): HTTP method (GET, POST, PUT, DELETE, etc.)
+- `url` (string): Target URL
+- `data` (string, optional): Request body
+- `headers` (object, optional): Request headers
 
-### Real HTTP Implementation
-In a production environment, the HTTP module would:
+**Returns:** Response object
 
-- Make actual network requests using libraries like libcurl
-- Handle network timeouts and connection errors
-- Support HTTPS/TLS encryption
-- Provide detailed error reporting
-- Support cookies and session management
+**Example:**
+```neutron
+use http;
+
+var response = http.request("OPTIONS", "https://api.example.com");
+say("Status: " + response.status);
+```
+
+---
+
+### `http.urlEncode(string)`
+Encodes a string for safe use in URLs (percent-encoding).
+
+**Parameters:**
+- `string` (string): String to encode
+
+**Returns:** URL-encoded string
+
+**Example:**
+```neutron
+use http;
+
+var encoded = http.urlEncode("hello world!");
+say(encoded); // Output: hello+world%21
+```
+
+---
+
+### `http.urlDecode(string)`
+Decodes a URL-encoded string.
+
+**Parameters:**
+- `string` (string): URL-encoded string
+
+**Returns:** Decoded string
+
+**Example:**
+```neutron
+use http;
+
+var decoded = http.urlDecode("hello+world%21");
+say(decoded); // Output: hello world!
+```
+
+---
+
+### `http.parseQuery(queryString)`
+Parses a URL query string into an object.
+
+**Parameters:**
+- `queryString` (string): Query string (e.g., "name=John&age=30")
+
+**Returns:** Object with key-value pairs
+
+**Example:**
+```neutron
+use http;
+
+var params = http.parseQuery("name=John&age=30&city=NYC");
+say(params.name); // Output: John
+say(params.age);  // Output: 30
+```
+
+---
+
+## Server Functions
+
+The HTTP server uses **POSIX sockets** for real TCP/IP networking with multi-threaded request handling.
+
+### `http.startServer(port)`
+Starts a simple HTTP server on the specified port.
+
+**Parameters:**
+- `port` (number): Port number to listen on (e.g., 8080)
+
+**Returns:** `true` on success
+
+**Features:**
+- Real socket binding with `bind()` and `listen()`
+- Background thread for handling incoming connections
+- Accepts multiple concurrent connections
+- Returns basic HTTP/1.1 responses
+
+**Example:**
+```neutron
+use http;
+
+// Start server on port 8080
+http.startServer(8080);
+say("Server is running on http://localhost:8080");
+
+// Server runs in background, program continues
+
+// Stop the server when done
+http.stopServer();
+```
+
+---
+
+### `http.createServer(handler)`
+Creates an HTTP server object with custom request handler.
+
+**Parameters:**
+- `handler` (function): Request handler function
+
+**Returns:** Server object
+
+**Note:** Advanced API - use `startServer()` for simple servers.
+
+---
+
+### `http.listen(server, port)`
+Starts an HTTP server object on specified port.
+
+**Parameters:**
+- `server` (object): Server object from createServer
+- `port` (number): Port number to listen on
+
+**Returns:** `true` on success
+
+---
+
+### `http.stopServer()`
+Stops the currently running HTTP server.
+
+**Returns:** `true` on success
+
+**Example:**
+```neutron
+use http;
+
+http.startServer(9000);
+// Do work...
+http.stopServer();
+say("Server stopped");
+```
+
+---
+
+## Implementation Details
+
+### HTTP Client (libcurl)
+- Uses **libcurl 8.17.0** for real HTTP/HTTPS requests
+- Supports TLS/SSL encryption
+- Handles redirects automatically
+- 30-second default timeout
+- Custom User-Agent: "Neutron/1.0"
+
+### HTTP Server (POSIX Sockets)
+- Real TCP/IP socket binding with `socket()`, `bind()`, `listen()`
+- Background thread using C++ `std::thread`
+- Accepts connections with `accept()`
+- Reads HTTP requests from socket
+- Returns basic "Neutron HTTP Server" responses
 
 ### Security Considerations
-When implementing real HTTP functionality:
+When using HTTP functionality:
 
 - Always validate URLs and input data
-- Use HTTPS for sensitive data
-- Implement proper authentication
-- Handle credentials securely
-- Validate server certificates
+- Use HTTPS for sensitive data (client supports it)
+- Server listens on all interfaces (0.0.0.0) - configure firewall appropriately
+- Validate server certificates when making requests
+- Implement proper authentication for your endpoints
 
 ### Performance Tips
 
 - Use HEAD requests to check resources without downloading content
-- Implement caching for frequently accessed data
-- Use appropriate timeouts for network requests
-- Consider connection pooling for multiple requests
+- Server uses non-blocking I/O for better concurrency
+- Client implements 30-second timeout to prevent hanging
+- Close connections properly with `stopServer()`
 
 ## Compatibility
 
-The HTTP module is available in both interpreter mode and compiled binaries. The mock implementation ensures consistent behavior during development and testing phases.
+The HTTP module is available in both interpreter mode and compiled binaries. All functionality uses real network operations with no mock implementations.

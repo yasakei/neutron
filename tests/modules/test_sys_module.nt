@@ -78,6 +78,32 @@ if (found_files) {
     say("✗ sys.listdir failed");
 }
 
+// Test 10: mkdir and rmdir (empty)
+sys.mkdir("test_empty_dir");
+if (sys.exists("test_empty_dir")) {
+    sys.rmdir("test_empty_dir");
+    if (!sys.exists("test_empty_dir")) {
+        say("✓ sys.mkdir and sys.rmdir work");
+    } else {
+        say("✗ sys.rmdir failed");
+    }
+} else {
+    say("✗ sys.mkdir failed");
+}
+
+// Test 11: rmdir recursive (with contents)
+sys.mkdir("test_full_dir");
+sys.write("test_full_dir/file1.txt", "content1");
+sys.write("test_full_dir/file2.txt", "content2");
+sys.mkdir("test_full_dir/subdir");
+sys.write("test_full_dir/subdir/file3.txt", "content3");
+sys.rmdir("test_full_dir", true);
+if (!sys.exists("test_full_dir")) {
+    say("✓ sys.rmdir recursive works");
+} else {
+    say("✗ sys.rmdir recursive failed");
+}
+
 // Cleanup
 sys.rm(tmp);
 sys.rm(testFile);

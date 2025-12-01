@@ -258,12 +258,14 @@ if (pattern.test(text)) {
 
 ---
 
-### 10. File System Module Enhancements
+### 10. File System Module Enhancements ✅ COMPLETED
 **Impact:** Low  
 **Effort:** Medium  
 **Description:** Add more file system operations to sys module.
 
-**New Features:**
+**Status:** Implemented and tested. See `tests/modules/test_sys_module.nt`.
+
+**Implemented Features:**
 ```neutron
 use sys;
 
@@ -279,11 +281,14 @@ say("Size: " + info.size);
 say("Modified: " + info.mtime);
 
 // Permissions
-sys.chmod("file.txt", 0644);
+sys.chmod("file.txt", 420); // 0644 in decimal
 
 // Temp files
 var tmpfile = sys.tmpfile();
 sys.write(tmpfile, "temporary data");
+
+// Recursive directory removal with safety
+sys.rmdir("folder", true); // Cannot delete outside cwd
 ```
 
 ---
@@ -322,7 +327,103 @@ say(data);
 
 ---
 
-### 13. Standard Library Expansion
+### 13. HTTP & JSON Module Enhancements ✅ COMPLETED
+**Impact:** Medium  
+**Effort:** Medium  
+**Description:** Enhanced HTTP and JSON modules with additional functionality.
+
+**Status:** Implemented and tested. See `tests/modules/test_http_module.nt` and `tests/modules/test_json_module.nt`.
+
+**HTTP Module - Implemented Features:**
+```neutron
+use http;
+
+// REST API methods (existing)
+http.get(url);
+http.post(url, data);
+http.put(url, data);
+http.delete(url);
+http.patch(url, data);
+http.head(url);
+
+// New utility functions
+http.request("OPTIONS", url);  // Custom method
+http.urlEncode("hello world!"); // URL encoding
+http.urlDecode("hello+world%21"); // URL decoding
+http.parseQuery("name=John&age=30"); // Parse query strings
+
+// Server creation (mock)
+var server = http.createServer(handler);
+http.listen(server, 3000);
+```
+
+**JSON Module - Implemented Features:**
+```neutron
+use json;
+
+// Core functions (existing)
+json.stringify(obj);
+json.parse(jsonStr);
+json.get(obj, key);
+
+// New manipulation functions
+json.set(obj, key, value);     // Set property
+json.has(obj, key);            // Check if key exists
+json.keys(obj);                // Get all keys
+json.values(obj);              // Get all values
+json.merge(obj1, obj2);        // Merge objects
+json.delete(obj, key);         // Remove property
+json.clone(obj);               // Deep copy
+```
+
+---
+
+### 14. Regular Expressions Module ✅ COMPLETED
+**Impact:** High  
+**Effort:** Medium  
+**Description:** Add comprehensive regex support for pattern matching and text manipulation.
+
+**Status:** Implemented and tested. See `tests/modules/test_regex_module.nt`.
+
+**Regex Module - Implemented Features:**
+```neutron
+use regex;
+
+// Core functions
+regex.test(text, pattern);        // Full string match
+regex.search(text, pattern);      // Search for pattern
+regex.find(text, pattern);        // Find with position and groups
+regex.findAll(text, pattern);     // Find all matches
+regex.replace(text, pattern, replacement);  // Replace matches
+regex.split(text, pattern);       // Split by pattern
+
+// Utilities
+regex.isValid(pattern);           // Validate pattern
+regex.escape(text);               // Escape special characters
+
+// Examples
+var email = "user@example.com";
+if (regex.test(email, "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}")) {
+    say("Valid email!");
+}
+
+var phone = "1234567890";
+var formatted = regex.replace(phone, "(\\d{3})(\\d{3})(\\d{4})", "($1) $2-$3");
+say(formatted);  // (123) 456-7890
+```
+
+**Implementation:**
+- ✅ Uses C++ std::regex (ECMAScript grammar)
+- ✅ Full capture group support
+- ✅ Backreferences in replacements
+- ✅ Comprehensive error handling
+- ✅ Position and length tracking for matches
+
+**Documentation:** `docs/modules/regex_module.md`
+
+---
+
+### 15. Standard Library Expansion
 **Impact:** Medium  
 **Effort:** High  
 **Description:** Add more built-in modules.
@@ -340,7 +441,7 @@ say(data);
 
 ---
 
-### 14. Debugger
+### 16. Debugger
 **Impact:** High  
 **Effort:** Very High  
 **Description:** Interactive debugger for Neutron scripts.
@@ -359,7 +460,7 @@ neutron --debug script.nt
 
 ---
 
-### 15. Static Type Hints (Optional)
+### 17. Static Type Hints (Optional)
 **Impact:** Medium  
 **Effort:** Very High  
 **Description:** Optional type annotations for better tooling support.
@@ -376,7 +477,7 @@ var age: number = 30;
 
 ---
 
-### 16. Object Destructuring
+### 18. Object Destructuring
 **Impact:** Low  
 **Effort:** Medium  
 **Description:** Unpack object properties into variables.

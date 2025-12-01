@@ -8,7 +8,7 @@ while (i < 1000) {
     text = text + "x";
     i = i + 1;
 }
-say("Built string of length: " + text.length());
+say("Built string of length: " + text.length);
 
 // String operations in loop
 var result = "";
@@ -40,7 +40,7 @@ while (m < 50) {
     repeated = repeated + "abc";
     m = m + 1;
 }
-say("Repeated string length: " + repeated.length());
+say("Repeated string length: " + repeated.length);
 
 // Case operations (simulated)
 var upper_count = 0;

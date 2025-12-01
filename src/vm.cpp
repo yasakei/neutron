@@ -47,6 +47,7 @@
 #include "math/native.h"
 #include "http/native.h"
 #include "async/native.h"
+#include "regex/native.h"
 #include "modules/module_registry.h"
 #include "utils/component_interface.h"
 
@@ -1568,6 +1569,10 @@ void VM::load_module(const std::string& name) {
         return;
     } else if (name == "async") {
         neutron_init_async_module(this);
+        loadedModuleCache[name] = true;
+        return;
+    } else if (name == "regex") {
+        neutron_init_regex_module(this);
         loadedModuleCache[name] = true;
         return;
     }

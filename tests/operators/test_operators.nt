@@ -99,8 +99,8 @@ if (result == 14) {
 }
 
 // Test 6: Parentheses
-var result2 = (2 + 3) * 4;
-if (result2 == 20) {
+var result3 = (2 + 3) * 4;
+if (result3 == 20) {
     say("✓ Parentheses for precedence work");
 } else {
     say("✗ Parentheses failed");

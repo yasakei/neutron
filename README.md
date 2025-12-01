@@ -146,10 +146,13 @@ Lambdas, closures, and higher-order functions for functional programming pattern
 File I/O, directory manipulation, environment variables, process control
 
 **Web & Networking** (`http`)  
-HTTP client with GET/POST/PUT/DELETE support
+HTTP client with GET/POST/PUT/DELETE support, real socket-based server
 
 **Data Formats** (`json`)  
-Fast JSON parsing and serialization
+Fast JSON parsing, serialization, and file I/O
+
+**Regular Expressions** (`regex`)  
+Pattern matching, search, replace, split with full capture group support
 
 **Mathematics** (`math`)  
 Standard math functions and constants
@@ -159,6 +162,9 @@ Type conversion, formatting, and inspection
 
 **Time & Date** (`time`)  
 Timestamps, formatting, and delays
+
+**Arrays** (`arrays`)  
+Advanced array operations and manipulations
 
 </td>
 </tr>
@@ -278,6 +284,9 @@ say("Hello, World!");
 ```bash
 ./neutron hello.nt  # Run it directly
 ```
+
+> [!TIP]
+> **Common Mistake**: Use `.length` (property), not `.length()` (method). See [Common Pitfalls Guide](docs/guides/common-pitfalls.md).
 
 ### Real-World Examples
 
@@ -409,8 +418,9 @@ say("  Warnings: ${warnings}");
 
 ### Module Documentation
 - [Sys Module](docs/modules/sys_module.md) - File I/O and system operations
-- [JSON Module](docs/modules/json_module.md) - JSON parsing and generation
-- [HTTP Module](docs/modules/http_module.md) - HTTP client functionality
+- [JSON Module](docs/modules/json_module.md) - JSON parsing, serialization, and file I/O
+- [HTTP Module](docs/modules/http_module.md) - HTTP client and server functionality
+- [Regex Module](docs/modules/regex_module.md) - Regular expressions and pattern matching
 - [Math Module](docs/modules/math_module.md) - Mathematical operations
 - [More modules...](docs/modules/)
 

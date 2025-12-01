@@ -1,9 +1,25 @@
+/*
+ * Neutron Programming Language
+ * Copyright (c) 2025 yasakei
+ * 
+ * This software is distributed under the Neutron Public License 1.0.
+ * For full license text, see LICENSE file in the root directory.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 #include "native.h"
 #include "vm.h"
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
-#include <functional>  // for std::function
+#include <functional>
+#include <fstream>
 
 using namespace neutron;
 
@@ -339,11 +355,245 @@ Value json_get(std::vector<Value> arguments) {
     return Value(); // Return null if key not found
 }
 
+// JSON set - set a property on an object
+Value json_set(std::vector<Value> arguments) {
+    if (arguments.size() != 3) {
+        throw std::runtime_error("Expected 3 arguments for json.set() (object, key, value).");
+    }
+    
+    if (arguments[0].type != ValueType::OBJECT) {
+        throw std::runtime_error("First argument for json.set() must be an object.");
+    }
+    
+    if (arguments[1].type != ValueType::STRING) {
+        throw std::runtime_error("Second argument for json.set() must be a string key.");
+    }
+    
+    JsonObject* obj = dynamic_cast<JsonObject*>(std::get<Object*>(arguments[0].as));
+    if (!obj) {
+        throw std::runtime_error("Invalid object type.");
+    }
+    
+    std::string key = std::get<std::string>(arguments[1].as);
+    obj->properties[key] = arguments[2];
+    
+    return arguments[0]; // Return the modified object
+}
+
+// JSON has - check if object has a key
+Value json_has(std::vector<Value> arguments) {
+    if (arguments.size() != 2) {
+        throw std::runtime_error("Expected 2 arguments for json.has() (object, key).");
+    }
+    
+    if (arguments[0].type != ValueType::OBJECT) {
+        throw std::runtime_error("First argument for json.has() must be an object.");
+    }
+    
+    if (arguments[1].type != ValueType::STRING) {
+        throw std::runtime_error("Second argument for json.has() must be a string key.");
+    }
+    
+    JsonObject* obj = dynamic_cast<JsonObject*>(std::get<Object*>(arguments[0].as));
+    if (!obj) {
+        throw std::runtime_error("Invalid object type.");
+    }
+    
+    std::string key = std::get<std::string>(arguments[1].as);
+    return Value(obj->properties.find(key) != obj->properties.end());
+}
+
+// JSON keys - get all keys from an object
+Value json_keys(std::vector<Value> arguments) {
+    if (arguments.size() != 1) {
+        throw std::runtime_error("Expected 1 argument for json.keys().");
+    }
+    
+    if (arguments[0].type != ValueType::OBJECT) {
+        throw std::runtime_error("Argument for json.keys() must be an object.");
+    }
+    
+    JsonObject* obj = dynamic_cast<JsonObject*>(std::get<Object*>(arguments[0].as));
+    if (!obj) {
+        throw std::runtime_error("Invalid object type.");
+    }
+    
+    auto keysArray = new Array();
+    for (const auto& pair : obj->properties) {
+        keysArray->elements.push_back(Value(pair.first));
+    }
+    
+    return Value(keysArray);
+}
+
+// JSON values - get all values from an object
+Value json_values(std::vector<Value> arguments) {
+    if (arguments.size() != 1) {
+        throw std::runtime_error("Expected 1 argument for json.values().");
+    }
+    
+    if (arguments[0].type != ValueType::OBJECT) {
+        throw std::runtime_error("Argument for json.values() must be an object.");
+    }
+    
+    JsonObject* obj = dynamic_cast<JsonObject*>(std::get<Object*>(arguments[0].as));
+    if (!obj) {
+        throw std::runtime_error("Invalid object type.");
+    }
+    
+    auto valuesArray = new Array();
+    for (const auto& pair : obj->properties) {
+        valuesArray->elements.push_back(pair.second);
+    }
+    
+    return Value(valuesArray);
+}
+
+// JSON merge - merge two objects
+Value json_merge(std::vector<Value> arguments) {
+    if (arguments.size() != 2) {
+        throw std::runtime_error("Expected 2 arguments for json.merge() (obj1, obj2).");
+    }
+    
+    if (arguments[0].type != ValueType::OBJECT || arguments[1].type != ValueType::OBJECT) {
+        throw std::runtime_error("Both arguments for json.merge() must be objects.");
+    }
+    
+    JsonObject* obj1 = dynamic_cast<JsonObject*>(std::get<Object*>(arguments[0].as));
+    JsonObject* obj2 = dynamic_cast<JsonObject*>(std::get<Object*>(arguments[1].as));
+    
+    if (!obj1 || !obj2) {
+        throw std::runtime_error("Invalid object type.");
+    }
+    
+    auto merged = new JsonObject();
+    
+    // Copy obj1 properties
+    for (const auto& pair : obj1->properties) {
+        merged->properties[pair.first] = pair.second;
+    }
+    
+    // Copy obj2 properties (overwriting duplicates)
+    for (const auto& pair : obj2->properties) {
+        merged->properties[pair.first] = pair.second;
+    }
+    
+    return Value(merged);
+}
+
+// JSON delete - remove a property from an object
+Value json_delete(std::vector<Value> arguments) {
+    if (arguments.size() != 2) {
+        throw std::runtime_error("Expected 2 arguments for json.delete() (object, key).");
+    }
+    
+    if (arguments[0].type != ValueType::OBJECT) {
+        throw std::runtime_error("First argument for json.delete() must be an object.");
+    }
+    
+    if (arguments[1].type != ValueType::STRING) {
+        throw std::runtime_error("Second argument for json.delete() must be a string key.");
+    }
+    
+    JsonObject* obj = dynamic_cast<JsonObject*>(std::get<Object*>(arguments[0].as));
+    if (!obj) {
+        throw std::runtime_error("Invalid object type.");
+    }
+    
+    std::string key = std::get<std::string>(arguments[1].as);
+    obj->properties.erase(key);
+    
+    return arguments[0]; // Return the modified object
+}
+
+// JSON clone - deep copy an object
+Value json_clone(std::vector<Value> arguments) {
+    if (arguments.size() != 1) {
+        throw std::runtime_error("Expected 1 argument for json.clone().");
+    }
+    
+    // Convert to JSON string and parse it back (simple deep copy)
+    std::string jsonStr = valueToJsonString(arguments[0], false);
+    return parseJsonString(jsonStr);
+}
+
+// JSON read from file
+Value json_readFile(std::vector<Value> arguments) {
+    if (arguments.size() != 1) {
+        throw std::runtime_error("Expected 1 argument for json.readFile() (filepath).");
+    }
+    
+    if (arguments[0].type != ValueType::STRING) {
+        throw std::runtime_error("Argument for json.readFile() must be a string filepath.");
+    }
+    
+    std::string filepath = std::get<std::string>(arguments[0].as);
+    std::ifstream file(filepath);
+    
+    if (!file.is_open()) {
+        throw std::runtime_error("Failed to open file: " + filepath);
+    }
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    file.close();
+    
+    std::string jsonContent = buffer.str();
+    return parseJsonString(jsonContent);
+}
+
+// JSON write to file
+Value json_writeFile(std::vector<Value> arguments) {
+    if (arguments.size() < 2 || arguments.size() > 3) {
+        throw std::runtime_error("Expected 2-3 arguments for json.writeFile() (filepath, data, pretty?).");
+    }
+    
+    if (arguments[0].type != ValueType::STRING) {
+        throw std::runtime_error("First argument for json.writeFile() must be a string filepath.");
+    }
+    
+    bool pretty = false;
+    if (arguments.size() == 3 && arguments[2].type == ValueType::BOOLEAN) {
+        pretty = std::get<bool>(arguments[2].as);
+    }
+    
+    std::string filepath = std::get<std::string>(arguments[0].as);
+    std::string jsonContent = valueToJsonString(arguments[1], pretty);
+    
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        throw std::runtime_error("Failed to open file for writing: " + filepath);
+    }
+    
+    file << jsonContent;
+    file.close();
+    
+    return Value(true);
+}
+
 namespace neutron {
     void register_json_functions(std::shared_ptr<Environment> env) {
+        // Core functions
         env->define("stringify", Value(new NativeFn(json_stringify, -1)));
         env->define("parse", Value(new NativeFn(json_parse, 1)));
+        
+        // File operations
+        env->define("readFile", Value(new NativeFn(json_readFile, 1)));
+        env->define("writeFile", Value(new NativeFn(json_writeFile, -1)));
+        
+        // Object manipulation
         env->define("get", Value(new NativeFn(json_get, 2)));
+        env->define("set", Value(new NativeFn(json_set, 3)));
+        env->define("has", Value(new NativeFn(json_has, 2)));
+        env->define("delete", Value(new NativeFn(json_delete, 2)));
+        
+        // Object introspection
+        env->define("keys", Value(new NativeFn(json_keys, 1)));
+        env->define("values", Value(new NativeFn(json_values, 1)));
+        
+        // Object utilities
+        env->define("merge", Value(new NativeFn(json_merge, 2)));
+        env->define("clone", Value(new NativeFn(json_clone, 1)));
     }
 }
 

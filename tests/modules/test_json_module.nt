@@ -1,0 +1,146 @@
+use json;
+
+say("=== Testing JSON Module ===");
+
+// Test 1: json.stringify basic types
+var strNull = json.stringify(nil);
+if (strNull == "null") {
+    say("✓ json.stringify(nil) works");
+} else {
+    say("✗ json.stringify(nil) failed");
+}
+
+var strBool = json.stringify(true);
+if (strBool == "true") {
+    say("✓ json.stringify(boolean) works");
+} else {
+    say("✗ json.stringify(boolean) failed");
+}
+
+var strNum = json.stringify(42);
+if (strNum == "42") {
+    say("✓ json.stringify(number) works");
+} else {
+    say("✗ json.stringify(number) failed");
+}
+
+// Test 2: json.parse basic types
+var parsedNull = json.parse("null");
+if (parsedNull == nil) {
+    say("✓ json.parse(null) works");
+} else {
+    say("✗ json.parse(null) failed");
+}
+
+var parsedBool = json.parse("true");
+if (parsedBool == true) {
+    say("✓ json.parse(boolean) works");
+} else {
+    say("✗ json.parse(boolean) failed");
+}
+
+var parsedNum = json.parse("42");
+if (parsedNum == 42) {
+    say("✓ json.parse(number) works");
+} else {
+    say("✗ json.parse(number) failed");
+}
+
+// Test 3: json.get
+var obj = json.parse("{\"name\": \"Alice\", \"age\": 30}");
+var name = json.get(obj, "name");
+if (name == "Alice") {
+    say("✓ json.get works");
+} else {
+    say("✗ json.get failed");
+}
+
+// Test 4: json.has
+if (json.has(obj, "name")) {
+    say("✓ json.has works");
+} else {
+    say("✗ json.has failed");
+}
+
+// Test 5: json.set
+json.set(obj, "city", "NYC");
+if (obj.city == "NYC") {
+    say("✓ json.set works");
+} else {
+    say("✗ json.set failed");
+}
+
+// Test 6: json.keys
+var keys = json.keys(obj);
+if (keys.length == 3) {
+    say("✓ json.keys works");
+} else {
+    say("✗ json.keys failed (expected 3, got " + keys.length + ")");
+}
+
+// Test 7: json.values
+var values = json.values(obj);
+if (values.length == 3) {
+    say("✓ json.values works");
+} else {
+    say("✗ json.values failed");
+}
+
+// Test 8: json.merge
+var obj2 = json.parse("{\"country\": \"USA\", \"age\": 31}");
+var merged = json.merge(obj, obj2);
+if (merged.country == "USA" and merged.age == 31) {
+    say("✓ json.merge works");
+} else {
+    say("✗ json.merge failed");
+}
+
+// Test 9: json.clone
+var cloned = json.clone(obj);
+json.set(cloned, "name", "Bob");
+if (obj.name == "Alice" and cloned.name == "Bob") {
+    say("✓ json.clone works (deep copy)");
+} else {
+    say("✗ json.clone failed");
+}
+
+// Test 10: json.delete
+json.delete(obj, "city");
+if (!json.has(obj, "city")) {
+    say("✓ json.delete works");
+} else {
+    say("✗ json.delete failed");
+}
+
+// Test 11: json.writeFile
+use sys;
+var fileData = json.parse("{\"app\": \"neutron\", \"version\": \"1.0\"}");
+json.writeFile("test_json.json", fileData);
+if (sys.exists("test_json.json")) {
+    say("✓ json.writeFile works");
+} else {
+    say("✗ json.writeFile failed");
+}
+
+// Test 12: json.readFile
+var loaded = json.readFile("test_json.json");
+if (loaded.app == "neutron" and loaded.version == "1.0") {
+    say("✓ json.readFile works");
+} else {
+    say("✗ json.readFile failed");
+}
+
+// Test 13: Pretty formatting
+json.writeFile("test_pretty.json", fileData, true);
+var prettyContent = sys.read("test_pretty.json");
+if (prettyContent != "") {
+    say("✓ json.writeFile with pretty formatting works");
+} else {
+    say("✗ json.writeFile pretty formatting failed");
+}
+
+// Cleanup
+sys.rm("test_json.json");
+sys.rm("test_pretty.json");
+
+say("\n=== All JSON module tests passed ===");

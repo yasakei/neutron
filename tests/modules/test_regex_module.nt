@@ -1,0 +1,158 @@
+use regex;
+
+say("=== Testing Regex Module ===");
+
+// Test 1: regex.test - Full string match
+var text1 = "hello";
+if (regex.test(text1, "hello")) {
+    say("✓ regex.test() exact match works");
+} else {
+    say("✗ regex.test() exact match failed");
+}
+
+if (!regex.test(text1, "world")) {
+    say("✓ regex.test() non-match works");
+} else {
+    say("✗ regex.test() non-match failed");
+}
+
+// Test 2: regex.search - Pattern search
+var text2 = "The quick brown fox";
+if (regex.search(text2, "quick")) {
+    say("✓ regex.search() finds pattern");
+} else {
+    say("✗ regex.search() failed to find pattern");
+}
+
+if (regex.search(text2, "\\w+")) {
+    say("✓ regex.search() works with regex patterns");
+} else {
+    say("✗ regex.search() regex pattern failed");
+}
+
+// Test 3: regex.find - Find first match with details
+var text3 = "Email: test@example.com";
+var result = regex.find(text3, "[a-z]+@[a-z]+\\.[a-z]+");
+if (result != nil) {
+    if (result.matched == "test@example.com") {
+        say("✓ regex.find() extracts matched text");
+    } else {
+        say("✗ regex.find() matched text incorrect");
+    }
+    if (result.position == 7) {
+        say("✓ regex.find() returns correct position");
+    } else {
+        say("✗ regex.find() position incorrect");
+    }
+} else {
+    say("✗ regex.find() failed to find match");
+}
+
+// Test 4: regex.find with capture groups
+var text4 = "Date: 2025-12-01";
+var dateResult = regex.find(text4, "(\\d+)-(\\d+)-(\\d+)");
+if (dateResult != nil) {
+    if (dateResult.groups.length == 4) {
+        say("✓ regex.find() capture groups work");
+    } else {
+        say("✗ regex.find() capture groups failed");
+    }
+} else {
+    say("✗ regex.find() date match failed");
+}
+
+// Test 5: regex.findAll - Find all matches
+var text5 = "Numbers: 123, 456, 789";
+var allMatches = regex.findAll(text5, "\\d+");
+if (allMatches.length == 3) {
+    say("✓ regex.findAll() finds all matches");
+    if (allMatches[0].matched == "123" and allMatches[1].matched == "456" and allMatches[2].matched == "789") {
+        say("✓ regex.findAll() extracts correct values");
+    } else {
+        say("✗ regex.findAll() values incorrect");
+    }
+} else {
+    say("✗ regex.findAll() match count incorrect");
+}
+
+// Test 6: regex.replace - Replace matches
+var text6 = "Hello World";
+var replaced = regex.replace(text6, "World", "Neutron");
+if (replaced == "Hello Neutron") {
+    say("✓ regex.replace() simple replacement works");
+} else {
+    say("✗ regex.replace() simple replacement failed");
+}
+
+var text7 = "cat bat rat";
+var replaced2 = regex.replace(text7, "[cbr]at", "mat");
+if (replaced2 == "mat mat mat") {
+    say("✓ regex.replace() pattern replacement works");
+} else {
+    say("✗ regex.replace() pattern replacement failed");
+}
+
+// Test 7: regex.split - Split by pattern
+var text8 = "apple,banana;orange|grape";
+var parts = regex.split(text8, "[,;|]");
+if (parts.length == 4) {
+    say("✓ regex.split() splits correctly");
+    if (parts[0] == "apple" and parts[1] == "banana" and parts[2] == "orange" and parts[3] == "grape") {
+        say("✓ regex.split() parts are correct");
+    } else {
+        say("✗ regex.split() parts incorrect");
+    }
+} else {
+    say("✗ regex.split() split count incorrect");
+}
+
+// Test 8: regex.isValid - Validate patterns
+if (regex.isValid("\\d+")) {
+    say("✓ regex.isValid() recognizes valid pattern");
+} else {
+    say("✗ regex.isValid() valid pattern check failed");
+}
+
+if (!regex.isValid("[invalid")) {
+    say("✓ regex.isValid() recognizes invalid pattern");
+} else {
+    say("✗ regex.isValid() invalid pattern check failed");
+}
+
+// Test 9: regex.escape - Escape special characters
+var special = "a.b*c?d+e";
+var escaped = regex.escape(special);
+if (regex.test("a.b*c?d+e", escaped)) {
+    say("✓ regex.escape() escapes special characters");
+} else {
+    say("✗ regex.escape() failed to escape");
+}
+
+// Test 10: Real-world use cases
+// Email validation
+var email = "user@example.com";
+if (regex.test(email, "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}")) {
+    say("✓ Email validation works");
+} else {
+    say("✗ Email validation failed");
+}
+
+// URL extraction
+var htmlText = "Visit https://example.com and http://test.org";
+var urls = regex.findAll(htmlText, "https?://[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
+if (urls.length == 2) {
+    say("✓ URL extraction works");
+} else {
+    say("✗ URL extraction failed");
+}
+
+// Phone number formatting
+var phone = "1234567890";
+var formatted = regex.replace(phone, "(\\d{3})(\\d{3})(\\d{4})", "($1) $2-$3");
+if (formatted == "(123) 456-7890") {
+    say("✓ Phone number formatting works");
+} else {
+    say("✗ Phone number formatting failed: " + formatted);
+}
+
+say("\n=== All regex module tests passed ===");

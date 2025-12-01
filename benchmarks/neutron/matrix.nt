@@ -45,4 +45,4 @@ var matrixB = createMatrix(size);
 
 // Multiply matrices
 var result = multiplyMatrices(matrixA, matrixB, size);
-say("Matrix ${result.length()}x${result[0].length()} = ${result[0][0]}");
+say("Matrix ${result.length}x${result[0].length} = ${result[0][0]}");

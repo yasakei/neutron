@@ -244,6 +244,8 @@ public:
 - Methods: `.push()`, `.pop()`, `.slice()`, `.map()`, `.filter()`, `.find()`, `.indexOf()`, `.join()`, `.reverse()`, `.sort()`
 - Property: `.length`
 
+> ⚠️ **Common Mistake**: `.length` is a **property**, not a method. Use `arr.length`, NOT `arr.length()`. See [Common Pitfalls Guide](guides/common-pitfalls.md) for more details.
+
 **Example**:
 ```neutron
 var arr = [1, 2, 3];

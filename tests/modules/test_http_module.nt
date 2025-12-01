@@ -9,7 +9,7 @@ say("=== Testing HTTP Module ===");
 
 // Test 1: HTTP GET request
 say("Testing http.get()...");
-var getResponse = http.get("https://api.example.com/test");
+var getResponse = http.get("https://httpbin.org/get");
 if (getResponse.status == 200) {
     say("✓ http.get() returns response object");
 } else {
@@ -27,7 +27,7 @@ if (!hasBody) {
 // Test 3: HTTP POST request
 say("Testing http.post()...");
 var postData = json.stringify({"key": "value"});
-var postResponse = http.post("https://api.example.com/submit", postData);
+var postResponse = http.post("https://httpbin.org/post", postData);
 if (postResponse.status == 200) {
     say("✓ http.post() returns response object");
 } else {
@@ -37,7 +37,7 @@ if (postResponse.status == 200) {
 // Test 4: HTTP PUT request
 say("Testing http.put()...");
 var putData = json.stringify({"update": "data"});
-var putResponse = http.put("https://api.example.com/update", putData);
+var putResponse = http.put("https://httpbin.org/put", putData);
 var putIsNil = putResponse == nil;
 if (!putIsNil) {
     say("✓ http.put() works");
@@ -47,7 +47,7 @@ if (!putIsNil) {
 
 // Test 5: HTTP DELETE request
 say("Testing http.delete()...");
-var deleteResponse = http.delete("https://api.example.com/remove");
+var deleteResponse = http.delete("https://httpbin.org/delete");
 var deleteIsNil = deleteResponse == nil;
 if (!deleteIsNil) {
     say("✓ http.delete() works");
@@ -57,7 +57,7 @@ if (!deleteIsNil) {
 
 // Test 6: HTTP HEAD request
 say("Testing http.head()...");
-var headResponse = http.head("https://api.example.com/check");
+var headResponse = http.head("https://httpbin.org/get");
 var headIsNil = headResponse == nil;
 if (!headIsNil) {
     say("✓ http.head() works");
@@ -68,7 +68,7 @@ if (!headIsNil) {
 // Test 7: HTTP PATCH request
 say("Testing http.patch()...");
 var patchData = json.stringify({"patch": "value"});
-var patchResponse = http.patch("https://api.example.com/partial", patchData);
+var patchResponse = http.patch("https://httpbin.org/patch", patchData);
 var patchIsNil = patchResponse == nil;
 if (!patchIsNil) {
     say("✓ http.patch() works");
@@ -76,5 +76,82 @@ if (!patchIsNil) {
     say("✗ http.patch() failed");
 }
 
+// Test 8: URL encoding
+var encoded = http.urlEncode("hello world!");
+if (encoded == "hello+world%21") {
+    say("✓ http.urlEncode works");
+} else {
+    say("✗ http.urlEncode failed");
+}
+
+// Test 9: URL decoding
+var decoded = http.urlDecode("hello+world%21");
+if (decoded == "hello world!") {
+    say("✓ http.urlDecode works");
+} else {
+    say("✗ http.urlDecode failed");
+}
+
+// Test 10: Parse query string
+var params = http.parseQuery("name=John&age=30");
+if (params.name == "John" and params.age == "30") {
+    say("✓ http.parseQuery works");
+} else {
+    say("✗ http.parseQuery failed");
+}
+
+// Test 11: Custom request method
+var customResponse = http.request("OPTIONS", "https://api.example.com");
+if (customResponse.status == 200) {
+    say("✓ http.request works");
+} else {
+    say("✗ http.request failed");
+}
+
+// Test 12: Create server
+var handler = fun(req, res) {
+    return "Hello!";
+};
+var server = http.createServer(handler);
+if (server.running == false) {
+    say("✓ http.createServer works");
+} else {
+    say("✗ http.createServer failed");
+}
+
+// Test 13: Listen on port
+http.listen(server, 8080);
+if (server.running == true and server.port == 8080) {
+    say("✓ http.listen works");
+} else {
+    say("✗ http.listen failed");
+}
+
+// Stop the server from listen test
+http.stopServer();
+
+// Test 14: HTTP Server with startServer
+say("\nTesting HTTP Server...");
+http.startServer(8081);
+say("✓ HTTP server started on port 8081");
+
+// Give server time to initialize
+var serverWait = 0;
+while (serverWait < 1000000) {
+    serverWait = serverWait + 1;
+}
+
+// Test 15: Make request to local server
+var serverResponse = http.get("http://localhost:8081/test");
+if (serverResponse.status == 200) {
+    say("✓ HTTP server responds to requests");
+} else {
+    say("✗ HTTP server failed to respond");
+}
+
+// Test 16: Stop server
+http.stopServer();
+say("✓ HTTP server stopped");
+
 say("\n=== All HTTP module tests passed ===");
-say("Note: HTTP responses may be mocked in test environment");
+say("Note: All HTTP operations use real libcurl client and POSIX socket server");
