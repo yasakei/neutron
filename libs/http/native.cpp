@@ -6,17 +6,45 @@
 #include <cstring>
 #include <thread>
 #include <atomic>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <arpa/inet.h>
+
+#ifdef _WIN32
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #pragma comment(lib, "Ws2_32.lib")
+    
+    typedef int socklen_t;
+    #define close closesocket
+    #define SHUT_RDWR SD_BOTH
+#else
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <unistd.h>
+    #include <arpa/inet.h>
+    #define INVALID_SOCKET -1
+    #define SOCKET_ERROR -1
+    typedef int SOCKET;
+#endif
 
 namespace neutron {
 
 // Global server state
 static std::atomic<bool> serverRunning{false};
 static std::thread* serverThread = nullptr;
-static int serverSocket = -1;
+static SOCKET serverSocket = INVALID_SOCKET;
+
+// Helper to initialize Winsock on Windows
+static void initSockets() {
+#ifdef _WIN32
+    static bool initialized = false;
+    if (!initialized) {
+        WSADATA wsaData;
+        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+            throw std::runtime_error("WSAStartup failed");
+        }
+        initialized = true;
+    }
+#endif
+}
 
 // CURL write callback
 static size_t curlWriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
@@ -377,17 +405,23 @@ Value http_request(std::vector<Value> arguments) {
 
 // Server thread function
 static void serverThreadFunc(int port, std::string (*handler)(const std::string&)) {
+    initSockets();
+    
     struct sockaddr_in address;
     int opt = 1;
     int addrlen = sizeof(address);
     
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (serverSocket == 0) {
+    if (serverSocket == INVALID_SOCKET) {
         serverRunning = false;
         return;
     }
     
-    setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+    #ifdef _WIN32
+        setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt));
+    #else
+        setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+    #endif
     
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
@@ -406,11 +440,11 @@ static void serverThreadFunc(int port, std::string (*handler)(const std::string&
     }
     
     while (serverRunning) {
-        int clientSocket = accept(serverSocket, (struct sockaddr*)&address, (socklen_t*)&addrlen);
-        if (clientSocket < 0) continue;
+        SOCKET clientSocket = accept(serverSocket, (struct sockaddr*)&address, (socklen_t*)&addrlen);
+        if (clientSocket == INVALID_SOCKET) continue;
         
         char buffer[4096] = {0};
-        read(clientSocket, buffer, 4096);
+        recv(clientSocket, buffer, 4096, 0);
         
         std::string request(buffer);
         std::string response;
@@ -489,18 +523,24 @@ Value http_listen(VM& vm, std::vector<Value> arguments) {
     server->properties["port"] = Value(static_cast<double>(port));
     server->properties["running"] = Value(true);
     
+    initSockets();
+    
     // Setup socket
     struct sockaddr_in address;
     int opt = 1;
     int addrlen = sizeof(address);
     
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (serverSocket == 0) {
+    if (serverSocket == INVALID_SOCKET) {
         serverRunning = false;
         throw std::runtime_error("Socket creation failed");
     }
     
-    setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+    #ifdef _WIN32
+        setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt));
+    #else
+        setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+    #endif
     
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
@@ -520,11 +560,11 @@ Value http_listen(VM& vm, std::vector<Value> arguments) {
     
     // Main loop (blocking)
     while (serverRunning) {
-        int clientSocket = accept(serverSocket, (struct sockaddr*)&address, (socklen_t*)&addrlen);
-        if (clientSocket < 0) continue;
+        SOCKET clientSocket = accept(serverSocket, (struct sockaddr*)&address, (socklen_t*)&addrlen);
+        if (clientSocket == INVALID_SOCKET) continue;
         
         char buffer[4096] = {0};
-        read(clientSocket, buffer, 4096);
+        recv(clientSocket, buffer, 4096, 0);
         
         std::string rawRequest(buffer);
         
@@ -631,12 +671,12 @@ Value http_startServer(std::vector<Value> arguments) {
 }
 
 // Stop HTTP server
-Value http_stopServer(std::vector<Value> arguments) {
+Value http_stopServer(std::vector<Value> /*arguments*/) {
     if (serverRunning) {
         serverRunning = false;
-        if (serverSocket != -1) {
+        if (serverSocket != INVALID_SOCKET) {
             close(serverSocket);
-            serverSocket = -1;
+            serverSocket = INVALID_SOCKET;
         }
     }
     return Value(true);
@@ -754,17 +794,23 @@ Value http_serveHTML(std::vector<Value> arguments) {
     
     // Start server in background thread with captured HTML content
     serverThread = new std::thread([port, html_content]() {
+        initSockets();
+        
         struct sockaddr_in address;
         int opt = 1;
         int addrlen = sizeof(address);
         
         serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-        if (serverSocket == 0) {
+        if (serverSocket == INVALID_SOCKET) {
             serverRunning = false;
             return;
         }
         
-        setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+        #ifdef _WIN32
+            setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt));
+        #else
+            setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+        #endif
         
         address.sin_family = AF_INET;
         address.sin_addr.s_addr = INADDR_ANY;
@@ -783,11 +829,11 @@ Value http_serveHTML(std::vector<Value> arguments) {
         }
         
         while (serverRunning) {
-            int clientSocket = accept(serverSocket, (struct sockaddr*)&address, (socklen_t*)&addrlen);
-            if (clientSocket < 0) continue;
+            SOCKET clientSocket = accept(serverSocket, (struct sockaddr*)&address, (socklen_t*)&addrlen);
+            if (clientSocket == INVALID_SOCKET) continue;
             
             char buffer[4096] = {0};
-            read(clientSocket, buffer, 4096);
+            recv(clientSocket, buffer, 4096, 0);
             
             std::string httpResponse = 
                 "HTTP/1.1 200 OK\r\n"

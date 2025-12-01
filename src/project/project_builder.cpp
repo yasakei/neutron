@@ -135,7 +135,7 @@ std::vector<std::string> ProjectBuilder::getBuiltinModuleSources() {
 bool ProjectBuilder::buildProjectExecutable(
     const std::string& projectRoot,
     const std::string& sourceCode,
-    const std::string& sourcePath,
+    const std::string& /*sourcePath*/,
     const std::string& outputPath,
     const std::string& neutronExecutablePath,
     bool bundleLibs
@@ -406,28 +406,22 @@ bool ProjectBuilder::buildProjectExecutable(
     srcFile.close();
     
     // Determine compiler
-    std::string compiler, objExt, linkFlags, picFlag;
+    std::string compiler, linkFlags;
     
     if (isWindows && !isMingw) {
         compiler = "cl";
-        objExt = ".obj";
         linkFlags = "/link /LIBPATH:\"" + executableDir + "\" CURL::libcurl.lib JsonCpp::JsonCpp.lib";
-        picFlag = "";
     } else if (isWindows && isMingw) {
         compiler = "g++";
-        objExt = ".o";
         linkFlags = "-lcurl -ljsoncpp";
-        picFlag = "-fPIC";
     } else {
         compiler = "g++";
-        objExt = ".o";
         if (isMacOS) {
             linkFlags = "-lcurl -ljsoncpp -framework CoreFoundation";
         } else {
             // Linux: Add -rdynamic to export symbols for dlopen
             linkFlags = "-lcurl -ljsoncpp -ldl -rdynamic";
         }
-        picFlag = "-fPIC";
     }
     
     // Determine Neutron source directory
