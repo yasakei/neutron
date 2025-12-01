@@ -70,10 +70,14 @@ std::vector<std::string> ProjectBuilder::findBoxModules(const std::string& proje
                 
                 // Look for shared library files
                 std::string libSo = entry.path().string() + "/lib" + moduleName + ".so";      // Linux
+                std::string libSoNoPrefix = entry.path().string() + "/" + moduleName + ".so"; // Linux (no prefix)
                 std::string libDylib = entry.path().string() + "/lib" + moduleName + ".dylib"; // macOS
+                std::string libDylibNoPrefix = entry.path().string() + "/" + moduleName + ".dylib"; // macOS (no prefix)
                 std::string libDll = entry.path().string() + "/" + moduleName + ".dll";        // Windows
                 
-                if (fileExists(libSo) || fileExists(libDylib) || fileExists(libDll)) {
+                if (fileExists(libSo) || fileExists(libSoNoPrefix) || 
+                    fileExists(libDylib) || fileExists(libDylibNoPrefix) || 
+                    fileExists(libDll)) {
                     nativeModules.push_back(moduleName);
                 }
             }
@@ -133,7 +137,8 @@ bool ProjectBuilder::buildProjectExecutable(
     const std::string& sourceCode,
     const std::string& sourcePath,
     const std::string& outputPath,
-    const std::string& neutronExecutablePath
+    const std::string& neutronExecutablePath,
+    bool bundleLibs
 ) {
     std::cout << "Building project executable..." << std::endl;
     
@@ -215,6 +220,51 @@ bool ProjectBuilder::buildProjectExecutable(
     srcFile << "const char* embedded_source = R\"neutron_source(\n";
     srcFile << sourceCode;
     srcFile << "\n)neutron_source\";\n\n";
+
+    // Embed native modules if bundling is enabled
+    auto boxModules = findBoxModules(projectRoot);
+    std::vector<std::string> bundledModules;
+    
+    if (bundleLibs && !boxModules.empty()) {
+        srcFile << "#include <filesystem>\n";
+        srcFile << "#include <fstream>\n";
+        srcFile << "#include <cstdlib>\n\n";
+        
+        for (const auto& moduleName : boxModules) {
+            std::string moduleDir = projectRoot + "/.box/modules/" + moduleName;
+            std::string libFile;
+            std::string libSo = moduleDir + "/lib" + moduleName + ".so";
+            std::string libSoNoPrefix = moduleDir + "/" + moduleName + ".so";
+            std::string libDylib = moduleDir + "/lib" + moduleName + ".dylib";
+            std::string libDylibNoPrefix = moduleDir + "/" + moduleName + ".dylib";
+            std::string libDll = moduleDir + "/" + moduleName + ".dll";
+            
+            if (fileExists(libSo)) libFile = libSo;
+            else if (fileExists(libSoNoPrefix)) libFile = libSoNoPrefix;
+            else if (fileExists(libDylib)) libFile = libDylib;
+            else if (fileExists(libDylibNoPrefix)) libFile = libDylibNoPrefix;
+            else if (fileExists(libDll)) libFile = libDll;
+            
+            if (!libFile.empty()) {
+                std::ifstream binFile(libFile, std::ios::binary);
+                if (binFile) {
+                    std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(binFile), {});
+                    
+                    srcFile << "// Embedded native module: " << moduleName << "\n";
+                    srcFile << "const unsigned char lib_" << moduleName << "_data[] = {";
+                    
+                    for (size_t i = 0; i < buffer.size(); ++i) {
+                        if (i % 16 == 0) srcFile << "\n    ";
+                        srcFile << "0x" << std::hex << (int)buffer[i] << ", ";
+                    }
+                    
+                    srcFile << "\n};\n";
+                    srcFile << "const size_t lib_" << moduleName << "_size = " << std::dec << buffer.size() << ";\n\n";
+                    bundledModules.push_back(moduleName);
+                }
+            }
+        }
+    }
     
     // Helper lambda to find imported files
     auto findImports = [](const std::string& src) -> std::vector<std::string> {
@@ -285,6 +335,33 @@ bool ProjectBuilder::buildProjectExecutable(
     // Write main function
     srcFile << "int main() {\n";
     srcFile << "    neutron::VM vm;\n\n";
+    
+    // Extract bundled native modules
+    if (!bundledModules.empty()) {
+        srcFile << "    // Extract bundled native modules\n";
+        srcFile << "    std::string tempDir = std::filesystem::temp_directory_path().string() + \"/neutron_bundle_\" + std::to_string(std::rand());\n";
+        srcFile << "    std::filesystem::create_directories(tempDir);\n";
+        srcFile << "    vm.add_module_search_path(tempDir);\n\n";
+        
+        for (const auto& moduleName : bundledModules) {
+            std::string filename = "lib" + moduleName + ".so"; // Default to Linux convention
+            #ifdef _WIN32
+            filename = moduleName + ".dll";
+            #elif __APPLE__
+            filename = "lib" + moduleName + ".dylib";
+            #endif
+            
+            srcFile << "    {\n";
+            srcFile << "        std::string libPath = tempDir + \"/" << filename << "\";\n";
+            srcFile << "        std::ofstream libFile(libPath, std::ios::binary);\n";
+            srcFile << "        if (libFile) {\n";
+            srcFile << "            libFile.write((const char*)lib_" << moduleName << "_data, lib_" << moduleName << "_size);\n";
+            srcFile << "            libFile.close();\n";
+            srcFile << "        }\n";
+            srcFile << "    }\n";
+        }
+        srcFile << "\n";
+    }
     
     // Register embedded files
     for (const auto& file : processingQueue) {
@@ -470,23 +547,33 @@ bool ProjectBuilder::buildProjectExecutable(
         }
     }
     
-    // Add Box native modules from project (shared libraries)
-    auto boxModules = findBoxModules(projectRoot);
+    
+    // Add Box native modules from project
+    // Note: We already processed boxModules for embedding above if bundleLibs is true.
+    // But we still need to handle static linking if bundleLibs is false.
+    
     if (!boxModules.empty()) {
-        std::cout << "Linking " << boxModules.size() << " Box module(s)..." << std::endl;
-        
-        for (const auto& moduleName : boxModules) {
-            std::string moduleDir = projectRoot + "/.box/modules/" + moduleName;
+        if (bundleLibs) {
+            std::cout << "Bundling " << boxModules.size() << " Box module(s) as embedded shared libraries..." << std::endl;
+            for (const auto& moduleName : boxModules) {
+                std::cout << "  - " << moduleName << " (embedded)" << std::endl;
+            }
+            // No need to add -L or -l flags or copy files, as we embedded them in the source
+        } else {
+            // Default: Static linking
+            std::cout << "Linking " << boxModules.size() << " Box module(s) statically..." << std::endl;
             
-            // Add library search path
-            compileCommand += "-L\"" + moduleDir + "\" ";
-            
-            // Add library to link
-            compileCommand += "-l" + moduleName + " ";
-            
-            // Add rpath for runtime (Linux/macOS only)
-            if (!isWindows) {
-                compileCommand += "-Wl,-rpath,\"" + moduleDir + "\" ";
+            for (const auto& moduleName : boxModules) {
+                std::string moduleDir = projectRoot + "/.box/modules/" + moduleName;
+                std::string libA = moduleDir + "/lib" + moduleName + ".a";  // Static library
+                
+                if (fileExists(libA)) {
+                    std::cout << "  - " << moduleName << " (static)" << std::endl;
+                    compileCommand += "\"" + libA + "\" ";
+                } else {
+                    std::cerr << "Warning: No static library (.a) found for module: " << moduleName << std::endl;
+                    std::cerr << "         Try 'neutron build --bundle' to use shared libraries instead." << std::endl;
+                }
             }
         }
     }

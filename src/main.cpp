@@ -22,6 +22,7 @@
 #include <sstream>
 #include <iomanip>
 #include <filesystem>
+#include <sys/stat.h>
 #include "compiler/scanner.h"
 #include "compiler/parser.h"
 #include "vm.h"
@@ -164,6 +165,12 @@ int main(int argc, char* argv[]) {
         }
         
         else if (arg == "build") {
+            // Check for --no-bundle flag (bundling is now default)
+            bool bundleLibs = true;
+            if (argc > 2 && std::string(argv[2]) == "--no-bundle") {
+                bundleLibs = false;
+            }
+            
             // Check if we're in a Neutron project
             std::string projectRoot = neutron::ProjectManager::findProjectRoot(".");
             if (projectRoot.empty()) {
@@ -182,6 +189,9 @@ int main(int argc, char* argv[]) {
             
             std::cout << "Building: " << config->name << " v" << config->version << std::endl;
             std::cout << "Entry: " << config->entry << std::endl;
+            if (bundleLibs) {
+                std::cout << "Mode: Bundle shared libraries" << std::endl;
+            }
             
             // Create build directory
             std::string buildDir = projectRoot + "/build";
@@ -216,7 +226,8 @@ int main(int argc, char* argv[]) {
                 source,
                 entryFile,
                 outputPath,
-                neutron::platform::getExecutablePath()
+                neutron::platform::getExecutablePath(),
+                bundleLibs
             );
             
             return success ? 0 : 1;
@@ -238,6 +249,8 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
         }
+        
+        // Legacy box build command
         
         // Legacy box build command
         else if (arg == "--build-box" && argc > 2) {

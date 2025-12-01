@@ -105,11 +105,23 @@ VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>"), hasException(f
     // Set up module search paths
     module_search_paths.push_back(".");
     module_search_paths.push_back("lib/");
+    module_search_paths.push_back("libs/");
     module_search_paths.push_back("box/");
+}
+
+VM::~VM() {
+    for (Object* obj : heap) {
+        delete obj;
+    }
+    heap.clear();
 }
 
 Function::Function(const FunctionStmt* declaration, std::shared_ptr<Environment> closure) 
     : name(), arity_val(0), chunk(new Chunk()), declaration(declaration), closure(closure) {}
+
+Function::~Function() {
+    delete chunk;
+}
 
 Value Function::call(VM& /*vm*/, std::vector<Value> /*arguments*/) {
     // This is now handled by the VM's call stack
@@ -1608,14 +1620,6 @@ void VM::load_module(const std::string& name) {
         return;
     }
 
-    std::string nt_path = "box/" + name + ".nt";
-    
-#ifdef __APPLE__
-    std::string shared_lib_path = ".box/modules/" + name + "/" + name + ".dylib";
-#else
-    std::string shared_lib_path = ".box/modules/" + name + "/" + name + ".so";
-#endif
-    
     std::string module_nt_path = "box/" + name + "/" + name + ".nt";
 
     // Search paths for .nt modules
@@ -1688,14 +1692,52 @@ void VM::load_module(const std::string& name) {
         globals = saved_globals;
         
         // Create the module with the populated environment
-        auto module = new Module(name, module_env);
+        auto module = allocate<Module>(name, module_env);
         define_module(name, module);
         loadedModuleCache[name] = true;
         return;
     }
 
     // Try to load as a native shared library module
-    void* handle = dlopen(shared_lib_path.c_str(), RTLD_LAZY);
+    void* handle = nullptr;
+    
+    // Search for shared library in module search paths
+    std::vector<std::string> lib_extensions;
+#ifdef __APPLE__
+    lib_extensions.push_back(".dylib");
+    lib_extensions.push_back(".so");
+#elif defined(_WIN32) || defined(WIN32)
+    lib_extensions.push_back(".dll");
+#else
+    lib_extensions.push_back(".so");
+#endif
+
+    std::vector<std::string> lib_prefixes = {"", "lib"};
+    
+    // Add .box/modules/name/ to search paths for backward compatibility
+    std::vector<std::string> native_search_paths = module_search_paths;
+    native_search_paths.push_back(".box/modules/" + name + "/");
+
+    for (const auto& path : native_search_paths) {
+        for (const auto& prefix : lib_prefixes) {
+            for (const auto& ext : lib_extensions) {
+                std::string try_path = path;
+                if (!try_path.empty() && try_path.back() != '/') {
+                    try_path += "/";
+                }
+                try_path += prefix + name + ext;
+                
+                std::ifstream f(try_path);
+                if (f.good()) {
+                    f.close();
+                    handle = dlopen(try_path.c_str(), RTLD_LAZY);
+                    if (handle) break;
+                }
+            }
+            if (handle) break;
+        }
+        if (handle) break;
+    }
     
     if (handle) {
         // It's a native module, we need to load it.
@@ -1724,7 +1766,7 @@ void VM::load_module(const std::string& name) {
         globals = saved_globals;
         
         // Create the module with the populated environment
-        auto module = new Module(name, module_env);
+        auto module = allocate<Module>(name, module_env, handle);
         define_module(name, module);
         loadedModuleCache[name] = true;
         return;
@@ -1984,7 +2026,17 @@ void VM::markValue(const Value& value) {
                 markValue(field.second);
             }
         }
-    } 
+    } else if (value.type == ValueType::MODULE) {
+        Module* module = value.asModule();
+        if (module && !module->is_marked) {
+            module->mark();
+            if (module->env) {
+                for (const auto& pair : module->env->values) {
+                    markValue(pair.second);
+                }
+            }
+        }
+    }
     // Note: Functions, Classes, and other Callables are not marked in this implementation
     // as they don't inherit from Object and marking them requires more complex implementation
 }

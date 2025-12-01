@@ -19,7 +19,8 @@ public:
         const std::string& sourceCode,
         const std::string& sourcePath,
         const std::string& outputPath,
-        const std::string& neutronExecutablePath
+        const std::string& neutronExecutablePath,
+        bool bundleLibs = false
     );
     
 private:

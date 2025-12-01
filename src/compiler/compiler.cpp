@@ -304,7 +304,9 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
             }
 
             if (stmt->name.lexeme == local.name.lexeme) {
-                // error("Already a variable with this name in this scope.");
+                std::string errorMsg = "Variable '" + stmt->name.lexeme + "' is already declared in this scope.";
+                ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, stmt->name.line);
+                exit(1);
             }
         }
 
@@ -343,6 +345,14 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
     }
 
     // Global variable
+    // Check if already declared
+    if (declaredGlobals.count(stmt->name.lexeme)) {
+        std::string errorMsg = "Variable '" + stmt->name.lexeme + "' is already declared.";
+        ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, stmt->name.line);
+        exit(1);
+    }
+    declaredGlobals.insert(stmt->name.lexeme);
+    
     // Track static variables in VM (persistence across REPL statements)
     if (stmt->isStatic) {
         vm.staticVariables.insert(stmt->name.lexeme);

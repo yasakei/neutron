@@ -78,6 +78,7 @@ public:
 class VM {
 public:
     VM();
+    ~VM();
     void interpret(Function* function);
     void push(const Value& value);
     Value pop();

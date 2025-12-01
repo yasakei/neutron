@@ -10,6 +10,7 @@
 #include <fstream>
 #include <filesystem>
 #include <cstdlib>
+#include <algorithm>
 
 #ifdef _WIN32
 #include <direct.h>

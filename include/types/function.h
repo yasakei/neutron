@@ -13,6 +13,7 @@ class FunctionStmt;
 class Function : public Callable {
 public:
     Function(const FunctionStmt* declaration, std::shared_ptr<Environment> closure);
+    ~Function();
     int arity() override;
     Value call(VM& vm, std::vector<Value> arguments) override;
     std::string toString() override;
