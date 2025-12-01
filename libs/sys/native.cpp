@@ -31,6 +31,7 @@
 #include <memory>
 #include <filesystem>
 #include <chrono>
+#include <thread>
 #include <iomanip>
 
 using namespace neutron;
@@ -438,6 +439,20 @@ static Value sys_input(const std::vector<Value>& args) {
     return Value(line);
 }
 
+static Value sys_sleep(const std::vector<Value>& args) {
+    if (args.size() != 1) {
+        throw std::runtime_error("sys.sleep() expects 1 argument (milliseconds)");
+    }
+    if (args[0].type != ValueType::NUMBER) {
+        throw std::runtime_error("sys.sleep() expects a number (milliseconds)");
+    }
+    
+    int ms = static_cast<int>(std::get<double>(args[0].as));
+    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+    
+    return Value(true);
+}
+
 // Process Control
 
 static Value sys_exit(const std::vector<Value>& args) {
@@ -501,6 +516,7 @@ namespace neutron {
         
         // User Input
         env->define("input", Value(new NativeFn(sys_input, -1)));
+        env->define("sleep", Value(new NativeFn(sys_sleep, 1)));
         
         // Process Control
         env->define("exit", Value(new NativeFn(sys_exit, -1)));

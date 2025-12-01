@@ -601,6 +601,41 @@ bool VM::callStringMethod(BoundStringMethod* method, int argCount) {
                 parts.push_back(Value(s));
             }
             result = Value(new Array(parts));
+        } else if (methodName == "substring") {
+            // substring(start, [end])
+            if (argCount < 1 || argCount > 2) {
+                runtimeError(this, "substring() expects 1 or 2 arguments.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
+            }
+            
+            if (args[0].type != ValueType::NUMBER) {
+                runtimeError(this, "substring() expects first argument to be a number.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
+            }
+            int start = static_cast<int>(std::get<double>(args[0].as));
+            int len = static_cast<int>(str.length());
+            
+            if (start < 0) start = 0;
+            if (start > len) start = len;
+            
+            int end = len;
+            if (argCount == 2) {
+                if (args[1].type != ValueType::NUMBER) {
+                    runtimeError(this, "substring() expects second argument to be a number.", frames.empty() ? -1 : frames.back().currentLine);
+                    return false;
+                }
+                end = static_cast<int>(std::get<double>(args[1].as));
+                if (end < 0) end = 0;
+                if (end > len) end = len;
+            }
+            
+            if (end < start) {
+                int temp = start;
+                start = end;
+                end = temp;
+            }
+            
+            result = Value(str.substr(start, end - start));
         } else {
             runtimeError(this, "Unknown string method: " + methodName, frames.empty() ? -1 : frames.back().currentLine);
             return false;
@@ -649,15 +684,25 @@ void VM::run(size_t minFrameDepth) {
                 size_t return_slot_offset = frame->slot_offset;  // Points to first argument
                 bool was_bound_method = frame->isBoundMethod;
                 frames.pop_back();
+                
                 if (frames.empty() || frames.size() <= minFrameDepth) {
                     // We are done executing - either the main script or we've returned to target depth
-                    if (!frames.empty()) {
-                        // Returning to a specific frame depth (from array method)
-                        if (return_slot_offset > 0) {
-                            stack.resize(return_slot_offset - 1);  // Remove callee too (NEUT-020 fix)
+                    
+                    // Clean up stack frame (arguments and callee)
+                    if (was_bound_method) {
+                        stack.resize(return_slot_offset);  // Keep everything before receiver
+                    } else if (return_slot_offset > 0) {
+                        // If it was a function call, clean up stack
+                        // Ensure we don't underflow if stack is somehow smaller (shouldn't happen)
+                        if (stack.size() >= return_slot_offset - 1) {
+                            stack.resize(return_slot_offset - 1);  // Remove callee too
                         }
-                        push(result);
+                    } else {
+                        // Top level script or no arguments/callee on stack
+                        stack.clear();
                     }
+                    
+                    push(result);
                     return;
                 }
 
@@ -976,7 +1021,7 @@ void VM::run(size_t minFrameDepth) {
                         }
                         stack.pop_back();
                         push(Value(charArray));
-                    } else if (propertyName == "contains" || propertyName == "split") {
+                    } else if (propertyName == "contains" || propertyName == "split" || propertyName == "substring") {
                         // Return a bound method that captures the string
                         stack.pop_back();
                         push(Value(new BoundStringMethod(str, propertyName)));
@@ -1289,8 +1334,27 @@ void VM::run(size_t minFrameDepth) {
                     
                     // Return the character at the index as a string
                     push(Value(std::string(1, str[idx])));
+                } else if (object.type == ValueType::OBJECT) {
+                    Object* objPtr = std::get<Object*>(object.as);
+                    JsonObject* jsonObj = dynamic_cast<JsonObject*>(objPtr);
+                    
+                    if (jsonObj) {
+                        if (index.type != ValueType::STRING) {
+                            runtimeError(this, "Object key must be a string.", frames.empty() ? -1 : frames.back().currentLine);
+                            return;
+                        }
+                        std::string key = std::get<std::string>(index.as);
+                        if (jsonObj->properties.count(key)) {
+                            push(jsonObj->properties[key]);
+                        } else {
+                            push(Value()); // Return nil if key not found
+                        }
+                    } else {
+                         runtimeError(this, "This object type does not support index access.", frames.empty() ? -1 : frames.back().currentLine);
+                         return;
+                    }
                 } else {
-                    runtimeError(this, "Only arrays and strings support index access.", frames.empty() ? -1 : frames.back().currentLine);
+                    runtimeError(this, "Only arrays, strings, and objects support index access.", frames.empty() ? -1 : frames.back().currentLine);
                     return;
                 }
                                 break;
@@ -1320,8 +1384,24 @@ void VM::run(size_t minFrameDepth) {
                     
                                         array->set(idx, value);
                     push(value); // Return the assigned value
-                }                 else {
-                    runtimeError(this, "Only arrays support index assignment.", frames.empty() ? -1 : frames.back().currentLine);
+                } else if (object.type == ValueType::OBJECT) {
+                    Object* objPtr = std::get<Object*>(object.as);
+                    JsonObject* jsonObj = dynamic_cast<JsonObject*>(objPtr);
+                    
+                    if (jsonObj) {
+                        if (index.type != ValueType::STRING) {
+                            runtimeError(this, "Object key must be a string.", frames.empty() ? -1 : frames.back().currentLine);
+                            return;
+                        }
+                        std::string key = std::get<std::string>(index.as);
+                        jsonObj->properties[key] = value;
+                        push(value);
+                    } else {
+                         runtimeError(this, "This object type does not support index assignment.", frames.empty() ? -1 : frames.back().currentLine);
+                         return;
+                    }
+                } else {
+                    runtimeError(this, "Only arrays and objects support index assignment.", frames.empty() ? -1 : frames.back().currentLine);
                                         return;
                 }
                                 break;
@@ -1485,11 +1565,38 @@ Value VM::call(const Value& callee, const std::vector<Value>& arguments) {
     Value result = function->call(*this, arguments);
     
     // Restore stack state (in case the function didn't clean up properly)
-    while (stack.size() > stack_size) {
-        pop();
-    }
+    // Note: Native functions usually handle their own stack, but interpreted functions rely on VM::run
+    // If this is a native function, it returns immediately.
+    // If it's an interpreted function, call() pushes a frame and returns NIL (usually), 
+    // and we need to call run() to execute it.
     
-    return result;
+    if (function->isCNativeFn()) {
+        while (stack.size() > stack_size) {
+            pop();
+        }
+        return result;
+    } else {
+        // For interpreted functions, call() just sets up the frame.
+        // We need to run the VM to execute the function.
+        
+        // If we are calling from C++, we need to drive the VM.
+        run(frames.size() - 1); // Run until we return from this function
+        
+        // The result should be on top of the stack
+        // Note: run() leaves the return value on the stack
+        if (stack.size() > stack_size) {
+            result = stack.back(); // Don't pop yet, we need to clean up
+        } else {
+            result = Value(); // Nil
+        }
+        
+        // Clean up any remaining stack items
+        while (stack.size() > stack_size) {
+            pop();
+        }
+        
+        return result;
+    }
 }
 
 Value VM::execute_string(const std::string& source) {

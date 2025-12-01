@@ -88,8 +88,8 @@ Parses a JSON string and returns the corresponding Neutron value.
 - `true`/`false` → boolean values
 - Numbers → number values
 - Strings → string values
-- Objects → Neutron objects
-- Arrays → Neutron array objects
+- Objects → Neutron objects (supports `obj["key"]` access)
+- Arrays → Neutron arrays (supports standard array methods like `map`, `filter`, etc.)
 
 **Example:**
 ```neutron
@@ -111,7 +111,8 @@ say(strValue); // Output: hello world
 // Objects
 var jsonStr = "{\"name\":\"Bob\",\"age\":25,\"skills\":[\"coding\",\"design\"]}";
 var parsed = json.parse(jsonStr);
-say("Name: " + json.get(parsed, "name")); // Output: Name: Bob
+say("Name: " + parsed["name"]); // Output: Name: Bob
+say("First Skill: " + parsed["skills"][0]); // Output: First Skill: coding
 ```
 
 **Throws:** 
@@ -123,6 +124,9 @@ say("Name: " + json.get(parsed, "name")); // Output: Name: Bob
 
 ### `json.get(object, key)`
 Retrieves a value from a JSON object by key.
+
+> [!NOTE]
+> You can also use direct indexing syntax `object["key"]` which is more idiomatic.
 
 **Parameters:**
 - `object` (object): The JSON object to get value from
@@ -136,13 +140,15 @@ use json;
 
 var data = json.parse("{\"user\":\"alice\",\"score\":100,\"active\":true}");
 
-var username = json.get(data, "user");
+// Using direct indexing (Preferred)
+var username = data["user"];
 say("Username: " + username); // Output: Username: alice
 
+// Using json.get()
 var score = json.get(data, "score");
 say("Score: " + score); // Output: Score: 100
 
-var missing = json.get(data, "nonexistent");
+var missing = data["nonexistent"];
 say(missing == nil); // Output: true
 ```
 
@@ -176,7 +182,7 @@ if (sys.exists("config.json")) {
     var configData = sys.read("config.json");
     var loadedConfig = json.parse(configData);
     
-    var dbHost = json.get(json.get(loadedConfig, "database"), "host");
+    var dbHost = loadedConfig["database"]["host"];
     say("Database host: " + dbHost);
 }
 ```
@@ -190,8 +196,8 @@ use http;
 var response = http.get("https://api.example.com/users/1");
 var userData = json.parse(response["body"]);
 
-var name = json.get(userData, "name");
-var email = json.get(userData, "email");
+var name = userData["name"];
+var email = userData["email"];
 
 say("User: " + name + " (" + email + ")");
 

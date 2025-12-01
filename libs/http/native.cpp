@@ -413,11 +413,31 @@ static void serverThreadFunc(int port, std::string (*handler)(const std::string&
         read(clientSocket, buffer, 4096);
         
         std::string request(buffer);
-        std::string response = handler ? handler(request) : "Hello from Neutron Server!";
+        std::string response;
+        
+        if (handler) {
+            response = handler(request);
+        } else {
+            // Default behavior: Echo request info in JSON for testing
+            std::string method = "GET";
+            std::string path = "/";
+            
+            // Simple parsing
+            size_t firstSpace = request.find(' ');
+            if (firstSpace != std::string::npos) {
+                method = request.substr(0, firstSpace);
+                size_t secondSpace = request.find(' ', firstSpace + 1);
+                if (secondSpace != std::string::npos) {
+                    path = request.substr(firstSpace + 1, secondSpace - firstSpace - 1);
+                }
+            }
+            
+            response = "{\"method\": \"" + method + "\", \"path\": \"" + path + "\", \"message\": \"Hello from Neutron Server!\"}";
+        }
         
         std::string httpResponse = 
             "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/html\r\n"
+            "Content-Type: application/json\r\n"
             "Content-Length: " + std::to_string(response.length()) + "\r\n"
             "\r\n" + response;
         
@@ -440,8 +460,8 @@ Value http_createServer(std::vector<Value> arguments) {
     return Value(serverObj);
 }
 
-// Start HTTP server
-Value http_listen(std::vector<Value> arguments) {
+// Start HTTP server (blocking)
+Value http_listen(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() < 2) {
         throw std::runtime_error("Expected 2 arguments for http.listen() (server, port).");
     }
@@ -459,6 +479,7 @@ Value http_listen(std::vector<Value> arguments) {
     }
     
     int port = static_cast<int>(std::get<double>(arguments[1].as));
+    Value handler = server->properties["handler"];
     
     if (serverRunning) {
         throw std::runtime_error("Server is already running");
@@ -468,9 +489,118 @@ Value http_listen(std::vector<Value> arguments) {
     server->properties["port"] = Value(static_cast<double>(port));
     server->properties["running"] = Value(true);
     
-    // Start server in background thread
-    serverThread = new std::thread(serverThreadFunc, port, nullptr);
-    serverThread->detach();
+    // Setup socket
+    struct sockaddr_in address;
+    int opt = 1;
+    int addrlen = sizeof(address);
+    
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket == 0) {
+        serverRunning = false;
+        throw std::runtime_error("Socket creation failed");
+    }
+    
+    setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+    
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(port);
+    
+    if (bind(serverSocket, (struct sockaddr*)&address, sizeof(address)) < 0) {
+        close(serverSocket);
+        serverRunning = false;
+        throw std::runtime_error("Bind failed");
+    }
+    
+    if (listen(serverSocket, 10) < 0) {
+        close(serverSocket);
+        serverRunning = false;
+        throw std::runtime_error("Listen failed");
+    }
+    
+    // Main loop (blocking)
+    while (serverRunning) {
+        int clientSocket = accept(serverSocket, (struct sockaddr*)&address, (socklen_t*)&addrlen);
+        if (clientSocket < 0) continue;
+        
+        char buffer[4096] = {0};
+        read(clientSocket, buffer, 4096);
+        
+        std::string rawRequest(buffer);
+        
+        // Parse method and path
+        std::string method = "GET";
+        std::string path = "/";
+        
+        size_t firstLineEnd = rawRequest.find("\r\n");
+        if (firstLineEnd != std::string::npos) {
+            std::string requestLine = rawRequest.substr(0, firstLineEnd);
+            size_t firstSpace = requestLine.find(' ');
+            if (firstSpace != std::string::npos) {
+                method = requestLine.substr(0, firstSpace);
+                size_t secondSpace = requestLine.find(' ', firstSpace + 1);
+                if (secondSpace != std::string::npos) {
+                    path = requestLine.substr(firstSpace + 1, secondSpace - firstSpace - 1);
+                }
+            }
+        }
+        
+        // Create request object
+        auto reqObj = new JsonObject();
+        reqObj->properties["raw"] = Value(rawRequest);
+        reqObj->properties["method"] = Value(method);
+        reqObj->properties["path"] = Value(path);
+        
+        // Call handler
+        vm.push(handler);
+        vm.push(Value(reqObj));
+        
+        size_t frameCountBefore = vm.frames.size();
+        vm.callValuePublic(handler, 1);
+        
+        // Only run if a new frame was pushed (interpreted function)
+        if (vm.frames.size() > frameCountBefore) {
+            vm.runPublic(frameCountBefore);
+        }
+        
+        std::string responseBody;
+        int status = 200;
+        std::string contentType = "text/html";
+        
+        // Check if stack is empty
+        if (vm.stack.empty()) {
+            // Handler didn't return anything or stack issue
+            responseBody = "Internal Server Error: Handler returned no value";
+            status = 500;
+        } else {
+            Value responseVal = vm.pop();
+            
+            if (responseVal.type == ValueType::STRING) {
+                responseBody = std::get<std::string>(responseVal.as);
+            } else if (responseVal.type == ValueType::OBJECT) {
+                JsonObject* resObj = dynamic_cast<JsonObject*>(std::get<Object*>(responseVal.as));
+                if (resObj) {
+                    if (resObj->properties.count("body") && resObj->properties["body"].type == ValueType::STRING) {
+                        responseBody = std::get<std::string>(resObj->properties["body"].as);
+                    }
+                    if (resObj->properties.count("status") && resObj->properties["status"].type == ValueType::NUMBER) {
+                        status = static_cast<int>(std::get<double>(resObj->properties["status"].as));
+                    }
+                    // TODO: Handle headers
+                }
+            }
+        }
+        
+        std::string httpResponse = 
+            "HTTP/1.1 " + std::to_string(status) + " OK\r\n"
+            "Content-Type: " + contentType + "\r\n"
+            "Content-Length: " + std::to_string(responseBody.length()) + "\r\n"
+            "Connection: close\r\n"
+            "\r\n" + responseBody;
+        
+        send(clientSocket, httpResponse.c_str(), httpResponse.length(), 0);
+        close(clientSocket);
+    }
     
     return Value(true);
 }
@@ -600,6 +730,81 @@ Value http_parseQuery(std::vector<Value> arguments) {
     return Value(params);
 }
 
+// Serve static HTML content
+Value http_serveHTML(std::vector<Value> arguments) {
+    if (arguments.size() != 2) {
+        throw std::runtime_error("Expected 2 arguments for http.serveHTML() (port, html).");
+    }
+    
+    if (arguments[0].type != ValueType::NUMBER) {
+        throw std::runtime_error("First argument for http.serveHTML() must be a port number.");
+    }
+    if (arguments[1].type != ValueType::STRING) {
+        throw std::runtime_error("Second argument for http.serveHTML() must be a string HTML content.");
+    }
+    
+    int port = static_cast<int>(std::get<double>(arguments[0].as));
+    std::string html_content = std::get<std::string>(arguments[1].as);
+    
+    if (serverRunning) {
+        throw std::runtime_error("Server is already running");
+    }
+    
+    serverRunning = true;
+    
+    // Start server in background thread with captured HTML content
+    serverThread = new std::thread([port, html_content]() {
+        struct sockaddr_in address;
+        int opt = 1;
+        int addrlen = sizeof(address);
+        
+        serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+        if (serverSocket == 0) {
+            serverRunning = false;
+            return;
+        }
+        
+        setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+        
+        address.sin_family = AF_INET;
+        address.sin_addr.s_addr = INADDR_ANY;
+        address.sin_port = htons(port);
+        
+        if (bind(serverSocket, (struct sockaddr*)&address, sizeof(address)) < 0) {
+            close(serverSocket);
+            serverRunning = false;
+            return;
+        }
+        
+        if (listen(serverSocket, 10) < 0) {
+            close(serverSocket);
+            serverRunning = false;
+            return;
+        }
+        
+        while (serverRunning) {
+            int clientSocket = accept(serverSocket, (struct sockaddr*)&address, (socklen_t*)&addrlen);
+            if (clientSocket < 0) continue;
+            
+            char buffer[4096] = {0};
+            read(clientSocket, buffer, 4096);
+            
+            std::string httpResponse = 
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/html; charset=UTF-8\r\n"
+                "Content-Length: " + std::to_string(html_content.length()) + "\r\n"
+                "Connection: close\r\n"
+                "\r\n" + html_content;
+            
+            send(clientSocket, httpResponse.c_str(), httpResponse.length(), 0);
+            close(clientSocket);
+        }
+    });
+    serverThread->detach();
+    
+    return Value(true);
+}
+
 void register_http_functions(std::shared_ptr<Environment> env) {
     // REST API methods
     env->define("get", Value(new NativeFn(http_get, -1)));
@@ -612,9 +817,10 @@ void register_http_functions(std::shared_ptr<Environment> env) {
     
     // Server functions
     env->define("createServer", Value(new NativeFn(http_createServer, -1)));
-    env->define("listen", Value(new NativeFn(http_listen, 2)));
+    env->define("listen", Value(new NativeFn(http_listen, 2, true))); // Needs VM
     env->define("startServer", Value(new NativeFn(http_startServer, 1)));
     env->define("stopServer", Value(new NativeFn(http_stopServer, 0)));
+    env->define("serveHTML", Value(new NativeFn(http_serveHTML, 2)));
     
     // Utility functions
     env->define("urlEncode", Value(new NativeFn(http_urlEncode, 1)));

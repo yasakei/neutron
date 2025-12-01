@@ -309,6 +309,32 @@ say("Language: ${repo.language}");
 </details>
 
 <details>
+<summary><b>HTTP Server - Simple Web Server</b></summary>
+
+```js
+// server.nt - Simple HTTP server
+use http;
+
+fun handler(req) {
+    say("Request: " + req.method + " " + req.path);
+    
+    if (req.path == "/") {
+        return "Hello from Neutron!";
+    } else {
+        return {
+            "status": 404,
+            "body": "Not Found"
+        };
+    }
+}
+
+say("Starting server on port 8080...");
+var server = http.createServer(handler);
+http.listen(server, 8080);
+```
+</details>
+
+<details>
 <summary><b>Algorithms - Fibonacci with Performance</b></summary>
 
 ```js
@@ -368,37 +394,23 @@ alice.birthday();
 // analyzer.nt - Analyze log files
 use sys;
 
-// Note: String methods like split() and contains() are not available in current version
-// This example shows basic file reading and simple character-based analysis
-var content = sys.read_file("server.log");
+var content = sys.read("server.log");
+var lines = content.split("\n");
 
-// Manual character counting approach for demonstration
 var errors = 0;
 var warnings = 0;
 
-// Simple approach: count occurrences of "ERROR" and "WARN" by scanning
-var pos = 0;
-while (pos < string_length(content)) {
-    // A simplified implementation to count "ERROR" occurrences
-    if (pos + 4 < string_length(content) and
-        content[pos] == "E" and content[pos+1] == "R" and
-        content[pos+2] == "R" and content[pos+3] == "O" and content[pos+4] == "R") {
+for (var i = 0; i < lines.length(); i = i + 1) {
+    var line = lines[i];
+    if (line.contains("ERROR")) {
         errors = errors + 1;
-        pos = pos + 4;  // Skip to avoid overlapping matches
     }
-    // A simplified implementation to count "WARN" occurrences
-    else if (pos + 3 < string_length(content) and
-             content[pos] == "W" and content[pos+1] == "A" and
-             content[pos+2] == "R" and content[pos+3] == "N") {
+    if (line.contains("WARN")) {
         warnings = warnings + 1;
-        pos = pos + 3;  // Skip to avoid overlapping matches
-    }
-    else {
-        pos = pos + 1;
     }
 }
 
-say("Log Analysis (approximate):");
+say("Log Analysis:");
 say("  Errors: ${errors}");
 say("  Warnings: ${warnings}");
 ```

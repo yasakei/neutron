@@ -163,6 +163,18 @@ private:
     bool callStringMethod(class BoundStringMethod* method, int argCount);
     
     void run(size_t minFrameDepth = 0);  // Run until frames.size() <= minFrameDepth (0 = run completely)
+    
+public:
+    // Expose callValue and run for native modules
+    bool callValuePublic(Value callee, int argCount) {
+        return callValue(callee, argCount);
+    }
+    
+    void runPublic(size_t minFrameDepth = 0) {
+        run(minFrameDepth);
+    }
+
+private:
     void interpret_module(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> module_env);
     
     // Exception handling methods

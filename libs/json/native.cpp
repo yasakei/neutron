@@ -155,177 +155,168 @@ std::string valueToJsonString(const Value& value, bool pretty, int indent) {
     return "null";
 }
 
-// Helper function to parse JSON string
-Value parseJsonString(const std::string& json) {
-    // This is a simplified JSON parser - in a real implementation,
-    // you would want to use a proper JSON parsing library
-    size_t pos = 0;
-    
-    // Skip whitespace
+// Forward declaration
+Value parseJsonValue(const std::string& json, size_t& pos);
+
+void skipWhitespace(const std::string& json, size_t& pos) {
     while (pos < json.length() && isspace(json[pos])) {
         pos++;
     }
-    
-    if (pos >= json.length()) {
-        throw std::runtime_error("Unexpected end of JSON input");
-    }
-    
-    char c = json[pos];
-    
-    // Parse null
+}
+
+Value parseJsonNull(const std::string& json, size_t& pos) {
     if (json.substr(pos, 4) == "null") {
+        pos += 4;
         return Value();
     }
-    
-    // Parse boolean
+    throw std::runtime_error("Expected 'null'");
+}
+
+Value parseJsonBoolean(const std::string& json, size_t& pos) {
     if (json.substr(pos, 4) == "true") {
+        pos += 4;
         return Value(true);
     }
     if (json.substr(pos, 5) == "false") {
+        pos += 5;
         return Value(false);
     }
-    
-    // Parse number
-    if (isdigit(c) || c == '-') {
-        size_t start = pos;
-        if (c == '-') pos++;
-        while (pos < json.length() && (isdigit(json[pos]) || json[pos] == '.' || json[pos] == 'e' || json[pos] == 'E' || json[pos] == '+' || json[pos] == '-')) {
-            pos++;
-        }
-        std::string numStr = json.substr(start, pos - start);
-        try {
-            return Value(std::stod(numStr));
-        } catch (const std::exception&) {
-            throw std::runtime_error("Invalid number format");
-        }
-    }
-    
-    // Parse string
-    if (c == '"') {
+    throw std::runtime_error("Expected boolean");
+}
+
+Value parseJsonNumber(const std::string& json, size_t& pos) {
+    size_t start = pos;
+    if (json[pos] == '-') pos++;
+    while (pos < json.length() && (isdigit(json[pos]) || json[pos] == '.' || json[pos] == 'e' || json[pos] == 'E' || json[pos] == '+' || json[pos] == '-')) {
         pos++;
-        std::string str;
-        while (pos < json.length() && json[pos] != '"') {
-            if (json[pos] == '\\') {
-                pos++;
-                if (pos >= json.length()) {
-                    throw std::runtime_error("Unexpected end of string");
-                }
-                switch (json[pos]) {
-                    case '"':  str += '"';  break;
-                    case '\\': str += '\\'; break;
-                    case '/':  str += '/';  break;
-                    case 'b':  str += '\b'; break;
-                    case 'f':  str += '\f'; break;
-                    case 'n':  str += '\n'; break;
-                    case 'r':  str += '\r'; break;
-                    case 't':  str += '\t'; break;
-                    case 'u': {
-                        // Unicode escape sequence - simplified handling
-                        if (pos + 4 >= json.length()) {
-                            throw std::runtime_error("Invalid unicode escape sequence");
-                        }
-                        pos += 4;
-                        str += '?'; // Placeholder for actual unicode handling
-                        break;
-                    }
-                    default:
-                        str += json[pos];
-                }
-            } else {
-                str += json[pos];
-            }
-            pos++;
-        }
-        if (pos >= json.length()) {
-            throw std::runtime_error("Unterminated string");
-        }
-        pos++; // Skip closing quote
-        return Value(str);
     }
-    
-    // Parse array
-    if (c == '[') {
+    std::string numStr = json.substr(start, pos - start);
+    try {
+        return Value(std::stod(numStr));
+    } catch (...) {
+        throw std::runtime_error("Invalid number format");
+    }
+}
+
+std::string parseJsonStringInternal(const std::string& json, size_t& pos) {
+    if (json[pos] != '"') throw std::runtime_error("Expected string");
+    pos++; // skip opening quote
+    std::string str;
+    while (pos < json.length()) {
+        char c = json[pos];
+        if (c == '"') {
+            pos++; // skip closing quote
+            return str;
+        }
+        if (c == '\\') {
+            pos++;
+            if (pos >= json.length()) throw std::runtime_error("Unexpected end of string");
+            char escaped = json[pos];
+            switch (escaped) {
+                case '"': str += '"'; break;
+                case '\\': str += '\\'; break;
+                case '/': str += '/'; break;
+                case 'b': str += '\b'; break;
+                case 'f': str += '\f'; break;
+                case 'n': str += '\n'; break;
+                case 'r': str += '\r'; break;
+                case 't': str += '\t'; break;
+                case 'u': {
+                    // Simplified unicode handling (just skip 4 chars)
+                    if (pos + 4 >= json.length()) throw std::runtime_error("Invalid unicode");
+                    pos += 4; 
+                    str += '?'; 
+                    break;
+                }
+                default: str += escaped; break;
+            }
+        } else {
+            str += c;
+        }
         pos++;
-        auto jsonArray = new JsonArray();
-        // Skip whitespace
-        while (pos < json.length() && isspace(json[pos])) {
-            pos++;
-        }
-        // Parse elements
-        while (pos < json.length() && json[pos] != ']') {
-            jsonArray->elements.push_back(parseJsonString(json.substr(pos)));
-            // Skip to end of value
-            // This is a simplified implementation - in practice you'd need a proper parser
-            // For now, we'll just skip to the next comma or closing bracket
-            while (pos < json.length() && json[pos] != ',' && json[pos] != ']') {
-                pos++;
-            }
-            if (json[pos] == ',') {
-                pos++;
-                // Skip whitespace
-                while (pos < json.length() && isspace(json[pos])) {
-                    pos++;
-                }
-            }
-        }
-        if (pos >= json.length()) {
-            throw std::runtime_error("Unterminated array");
-        }
-        pos++; // Skip closing bracket
-        return Value(jsonArray);
     }
-    
-    // Parse object
-    if (c == '{') {
+    throw std::runtime_error("Unterminated string");
+}
+
+Value parseJsonArray(const std::string& json, size_t& pos) {
+    pos++; // skip [
+    auto arr = new Array();
+    skipWhitespace(json, pos);
+    if (pos < json.length() && json[pos] == ']') {
         pos++;
-        auto jsonObject = new JsonObject();
-        // Skip whitespace
-        while (pos < json.length() && isspace(json[pos])) {
-            pos++;
-        }
-        // Parse key-value pairs
-        while (pos < json.length() && json[pos] != '}') {
-            // Parse key
-            if (json[pos] != '"') {
-                throw std::runtime_error("Expected string key");
-            }
-            Value keyVal = parseJsonString(json.substr(pos));
-            std::string key = std::get<std::string>(keyVal.as);
-            pos += 2; // Skip opening quote and some content (simplified)
-            // Skip to colon
-            while (pos < json.length() && json[pos] != ':') {
-                pos++;
-            }
-            if (pos >= json.length()) {
-                throw std::runtime_error("Expected colon");
-            }
-            pos++; // Skip colon
-            // Skip whitespace
-            while (pos < json.length() && isspace(json[pos])) {
-                pos++;
-            }
-            // Parse value
-            jsonObject->properties[key] = parseJsonString(json.substr(pos));
-            // Skip to end of value (simplified)
-            while (pos < json.length() && json[pos] != ',' && json[pos] != '}') {
-                pos++;
-            }
-            if (json[pos] == ',') {
-                pos++;
-                // Skip whitespace
-                while (pos < json.length() && isspace(json[pos])) {
-                    pos++;
-                }
-            }
-        }
-        if (pos >= json.length()) {
-            throw std::runtime_error("Unterminated object");
-        }
-        pos++; // Skip closing brace
-        return Value(jsonObject);
+        return Value(arr);
     }
     
-    throw std::runtime_error("Invalid JSON");
+    while (pos < json.length()) {
+        arr->push(parseJsonValue(json, pos));
+        skipWhitespace(json, pos);
+        if (pos < json.length() && json[pos] == ']') {
+            pos++;
+            return Value(arr);
+        }
+        if (pos < json.length() && json[pos] == ',') {
+            pos++;
+            skipWhitespace(json, pos);
+        } else {
+            throw std::runtime_error("Expected ',' or ']' in array");
+        }
+    }
+    throw std::runtime_error("Unterminated array");
+}
+
+Value parseJsonObject(const std::string& json, size_t& pos) {
+    pos++; // skip {
+    auto obj = new JsonObject();
+    skipWhitespace(json, pos);
+    if (pos < json.length() && json[pos] == '}') {
+        pos++;
+        return Value(obj);
+    }
+    
+    while (pos < json.length()) {
+        if (json[pos] != '"') throw std::runtime_error("Expected string key");
+        std::string key = parseJsonStringInternal(json, pos);
+        skipWhitespace(json, pos);
+        if (pos >= json.length() || json[pos] != ':') throw std::runtime_error("Expected ':'");
+        pos++; // skip :
+        skipWhitespace(json, pos);
+        
+        obj->properties[key] = parseJsonValue(json, pos);
+        
+        skipWhitespace(json, pos);
+        if (pos < json.length() && json[pos] == '}') {
+            pos++;
+            return Value(obj);
+        }
+        if (pos < json.length() && json[pos] == ',') {
+            pos++;
+            skipWhitespace(json, pos);
+        } else {
+            throw std::runtime_error("Expected ',' or '}' in object");
+        }
+    }
+    throw std::runtime_error("Unterminated object");
+}
+
+Value parseJsonValue(const std::string& json, size_t& pos) {
+    skipWhitespace(json, pos);
+    if (pos >= json.length()) throw std::runtime_error("Unexpected end of JSON");
+    
+    char c = json[pos];
+    if (c == '{') return parseJsonObject(json, pos);
+    if (c == '[') return parseJsonArray(json, pos);
+    if (c == '"') return Value(parseJsonStringInternal(json, pos));
+    if (c == 't' || c == 'f') return parseJsonBoolean(json, pos);
+    if (c == 'n') return parseJsonNull(json, pos);
+    if (isdigit(c) || c == '-') return parseJsonNumber(json, pos);
+    
+    throw std::runtime_error(std::string("Unexpected character: ") + c);
+}
+
+// Helper function to parse JSON string
+Value parseJsonString(const std::string& json) {
+    size_t pos = 0;
+    return parseJsonValue(json, pos);
 }
 
 Value json_get(std::vector<Value> arguments) {

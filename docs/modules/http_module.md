@@ -578,75 +578,81 @@ say(params.age);  // Output: 30
 
 ## Server Functions
 
-The HTTP server uses **POSIX sockets** for real TCP/IP networking with multi-threaded request handling.
+The HTTP server uses **POSIX sockets** for real TCP/IP networking.
 
-### `http.startServer(port)`
-Starts a simple HTTP server on the specified port.
+### `http.createServer(handler)`
+Creates an HTTP server object with a custom request handler.
 
 **Parameters:**
-- `port` (number): Port number to listen on (e.g., 8080)
+- `handler` (function): A function that takes a request object and returns a response.
 
-**Returns:** `true` on success
+**Returns:** Server object
 
-**Features:**
-- Real socket binding with `bind()` and `listen()`
-- Background thread for handling incoming connections
-- Accepts multiple concurrent connections
-- Returns basic HTTP/1.1 responses
+**Handler Function:**
+The handler function receives a `request` object with the following properties:
+- `method` (string): The HTTP method (e.g., "GET", "POST").
+- `path` (string): The request path (e.g., "/api/users").
+- `raw` (string): The raw HTTP request string.
+
+The handler must return either:
+1.  A **string** (which will be sent as the response body with status 200 OK).
+2.  An **object** with:
+    - `status` (number, optional): HTTP status code (default: 200).
+    - `body` (string): The response body.
 
 **Example:**
 ```neutron
 use http;
 
-// Start server on port 8080
-http.startServer(8080);
-say("Server is running on http://localhost:8080");
+fun handler(req) {
+    say("Received " + req.method + " request for " + req.path);
+    
+    if (req.path == "/") {
+        return "Welcome to the home page!";
+    } else if (req.path == "/api") {
+        return {
+            "status": 200,
+            "body": "{\"message\": \"API is working\"}"
+        };
+    } else {
+        return {
+            "status": 404,
+            "body": "Not Found"
+        };
+    }
+}
 
-// Server runs in background, program continues
-
-// Stop the server when done
-http.stopServer();
+var server = http.createServer(handler);
+http.listen(server, 8080);
 ```
-
----
-
-### `http.createServer(handler)`
-Creates an HTTP server object with custom request handler.
-
-**Parameters:**
-- `handler` (function): Request handler function
-
-**Returns:** Server object
-
-**Note:** Advanced API - use `startServer()` for simple servers.
 
 ---
 
 ### `http.listen(server, port)`
-Starts an HTTP server object on specified port.
+Starts the HTTP server and listens for incoming connections. This function blocks the current thread.
 
 **Parameters:**
-- `server` (object): Server object from createServer
-- `port` (number): Port number to listen on
+- `server` (object): Server object returned from `http.createServer`.
+- `port` (number): Port number to listen on (e.g., 8080).
 
-**Returns:** `true` on success
+**Returns:** Does not return (blocking loop).
+
+---
+
+### `http.startServer(port)`
+Starts a simple background HTTP server on the specified port. This is useful for simple static serving or testing, but `createServer` is recommended for custom logic.
+
+**Parameters:**
+- `port` (number): Port number to listen on.
+
+**Returns:** `true` on success.
 
 ---
 
 ### `http.stopServer()`
-Stops the currently running HTTP server.
+Stops the currently running background HTTP server (started with `startServer`).
 
-**Returns:** `true` on success
-
-**Example:**
-```neutron
-use http;
-
-http.startServer(9000);
-// Do work...
-http.stopServer();
-say("Server stopped");
-```
+**Returns:** `true` on success.
 
 ---
 

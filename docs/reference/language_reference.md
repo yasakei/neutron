@@ -112,6 +112,7 @@ Strings provide built-in methods for common operations:
 | `length()` | Returns number of characters | `"abc".length()` → `3` |
 | `contains(substr)` | Checks if string contains substring | `"hello".contains("ll")` → `true` |
 | `split(delimiter)` | Splits string into array | `"a,b".split(",")` → `["a", "b"]` |
+| `substring(start, [end])` | Returns a substring | `"hello".substring(1, 4)` → `"ell"` |
 
 ```js
 var text = "Hello, World!";
@@ -119,6 +120,7 @@ say(text.length());          // 13
 say(text.contains("World")); // true
 var parts = text.split(", "); 
 say(parts[0]);               // "Hello"
+say(text.substring(0, 5));   // "Hello"
 ```
 
 ### Nil

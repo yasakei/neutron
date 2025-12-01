@@ -265,6 +265,26 @@ say(arr);  // [1, 2, 3]
 
 **Note**: Built-in array methods like `.push()`, `.pop()`, `.map()`, `.filter()` work directly on arrays. Module functions like `arrays.sort()` require the module prefix.
 
+## 8. HTTP Handler Must Return a Value
+
+When using `http.createServer(handler)`, your handler function **must** return a value. If it returns `nil` (or nothing), the server will respond with a 500 Internal Server Error.
+
+### ❌ Wrong
+```neutron
+fun handler(req) {
+    say("Request received");
+    // No return statement -> returns nil
+}
+```
+
+### ✅ Correct
+```neutron
+fun handler(req) {
+    say("Request received");
+    return "OK"; // Returns string body
+}
+```
+
 ## Quick Reference Checklist
 
 - [ ] Use `.length` (property) not `.length()` (method call)
