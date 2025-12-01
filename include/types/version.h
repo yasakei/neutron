@@ -10,7 +10,7 @@ public:
     // Version components
     static constexpr int MAJOR = 2;
     static constexpr int MINOR = 0;
-    static constexpr int PATCH = 0;
+    static constexpr int PATCH = 2;
     static constexpr const char* STAGE = "beta";
     
     // Full version string
