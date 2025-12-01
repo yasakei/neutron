@@ -13,6 +13,9 @@ Compiler::Compiler(VM& vm) : enclosing(nullptr), function(nullptr), vm(vm), chun
     function->name = "<script>";
     function->chunk = new Chunk();
     chunk = function->chunk;
+    
+    // Initialize declared globals from VM to support REPL persistence
+    declaredGlobals = vm.declaredGlobals;
 }
 
 Compiler::Compiler(Compiler* enclosing) : enclosing(enclosing), function(nullptr), vm(enclosing->vm), chunk(nullptr), scopeDepth(0), currentLine(1) {
@@ -352,6 +355,7 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
         exit(1);
     }
     declaredGlobals.insert(stmt->name.lexeme);
+    vm.declaredGlobals.insert(stmt->name.lexeme); // Update VM for REPL persistence
     
     // Track static variables in VM (persistence across REPL statements)
     if (stmt->isStatic) {

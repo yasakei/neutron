@@ -152,6 +152,9 @@ public:
     
     // Static (immutable) variables - tracked in VM so they persist across REPL statements
     std::set<std::string> staticVariables;
+    
+    // Track declared global variables to prevent redeclaration in REPL
+    std::set<std::string> declaredGlobals;
 
 private:
     bool call(Function* function, int argCount);
