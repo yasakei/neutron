@@ -15,6 +15,9 @@
  */
 #include "native.h"
 #include "vm.h"
+#include "types/array.h"
+#include "types/json_object.h"
+#include "types/json_array.h"
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -123,7 +126,7 @@ std::string valueToJsonString(const Value& value, bool pretty, int indent) {
             return "null";
         }
         case ValueType::ARRAY: {
-            JsonArray* arr = dynamic_cast<JsonArray*>(std::get<Object*>(value.as));
+            Array* arr = std::get<Array*>(value.as);
             if (arr) {
                 std::ostringstream oss;
                 oss << "[";

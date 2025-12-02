@@ -288,6 +288,9 @@ say("Hello, World!");
 > [!TIP]
 > **Common Mistake**: Use `.length` (property), not `.length()` (method). See [Common Pitfalls Guide](docs/guides/common-pitfalls.md).
 
+> [!NOTE]
+> **Looking for more examples?** Check out the `examples/real_world/` directory for practical applications like a Todo CLI, HTTP Server, and Data Processing scripts.
+
 ### Real-World Examples
 
 <details>

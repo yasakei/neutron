@@ -53,12 +53,9 @@ testing.env
 # Debug files
 debug/
 gdb_history
-*.dSYM/
+*.dSYM/s
 
-# Examples
-examples/
-
-# External dependencies
+# External dependencises
 external/
 
 # Benchmark

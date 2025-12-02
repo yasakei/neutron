@@ -1,0 +1,110 @@
+// Example: Using the Regex Module in Neutron
+use regex;
+
+say("=== Neutron Regex Module Examples ===\n");
+
+// Example 1: Email Validation
+say("1. Email Validation:");
+var emails = ["user@example.com", "invalid.email", "test@domain.co.uk"];
+var emailPattern = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}";
+
+var i = 0;
+while (i < emails.length) {
+    if (regex.test(emails[i], emailPattern)) {
+        say("  ✓ " + emails[i] + " is valid");
+    } else {
+        say("  ✗ " + emails[i] + " is invalid");
+    }
+    i = i + 1;
+}
+
+// Example 2: Extract URLs from Text
+say("\n2. URL Extraction:");
+var htmlText = "Check out https://neutron-lang.org and http://github.com/yasakei/neutron";
+var urls = regex.findAll(htmlText, "https?://[a-zA-Z0-9.-]+\\.[a-zA-Z0-9/.-]*");
+
+say("  Found " + urls.length + " URLs:");
+i = 0;
+while (i < urls.length) {
+    say("  - " + urls[i].matched);
+    i = i + 1;
+}
+
+// Example 3: Phone Number Formatting
+say("\n3. Phone Number Formatting:");
+var rawPhone = "1234567890";
+var formattedPhone = regex.replace(rawPhone, "(\\d{3})(\\d{3})(\\d{4})", "($1) $2-$3");
+say("  Raw: " + rawPhone);
+say("  Formatted: " + formattedPhone);
+
+// Example 4: Parse CSV Data
+say("\n4. Parse CSV Data:");
+var csv = "apple,banana,orange,grape,kiwi";
+var fruits = regex.split(csv, ",");
+say("  Fruits: " + fruits.length + " items");
+i = 0;
+while (i < fruits.length) {
+    say("  " + (i + 1) + ". " + fruits[i]);
+    i = i + 1;
+}
+
+// Example 5: Extract Date Components
+say("\n5. Date Parsing:");
+var logEntry = "[2025-12-01 15:30:45] Server started";
+var dateResult = regex.find(logEntry, "(\\d{4})-(\\d{2})-(\\d{2}) (\\d{2}):(\\d{2}):(\\d{2})");
+
+if (dateResult != nil) {
+    say("  Date: " + dateResult.groups[1] + "-" + dateResult.groups[2] + "-" + dateResult.groups[3]);
+    say("  Time: " + dateResult.groups[4] + ":" + dateResult.groups[5] + ":" + dateResult.groups[6]);
+}
+
+// Example 6: Clean Whitespace
+say("\n6. Clean Extra Whitespace:");
+var messyText = "Too    many     spaces    here";
+var cleaned = regex.replace(messyText, "\\s+", " ");
+say("  Before: '" + messyText + "'");
+say("  After:  '" + cleaned + "'");
+
+// Example 7: Validate Password Strength
+say("\n7. Password Validation:");
+var passwords = ["weak", "Strong123", "VeryStrong123!"];
+
+i = 0;
+while (i < passwords.length) {
+    var pwd = passwords[i];
+    var hasUpper = regex.search(pwd, "[A-Z]");
+    var hasLower = regex.search(pwd, "[a-z]");
+    var hasDigit = regex.search(pwd, "\\d");
+    var hasSpecial = regex.search(pwd, "[!@#$%^&*]");
+    var longEnough = pwd.length >= 8;
+    
+    if (hasUpper and hasLower and hasDigit and longEnough) {
+        say("  ✓ '" + pwd + "' is strong");
+    } else {
+        say("  ✗ '" + pwd + "' is weak");
+    }
+    i = i + 1;
+}
+
+// Example 8: Find All Words
+say("\n8. Word Extraction:");
+var sentence = "The quick brown fox jumps over the lazy dog";
+var words = regex.findAll(sentence, "\\w+");
+say("  Sentence has " + words.length + " words");
+
+// Example 9: Escape Special Characters
+say("\n9. Escape Special Characters:");
+var literal = "Cost: $5.99 (sale!)";
+var escaped = regex.escape(literal);
+say("  Original: " + literal);
+say("  Escaped:  " + escaped);
+
+// Example 10: Replace with Pattern
+say("\n10. Markdown to HTML:");
+var markdown = "This is **bold** and this is *italic*";
+var html = regex.replace(markdown, "\\*\\*([^*]+)\\*\\*", "<strong>$1</strong>");
+html = regex.replace(html, "\\*([^*]+)\\*", "<em>$1</em>");
+say("  Markdown: " + markdown);
+say("  HTML:     " + html);
+
+say("\n=== Examples Complete ===");

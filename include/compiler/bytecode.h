@@ -47,6 +47,7 @@ enum class OpCode : uint8_t {
     OP_SET_UPVALUE,
     OP_CLOSE_UPVALUE,
     OP_ARRAY,
+    OP_OBJECT,
     OP_INDEX_GET,
     OP_INDEX_SET,
     OP_THIS,

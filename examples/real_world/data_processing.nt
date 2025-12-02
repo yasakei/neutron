@@ -1,0 +1,74 @@
+// Data Processing Example
+// This example demonstrates processing a list of user data, filtering, and aggregation.
+
+use arrays;
+use math;
+
+// Sample data: List of users with name, age, and role
+var users = [
+    {"name": "Alice", "age": 28, "role": "admin", "salary": 85000},
+    {"name": "Bob", "age": 35, "role": "developer", "salary": 75000},
+    {"name": "Charlie", "age": 22, "role": "intern", "salary": 30000},
+    {"name": "Diana", "age": 42, "role": "manager", "salary": 95000},
+    {"name": "Eve", "age": 29, "role": "developer", "salary": 78000},
+    {"name": "Frank", "age": 31, "role": "developer", "salary": 82000}
+];
+
+say("Processing " + arrays.length(users) + " users...");
+
+// 1. Filter: Find all developers
+say("\n--- Developers ---");
+var developers = [];
+var i = 0;
+while (i < arrays.length(users)) {
+    var u = arrays.at(users, i);
+    if (u.role == "developer") {
+        arrays.push(developers, u);
+        say("- " + u.name + " (" + u.age + ")");
+    }
+    i = i + 1;
+}
+
+// 2. Map & Reduce: Calculate average salary of developers
+var totalSalary = 0;
+i = 0;
+while (i < arrays.length(developers)) {
+    totalSalary = totalSalary + arrays.at(developers, i).salary;
+    i = i + 1;
+}
+
+var avgSalary = 0;
+if (arrays.length(developers) > 0) {
+    avgSalary = totalSalary / arrays.length(developers);
+}
+
+say("\nAverage Developer Salary: $" + avgSalary);
+
+// 3. Find: Find the youngest user
+var youngest = nil;
+i = 0;
+while (i < arrays.length(users)) {
+    var u = arrays.at(users, i);
+    if (youngest == nil) {
+        youngest = u;
+    } else {
+        if (u.age < youngest.age) {
+            youngest = u;
+        }
+    }
+    i = i + 1;
+}
+
+if (youngest != nil) {
+    say("\nYoungest User: " + youngest.name + " (" + youngest.age + ")");
+}
+
+// 4. Transformation: Create a list of email addresses (simulated)
+say("\n--- Generated Emails ---");
+i = 0;
+while (i < arrays.length(users)) {
+    var u = arrays.at(users, i);
+    var email = u.name + "@company.com";
+    say(u.name + " -> " + email);
+    i = i + 1;
+}

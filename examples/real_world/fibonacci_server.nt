@@ -1,0 +1,45 @@
+// Fibonacci API Server
+// Calculates Fibonacci numbers via HTTP API
+
+use http;
+use json;
+use math;
+
+// Recursive Fibonacci function
+fun fib(n) {
+    if (n <= 1) {
+        return n;
+    }
+    return fib(n - 1) + fib(n - 2);
+}
+
+// Request handler
+fun handleRequest(req) {
+    var response = {};
+    
+    if (req.path == "/fib") {
+        var n = 10; // Default
+        
+        // Calculate
+        var result = fib(n);
+        
+        var bodyObj = {};
+        bodyObj.n = n;
+        bodyObj.result = result;
+        bodyObj.method = "recursive";
+
+        response.status = 200;
+        response.body = json.stringify(bodyObj);
+        response.headers = {"Content-Type": "application/json"};
+        
+    } else {
+        response.status = 404;
+        response.body = json.stringify({"error": "Not Found"});
+    }
+    
+    return response;
+}
+
+say("Starting Fibonacci Server on port 9000...");
+var server = http.createServer(handleRequest);
+http.listen(server, 9000);

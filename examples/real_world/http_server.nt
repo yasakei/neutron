@@ -1,0 +1,46 @@
+// Simple HTTP Server Example
+// This example demonstrates how to create a basic HTTP server using the http module.
+
+use http;
+use json;
+
+// Define a request handler function
+fun handleRequest(req) {
+    // Log the request (in a real app, you'd parse the request object)
+    say("Received request: " + req.method + " " + req.path);
+
+    // Create a response object
+    var response = {};
+    
+    if (req.path == "/") {
+        response.status = 200;
+        response.body = json.stringify({
+            "message": "Welcome to the Neutron HTTP Server!",
+            "endpoints": ["/api/status", "/api/echo"]
+        });
+        response.headers = {"Content-Type": "application/json"};
+    } else if (req.path == "/api/status") {
+        response.status = 200;
+        response.body = json.stringify({
+            "status": "online",
+            "uptime": "unknown", // TODO: Add uptime tracking
+            "version": "1.0.0"
+        });
+        response.headers = {"Content-Type": "application/json"};
+    } else {
+        response.status = 404;
+        response.body = json.stringify({
+            "error": "Not Found",
+            "path": req.path
+        });
+        response.headers = {"Content-Type": "application/json"};
+    }
+
+    return response;
+}
+
+// Create the server instance
+say("Starting server on port 8080...");
+
+var server = http.createServer(handleRequest);
+http.listen(server, 8080);

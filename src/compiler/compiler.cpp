@@ -724,30 +724,22 @@ void Compiler::visitMemberSetExpr(const MemberSetExpr* expr) {
 }
 
 void Compiler::visitObjectExpr(const ObjectExpr* expr) {
-    // Create a new JsonObject
-    auto obj = new JsonObject();
-    
-    // For each property, check if it's a string literal and store the actual value
+    // Compile properties
     for (const auto& property : expr->properties) {
-        // Check if the value is a string literal
-        const LiteralExpr* literalExpr = dynamic_cast<const LiteralExpr*>(property.second.get());
-        if (literalExpr && literalExpr->valueType == LiteralValueType::STRING) {
-            // Store the actual string value
-            obj->properties[property.first] = Value(*static_cast<std::string*>(literalExpr->value.get()));
-        } else if (literalExpr && literalExpr->valueType == LiteralValueType::NUMBER) {
-            // Store the actual number value
-            obj->properties[property.first] = Value(*static_cast<double*>(literalExpr->value.get()));
-        } else if (literalExpr && literalExpr->valueType == LiteralValueType::BOOLEAN) {
-            // Store the actual boolean value
-            obj->properties[property.first] = Value(*static_cast<bool*>(literalExpr->value.get()));
-        } else {
-            // For other expressions, store a placeholder value
-            obj->properties[property.first] = Value(property.first + " value");
-        }
+        // Push key
+        emitConstant(Value(property.first));
+        
+        // Push value
+        compileExpression(property.second.get());
     }
     
-    // Push the object onto the stack
-    emitConstant(Value(obj));
+    // Emit OP_OBJECT with property count
+    if (expr->properties.size() > 255) {
+        // Handle error or use extended opcode if available (not yet)
+        // For now, limit to 255 properties
+        std::cerr << "Error: Too many properties in object literal (max 255)." << std::endl;
+    }
+    emitBytes((uint8_t)OpCode::OP_OBJECT, (uint8_t)expr->properties.size());
 }
 
 

@@ -62,6 +62,12 @@ static int constantInstruction(const char* name, const Chunk* chunk, int offset)
     return offset + 2;
 }
 
+static int byteInstruction(const char* name, const Chunk* chunk, int offset) {
+    uint8_t slot = chunk->code[offset + 1];
+    printf("%-16s %4d\n", name, slot);
+    return offset + 2;
+}
+
 size_t disassembleInstruction(const Chunk* chunk, size_t offset) {
     std::cout << offset << " ";
     if (offset > 0 && chunk->lines[offset] == chunk->lines[offset - 1]) {

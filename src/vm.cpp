@@ -1285,11 +1285,33 @@ void VM::run(size_t minFrameDepth) {
                 
                 // Pop 'count' elements from the stack in reverse order
                 for (int i = 0; i < count; i++) {
-                                        elements.insert(elements.begin(), pop());
+                    elements.insert(elements.begin(), pop());
                 }
                 
                                 push(Value(new Array(std::move(elements))));
                                 break;
+            }
+                        case (uint8_t)OpCode::OP_OBJECT: {
+                uint8_t count = READ_BYTE();
+                auto obj = new JsonObject();
+                
+                // Pop 'count' pairs from the stack
+                // Stack: [key1, val1, key2, val2] (top)
+                // We pop val2, key2, val1, key1
+                
+                for (int i = 0; i < count; i++) {
+                    Value val = pop();
+                    Value key = pop();
+                    
+                    if (key.type != ValueType::STRING) {
+                        runtimeError(this, "Object keys must be strings.", frames.empty() ? -1 : frames.back().currentLine);
+                    }
+                    
+                    obj->properties[std::get<std::string>(key.as)] = val;
+                }
+                
+                push(Value(obj));
+                break;
             }
                         case (uint8_t)OpCode::OP_INDEX_GET: {
                                 Value index = pop();

@@ -1,0 +1,103 @@
+// CLI Todo List Example
+// This example demonstrates file I/O, JSON parsing, and command line arguments.
+
+use sys;
+use json;
+use arrays;
+use fmt;
+
+// File to store todos
+var TODO_FILE = "todos.json";
+
+// Helper to read todos
+fun readTodos() {
+    if (sys.exists(TODO_FILE)) {
+        var content = sys.read(TODO_FILE);
+        return json.parse(content);
+    }
+    return []; 
+}
+
+// Helper to save todos
+fun saveTodos(todos) {
+    var jsonStr = json.stringify(todos);
+    sys.write(TODO_FILE, jsonStr);
+    say("Saved " + arrays.length(todos) + " todos to " + TODO_FILE);
+}
+
+fun printUsage() {
+    say("Todo List CLI");
+    say("Usage:");
+    say("  neutron todo_cli.nt add <task>    - Add a new task");
+    say("  neutron todo_cli.nt list          - List all tasks");
+    say("  neutron todo_cli.nt done <id>     - Mark task as done");
+}
+
+// Main logic
+var args = sys.args();
+
+if (arrays.length(args) < 2) {
+    printUsage();
+} else {
+    var command = arrays.at(args, 1);
+    var todos = readTodos();
+    
+    if (command == "add") {
+        if (arrays.length(args) < 3) {
+            say("Error: Missing task description");
+        } else {
+            var task = arrays.at(args, 2);
+            var item = {};
+            item.id = arrays.length(todos) + 1;
+            item.task = task;
+            item.done = false;
+            
+            arrays.push(todos, item);
+            say("Added: " + task);
+            saveTodos(todos);
+        }
+    } else if (command == "list") {
+        say("=== Todo List ===");
+        var i = 0;
+        while (i < arrays.length(todos)) {
+            var item = arrays.at(todos, i);
+            var status = "[ ]";
+            if (item.done) {
+                status = "[x]";
+            }
+            say(status + " " + item.id + ". " + item.task);
+            i = i + 1;
+        }
+        say("=================");
+    } else if (command == "done") {
+        if (arrays.length(args) < 3) {
+            say("Error: Missing task ID");
+        } else {
+            // Parse ID
+            var idStr = arrays.at(args, 2);
+            var id = fmt.to_int(idStr);
+            
+            var found = false;
+            var i = 0;
+            while (i < arrays.length(todos)) {
+                var item = arrays.at(todos, i);
+                if (item.id == id) {
+                    item.done = true;
+                    found = true;
+                    say("Marked task " + id + " as done.");
+                    break;
+                }
+                i = i + 1;
+            }
+            
+            if (found) {
+                saveTodos(todos);
+            } else {
+                say("Task not found.");
+            }
+        }
+    } else {
+        printUsage();
+    }
+}
+
