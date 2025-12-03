@@ -1,5 +1,6 @@
 #include "native.h"
 #include "vm.h"
+#include "types/obj_string.h"
 #include <chrono>
 #include <ctime>
 #include <iomanip>
@@ -9,7 +10,8 @@
 using namespace neutron;
 
 // Get current timestamp
-Value time_now(std::vector<Value> arguments) {
+Value time_now(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
     if (arguments.size() != 0) {
         throw std::runtime_error("Expected 0 arguments for time.now().");
     }
@@ -21,7 +23,7 @@ Value time_now(std::vector<Value> arguments) {
 }
 
 // Format timestamp as string
-Value time_format(std::vector<Value> arguments) {
+Value time_format(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() < 1 || arguments.size() > 2) {
         throw std::runtime_error("Expected 1-2 arguments for time.format().");
     }
@@ -36,10 +38,10 @@ Value time_format(std::vector<Value> arguments) {
     // Default format or custom format
     std::string format = "%Y-%m-%d %H:%M:%S";
     if (arguments.size() == 2) {
-        if (arguments[1].type != ValueType::STRING) {
+        if (arguments[1].type != ValueType::OBJ_STRING) {
             throw std::runtime_error("Second argument for time.format() must be a string (format).");
         }
-        format = std::get<std::string>(arguments[1].as);
+        format = arguments[1].asString()->chars;
     }
     
     // Convert timestamp to time_t
@@ -49,11 +51,12 @@ Value time_format(std::vector<Value> arguments) {
     std::ostringstream oss;
     oss << std::put_time(std::localtime(&t), format.c_str());
     
-    return Value(oss.str());
+    return Value(vm.allocate<ObjString>(oss.str()));
 }
 
 // Sleep for specified milliseconds
-Value time_sleep(std::vector<Value> arguments) {
+Value time_sleep(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected 1 argument for time.sleep().");
     }
@@ -69,16 +72,16 @@ Value time_sleep(std::vector<Value> arguments) {
 }
 
 namespace neutron {
-    void register_time_functions(std::shared_ptr<Environment> env) {
-        env->define("now", Value(new NativeFn(time_now, 0)));
-        env->define("format", Value(new NativeFn(time_format, -1))); // -1 for variable arguments
-        env->define("sleep", Value(new NativeFn(time_sleep, 1)));
+    void register_time_functions(VM& vm, std::shared_ptr<Environment> env) {
+        env->define("now", Value(vm.allocate<NativeFn>(time_now, 0, true)));
+        env->define("format", Value(vm.allocate<NativeFn>(time_format, -1, true))); // -1 for variable arguments
+        env->define("sleep", Value(vm.allocate<NativeFn>(time_sleep, 1, true)));
     }
 }
 
 extern "C" void neutron_init_time_module(neutron::VM* vm) {
     auto time_env = std::make_shared<neutron::Environment>();
-    neutron::register_time_functions(time_env);
-    auto time_module = new neutron::Module("time", time_env);
+    neutron::register_time_functions(*vm, time_env);
+    auto time_module = vm->allocate<neutron::Module>("time", time_env);
     vm->define_module("time", time_module);
 }

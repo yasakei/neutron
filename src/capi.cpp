@@ -1,6 +1,8 @@
 #include "neutron.h"
 #include "vm.h"
 #include "capi.h"
+#include "types/obj_string.h"
+#include <cstring>
 
 // A C++ class that wraps a C native function
 neutron::Value CNativeFn::call(neutron::VM& vm, std::vector<neutron::Value> args) {
@@ -52,7 +54,7 @@ NeutronType neutron_get_type(NeutronValue* value) {
         case neutron::ValueType::NIL: return NEUTRON_NIL;
         case neutron::ValueType::BOOLEAN: return NEUTRON_BOOLEAN;
         case neutron::ValueType::NUMBER: return NEUTRON_NUMBER;
-        case neutron::ValueType::STRING: return NEUTRON_STRING;
+        case neutron::ValueType::OBJ_STRING: return NEUTRON_STRING;
         default: return NEUTRON_NIL; // Should not happen
     }
 }
@@ -70,7 +72,7 @@ bool neutron_is_number(NeutronValue* value) {
 }
 
 bool neutron_is_string(NeutronValue* value) {
-    return to_cpp_value(value)->type == neutron::ValueType::STRING;
+    return to_cpp_value(value)->type == neutron::ValueType::OBJ_STRING;
 }
 
 bool neutron_get_boolean(NeutronValue* value) {
@@ -82,7 +84,7 @@ double neutron_get_number(NeutronValue* value) {
 }
 
 const char* neutron_get_string(NeutronValue* value, size_t* length) {
-    const std::string& str = std::get<std::string>(to_cpp_value(value)->as);
+    const std::string& str = std::get<neutron::ObjString*>(to_cpp_value(value)->as)->chars;
     *length = str.length();
     return str.c_str();
 }
@@ -99,8 +101,9 @@ NeutronValue* neutron_new_number(double value) {
     return to_c_value(new neutron::Value(value));
 }
 
-NeutronValue* neutron_new_string(const char* chars, size_t length) {
-    return to_c_value(new neutron::Value(std::string(chars, length)));
+NeutronValue* neutron_new_string(NeutronVM* vm, const char* chars, size_t length) {
+    neutron::VM* cpp_vm = reinterpret_cast<neutron::VM*>(vm);
+    return to_c_value(new neutron::Value(cpp_vm->allocate<neutron::ObjString>(std::string(chars, length))));
 }
 
 // --- Native Functions ---

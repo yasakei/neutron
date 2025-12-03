@@ -14,7 +14,7 @@ public:
     Class(const std::string& name, std::shared_ptr<Environment> class_env);
     int arity() override;
     Value call(VM& vm, std::vector<Value> arguments) override;
-    std::string toString() override;
+    std::string toString() const override;
     
     std::string name;
     std::shared_ptr<Environment> class_env;  // Store the environment for this class

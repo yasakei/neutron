@@ -17,7 +17,7 @@ if [ ! -f "$NEUTRON_BIN" ]; then
     exit 1
 fi
 
-TEST_DIRS=("tests/fixes" "tests/core" "tests/operators" "tests/control-flow" "tests/functions" "tests/classes" "tests/modules")
+TEST_DIRS=("tests/fixes" "tests/core" "tests/operators" "tests/control-flow" "tests/functions" "tests/classes" "tests/modules" "benchmarks/neutron")
 
 TOTAL_PASSED=0
 TOTAL_FAILED=0

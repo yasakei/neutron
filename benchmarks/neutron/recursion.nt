@@ -29,7 +29,7 @@ fun power(base, exp) {
 
 // Run recursive benchmarks
 var fact15 = factorial(15);
-var ack = ackermann(3, 6);
+var ack = ackermann(3, 4);
 var pow = power(2, 10);
 
 say("Recursion: fact=${fact15} ack=${ack} pow=${pow}");

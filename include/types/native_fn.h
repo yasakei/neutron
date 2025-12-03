@@ -15,7 +15,7 @@ public:
     NativeFn(NativeFnPtrWithVM function, int arity, bool needsVM);
     int arity() override;
     Value call(VM& vm, std::vector<Value> arguments) override;
-    std::string toString() override;
+    std::string toString() const override;
 
 private:
     NativeFnPtr function;

@@ -16,6 +16,8 @@
 #include "native.h"
 #include "vm.h"
 #include "types/array.h"
+#include "types/object.h"
+#include "types/obj_string.h"
 #include "types/json_object.h"
 #include "types/json_array.h"
 #include <sstream>
@@ -28,10 +30,10 @@ using namespace neutron;
 
 // Forward declaration for helper functions
 std::string valueToJsonString(const Value& value, bool pretty = false, int indent = 0);
-Value parseJsonString(const std::string& json);
+Value parseJsonString(VM& vm, const std::string& json);
 
 // JSON stringify function
-Value json_stringify(std::vector<Value> arguments) {
+Value json_stringify(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() < 1 || arguments.size() > 2) {
         throw std::runtime_error("Expected 1 or 2 arguments for json.stringify().");
     }
@@ -45,20 +47,20 @@ Value json_stringify(std::vector<Value> arguments) {
     }
     
     std::string result = valueToJsonString(arguments[0], pretty);
-    return Value(result);
+    return Value(vm.allocate<ObjString>(result));
 }
 
 // JSON parse function
-Value json_parse(std::vector<Value> arguments) {
+Value json_parse(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected 1 argument for json.parse().");
     }
     
-    if (arguments[0].type != ValueType::STRING) {
+    if (arguments[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("Argument for json.parse() must be a string.");
     }
     
-    return parseJsonString(std::get<std::string>(arguments[0].as).c_str());
+    return parseJsonString(vm, arguments[0].asString()->chars.c_str());
 }
 
 // Helper function to convert Value to JSON string
@@ -76,8 +78,8 @@ std::string valueToJsonString(const Value& value, bool pretty, int indent) {
             oss << std::setprecision(15) << std::get<double>(value.as);
             return oss.str();
         }
-        case ValueType::STRING: {
-            std::string str = std::get<std::string>(value.as);
+        case ValueType::OBJ_STRING: {
+            std::string str = value.asString()->chars;
             // Escape special characters
             std::string escaped;
             for (char c : str) {
@@ -159,7 +161,7 @@ std::string valueToJsonString(const Value& value, bool pretty, int indent) {
 }
 
 // Forward declaration
-Value parseJsonValue(const std::string& json, size_t& pos);
+Value parseJsonValue(VM& vm, const std::string& json, size_t& pos);
 
 void skipWhitespace(const std::string& json, size_t& pos) {
     while (pos < json.length() && isspace(json[pos])) {
@@ -241,9 +243,9 @@ std::string parseJsonStringInternal(const std::string& json, size_t& pos) {
     throw std::runtime_error("Unterminated string");
 }
 
-Value parseJsonArray(const std::string& json, size_t& pos) {
+Value parseJsonArray(VM& vm, const std::string& json, size_t& pos) {
     pos++; // skip [
-    auto arr = new Array();
+    auto arr = vm.allocate<Array>();
     skipWhitespace(json, pos);
     if (pos < json.length() && json[pos] == ']') {
         pos++;
@@ -251,7 +253,7 @@ Value parseJsonArray(const std::string& json, size_t& pos) {
     }
     
     while (pos < json.length()) {
-        arr->push(parseJsonValue(json, pos));
+        arr->push(parseJsonValue(vm, json, pos));
         skipWhitespace(json, pos);
         if (pos < json.length() && json[pos] == ']') {
             pos++;
@@ -267,9 +269,9 @@ Value parseJsonArray(const std::string& json, size_t& pos) {
     throw std::runtime_error("Unterminated array");
 }
 
-Value parseJsonObject(const std::string& json, size_t& pos) {
+Value parseJsonObject(VM& vm, const std::string& json, size_t& pos) {
     pos++; // skip {
-    auto obj = new JsonObject();
+    auto obj = vm.allocate<JsonObject>();
     skipWhitespace(json, pos);
     if (pos < json.length() && json[pos] == '}') {
         pos++;
@@ -284,7 +286,7 @@ Value parseJsonObject(const std::string& json, size_t& pos) {
         pos++; // skip :
         skipWhitespace(json, pos);
         
-        obj->properties[key] = parseJsonValue(json, pos);
+        obj->properties[key] = parseJsonValue(vm, json, pos);
         
         skipWhitespace(json, pos);
         if (pos < json.length() && json[pos] == '}') {
@@ -301,14 +303,14 @@ Value parseJsonObject(const std::string& json, size_t& pos) {
     throw std::runtime_error("Unterminated object");
 }
 
-Value parseJsonValue(const std::string& json, size_t& pos) {
+Value parseJsonValue(VM& vm, const std::string& json, size_t& pos) {
     skipWhitespace(json, pos);
     if (pos >= json.length()) throw std::runtime_error("Unexpected end of JSON");
     
     char c = json[pos];
-    if (c == '{') return parseJsonObject(json, pos);
-    if (c == '[') return parseJsonArray(json, pos);
-    if (c == '"') return Value(parseJsonStringInternal(json, pos));
+    if (c == '{') return parseJsonObject(vm, json, pos);
+    if (c == '[') return parseJsonArray(vm, json, pos);
+    if (c == '"') return Value(vm.allocate<ObjString>(parseJsonStringInternal(json, pos)));
     if (c == 't' || c == 'f') return parseJsonBoolean(json, pos);
     if (c == 'n') return parseJsonNull(json, pos);
     if (isdigit(c) || c == '-') return parseJsonNumber(json, pos);
@@ -317,12 +319,13 @@ Value parseJsonValue(const std::string& json, size_t& pos) {
 }
 
 // Helper function to parse JSON string
-Value parseJsonString(const std::string& json) {
+Value parseJsonString(VM& vm, const std::string& json) {
     size_t pos = 0;
-    return parseJsonValue(json, pos);
+    return parseJsonValue(vm, json, pos);
 }
 
-Value json_get(std::vector<Value> arguments) {
+Value json_get(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
     if (arguments.size() != 2) {
         throw std::runtime_error("Expected 2 arguments for json.get().");
     }
@@ -331,7 +334,7 @@ Value json_get(std::vector<Value> arguments) {
         throw std::runtime_error("First argument for json.get() must be an object.");
     }
     
-    if (arguments[1].type != ValueType::STRING) {
+    if (arguments[1].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("Second argument for json.get() must be a string.");
     }
     
@@ -340,7 +343,7 @@ Value json_get(std::vector<Value> arguments) {
         throw std::runtime_error("Invalid object type.");
     }
     
-    std::string key = std::get<std::string>(arguments[1].as);
+    std::string key = arguments[1].asString()->chars;
     auto it = obj->properties.find(key);
     if (it != obj->properties.end()) {
         return it->second;
@@ -350,7 +353,8 @@ Value json_get(std::vector<Value> arguments) {
 }
 
 // JSON set - set a property on an object
-Value json_set(std::vector<Value> arguments) {
+Value json_set(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
     if (arguments.size() != 3) {
         throw std::runtime_error("Expected 3 arguments for json.set() (object, key, value).");
     }
@@ -359,7 +363,7 @@ Value json_set(std::vector<Value> arguments) {
         throw std::runtime_error("First argument for json.set() must be an object.");
     }
     
-    if (arguments[1].type != ValueType::STRING) {
+    if (arguments[1].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("Second argument for json.set() must be a string key.");
     }
     
@@ -368,14 +372,15 @@ Value json_set(std::vector<Value> arguments) {
         throw std::runtime_error("Invalid object type.");
     }
     
-    std::string key = std::get<std::string>(arguments[1].as);
+    std::string key = arguments[1].asString()->chars;
     obj->properties[key] = arguments[2];
     
     return arguments[0]; // Return the modified object
 }
 
 // JSON has - check if object has a key
-Value json_has(std::vector<Value> arguments) {
+Value json_has(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
     if (arguments.size() != 2) {
         throw std::runtime_error("Expected 2 arguments for json.has() (object, key).");
     }
@@ -384,7 +389,7 @@ Value json_has(std::vector<Value> arguments) {
         throw std::runtime_error("First argument for json.has() must be an object.");
     }
     
-    if (arguments[1].type != ValueType::STRING) {
+    if (arguments[1].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("Second argument for json.has() must be a string key.");
     }
     
@@ -393,12 +398,12 @@ Value json_has(std::vector<Value> arguments) {
         throw std::runtime_error("Invalid object type.");
     }
     
-    std::string key = std::get<std::string>(arguments[1].as);
+    std::string key = arguments[1].asString()->chars;
     return Value(obj->properties.find(key) != obj->properties.end());
 }
 
 // JSON keys - get all keys from an object
-Value json_keys(std::vector<Value> arguments) {
+Value json_keys(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected 1 argument for json.keys().");
     }
@@ -412,16 +417,16 @@ Value json_keys(std::vector<Value> arguments) {
         throw std::runtime_error("Invalid object type.");
     }
     
-    auto keysArray = new Array();
+    auto keysArray = vm.allocate<Array>();
     for (const auto& pair : obj->properties) {
-        keysArray->elements.push_back(Value(pair.first));
+        keysArray->elements.push_back(Value(vm.allocate<ObjString>(pair.first)));
     }
     
     return Value(keysArray);
 }
 
 // JSON values - get all values from an object
-Value json_values(std::vector<Value> arguments) {
+Value json_values(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected 1 argument for json.values().");
     }
@@ -435,7 +440,7 @@ Value json_values(std::vector<Value> arguments) {
         throw std::runtime_error("Invalid object type.");
     }
     
-    auto valuesArray = new Array();
+    auto valuesArray = vm.allocate<Array>();
     for (const auto& pair : obj->properties) {
         valuesArray->elements.push_back(pair.second);
     }
@@ -444,7 +449,7 @@ Value json_values(std::vector<Value> arguments) {
 }
 
 // JSON merge - merge two objects
-Value json_merge(std::vector<Value> arguments) {
+Value json_merge(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() != 2) {
         throw std::runtime_error("Expected 2 arguments for json.merge() (obj1, obj2).");
     }
@@ -460,7 +465,7 @@ Value json_merge(std::vector<Value> arguments) {
         throw std::runtime_error("Invalid object type.");
     }
     
-    auto merged = new JsonObject();
+    auto merged = vm.allocate<JsonObject>();
     
     // Copy obj1 properties
     for (const auto& pair : obj1->properties) {
@@ -476,7 +481,8 @@ Value json_merge(std::vector<Value> arguments) {
 }
 
 // JSON delete - remove a property from an object
-Value json_delete(std::vector<Value> arguments) {
+Value json_delete(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
     if (arguments.size() != 2) {
         throw std::runtime_error("Expected 2 arguments for json.delete() (object, key).");
     }
@@ -485,7 +491,7 @@ Value json_delete(std::vector<Value> arguments) {
         throw std::runtime_error("First argument for json.delete() must be an object.");
     }
     
-    if (arguments[1].type != ValueType::STRING) {
+    if (arguments[1].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("Second argument for json.delete() must be a string key.");
     }
     
@@ -494,34 +500,34 @@ Value json_delete(std::vector<Value> arguments) {
         throw std::runtime_error("Invalid object type.");
     }
     
-    std::string key = std::get<std::string>(arguments[1].as);
+    std::string key = arguments[1].asString()->chars;
     obj->properties.erase(key);
     
     return arguments[0]; // Return the modified object
 }
 
 // JSON clone - deep copy an object
-Value json_clone(std::vector<Value> arguments) {
+Value json_clone(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected 1 argument for json.clone().");
     }
     
     // Convert to JSON string and parse it back (simple deep copy)
     std::string jsonStr = valueToJsonString(arguments[0], false);
-    return parseJsonString(jsonStr);
+    return parseJsonString(vm, jsonStr);
 }
 
 // JSON read from file
-Value json_readFile(std::vector<Value> arguments) {
+Value json_readFile(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected 1 argument for json.readFile() (filepath).");
     }
     
-    if (arguments[0].type != ValueType::STRING) {
+    if (arguments[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("Argument for json.readFile() must be a string filepath.");
     }
     
-    std::string filepath = std::get<std::string>(arguments[0].as);
+    std::string filepath = arguments[0].asString()->chars;
     std::ifstream file(filepath);
     
     if (!file.is_open()) {
@@ -533,16 +539,17 @@ Value json_readFile(std::vector<Value> arguments) {
     file.close();
     
     std::string jsonContent = buffer.str();
-    return parseJsonString(jsonContent);
+    return parseJsonString(vm, jsonContent);
 }
 
 // JSON write to file
-Value json_writeFile(std::vector<Value> arguments) {
+Value json_writeFile(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
     if (arguments.size() < 2 || arguments.size() > 3) {
         throw std::runtime_error("Expected 2-3 arguments for json.writeFile() (filepath, data, pretty?).");
     }
     
-    if (arguments[0].type != ValueType::STRING) {
+    if (arguments[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("First argument for json.writeFile() must be a string filepath.");
     }
     
@@ -551,7 +558,7 @@ Value json_writeFile(std::vector<Value> arguments) {
         pretty = std::get<bool>(arguments[2].as);
     }
     
-    std::string filepath = std::get<std::string>(arguments[0].as);
+    std::string filepath = arguments[0].asString()->chars;
     std::string jsonContent = valueToJsonString(arguments[1], pretty);
     
     std::ofstream file(filepath);
@@ -566,34 +573,34 @@ Value json_writeFile(std::vector<Value> arguments) {
 }
 
 namespace neutron {
-    void register_json_functions(std::shared_ptr<Environment> env) {
+    void register_json_functions(VM& vm, std::shared_ptr<Environment> env) {
         // Core functions
-        env->define("stringify", Value(new NativeFn(json_stringify, -1)));
-        env->define("parse", Value(new NativeFn(json_parse, 1)));
+        env->define("stringify", Value(vm.allocate<NativeFn>(json_stringify, -1, true)));
+        env->define("parse", Value(vm.allocate<NativeFn>(json_parse, 1, true)));
         
         // File operations
-        env->define("readFile", Value(new NativeFn(json_readFile, 1)));
-        env->define("writeFile", Value(new NativeFn(json_writeFile, -1)));
+        env->define("readFile", Value(vm.allocate<NativeFn>(json_readFile, 1, true)));
+        env->define("writeFile", Value(vm.allocate<NativeFn>(json_writeFile, -1, true)));
         
         // Object manipulation
-        env->define("get", Value(new NativeFn(json_get, 2)));
-        env->define("set", Value(new NativeFn(json_set, 3)));
-        env->define("has", Value(new NativeFn(json_has, 2)));
-        env->define("delete", Value(new NativeFn(json_delete, 2)));
+        env->define("get", Value(vm.allocate<NativeFn>(json_get, 2, true)));
+        env->define("set", Value(vm.allocate<NativeFn>(json_set, 3, true)));
+        env->define("has", Value(vm.allocate<NativeFn>(json_has, 2, true)));
+        env->define("delete", Value(vm.allocate<NativeFn>(json_delete, 2, true)));
         
         // Object introspection
-        env->define("keys", Value(new NativeFn(json_keys, 1)));
-        env->define("values", Value(new NativeFn(json_values, 1)));
+        env->define("keys", Value(vm.allocate<NativeFn>(json_keys, 1, true)));
+        env->define("values", Value(vm.allocate<NativeFn>(json_values, 1, true)));
         
         // Object utilities
-        env->define("merge", Value(new NativeFn(json_merge, 2)));
-        env->define("clone", Value(new NativeFn(json_clone, 1)));
+        env->define("merge", Value(vm.allocate<NativeFn>(json_merge, 2, true)));
+        env->define("clone", Value(vm.allocate<NativeFn>(json_clone, 1, true)));
     }
 }
 
 extern "C" void neutron_init_json_module(VM* vm) {
     auto json_env = std::make_shared<neutron::Environment>();
-    neutron::register_json_functions(json_env);
-    auto json_module = new neutron::Module("json", json_env);
+    neutron::register_json_functions(*vm, json_env);
+    auto json_module = vm->allocate<neutron::Module>("json", json_env);
     vm->define_module("json", json_module);
 }

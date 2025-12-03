@@ -1,4 +1,6 @@
 #include "native.h"
+#include "vm.h"
+#include "types/obj_string.h"
 #include <string>
 #include <unordered_map>
 #include <curl/curl.h>
@@ -74,15 +76,15 @@ static size_t curlHeaderCallback(char* buffer, size_t size, size_t nitems, void*
 }
 
 // Helper function to create a response object
-Value createResponse(double status, const std::string& body, const std::unordered_map<std::string, std::string>& headers = {}) {
-    auto responseObject = new JsonObject();
+Value createResponse(VM& vm, double status, const std::string& body, const std::unordered_map<std::string, std::string>& headers = {}) {
+    auto responseObject = vm.allocate<JsonObject>();
     responseObject->properties["status"] = Value(status);
-    responseObject->properties["body"] = Value(body);
+    responseObject->properties["body"] = Value(vm.allocate<ObjString>(body));
     
     // Create headers object
-    auto headersObject = new JsonObject();
+    auto headersObject = vm.allocate<JsonObject>();
     for (const auto& header : headers) {
-        headersObject->properties[header.first] = Value(header.second);
+        headersObject->properties[header.first] = Value(vm.allocate<ObjString>(header.second));
     }
     responseObject->properties["headers"] = Value(headersObject);
     
@@ -90,16 +92,16 @@ Value createResponse(double status, const std::string& body, const std::unordere
 }
 
 // HTTP GET request
-Value http_get(std::vector<Value> arguments) {
+Value http_get(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() < 1 || arguments.size() > 2) {
         throw std::runtime_error("Expected 1-2 arguments for http.get().");
     }
     
-    if (arguments[0].type != ValueType::STRING) {
+    if (arguments[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("First argument for http.get() must be a string URL.");
     }
     
-    std::string url = std::get<std::string>(arguments[0].as);
+    std::string url = std::get<ObjString*>(arguments[0].as)->chars;
     
     CURL* curl = curl_easy_init();
     if (!curl) {
@@ -130,24 +132,24 @@ Value http_get(std::vector<Value> arguments) {
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
     curl_easy_cleanup(curl);
     
-    return createResponse(static_cast<double>(httpCode), responseBody, responseHeaders);
+    return createResponse(vm, static_cast<double>(httpCode), responseBody, responseHeaders);
 }
 
 // HTTP POST request
-Value http_post(std::vector<Value> arguments) {
+Value http_post(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() < 1 || arguments.size() > 3) {
         throw std::runtime_error("Expected 1-3 arguments for http.post().");
     }
     
-    if (arguments[0].type != ValueType::STRING) {
+    if (arguments[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("First argument for http.post() must be a string URL.");
     }
     
-    std::string url = std::get<std::string>(arguments[0].as);
+    std::string url = std::get<ObjString*>(arguments[0].as)->chars;
     std::string data = "";
     
-    if (arguments.size() >= 2 && arguments[1].type == ValueType::STRING) {
-        data = std::get<std::string>(arguments[1].as);
+    if (arguments.size() >= 2 && arguments[1].type == ValueType::OBJ_STRING) {
+        data = std::get<ObjString*>(arguments[1].as)->chars;
     }
     
     CURL* curl = curl_easy_init();
@@ -180,28 +182,28 @@ Value http_post(std::vector<Value> arguments) {
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
     curl_easy_cleanup(curl);
     
-    return createResponse(static_cast<double>(httpCode), responseBody, responseHeaders);
+    return createResponse(vm, static_cast<double>(httpCode), responseBody, responseHeaders);
 }
 
 // HTTP PUT request
-Value http_put(std::vector<Value> arguments) {
+Value http_put(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() < 1 || arguments.size() > 3) {
         throw std::runtime_error("Expected 1-3 arguments for http.put().");
     }
     
-    if (arguments[0].type != ValueType::STRING) {
+    if (arguments[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("First argument for http.put() must be a string URL.");
     }
     
-    std::string url = std::get<std::string>(arguments[0].as);
+    std::string url = std::get<ObjString*>(arguments[0].as)->chars;
     std::string data = "";
     
     // Handle data if provided
     if (arguments.size() >= 2) {
-        if (arguments[1].type != ValueType::STRING) {
+        if (arguments[1].type != ValueType::OBJ_STRING) {
             throw std::runtime_error("Second argument for http.put() must be a string data.");
         }
-        data = std::get<std::string>(arguments[1].as);
+        data = std::get<ObjString*>(arguments[1].as)->chars;
     }
     
     CURL* curl = curl_easy_init();
@@ -234,20 +236,20 @@ Value http_put(std::vector<Value> arguments) {
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
     curl_easy_cleanup(curl);
     
-    return createResponse(static_cast<double>(httpCode), responseBody, responseHeaders);
+    return createResponse(vm, static_cast<double>(httpCode), responseBody, responseHeaders);
 }
 
 // HTTP DELETE request
-Value http_delete(std::vector<Value> arguments) {
+Value http_delete(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() < 1 || arguments.size() > 2) {
         throw std::runtime_error("Expected 1-2 arguments for http.delete().");
     }
     
-    if (arguments[0].type != ValueType::STRING) {
+    if (arguments[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("First argument for http.delete() must be a string URL.");
     }
     
-    std::string url = std::get<std::string>(arguments[0].as);
+    std::string url = std::get<ObjString*>(arguments[0].as)->chars;
     
     CURL* curl = curl_easy_init();
     if (!curl) {
@@ -278,20 +280,20 @@ Value http_delete(std::vector<Value> arguments) {
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
     curl_easy_cleanup(curl);
     
-    return createResponse(static_cast<double>(httpCode), responseBody, responseHeaders);
+    return createResponse(vm, static_cast<double>(httpCode), responseBody, responseHeaders);
 }
 
 // HTTP HEAD request
-Value http_head(std::vector<Value> arguments) {
+Value http_head(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() < 1 || arguments.size() > 2) {
         throw std::runtime_error("Expected 1-2 arguments for http.head().");
     }
     
-    if (arguments[0].type != ValueType::STRING) {
+    if (arguments[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("First argument for http.head() must be a string URL.");
     }
     
-    std::string url = std::get<std::string>(arguments[0].as);
+    std::string url = std::get<ObjString*>(arguments[0].as)->chars;
     
     CURL* curl = curl_easy_init();
     if (!curl) {
@@ -320,24 +322,24 @@ Value http_head(std::vector<Value> arguments) {
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
     curl_easy_cleanup(curl);
     
-    return createResponse(static_cast<double>(httpCode), "", responseHeaders);
+    return createResponse(vm, static_cast<double>(httpCode), "", responseHeaders);
 }
 
 // HTTP PATCH request
-Value http_patch(std::vector<Value> arguments) {
+Value http_patch(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() < 1 || arguments.size() > 3) {
         throw std::runtime_error("Expected 1-3 arguments for http.patch().");
     }
     
-    if (arguments[0].type != ValueType::STRING) {
+    if (arguments[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("First argument for http.patch() must be a string URL.");
     }
     
-    std::string url = std::get<std::string>(arguments[0].as);
+    std::string url = std::get<ObjString*>(arguments[0].as)->chars;
     std::string data = "";
     
-    if (arguments.size() >= 2 && arguments[1].type == ValueType::STRING) {
-        data = std::get<std::string>(arguments[1].as);
+    if (arguments.size() >= 2 && arguments[1].type == ValueType::OBJ_STRING) {
+        data = std::get<ObjString*>(arguments[1].as)->chars;
     }
     
     CURL* curl = curl_easy_init();
@@ -370,29 +372,29 @@ Value http_patch(std::vector<Value> arguments) {
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
     curl_easy_cleanup(curl);
     
-    return createResponse(static_cast<double>(httpCode), responseBody, responseHeaders);
+    return createResponse(vm, static_cast<double>(httpCode), responseBody, responseHeaders);
 }
 
 // HTTP request with custom method
-Value http_request(std::vector<Value> arguments) {
+Value http_request(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() < 2) {
         throw std::runtime_error("Expected at least 2 arguments for http.request() (method, url).");
     }
     
-    if (arguments[0].type != ValueType::STRING) {
+    if (arguments[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("First argument for http.request() must be a string method.");
     }
-    if (arguments[1].type != ValueType::STRING) {
+    if (arguments[1].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("Second argument for http.request() must be a string URL.");
     }
     
-    std::string method = std::get<std::string>(arguments[0].as);
-    std::string url = std::get<std::string>(arguments[1].as);
+    std::string method = std::get<ObjString*>(arguments[0].as)->chars;
+    std::string url = std::get<ObjString*>(arguments[1].as)->chars;
     std::string data = "";
     std::unordered_map<std::string, std::string> headers;
     
-    if (arguments.size() >= 3 && arguments[2].type == ValueType::STRING) {
-        data = std::get<std::string>(arguments[2].as);
+    if (arguments.size() >= 3 && arguments[2].type == ValueType::OBJ_STRING) {
+        data = std::get<ObjString*>(arguments[2].as)->chars;
     }
     
     std::string responseBody = "Mock " + method + " request to " + url;
@@ -400,7 +402,7 @@ Value http_request(std::vector<Value> arguments) {
         responseBody += " with data: " + data;
     }
     
-    return createResponse(200.0, responseBody, headers);
+    return createResponse(vm, 200.0, responseBody, headers);
 }
 
 // Server thread function
@@ -481,12 +483,12 @@ static void serverThreadFunc(int port, std::string (*handler)(const std::string&
 }
 
 // Create HTTP server
-Value http_createServer(std::vector<Value> arguments) {
+Value http_createServer(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() < 1) {
         throw std::runtime_error("Expected at least 1 argument for http.createServer() (handler function).");
     }
     
-    auto serverObj = new JsonObject();
+    auto serverObj = vm.allocate<JsonObject>();
     serverObj->properties["port"] = Value(0.0);
     serverObj->properties["running"] = Value(false);
     serverObj->properties["handler"] = arguments[0];
@@ -586,10 +588,10 @@ Value http_listen(VM& vm, std::vector<Value> arguments) {
         }
         
         // Create request object
-        auto reqObj = new JsonObject();
-        reqObj->properties["raw"] = Value(rawRequest);
-        reqObj->properties["method"] = Value(method);
-        reqObj->properties["path"] = Value(path);
+        auto reqObj = vm.allocate<JsonObject>();
+        reqObj->properties["raw"] = Value(vm.allocate<ObjString>(rawRequest));
+        reqObj->properties["method"] = Value(vm.allocate<ObjString>(method));
+        reqObj->properties["path"] = Value(vm.allocate<ObjString>(path));
         
         // Call handler
         vm.push(handler);
@@ -615,13 +617,13 @@ Value http_listen(VM& vm, std::vector<Value> arguments) {
         } else {
             Value responseVal = vm.pop();
             
-            if (responseVal.type == ValueType::STRING) {
-                responseBody = std::get<std::string>(responseVal.as);
+            if (responseVal.type == ValueType::OBJ_STRING) {
+                responseBody = std::get<ObjString*>(responseVal.as)->chars;
             } else if (responseVal.type == ValueType::OBJECT) {
                 JsonObject* resObj = dynamic_cast<JsonObject*>(std::get<Object*>(responseVal.as));
                 if (resObj) {
-                    if (resObj->properties.count("body") && resObj->properties["body"].type == ValueType::STRING) {
-                        responseBody = std::get<std::string>(resObj->properties["body"].as);
+                    if (resObj->properties.count("body") && resObj->properties["body"].type == ValueType::OBJ_STRING) {
+                        responseBody = std::get<ObjString*>(resObj->properties["body"].as)->chars;
                     }
                     if (resObj->properties.count("status") && resObj->properties["status"].type == ValueType::NUMBER) {
                         status = static_cast<int>(std::get<double>(resObj->properties["status"].as));
@@ -646,7 +648,7 @@ Value http_listen(VM& vm, std::vector<Value> arguments) {
 }
 
 // Simple server start (just takes port, no handler)
-Value http_startServer(std::vector<Value> arguments) {
+Value http_startServer(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected 1 argument for http.startServer() (port).");
     }
@@ -671,7 +673,7 @@ Value http_startServer(std::vector<Value> arguments) {
 }
 
 // Stop HTTP server
-Value http_stopServer(std::vector<Value> /*arguments*/) {
+Value http_stopServer(VM& vm, std::vector<Value> /*arguments*/) {
     if (serverRunning) {
         serverRunning = false;
         if (serverSocket != INVALID_SOCKET) {
@@ -683,16 +685,16 @@ Value http_stopServer(std::vector<Value> /*arguments*/) {
 }
 
 // URL encode
-Value http_urlEncode(std::vector<Value> arguments) {
+Value http_urlEncode(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected 1 argument for http.urlEncode().");
     }
     
-    if (arguments[0].type != ValueType::STRING) {
+    if (arguments[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("Argument for http.urlEncode() must be a string.");
     }
     
-    std::string str = std::get<std::string>(arguments[0].as);
+    std::string str = std::get<ObjString*>(arguments[0].as)->chars;
     std::string encoded;
     
     for (char c : str) {
@@ -707,20 +709,20 @@ Value http_urlEncode(std::vector<Value> arguments) {
         }
     }
     
-    return Value(encoded);
+    return Value(vm.allocate<ObjString>(encoded));
 }
 
 // URL decode
-Value http_urlDecode(std::vector<Value> arguments) {
+Value http_urlDecode(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected 1 argument for http.urlDecode().");
     }
     
-    if (arguments[0].type != ValueType::STRING) {
+    if (arguments[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("Argument for http.urlDecode() must be a string.");
     }
     
-    std::string str = std::get<std::string>(arguments[0].as);
+    std::string str = std::get<ObjString*>(arguments[0].as)->chars;
     std::string decoded;
     
     for (size_t i = 0; i < str.length(); i++) {
@@ -736,21 +738,21 @@ Value http_urlDecode(std::vector<Value> arguments) {
         }
     }
     
-    return Value(decoded);
+    return Value(vm.allocate<ObjString>(decoded));
 }
 
 // Parse query string
-Value http_parseQuery(std::vector<Value> arguments) {
+Value http_parseQuery(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected 1 argument for http.parseQuery().");
     }
     
-    if (arguments[0].type != ValueType::STRING) {
+    if (arguments[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("Argument for http.parseQuery() must be a string.");
     }
     
-    std::string query = std::get<std::string>(arguments[0].as);
-    auto params = new JsonObject();
+    std::string query = std::get<ObjString*>(arguments[0].as)->chars;
+    auto params = vm.allocate<JsonObject>();
     
     size_t pos = 0;
     while (pos < query.length()) {
@@ -763,7 +765,7 @@ Value http_parseQuery(std::vector<Value> arguments) {
         std::string key = query.substr(pos, eq - pos);
         std::string value = query.substr(eq + 1, amp - eq - 1);
         
-        params->properties[key] = Value(value);
+        params->properties[key] = Value(vm.allocate<ObjString>(value));
         pos = amp + 1;
     }
     
@@ -771,7 +773,7 @@ Value http_parseQuery(std::vector<Value> arguments) {
 }
 
 // Serve static HTML content
-Value http_serveHTML(std::vector<Value> arguments) {
+Value http_serveHTML(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() != 2) {
         throw std::runtime_error("Expected 2 arguments for http.serveHTML() (port, html).");
     }
@@ -779,12 +781,12 @@ Value http_serveHTML(std::vector<Value> arguments) {
     if (arguments[0].type != ValueType::NUMBER) {
         throw std::runtime_error("First argument for http.serveHTML() must be a port number.");
     }
-    if (arguments[1].type != ValueType::STRING) {
+    if (arguments[1].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("Second argument for http.serveHTML() must be a string HTML content.");
     }
     
     int port = static_cast<int>(std::get<double>(arguments[0].as));
-    std::string html_content = std::get<std::string>(arguments[1].as);
+    std::string html_content = std::get<ObjString*>(arguments[1].as)->chars;
     
     if (serverRunning) {
         throw std::runtime_error("Server is already running");
@@ -851,34 +853,34 @@ Value http_serveHTML(std::vector<Value> arguments) {
     return Value(true);
 }
 
-void register_http_functions(std::shared_ptr<Environment> env) {
+void register_http_functions(VM& vm, std::shared_ptr<Environment> env) {
     // REST API methods
-    env->define("get", Value(new NativeFn(http_get, -1)));
-    env->define("post", Value(new NativeFn(http_post, -1)));
-    env->define("put", Value(new NativeFn(http_put, -1)));
-    env->define("delete", Value(new NativeFn(http_delete, -1)));
-    env->define("head", Value(new NativeFn(http_head, -1)));
-    env->define("patch", Value(new NativeFn(http_patch, -1)));
-    env->define("request", Value(new NativeFn(http_request, -1)));
+    env->define("get", Value(vm.allocate<NativeFn>(http_get, -1, true)));
+    env->define("post", Value(vm.allocate<NativeFn>(http_post, -1, true)));
+    env->define("put", Value(vm.allocate<NativeFn>(http_put, -1, true)));
+    env->define("delete", Value(vm.allocate<NativeFn>(http_delete, -1, true)));
+    env->define("head", Value(vm.allocate<NativeFn>(http_head, -1, true)));
+    env->define("patch", Value(vm.allocate<NativeFn>(http_patch, -1, true)));
+    env->define("request", Value(vm.allocate<NativeFn>(http_request, -1, true)));
     
     // Server functions
-    env->define("createServer", Value(new NativeFn(http_createServer, -1)));
-    env->define("listen", Value(new NativeFn(http_listen, 2, true))); // Needs VM
-    env->define("startServer", Value(new NativeFn(http_startServer, 1)));
-    env->define("stopServer", Value(new NativeFn(http_stopServer, 0)));
-    env->define("serveHTML", Value(new NativeFn(http_serveHTML, 2)));
+    env->define("createServer", Value(vm.allocate<NativeFn>(http_createServer, -1, true)));
+    env->define("listen", Value(vm.allocate<NativeFn>(http_listen, 2, true))); // Needs VM
+    env->define("startServer", Value(vm.allocate<NativeFn>(http_startServer, 1, true)));
+    env->define("stopServer", Value(vm.allocate<NativeFn>(http_stopServer, 0, true)));
+    env->define("serveHTML", Value(vm.allocate<NativeFn>(http_serveHTML, 2, true)));
     
     // Utility functions
-    env->define("urlEncode", Value(new NativeFn(http_urlEncode, 1)));
-    env->define("urlDecode", Value(new NativeFn(http_urlDecode, 1)));
-    env->define("parseQuery", Value(new NativeFn(http_parseQuery, 1)));
+    env->define("urlEncode", Value(vm.allocate<NativeFn>(http_urlEncode, 1, true)));
+    env->define("urlDecode", Value(vm.allocate<NativeFn>(http_urlDecode, 1, true)));
+    env->define("parseQuery", Value(vm.allocate<NativeFn>(http_parseQuery, 1, true)));
 }
 
 } // namespace neutron
 
 extern "C" void neutron_init_http_module(neutron::VM* vm) {
     auto http_env = std::make_shared<neutron::Environment>();
-    neutron::register_http_functions(http_env);
-    auto http_module = new neutron::Module("http", http_env);
+    neutron::register_http_functions(*vm, http_env);
+    auto http_module = vm->allocate<neutron::Module>("http", http_env);
     vm->define_module("http", http_module);
 }

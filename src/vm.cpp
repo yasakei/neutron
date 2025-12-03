@@ -23,6 +23,7 @@
 #include "runtime/error_handler.h"
 #include "compiler/scanner.h"
 #include "compiler/parser.h"
+#include "types/obj_string.h"
 #include "types/json_object.h"
 #include "types/instance.h"
 #include "types/bound_method.h"
@@ -94,7 +95,7 @@ VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>"), hasException(f
     ErrorHandler::setColorEnabled(true);
     ErrorHandler::setStackTraceEnabled(true);
     
-    globals["say"] = Value(new NativeFn(std::function<Value(std::vector<Value>)>(native_say), 1));
+    globals["say"] = Value(allocate<NativeFn>(std::function<Value(std::vector<Value>)>(native_say), 1));
     
     // Register array functions
     // Built-in modules (sys, math, json, http, time, convert) are now loaded on-demand
@@ -129,7 +130,7 @@ Value Function::call(VM& /*vm*/, std::vector<Value> /*arguments*/) {
     return Value();
 }
 
-std::string Function::toString() {
+std::string Function::toString() const {
     if (declaration) {
         return "<fn " + declaration->name.lexeme + ">";
     } else if (!name.empty()) {
@@ -372,7 +373,7 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
             for (int i = start; i < end; i++) {
                 sliced.push_back(arr->at(i));
             }
-            result = Value(new Array(sliced));
+            result = Value(allocate<Array>(sliced));
         } else if (methodName == "indexOf") {
             // indexOf(value) - return index of first occurrence or -1
             if (argCount != 1) {
@@ -418,7 +419,7 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
                 // Numbers come before strings
                 if (a.type == ValueType::NUMBER && b.type == ValueType::NUMBER) {
                     return std::get<double>(a.as) < std::get<double>(b.as);
-                } else if (a.type == ValueType::STRING && b.type == ValueType::STRING) {
+                } else if (a.type == ValueType::OBJ_STRING && b.type == ValueType::OBJ_STRING) {
                     return a.toString() < b.toString();
                 } else if (a.type == ValueType::NUMBER) {
                     return true;
@@ -458,7 +459,7 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
                 // Get result and store it
                 mapped.push_back(pop());
             }
-            result = Value(new Array(mapped));
+            result = Value(allocate<Array>(mapped));
         } else if (methodName == "filter") {
             // filter(function) - filter elements by predicate
             if (argCount != 1) {
@@ -492,7 +493,7 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
                     filtered.push_back(arr->at(i));
                 }
             }
-            result = Value(new Array(filtered));
+            result = Value(allocate<Array>(filtered));
         } else if (methodName == "find") {
             // find(function) - find first element matching predicate
             if (argCount != 1) {
@@ -600,7 +601,7 @@ bool VM::callStringMethod(BoundStringMethod* method, int argCount) {
                 }
                 parts.push_back(Value(s));
             }
-            result = Value(new Array(parts));
+            result = Value(allocate<Array>(parts));
         } else if (methodName == "substring") {
             // substring(start, [end])
             if (argCount < 1 || argCount > 2) {
@@ -668,7 +669,7 @@ void VM::run(size_t minFrameDepth) {
         } \
         return frame->function->chunk->constants[index]; \
     }())
-#define READ_STRING() (std::get<std::string>(READ_CONSTANT().as))
+#define READ_STRING() (std::get<ObjString*>(READ_CONSTANT().as)->chars)
 
     for (;;) {
         // Update currentLine from bytecode before processing instruction
@@ -836,7 +837,7 @@ void VM::run(size_t minFrameDepth) {
                         isValid = value.type == ValueType::NUMBER;
                         break;
                     case TokenType::TYPE_STRING:
-                        isValid = value.type == ValueType::STRING;
+                        isValid = value.type == ValueType::OBJ_STRING;
                         break;
                     case TokenType::TYPE_BOOL:
                         isValid = value.type == ValueType::BOOLEAN;
@@ -885,7 +886,7 @@ void VM::run(size_t minFrameDepth) {
                     std::string actualTypeName = value.type == ValueType::NIL ? "nil" : 
                                                   value.type == ValueType::BOOLEAN ? "boolean" :
                                                   value.type == ValueType::NUMBER ? "number" :
-                                                  value.type == ValueType::STRING ? "string" :
+                                                  value.type == ValueType::OBJ_STRING ? "string" :
                                                   value.type == ValueType::ARRAY ? "array" :
                                                   value.type == ValueType::OBJECT ? "object" :
                                                   "callable";
@@ -912,7 +913,7 @@ void VM::run(size_t minFrameDepth) {
                         isValid = value.type == ValueType::NUMBER;
                         break;
                     case TokenType::TYPE_STRING:
-                        isValid = value.type == ValueType::STRING;
+                        isValid = value.type == ValueType::OBJ_STRING;
                         break;
                     case TokenType::TYPE_BOOL:
                         isValid = value.type == ValueType::BOOLEAN;
@@ -961,7 +962,7 @@ void VM::run(size_t minFrameDepth) {
                     std::string actualTypeName = value.type == ValueType::NIL ? "nil" : 
                                                   value.type == ValueType::BOOLEAN ? "boolean" :
                                                   value.type == ValueType::NUMBER ? "number" :
-                                                  value.type == ValueType::STRING ? "string" :
+                                                  value.type == ValueType::OBJ_STRING ? "string" :
                                                   value.type == ValueType::ARRAY ? "array" :
                                                   value.type == ValueType::OBJECT ? "object" :
                                                   "callable";
@@ -1001,21 +1002,21 @@ void VM::run(size_t minFrameDepth) {
                                propertyName == "reverse" || propertyName == "sort") {
                         // Return a bound method that captures the array
                         stack.pop_back();
-                        push(Value(new BoundArrayMethod(arr, propertyName)));
+                        push(Value(allocate<BoundArrayMethod>(arr, propertyName)));
                     } else {
                         runtimeError(this, "Array does not have property '" + propertyName + "'.",
                                     frames.empty() ? -1 : frames.back().currentLine);
                     }
-                } else if (object.type == ValueType::STRING) {
+                } else if (object.type == ValueType::OBJ_STRING) {
                     // Handle string properties and methods
-                    std::string str = std::get<std::string>(object.as);
+                    std::string str = object.asString()->chars;
                     
                     if (propertyName == "length") {
                         stack.pop_back();
                         push(Value(static_cast<double>(str.length())));
                     } else if (propertyName == "chars") {
                         // Return an array of individual characters
-                        Array* charArray = new Array();
+                        Array* charArray = allocate<Array>();
                         for (char c : str) {
                             charArray->push(Value(std::string(1, c)));
                         }
@@ -1024,7 +1025,7 @@ void VM::run(size_t minFrameDepth) {
                     } else if (propertyName == "contains" || propertyName == "split" || propertyName == "substring") {
                         // Return a bound method that captures the string
                         stack.pop_back();
-                        push(Value(new BoundStringMethod(str, propertyName)));
+                        push(Value(allocate<BoundStringMethod>(str, propertyName)));
                     } else {
                         runtimeError(this, "String does not have property '" + propertyName + "'.",
                                     frames.empty() ? -1 : frames.back().currentLine);
@@ -1048,7 +1049,7 @@ void VM::run(size_t minFrameDepth) {
                                 Function* func = dynamic_cast<Function*>(std::get<Callable*>(methodValue.as));
                                 if (func != nullptr) {
                                     stack.pop_back();
-                                    push(Value(new BoundMethod(object, func)));
+                                    push(Value(allocate<BoundMethod>(object, func)));
                                 } else {
                                     // Not a Function, but still a callable - use as-is
                                     stack.pop_back();
@@ -1126,8 +1127,8 @@ void VM::run(size_t minFrameDepth) {
                     result = (std::get<bool>(a.as) == std::get<bool>(b.as));
                 } else if (a.type == ValueType::NUMBER) {
                     result = (std::get<double>(a.as) == std::get<double>(b.as));
-                } else if (a.type == ValueType::STRING) {
-                    result = (std::get<std::string>(a.as) == std::get<std::string>(b.as));
+                } else if (a.type == ValueType::OBJ_STRING) {
+                    result = (a.asString()->chars == b.asString()->chars);
                 } else {
                     // For complex types (OBJECT, ARRAY, etc.), fall back to string comparison
                     result = (a.toString() == b.toString());
@@ -1148,8 +1149,8 @@ void VM::run(size_t minFrameDepth) {
                     result = (std::get<bool>(a.as) != std::get<bool>(b.as));
                 } else if (a.type == ValueType::NUMBER) {
                     result = (std::get<double>(a.as) != std::get<double>(b.as));
-                } else if (a.type == ValueType::STRING) {
-                    result = (std::get<std::string>(a.as) != std::get<std::string>(b.as));
+                } else if (a.type == ValueType::OBJ_STRING) {
+                    result = (a.asString()->chars != b.asString()->chars);
                 } else {
                     // For complex types (OBJECT, ARRAY, etc.), fall back to string comparison
                     result = (a.toString() != b.toString());
@@ -1288,12 +1289,12 @@ void VM::run(size_t minFrameDepth) {
                     elements.insert(elements.begin(), pop());
                 }
                 
-                                push(Value(new Array(std::move(elements))));
+                                push(Value(allocate<Array>(std::move(elements))));
                                 break;
             }
                         case (uint8_t)OpCode::OP_OBJECT: {
                 uint8_t count = READ_BYTE();
-                auto obj = new JsonObject();
+                auto obj = allocate<JsonObject>();
                 
                 // Pop 'count' pairs from the stack
                 // Stack: [key1, val1, key2, val2] (top)
@@ -1303,11 +1304,11 @@ void VM::run(size_t minFrameDepth) {
                     Value val = pop();
                     Value key = pop();
                     
-                    if (key.type != ValueType::STRING) {
+                    if (key.type != ValueType::OBJ_STRING) {
                         runtimeError(this, "Object keys must be strings.", frames.empty() ? -1 : frames.back().currentLine);
                     }
                     
-                    obj->properties[std::get<std::string>(key.as)] = val;
+                    obj->properties[key.asString()->chars] = val;
                 }
                 
                 push(Value(obj));
@@ -1336,14 +1337,14 @@ void VM::run(size_t minFrameDepth) {
                     }
                     
                                         push(array->at(idx));
-                } else if (object.type == ValueType::STRING) {
+                } else if (object.type == ValueType::OBJ_STRING) {
                     if (index.type != ValueType::NUMBER) {
                         runtimeError(this, "String index must be a number.", frames.empty() ? -1 : frames.back().currentLine);
                         return;
                     }
                     
                     int idx = static_cast<int>(std::get<double>(index.as));
-                    std::string str = std::get<std::string>(object.as);
+                    std::string str = object.asString()->chars;
                     
                     if (idx < 0 || idx >= static_cast<int>(str.length())) {
                         std::string range = str.length() == 0 ? "[]" : "[0, " + std::to_string(str.length()-1) + "]";
@@ -1361,11 +1362,11 @@ void VM::run(size_t minFrameDepth) {
                     JsonObject* jsonObj = dynamic_cast<JsonObject*>(objPtr);
                     
                     if (jsonObj) {
-                        if (index.type != ValueType::STRING) {
+                        if (index.type != ValueType::OBJ_STRING) {
                             runtimeError(this, "Object key must be a string.", frames.empty() ? -1 : frames.back().currentLine);
                             return;
                         }
-                        std::string key = std::get<std::string>(index.as);
+                        std::string key = index.asString()->chars;
                         if (jsonObj->properties.count(key)) {
                             push(jsonObj->properties[key]);
                         } else {
@@ -1411,11 +1412,11 @@ void VM::run(size_t minFrameDepth) {
                     JsonObject* jsonObj = dynamic_cast<JsonObject*>(objPtr);
                     
                     if (jsonObj) {
-                        if (index.type != ValueType::STRING) {
+                        if (index.type != ValueType::OBJ_STRING) {
                             runtimeError(this, "Object key must be a string.", frames.empty() ? -1 : frames.back().currentLine);
                             return;
                         }
-                        std::string key = std::get<std::string>(index.as);
+                        std::string key = index.asString()->chars;
                         jsonObj->properties[key] = value;
                         push(value);
                     } else {
@@ -1486,8 +1487,8 @@ void VM::run(size_t minFrameDepth) {
                 if (!handler) {
                     // No exception handler found - runtime error
                     std::string errorMsg = "Uncaught exception: ";
-                    if (exception.type == ValueType::STRING) {
-                        errorMsg += std::get<std::string>(exception.as);
+                    if (exception.type == ValueType::OBJ_STRING) {
+                        errorMsg += exception.asString()->chars;
                     } else {
                         errorMsg += exception.toString();
                     }
@@ -1859,6 +1860,7 @@ void VM::load_module(const std::string& name) {
     } else {
         // Handle error: module not found
         runtimeError(this, "Module '" + name + "' not found. Make sure to use 'use " + name + ";' before accessing it.",
+
                     frames.empty() ? -1 : frames.back().currentLine);
     }
 }
@@ -1994,7 +1996,7 @@ Module* VM::load_file_as_module(const std::string& filepath) {
     interpret_module(statements, module_env);
     
     // Create the module
-    return new Module(filepath, module_env);
+    return allocate<Module>(filepath, module_env);
 }
 
 void VM::registerComponent(std::shared_ptr<ComponentInterface> component) {
@@ -2054,77 +2056,77 @@ void VM::markRoots() {
             }
         }
     }
+
+    // Mark temporary roots
+    for (Object* obj : tempRoots) {
+        markObject(obj);
+    }
+}
+
+void VM::markObject(Object* obj) {
+    if (obj == nullptr || obj->is_marked) return;
+    obj->mark();
+    
+    if (auto* arr = dynamic_cast<Array*>(obj)) {
+        for (const auto& element : arr->elements) markValue(element);
+    } else if (auto* bam = dynamic_cast<BoundArrayMethod*>(obj)) {
+        markObject(bam->array);
+    } else if (auto* json_obj = dynamic_cast<JsonObject*>(obj)) {
+        for (const auto& prop : json_obj->properties) markValue(prop.second);
+    } else if (auto* json_arr = dynamic_cast<JsonArray*>(obj)) {
+        for (const auto& element : json_arr->elements) markValue(element);
+    } else if (auto* inst = dynamic_cast<Instance*>(obj)) {
+        for (const auto& field : inst->fields) markValue(field.second);
+        markObject(inst->klass);
+    } else if (auto* module = dynamic_cast<Module*>(obj)) {
+        if (module->env) {
+            for (const auto& pair : module->env->values) markValue(pair.second);
+        }
+    } else if (auto* bm = dynamic_cast<BoundMethod*>(obj)) {
+        markValue(bm->receiver);
+        markObject(bm->method);
+    } else if (auto* func = dynamic_cast<Function*>(obj)) {
+        if (func->closure) {
+            // Mark all values in the closure environment chain
+            auto env = func->closure;
+            // We don't have a way to mark Environment itself as it's not an Object
+            // So we just traverse. To avoid infinite loops if environments are cyclic (unlikely for scope chain),
+            // we might need a set of visited environments. But scope chains are usually trees/lists.
+            // However, multiple functions can share the same environment.
+            // We rely on markValue checking is_marked to stop recursion on values.
+            // But we might re-scan the environment map many times.
+            // For now, simple traversal.
+            while (env) {
+                for (const auto& pair : env->values) markValue(pair.second);
+                env = env->enclosing;
+            }
+        }
+        if (func->chunk) {
+            for (const auto& constant : func->chunk->constants) markValue(constant);
+        }
+    } else if (auto* klass = dynamic_cast<Class*>(obj)) {
+        if (klass->class_env) {
+            for (const auto& pair : klass->class_env->values) markValue(pair.second);
+        }
+        for (const auto& pair : klass->methods) {
+            markValue(pair.second);
+        }
+    }
 }
 
 void VM::markValue(const Value& value) {
-    if (value.type == ValueType::OBJECT) {
-        Object* obj = std::get<Object*>(value.as);
-        if (obj && !obj->is_marked) {
-            obj->mark();
-            
-            // For specific object types, mark their internal values
-            // Array - already handled below
-            // Instance
-            Instance* inst = dynamic_cast<Instance*>(obj);
-            if (inst) {
-                for (const auto& field : inst->fields) {
-                    markValue(field.second);
-                }
-            }
-            
-            // JsonObject
-            JsonObject* json_obj = dynamic_cast<JsonObject*>(obj);
-            if (json_obj) {
-                for (const auto& prop : json_obj->properties) {
-                    markValue(prop.second);
-                }
-            }
-            
-            // JsonArray
-            JsonArray* json_arr = dynamic_cast<JsonArray*>(obj);
-            if (json_arr) {
-                for (const auto& element : json_arr->elements) {
-                    markValue(element);
-                }
-            }
-            
-            // BoundArrayMethod - doesn't hold other values that need marking
-        }
-    } else if (value.type == ValueType::ARRAY) {
-        Array* arr = std::get<Array*>(value.as);
-        if (arr && !arr->is_marked) {
-            arr->mark();
-            
-            // Mark all elements in the array recursively
-            for (const auto& element : arr->elements) {
-                markValue(element);
-            }
-        }
-    } else if (value.type == ValueType::INSTANCE) {
-        // This case handles instances that might be stored as ValueType::INSTANCE
-        // but accessed directly (they should be handled in the OBJECT case)
-        Instance* inst = std::get<Instance*>(value.as);
-        if (inst && !inst->is_marked) {
-            inst->mark();
-            
-            // Mark all fields in the instance
-            for (const auto& field : inst->fields) {
-                markValue(field.second);
-            }
-        }
-    } else if (value.type == ValueType::MODULE) {
-        Module* module = value.asModule();
-        if (module && !module->is_marked) {
-            module->mark();
-            if (module->env) {
-                for (const auto& pair : module->env->values) {
-                    markValue(pair.second);
-                }
-            }
-        }
+    Object* obj = nullptr;
+    switch (value.type) {
+        case ValueType::OBJ_STRING: obj = std::get<ObjString*>(value.as); break;
+        case ValueType::ARRAY: obj = std::get<Array*>(value.as); break;
+        case ValueType::OBJECT: obj = std::get<Object*>(value.as); break;
+        case ValueType::CALLABLE: obj = std::get<Callable*>(value.as); break;
+        case ValueType::MODULE: obj = std::get<Module*>(value.as); break;
+        case ValueType::CLASS: obj = std::get<Class*>(value.as); break;
+        case ValueType::INSTANCE: obj = std::get<Instance*>(value.as); break;
+        default: return;
     }
-    // Note: Functions, Classes, and other Callables are not marked in this implementation
-    // as they don't inherit from Object and marking them requires more complex implementation
+    markObject(obj);
 }
 
 void VM::sweep() {
@@ -2276,4 +2278,5 @@ void VM::interpret_module(const std::vector<std::unique_ptr<Stmt>>& statements, 
     
     // Restore original globals
     globals = saved_globals;
-}}
+}
+}

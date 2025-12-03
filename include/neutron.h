@@ -38,7 +38,7 @@ const char* neutron_get_string(NeutronValue* value, size_t* length);
 NeutronValue* neutron_new_nil();
 NeutronValue* neutron_new_boolean(bool value);
 NeutronValue* neutron_new_number(double value);
-NeutronValue* neutron_new_string(const char* chars, size_t length);
+NeutronValue* neutron_new_string(NeutronVM* vm, const char* chars, size_t length);
 
 // --- Native Functions ---
 

@@ -5,7 +5,7 @@
 
 namespace neutron {
 
-void register_regex_functions(std::shared_ptr<Environment> env);
+void register_regex_functions(VM& vm, std::shared_ptr<Environment> env);
 
 } // namespace neutron
 
