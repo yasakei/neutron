@@ -16,7 +16,7 @@ std::ostream& operator<<(std::ostream& os, ValueType type) {
         case ValueType::NUMBER:
             os << "NUMBER";
             break;
-        case ValueType::STRING:
+        case ValueType::OBJ_STRING:
             os << "STRING";
             break;
         case ValueType::OBJECT:

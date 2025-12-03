@@ -1,6 +1,7 @@
 #include "types/value.h"
 #include "types/array.h"
 #include "types/object.h"
+#include "types/obj_string.h"
 #include "types/callable.h"
 #include "modules/module.h"
 #include "types/class.h"
@@ -17,7 +18,9 @@ Value::Value(bool value) : type(ValueType::BOOLEAN), as(value) {}
 
 Value::Value(double value) : type(ValueType::NUMBER), as(value) {}
 
-Value::Value(const std::string& value) : type(ValueType::STRING), as(value) {}
+Value::Value(ObjString* string) : type(ValueType::OBJ_STRING), as(string) {}
+
+Value::Value(const std::string& value) : type(ValueType::OBJ_STRING), as(new ObjString(value)) {}
 
 Value::Value(Array* array) : type(ValueType::ARRAY), as(array) {}
 
@@ -43,8 +46,8 @@ std::string Value::toString() const {
             snprintf(buffer, sizeof(buffer), "%.15g", std::get<double>(as));
             return std::string(buffer);
         }
-        case ValueType::STRING:
-            return std::get<std::string>(as);
+        case ValueType::OBJ_STRING:
+            return std::get<ObjString*>(as)->toString();
         case ValueType::ARRAY: {
             Array* arr = std::get<Array*>(as);
             if (!arr) return "<null array>";
@@ -79,6 +82,17 @@ bool Value::isModule() const {
 Module* Value::asModule() const {
     if (isModule()) {
         return std::get<Module*>(as);
+    }
+    return nullptr;
+}
+
+bool Value::isString() const {
+    return type == ValueType::OBJ_STRING;
+}
+
+ObjString* Value::asString() const {
+    if (isString()) {
+        return std::get<ObjString*>(as);
     }
     return nullptr;
 }

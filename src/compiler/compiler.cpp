@@ -9,9 +9,9 @@
 namespace neutron {
 
 Compiler::Compiler(VM& vm) : enclosing(nullptr), function(nullptr), vm(vm), chunk(nullptr), scopeDepth(0), currentLine(1) {
-    function = new Function(nullptr, std::make_shared<Environment>());
+    function = vm.allocate<Function>(nullptr, std::make_shared<Environment>());
     function->name = "<script>";
-    function->chunk = new Chunk();
+    // function->chunk is already allocated in constructor
     chunk = function->chunk;
     
     // Initialize declared globals from VM to support REPL persistence
@@ -19,8 +19,8 @@ Compiler::Compiler(VM& vm) : enclosing(nullptr), function(nullptr), vm(vm), chun
 }
 
 Compiler::Compiler(Compiler* enclosing) : enclosing(enclosing), function(nullptr), vm(enclosing->vm), chunk(nullptr), scopeDepth(0), currentLine(1) {
-    function = new Function(nullptr, std::make_shared<Environment>());
-    function->chunk = new Chunk();
+    function = vm.allocate<Function>(nullptr, std::make_shared<Environment>());
+    // function->chunk is already allocated in constructor
     chunk = function->chunk;
 }
 
@@ -510,7 +510,7 @@ void Compiler::visitWhileStmt(const WhileStmt* stmt) {
 
 void Compiler::visitClassStmt(const ClassStmt* stmt) {
     // Create a new class object
-    auto klass = new Class(stmt->name.lexeme);
+    auto klass = vm.allocate<Class>(stmt->name.lexeme);
 
     // Compile the methods
     for (const auto& method : stmt->body) {
@@ -753,9 +753,7 @@ void Compiler::visitThisExpr(const ThisExpr* expr) {
 void Compiler::visitFunctionExpr(const FunctionExpr* expr) {
     // Create a new compiler for the lambda function
     Compiler compiler(this);
-    compiler.function = new Function(nullptr, std::make_shared<Environment>());
-    compiler.function->chunk = new Chunk();
-    compiler.chunk = compiler.function->chunk;
+    // Function is already created in Compiler constructor
     compiler.function->arity_val = expr->params.size();
     
     // Add parameters as local variables
@@ -803,7 +801,7 @@ std::string Compiler::valueTypeToString(ValueType type) {
         case ValueType::NIL: return "nil";
         case ValueType::BOOLEAN: return "bool";
         case ValueType::NUMBER: return "number";
-        case ValueType::STRING: return "string";
+        case ValueType::OBJ_STRING: return "string";
         case ValueType::ARRAY: return "array";
         case ValueType::OBJECT: return "object";
         case ValueType::CALLABLE: return "function";
@@ -840,7 +838,7 @@ bool Compiler::validateType(const std::optional<Token>& typeAnnotation, ValueTyp
         case TokenType::TYPE_FLOAT:
             return actualType == ValueType::NUMBER;
         case TokenType::TYPE_STRING:
-            return actualType == ValueType::STRING;
+            return actualType == ValueType::OBJ_STRING;
         case TokenType::TYPE_BOOL:
             return actualType == ValueType::BOOLEAN;
         case TokenType::TYPE_ARRAY:
@@ -868,7 +866,7 @@ ValueType Compiler::getExpressionType(const Expr* expr) {
             case LiteralValueType::NUMBER:
                 return ValueType::NUMBER;
             case LiteralValueType::STRING:
-                return ValueType::STRING;
+                return ValueType::OBJ_STRING;
             default:
                 return ValueType::NIL;
         }
@@ -880,8 +878,8 @@ ValueType Compiler::getExpressionType(const Expr* expr) {
             // Could be number or string concatenation
             ValueType leftType = getExpressionType(binary->left.get());
             ValueType rightType = getExpressionType(binary->right.get());
-            if (leftType == ValueType::STRING || rightType == ValueType::STRING) {
-                return ValueType::STRING;
+            if (leftType == ValueType::OBJ_STRING || rightType == ValueType::OBJ_STRING) {
+                return ValueType::OBJ_STRING;
             }
             return ValueType::NUMBER;
         }
@@ -924,7 +922,7 @@ ValueType Compiler::getExpressionType(const Expr* expr) {
                 case TokenType::TYPE_FLOAT:
                     return ValueType::NUMBER;
                 case TokenType::TYPE_STRING:
-                    return ValueType::STRING;
+                    return ValueType::OBJ_STRING;
                 case TokenType::TYPE_BOOL:
                     return ValueType::BOOLEAN;
                 case TokenType::TYPE_ARRAY:

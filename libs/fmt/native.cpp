@@ -15,6 +15,7 @@
  */
 #include "native.h"
 #include "vm.h"
+#include "types/obj_string.h"
 #include <bitset>
 #include <sstream>
 
@@ -26,7 +27,7 @@ std::string getTypeName(const Value& val) {
         case ValueType::NIL:       return "nil";
         case ValueType::BOOLEAN:   return "bool";
         case ValueType::NUMBER:    return "number";
-        case ValueType::STRING:    return "string";
+        case ValueType::OBJ_STRING:    return "string";
         case ValueType::CALLABLE:  return "function";
         case ValueType::OBJECT:    return "object";
         case ValueType::ARRAY:     return "array";
@@ -35,7 +36,8 @@ std::string getTypeName(const Value& val) {
     }
 }
 
-Value native_fmt_to_int(std::vector<Value> arguments) {
+Value native_fmt_to_int(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected one argument for fmt.to_int().");
     }
@@ -47,9 +49,9 @@ Value native_fmt_to_int(std::vector<Value> arguments) {
             // Already a number, just return as integer (truncate decimal part)
             return Value(static_cast<double>(static_cast<int>(std::get<double>(val.as))));
         
-        case ValueType::STRING: {
+        case ValueType::OBJ_STRING: {
             // Convert string to number
-            std::string str = std::get<std::string>(val.as);
+            std::string str = val.asString()->chars;
             
             // Handle empty string
             if (str.empty()) {
@@ -84,7 +86,7 @@ Value native_fmt_to_int(std::vector<Value> arguments) {
     }
 }
 
-Value native_fmt_to_str(std::vector<Value> arguments) {
+Value native_fmt_to_str(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected one argument for fmt.to_str().");
     }
@@ -97,20 +99,20 @@ Value native_fmt_to_str(std::vector<Value> arguments) {
             char buffer[32];
             double num = std::get<double>(val.as);
             snprintf(buffer, sizeof(buffer), "%.15g", num);
-            return Value(std::string(buffer));
+            return Value(vm.allocate<ObjString>(std::string(buffer)));
         }
         
-        case ValueType::STRING:
+        case ValueType::OBJ_STRING:
             // Already a string, just return it
             return val;
             
         case ValueType::BOOLEAN:
             // Convert bool to string
-            return Value(std::get<bool>(val.as) ? "true" : "false");
+            return Value(vm.allocate<ObjString>(std::get<bool>(val.as) ? "true" : "false"));
             
         case ValueType::NIL:
             // nil converts to "nil" string
-            return Value("nil");
+            return Value(vm.allocate<ObjString>("nil"));
             
         case ValueType::ARRAY:
         case ValueType::OBJECT:
@@ -123,7 +125,7 @@ Value native_fmt_to_str(std::vector<Value> arguments) {
     }
 }
 
-Value native_fmt_to_bin(std::vector<Value> arguments) {
+Value native_fmt_to_bin(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected one argument for fmt.to_bin().");
     }
@@ -139,17 +141,17 @@ Value native_fmt_to_bin(std::vector<Value> arguments) {
             // Find first '1' and return substring from there, or return "0" if all zeros
             size_t firstOne = bin.find('1');
             if (firstOne == std::string::npos) {
-                return Value("0");
+                return Value(vm.allocate<ObjString>("0"));
             }
-            return Value(bin.substr(firstOne));
+            return Value(vm.allocate<ObjString>(bin.substr(firstOne)));
         }
         
-        case ValueType::STRING: {
+        case ValueType::OBJ_STRING: {
             // If it's a string, first convert to number, then to binary
-            std::string str = std::get<std::string>(val.as);
+            std::string str = val.asString()->chars;
             
             if (str.empty()) {
-                return Value("0");
+                return Value(vm.allocate<ObjString>("0"));
             }
             
             try {
@@ -158,9 +160,9 @@ Value native_fmt_to_bin(std::vector<Value> arguments) {
                 std::string bin = std::bitset<32>(intNum).to_string();
                 size_t firstOne = bin.find('1');
                 if (firstOne == std::string::npos) {
-                    return Value("0");
+                    return Value(vm.allocate<ObjString>("0"));
                 }
-                return Value(bin.substr(firstOne));
+                return Value(vm.allocate<ObjString>(bin.substr(firstOne)));
             } catch (const std::invalid_argument& ia) {
                 throw std::runtime_error("Cannot convert string '" + str + "' to binary: invalid format.");
             } catch (const std::out_of_range& oor) {
@@ -170,11 +172,11 @@ Value native_fmt_to_bin(std::vector<Value> arguments) {
         
         case ValueType::BOOLEAN:
             // Convert boolean to binary (true = 1, false = 0)
-            return Value(std::get<bool>(val.as) ? "1" : "0");
+            return Value(vm.allocate<ObjString>(std::get<bool>(val.as) ? "1" : "0"));
             
         case ValueType::NIL:
             // nil converts to "0" binary
-            return Value("0");
+            return Value(vm.allocate<ObjString>("0"));
         
         case ValueType::ARRAY:
         case ValueType::OBJECT:
@@ -186,7 +188,7 @@ Value native_fmt_to_bin(std::vector<Value> arguments) {
     }
 }
 
-Value native_fmt_type(std::vector<Value> arguments) {
+Value native_fmt_type(VM& vm, std::vector<Value> arguments) {
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected one argument for fmt.type().");
     }
@@ -204,7 +206,7 @@ Value native_fmt_type(std::vector<Value> arguments) {
         case ValueType::NUMBER:
             typeName = "number";
             break;
-        case ValueType::STRING:
+        case ValueType::OBJ_STRING:
             typeName = "string";
             break;
         case ValueType::CALLABLE:
@@ -224,10 +226,11 @@ Value native_fmt_type(std::vector<Value> arguments) {
             break;
     }
     
-    return Value(typeName);
+    return Value(vm.allocate<ObjString>(typeName));
 }
 
-Value native_fmt_to_float(std::vector<Value> arguments) {
+Value native_fmt_to_float(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected one argument for fmt.to_float().");
     }
@@ -239,9 +242,9 @@ Value native_fmt_to_float(std::vector<Value> arguments) {
             // Already a number, return as is (could be int or float)
             return val;
         
-        case ValueType::STRING: {
+        case ValueType::OBJ_STRING: {
             // Convert string to float
-            std::string str = std::get<std::string>(val.as);
+            std::string str = val.asString()->chars;
             
             // Handle empty string
             if (str.empty()) {
@@ -276,19 +279,19 @@ Value native_fmt_to_float(std::vector<Value> arguments) {
     }
 }
 
-void register_fmt_functions(std::shared_ptr<Environment> env) {
-    env->define("to_int", Value(new NativeFn(native_fmt_to_int, 1)));    // Dynamic int conversion
-    env->define("to_str", Value(new NativeFn(native_fmt_to_str, 1)));    // Dynamic string conversion
-    env->define("to_bin", Value(new NativeFn(native_fmt_to_bin, 1)));    // Dynamic binary conversion
-    env->define("to_float", Value(new NativeFn(native_fmt_to_float, 1))); // Dynamic float conversion
-    env->define("type", Value(new NativeFn(native_fmt_type, 1)));        // Type detection function
+void register_fmt_functions(VM& vm, std::shared_ptr<Environment> env) {
+    env->define("to_int", Value(vm.allocate<NativeFn>(native_fmt_to_int, 1, true)));    // Dynamic int conversion
+    env->define("to_str", Value(vm.allocate<NativeFn>(native_fmt_to_str, 1, true)));    // Dynamic string conversion
+    env->define("to_bin", Value(vm.allocate<NativeFn>(native_fmt_to_bin, 1, true)));    // Dynamic binary conversion
+    env->define("to_float", Value(vm.allocate<NativeFn>(native_fmt_to_float, 1, true))); // Dynamic float conversion
+    env->define("type", Value(vm.allocate<NativeFn>(native_fmt_type, 1, true)));        // Type detection function
 }
 
 } // namespace neutron
 
 extern "C" void neutron_init_fmt_module(neutron::VM* vm) {
     auto fmt_env = std::make_shared<neutron::Environment>();
-    neutron::register_fmt_functions(fmt_env);
-    auto fmt_module = new neutron::Module("fmt", fmt_env);
+    neutron::register_fmt_functions(*vm, fmt_env);
+    auto fmt_module = vm->allocate<neutron::Module>("fmt", fmt_env);
     vm->define_module("fmt", fmt_module);
 }

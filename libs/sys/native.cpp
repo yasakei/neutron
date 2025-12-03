@@ -18,6 +18,7 @@
 #include "vm.h"
 #include "runtime/environment.h"
 #include "types/value.h"
+#include "types/obj_string.h"
 #include "types/json_object.h"
 #include "types/array.h"
 #include "expr.h"
@@ -39,15 +40,15 @@ namespace fs = std::filesystem;
 
 // File Operations
 
-static Value sys_read(const std::vector<Value>& args) {
+Value sys_read(VM& vm, std::vector<Value> args) {
     if (args.size() != 1) {
         throw std::runtime_error("sys.read() expects 1 argument (filepath)");
     }
-    if (args[0].type != ValueType::STRING) {
+    if (args[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.read() expects a string filepath");
     }
     
-    std::string filepath = std::get<std::string>(args[0].as);
+    std::string filepath = args[0].asString()->chars;
     std::ifstream file(filepath);
     
     if (!file.is_open()) {
@@ -56,22 +57,23 @@ static Value sys_read(const std::vector<Value>& args) {
     
     std::stringstream buffer;
     buffer << file.rdbuf();
-    return Value(buffer.str());
+    return Value(vm.allocate<ObjString>(buffer.str()));
 }
 
-static Value sys_write(const std::vector<Value>& args) {
+Value sys_write(VM& vm, std::vector<Value> args) {
+    (void)vm;
     if (args.size() != 2) {
         throw std::runtime_error("sys.write() expects 2 arguments (filepath, content)");
     }
-    if (args[0].type != ValueType::STRING) {
+    if (args[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.write() expects a string filepath");
     }
-    if (args[1].type != ValueType::STRING) {
+    if (args[1].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.write() expects string content");
     }
     
-    std::string filepath = std::get<std::string>(args[0].as);
-    std::string content = std::get<std::string>(args[1].as);
+    std::string filepath = args[0].asString()->chars;
+    std::string content = args[1].asString()->chars;
     
     std::ofstream file(filepath);
     if (!file.is_open()) {
@@ -83,19 +85,20 @@ static Value sys_write(const std::vector<Value>& args) {
     return Value(true);
 }
 
-static Value sys_append(const std::vector<Value>& args) {
+Value sys_append(VM& vm, std::vector<Value> args) {
+    (void)vm;
     if (args.size() != 2) {
         throw std::runtime_error("sys.append() expects 2 arguments (filepath, content)");
     }
-    if (args[0].type != ValueType::STRING) {
+    if (args[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.append() expects a string filepath");
     }
-    if (args[1].type != ValueType::STRING) {
+    if (args[1].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.append() expects string content");
     }
     
-    std::string filepath = std::get<std::string>(args[0].as);
-    std::string content = std::get<std::string>(args[1].as);
+    std::string filepath = args[0].asString()->chars;
+    std::string content = args[1].asString()->chars;
     
     std::ofstream file(filepath, std::ios::app);
     if (!file.is_open()) {
@@ -107,16 +110,17 @@ static Value sys_append(const std::vector<Value>& args) {
     return Value(true);
 }
 
-static Value sys_cp(const std::vector<Value>& args) {
+Value sys_cp(VM& vm, std::vector<Value> args) {
+    (void)vm;
     if (args.size() != 2) {
         throw std::runtime_error("sys.cp() expects 2 arguments (source, destination)");
     }
-    if (args[0].type != ValueType::STRING || args[1].type != ValueType::STRING) {
+    if (args[0].type != ValueType::OBJ_STRING || args[1].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.cp() expects string arguments");
     }
     
-    std::string source = std::get<std::string>(args[0].as);
-    std::string destination = std::get<std::string>(args[1].as);
+    std::string source = args[0].asString()->chars;
+    std::string destination = args[1].asString()->chars;
     
     if (!platform::copyFile(source, destination)) {
         throw std::runtime_error("Failed to copy file from " + source + " to " + destination);
@@ -125,16 +129,17 @@ static Value sys_cp(const std::vector<Value>& args) {
     return Value(true);
 }
 
-static Value sys_mv(const std::vector<Value>& args) {
+Value sys_mv(VM& vm, std::vector<Value> args) {
+    (void)vm;
     if (args.size() != 2) {
         throw std::runtime_error("sys.mv() expects 2 arguments (source, destination)");
     }
-    if (args[0].type != ValueType::STRING || args[1].type != ValueType::STRING) {
+    if (args[0].type != ValueType::OBJ_STRING || args[1].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.mv() expects string arguments");
     }
     
-    std::string source = std::get<std::string>(args[0].as);
-    std::string destination = std::get<std::string>(args[1].as);
+    std::string source = args[0].asString()->chars;
+    std::string destination = args[1].asString()->chars;
     
     if (!platform::moveFile(source, destination)) {
         throw std::runtime_error("Failed to move file from " + source + " to " + destination);
@@ -143,15 +148,16 @@ static Value sys_mv(const std::vector<Value>& args) {
     return Value(true);
 }
 
-static Value sys_rm(const std::vector<Value>& args) {
+Value sys_rm(VM& vm, std::vector<Value> args) {
+    (void)vm;
     if (args.size() != 1) {
         throw std::runtime_error("sys.rm() expects 1 argument (filepath)");
     }
-    if (args[0].type != ValueType::STRING) {
+    if (args[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.rm() expects a string filepath");
     }
     
-    std::string filepath = std::get<std::string>(args[0].as);
+    std::string filepath = args[0].asString()->chars;
     
     if (!platform::removeFile(filepath)) {
         if (!platform::fileExists(filepath)) {
@@ -163,29 +169,31 @@ static Value sys_rm(const std::vector<Value>& args) {
     return Value(true);
 }
 
-static Value sys_exists(const std::vector<Value>& args) {
+Value sys_exists(VM& vm, std::vector<Value> args) {
+    (void)vm;
     if (args.size() != 1) {
         throw std::runtime_error("sys.exists() expects 1 argument (path)");
     }
-    if (args[0].type != ValueType::STRING) {
+    if (args[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.exists() expects a string path");
     }
     
-    std::string path = std::get<std::string>(args[0].as);
+    std::string path = args[0].asString()->chars;
     return Value(platform::fileExists(path));
 }
 
 // Directory Operations
 
-static Value sys_mkdir(const std::vector<Value>& args) {
+Value sys_mkdir(VM& vm, std::vector<Value> args) {
+    (void)vm;
     if (args.size() != 1) {
         throw std::runtime_error("sys.mkdir() expects 1 argument (path)");
     }
-    if (args[0].type != ValueType::STRING) {
+    if (args[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.mkdir() expects a string path");
     }
     
-    std::string path = std::get<std::string>(args[0].as);
+    std::string path = args[0].asString()->chars;
     
     if (!platform::createDirectory(path)) {
         throw std::runtime_error("Failed to create directory: " + path);
@@ -194,15 +202,16 @@ static Value sys_mkdir(const std::vector<Value>& args) {
     return Value(true);
 }
 
-static Value sys_rmdir(const std::vector<Value>& args) {
+Value sys_rmdir(VM& vm, std::vector<Value> args) {
+    (void)vm;
     if (args.size() < 1 || args.size() > 2) {
         throw std::runtime_error("sys.rmdir() expects 1 or 2 arguments (path, optional recursive)");
     }
-    if (args[0].type != ValueType::STRING) {
+    if (args[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.rmdir() expects a string path");
     }
     
-    std::string pathStr = std::get<std::string>(args[0].as);
+    std::string pathStr = args[0].asString()->chars;
     bool recursive = false;
     
     // Check if recursive flag is provided
@@ -251,40 +260,40 @@ static Value sys_rmdir(const std::vector<Value>& args) {
     return Value(true);
 }
 
-static Value sys_listdir(const std::vector<Value>& args) {
+Value sys_listdir(VM& vm, std::vector<Value> args) {
     if (args.size() != 1) {
         throw std::runtime_error("sys.listdir() expects 1 argument (path)");
     }
-    if (args[0].type != ValueType::STRING) {
+    if (args[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.listdir() expects a string path");
     }
     
-    std::string path = std::get<std::string>(args[0].as);
+    std::string path = args[0].asString()->chars;
     std::vector<std::string> files = platform::listDirectory(path);
     
-    auto array = new Array();
+    auto array = vm.allocate<Array>();
     for (const auto& file : files) {
-        array->elements.push_back(Value(file));
+        array->elements.push_back(Value(vm.allocate<ObjString>(file)));
     }
     return Value(array);
 }
 
-static Value sys_stat(const std::vector<Value>& args) {
+Value sys_stat(VM& vm, std::vector<Value> args) {
     if (args.size() != 1) {
         throw std::runtime_error("sys.stat() expects 1 argument (path)");
     }
-    if (args[0].type != ValueType::STRING) {
+    if (args[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.stat() expects a string path");
     }
     
-    std::string pathStr = std::get<std::string>(args[0].as);
+    std::string pathStr = args[0].asString()->chars;
     fs::path path(pathStr);
     
     if (!fs::exists(path)) {
         throw std::runtime_error("File not found: " + pathStr);
     }
     
-    auto info = new JsonObject();
+    auto info = vm.allocate<JsonObject>();
     info->properties["size"] = Value(static_cast<double>(fs::file_size(path)));
     
     // Handle time conversion safely
@@ -296,7 +305,7 @@ static Value sys_stat(const std::vector<Value>& args) {
     
     std::stringstream ss;
     ss << std::put_time(std::localtime(&cftime), "%Y-%m-%d %H:%M:%S");
-    info->properties["mtime"] = Value(ss.str());
+    info->properties["mtime"] = Value(vm.allocate<ObjString>(ss.str()));
     
     info->properties["is_directory"] = Value(fs::is_directory(path));
     info->properties["is_file"] = Value(fs::is_regular_file(path));
@@ -304,18 +313,19 @@ static Value sys_stat(const std::vector<Value>& args) {
     return Value(info);
 }
 
-static Value sys_chmod(const std::vector<Value>& args) {
+Value sys_chmod(VM& vm, std::vector<Value> args) {
+    (void)vm;
     if (args.size() != 2) {
         throw std::runtime_error("sys.chmod() expects 2 arguments (path, mode)");
     }
-    if (args[0].type != ValueType::STRING) {
+    if (args[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.chmod() expects a string path");
     }
     if (args[1].type != ValueType::NUMBER) {
         throw std::runtime_error("sys.chmod() expects a number mode");
     }
     
-    std::string pathStr = std::get<std::string>(args[0].as);
+    std::string pathStr = args[0].asString()->chars;
     int mode = static_cast<int>(std::get<double>(args[1].as));
     
     // Cast integer mode to permissions
@@ -324,7 +334,7 @@ static Value sys_chmod(const std::vector<Value>& args) {
     return Value(true);
 }
 
-static Value sys_tmpfile(const std::vector<Value>& args) {
+Value sys_tmpfile(VM& vm, std::vector<Value> args) {
     if (args.size() != 0) {
         throw std::runtime_error("sys.tmpfile() expects 0 arguments");
     }
@@ -337,12 +347,12 @@ static Value sys_tmpfile(const std::vector<Value>& args) {
     std::string filename = "neutron_tmp_" + std::to_string(now) + "_" + std::to_string(rand_val);
     fs::path tmp_path = tmp_dir / filename;
     
-    return Value(tmp_path.string());
+    return Value(vm.allocate<ObjString>(tmp_path.string()));
 }
 
 // System Information
 
-static Value sys_cwd(const std::vector<Value>& args) {
+Value sys_cwd(VM& vm, std::vector<Value> args) {
     if (args.size() != 0) {
         throw std::runtime_error("sys.cwd() expects 0 arguments");
     }
@@ -352,18 +362,19 @@ static Value sys_cwd(const std::vector<Value>& args) {
         throw std::runtime_error("Failed to get current working directory");
     }
     
-    return Value(cwd);
+    return Value(vm.allocate<ObjString>(cwd));
 }
 
-static Value sys_chdir(const std::vector<Value>& args) {
+Value sys_chdir(VM& vm, std::vector<Value> args) {
+    (void)vm;
     if (args.size() != 1) {
         throw std::runtime_error("sys.chdir() expects 1 argument (path)");
     }
-    if (args[0].type != ValueType::STRING) {
+    if (args[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.chdir() expects a string path");
     }
     
-    std::string path = std::get<std::string>(args[0].as);
+    std::string path = args[0].asString()->chars;
     
     if (!platform::setCwd(path)) {
         throw std::runtime_error("Failed to change directory to: " + path);
@@ -372,74 +383,75 @@ static Value sys_chdir(const std::vector<Value>& args) {
     return Value(true);
 }
 
-static Value sys_env(const std::vector<Value>& args) {
+Value sys_env(VM& vm, std::vector<Value> args) {
     if (args.size() != 1) {
         throw std::runtime_error("sys.env() expects 1 argument (variable name)");
     }
-    if (args[0].type != ValueType::STRING) {
+    if (args[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.env() expects a string variable name");
     }
     
-    std::string varname = std::get<std::string>(args[0].as);
+    std::string varname = args[0].asString()->chars;
     std::string value = platform::getEnv(varname);
     
     if (value.empty()) {
         return Value(); // Return nil
     }
     
-    return Value(value);
+    return Value(vm.allocate<ObjString>(value));
 }
 
-static Value sys_args(VM& vm, const std::vector<Value>& args) {
+Value sys_args(VM& vm, std::vector<Value> args) {
     if (args.size() != 0) {
         throw std::runtime_error("sys.args() expects 0 arguments");
     }
     
     // Return command line arguments from VM
-    auto array = new Array();
+    auto array = vm.allocate<Array>();
     for (const auto& arg : vm.commandLineArgs) {
-        array->elements.push_back(Value(arg));
+        array->elements.push_back(Value(vm.allocate<ObjString>(arg)));
     }
     return Value(array);
 }
 
-static Value sys_info(const std::vector<Value>& args) {
+Value sys_info(VM& vm, std::vector<Value> args) {
     if (args.size() != 0) {
         throw std::runtime_error("sys.info() expects 0 arguments");
     }
     
-    auto info = new JsonObject();
+    auto info = vm.allocate<JsonObject>();
     
     // Use platform abstraction for system info
-    info->properties["platform"] = Value(platform::getPlatform());
-    info->properties["arch"] = Value(platform::getArch());
-    info->properties["user"] = Value(platform::getUsername());
-    info->properties["hostname"] = Value(platform::getHostname());
-    info->properties["cwd"] = Value(platform::getCwd());
+    info->properties["platform"] = Value(vm.allocate<ObjString>(platform::getPlatform()));
+    info->properties["arch"] = Value(vm.allocate<ObjString>(platform::getArch()));
+    info->properties["user"] = Value(vm.allocate<ObjString>(platform::getUsername()));
+    info->properties["hostname"] = Value(vm.allocate<ObjString>(platform::getHostname()));
+    info->properties["cwd"] = Value(vm.allocate<ObjString>(platform::getCwd()));
     
     return Value(info);
 }
 
 // User Input
 
-static Value sys_input(const std::vector<Value>& args) {
+Value sys_input(VM& vm, std::vector<Value> args) {
     if (args.size() > 1) {
         throw std::runtime_error("sys.input() expects 0 or 1 argument (optional prompt)");
     }
     
     if (args.size() == 1) {
-        if (args[0].type != ValueType::STRING) {
+        if (args[0].type != ValueType::OBJ_STRING) {
             throw std::runtime_error("sys.input() prompt must be a string");
         }
-        std::cout << std::get<std::string>(args[0].as);
+        std::cout << args[0].asString()->chars;
     }
     
     std::string line;
     std::getline(std::cin, line);
-    return Value(line);
+    return Value(vm.allocate<ObjString>(line));
 }
 
-static Value sys_sleep(const std::vector<Value>& args) {
+Value sys_sleep(VM& vm, std::vector<Value> args) {
+    (void)vm;
     if (args.size() != 1) {
         throw std::runtime_error("sys.sleep() expects 1 argument (milliseconds)");
     }
@@ -455,7 +467,8 @@ static Value sys_sleep(const std::vector<Value>& args) {
 
 // Process Control
 
-static Value sys_exit(const std::vector<Value>& args) {
+Value sys_exit(VM& vm, std::vector<Value> args) {
+    (void)vm;
     if (args.size() > 1) {
         throw std::runtime_error("sys.exit() expects 0 or 1 argument (optional exit code)");
     }
@@ -472,61 +485,62 @@ static Value sys_exit(const std::vector<Value>& args) {
     return Value(); // Never reached
 }
 
-static Value sys_exec(const std::vector<Value>& args) {
+Value sys_exec(VM& vm, std::vector<Value> args) {
+    (void)vm;
     if (args.size() != 1) {
         throw std::runtime_error("sys.exec() expects 1 argument (command)");
     }
-    if (args[0].type != ValueType::STRING) {
+    if (args[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.exec() expects a string command");
     }
     
-    std::string command = std::get<std::string>(args[0].as);
+    std::string command = args[0].asString()->chars;
     int exitCode = platform::execute(command);
     
     return Value(static_cast<double>(exitCode));
 }
 
 namespace neutron {
-    void register_sys_functions(std::shared_ptr<Environment> env) {
+    void register_sys_functions(VM& vm, std::shared_ptr<Environment> env) {
         // File Operations
-        env->define("read", Value(new NativeFn(sys_read, 1)));
-        env->define("write", Value(new NativeFn(sys_write, 2)));
-        env->define("append", Value(new NativeFn(sys_append, 2)));
-        env->define("cp", Value(new NativeFn(sys_cp, 2)));
-        env->define("mv", Value(new NativeFn(sys_mv, 2)));
-        env->define("rm", Value(new NativeFn(sys_rm, 1)));
-        env->define("exists", Value(new NativeFn(sys_exists, 1)));
+        env->define("read", Value(vm.allocate<NativeFn>(sys_read, 1, true)));
+        env->define("write", Value(vm.allocate<NativeFn>(sys_write, 2, true)));
+        env->define("append", Value(vm.allocate<NativeFn>(sys_append, 2, true)));
+        env->define("cp", Value(vm.allocate<NativeFn>(sys_cp, 2, true)));
+        env->define("mv", Value(vm.allocate<NativeFn>(sys_mv, 2, true)));
+        env->define("rm", Value(vm.allocate<NativeFn>(sys_rm, 1, true)));
+        env->define("exists", Value(vm.allocate<NativeFn>(sys_exists, 1, true)));
         
         // Directory Operations
-        env->define("mkdir", Value(new NativeFn(sys_mkdir, 1)));
-        env->define("rmdir", Value(new NativeFn(sys_rmdir, -1))); // 1-2 arguments
-        env->define("listdir", Value(new NativeFn(sys_listdir, 1)));
+        env->define("mkdir", Value(vm.allocate<NativeFn>(sys_mkdir, 1, true)));
+        env->define("rmdir", Value(vm.allocate<NativeFn>(sys_rmdir, -1, true))); // 1-2 arguments
+        env->define("listdir", Value(vm.allocate<NativeFn>(sys_listdir, 1, true)));
         
         // File Info & Permissions
-        env->define("stat", Value(new NativeFn(sys_stat, 1)));
-        env->define("chmod", Value(new NativeFn(sys_chmod, 2)));
-        env->define("tmpfile", Value(new NativeFn(sys_tmpfile, 0)));
+        env->define("stat", Value(vm.allocate<NativeFn>(sys_stat, 1, true)));
+        env->define("chmod", Value(vm.allocate<NativeFn>(sys_chmod, 2, true)));
+        env->define("tmpfile", Value(vm.allocate<NativeFn>(sys_tmpfile, 0, true)));
         
         // System Information
-        env->define("cwd", Value(new NativeFn(sys_cwd, 0)));
-        env->define("chdir", Value(new NativeFn(sys_chdir, 1)));
-        env->define("env", Value(new NativeFn(sys_env, 1)));
-        env->define("args", Value(new NativeFn(sys_args, 0, true)));  // true = needs VM
-        env->define("info", Value(new NativeFn(sys_info, 0)));
+        env->define("cwd", Value(vm.allocate<NativeFn>(sys_cwd, 0, true)));
+        env->define("chdir", Value(vm.allocate<NativeFn>(sys_chdir, 1, true)));
+        env->define("env", Value(vm.allocate<NativeFn>(sys_env, 1, true)));
+        env->define("args", Value(vm.allocate<NativeFn>(sys_args, 0, true)));  // true = needs VM
+        env->define("info", Value(vm.allocate<NativeFn>(sys_info, 0, true)));
         
         // User Input
-        env->define("input", Value(new NativeFn(sys_input, -1)));
-        env->define("sleep", Value(new NativeFn(sys_sleep, 1)));
+        env->define("input", Value(vm.allocate<NativeFn>(sys_input, -1, true)));
+        env->define("sleep", Value(vm.allocate<NativeFn>(sys_sleep, 1, true)));
         
         // Process Control
-        env->define("exit", Value(new NativeFn(sys_exit, -1)));
-        env->define("exec", Value(new NativeFn(sys_exec, 1)));
+        env->define("exit", Value(vm.allocate<NativeFn>(sys_exit, -1, true)));
+        env->define("exec", Value(vm.allocate<NativeFn>(sys_exec, 1, true)));
     }
 }
 
 extern "C" void neutron_init_sys_module(VM* vm) {
     auto sys_env = std::make_shared<neutron::Environment>();
-    neutron::register_sys_functions(sys_env);
-    auto sys_module = new neutron::Module("sys", sys_env);
+    neutron::register_sys_functions(*vm, sys_env);
+    auto sys_module = vm->allocate<neutron::Module>("sys", sys_env);
     vm->define_module("sys", sys_module);
 }

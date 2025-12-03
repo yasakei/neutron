@@ -49,11 +49,12 @@ namespace neutron {
     class FunctionStmt;
     
     // Forward declarations for module registration functions
-    void register_sys_functions(std::shared_ptr<Environment> env);
-    void register_json_functions(std::shared_ptr<Environment> env);
-    void register_convert_functions(std::shared_ptr<Environment> env);
-    void register_time_functions(std::shared_ptr<Environment> env);
-    void register_math_functions(std::shared_ptr<Environment> env);
+    void register_sys_functions(VM& vm, std::shared_ptr<Environment> env);
+    void register_json_functions(VM& vm, std::shared_ptr<Environment> env);
+    void register_convert_functions(VM& vm, std::shared_ptr<Environment> env);
+    void register_time_functions(VM& vm, std::shared_ptr<Environment> env);
+    void register_math_functions(VM& vm, std::shared_ptr<Environment> env);
+    void register_arrays_functions(VM& vm, std::shared_ptr<Environment> env);
 }
 
 namespace neutron {
@@ -101,11 +102,19 @@ public:
     template<typename T, typename... Args>
     T* allocate(Args&&... args) {
         T* obj = new T(std::forward<Args>(args)...);
+        
+        // Protect the new object from GC until it's returned and used
+        tempRoots.push_back(obj);
         heap.push_back(obj);
         
         // Check if we need to run garbage collection
         if (heap.size() >= nextGC) {
             collectGarbage();
+        }
+        
+        // Unprotect
+        if (!tempRoots.empty() && tempRoots.back() == obj) {
+            tempRoots.pop_back();
         }
         
         return obj;
@@ -127,6 +136,9 @@ public:
     std::vector<std::string> sourceLines;  // Source code lines for error reporting
     std::vector<std::shared_ptr<ComponentInterface>> loadedComponents;  // Loaded components
     
+    // Temporary roots for garbage collection protection during allocation
+    std::vector<Object*> tempRoots;
+
     // Embedded files support (for standalone executables)
     std::unordered_map<std::string, std::string> embeddedFiles;
     void addEmbeddedFile(const std::string& path, const std::string& content);
@@ -183,6 +195,7 @@ private:
     // Garbage collection methods
     void markRoots();
     void markValue(const Value& value);
+    void markObject(Object* obj);
     void collectGarbage();
     void sweep();
 };

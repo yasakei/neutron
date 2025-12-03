@@ -105,6 +105,7 @@ set(NEUTRON_TYPES_SOURCES
     src/types/json_array.cpp
     src/types/return.cpp
     src/types/version.cpp
+    src/types/obj_string.cpp
 )
 
 # Runtime source files

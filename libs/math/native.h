@@ -6,7 +6,7 @@
 
 namespace neutron {
 
-void register_math_functions(std::shared_ptr<Environment> env);
+void register_math_functions(VM& vm, std::shared_ptr<Environment> env);
 
 extern "C" {
     void neutron_init_math_module(VM* vm);

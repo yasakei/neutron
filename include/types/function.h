@@ -11,12 +11,13 @@ namespace neutron {
 class FunctionStmt;
 
 class Function : public Callable {
+    friend class VM;
 public:
     Function(const FunctionStmt* declaration, std::shared_ptr<Environment> closure);
     ~Function();
     int arity() override;
     Value call(VM& vm, std::vector<Value> arguments) override;
-    std::string toString() override;
+    std::string toString() const override;
 
     std::string name;
     int arity_val;

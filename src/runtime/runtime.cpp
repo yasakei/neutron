@@ -32,7 +32,7 @@ Value NativeFn::call(VM& vm, std::vector<Value> arguments) {
     return function(arguments);
 }
 
-std::string NativeFn::toString() {
+std::string NativeFn::toString() const {
     return "<native fn>";
 }
 
@@ -49,7 +49,7 @@ Value BoundMethod::call(VM& vm, std::vector<Value> arguments) {
     return method->call(vm, arguments);
 }
 
-std::string BoundMethod::toString() {
+std::string BoundMethod::toString() const {
     return "<bound method>";
 }
 
@@ -65,14 +65,13 @@ int Class::arity() {
 }
 
 Value Class::call(VM& vm, std::vector<Value> arguments) {
-    (void)vm; // Unused parameter
     (void)arguments; // Unused parameter
     // Create a new instance of this class
-    Instance* instance = new Instance(this);
+    Instance* instance = vm.allocate<Instance>(this);
     return Value(instance);
 }
 
-std::string Class::toString() {
+std::string Class::toString() const {
     return name;
 }
 

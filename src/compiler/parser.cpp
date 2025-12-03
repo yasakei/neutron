@@ -14,7 +14,7 @@ ValueType tokenTypeToValueType(TokenType type) {
     switch (type) {
         case TokenType::TYPE_INT: return ValueType::NUMBER;
         case TokenType::TYPE_FLOAT: return ValueType::NUMBER;
-        case TokenType::TYPE_STRING: return ValueType::STRING;
+        case TokenType::TYPE_STRING: return ValueType::OBJ_STRING;
         case TokenType::TYPE_BOOL: return ValueType::BOOLEAN;
         case TokenType::TYPE_ARRAY: return ValueType::ARRAY;
         case TokenType::TYPE_OBJECT: return ValueType::OBJECT;
@@ -40,7 +40,7 @@ std::string valueTypeToString(ValueType type) {
         case ValueType::NIL: return "nil";
         case ValueType::BOOLEAN: return "bool";
         case ValueType::NUMBER: return "number";
-        case ValueType::STRING: return "string";
+        case ValueType::OBJ_STRING: return "string";
         case ValueType::ARRAY: return "array";
         case ValueType::OBJECT: return "object";
         case ValueType::CALLABLE: return "callable";
@@ -56,7 +56,7 @@ ValueType literalValueTypeToValueType(LiteralValueType type) {
         case LiteralValueType::NIL: return ValueType::NIL;
         case LiteralValueType::BOOLEAN: return ValueType::BOOLEAN;
         case LiteralValueType::NUMBER: return ValueType::NUMBER;
-        case LiteralValueType::STRING: return ValueType::STRING;
+        case LiteralValueType::STRING: return ValueType::OBJ_STRING;
         default: return ValueType::NIL; // Should not happen
     }
 }

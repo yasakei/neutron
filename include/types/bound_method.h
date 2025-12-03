@@ -10,7 +10,7 @@ public:
     BoundMethod(Value receiver, Function* method);
     int arity() override;
     Value call(VM& vm, std::vector<Value> arguments) override;
-    std::string toString() override;
+    std::string toString() const override;
     
     Value receiver;
     Function* method;

@@ -17,7 +17,7 @@ public:
 
     neutron::Value call(neutron::VM& vm, std::vector<neutron::Value> args) override;
 
-    std::string toString() override { return "<native fn>"; }
+    std::string toString() const override { return "<native fn>"; }
     bool isCNativeFn() const override { return true; }
 
 private:

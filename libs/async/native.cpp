@@ -15,6 +15,7 @@
  */
 #include "native.h"
 #include "vm.h"
+#include "types/obj_string.h"
 #include "runtime/environment.h"
 #include "types/value.h"
 #include "types/json_object.h"
@@ -46,7 +47,7 @@ struct AsyncHandle {
 };
 
 // Function to run an async operation in a separate thread
-static Value async_run(const std::vector<Value>& args) {
+static Value async_run(VM& vm, const std::vector<Value>& args) {
     if (args.size() != 1) {
         throw std::runtime_error("async.run() expects 1 argument (function)");
     }
@@ -57,15 +58,15 @@ static Value async_run(const std::vector<Value>& args) {
     // For now, we'll just return a simple object to represent an async task
     // In a real implementation, this would involve actual threading
     
-    auto result_obj = new JsonObject();
-    result_obj->properties["status"] = Value(std::string("created"));
+    auto result_obj = vm.allocate<JsonObject>();
+    result_obj->properties["status"] = Value(vm.allocate<ObjString>("created"));
     result_obj->properties["result"] = Value(); // nil initially
     
     return Value(result_obj);
 }
 
 // Function to await the result of an async operation
-static Value async_await(const std::vector<Value>& args) {
+static Value async_await(VM& vm, const std::vector<Value>& args) {
     if (args.size() != 1) {
         throw std::runtime_error("async.await() expects 1 argument (async handle)");
     }
@@ -78,7 +79,7 @@ static Value async_await(const std::vector<Value>& args) {
 }
 
 // Function to sleep asynchronously
-static Value async_sleep(const std::vector<Value>& args) {
+static Value async_sleep(VM& vm, const std::vector<Value>& args) {
     if (args.size() != 1) {
         throw std::runtime_error("async.sleep() expects 1 argument (milliseconds)");
     }
@@ -93,7 +94,7 @@ static Value async_sleep(const std::vector<Value>& args) {
 }
 
 // Function to create a timer that executes a function after a delay
-static Value async_timer(const std::vector<Value>& args) {
+static Value async_timer(VM& vm, const std::vector<Value>& args) {
     if (args.size() != 2) {
         throw std::runtime_error("async.timer() expects 2 arguments (function, delay_ms)");
     }
@@ -115,13 +116,13 @@ static Value async_timer(const std::vector<Value>& args) {
 }
 
 // Function to create a promise-like object for async operations
-static Value async_promise(const std::vector<Value>& args) {
+static Value async_promise(VM& vm, const std::vector<Value>& args) {
     if (args.size() != 1 && args.size() != 0) {
         throw std::runtime_error("async.promise() expects 0 or 1 argument (executor function)");
     }
     
-    auto promise_obj = new JsonObject();
-    promise_obj->properties["state"] = Value(std::string("pending"));
+    auto promise_obj = vm.allocate<JsonObject>();
+    promise_obj->properties["state"] = Value(vm.allocate<ObjString>("pending"));
     promise_obj->properties["result"] = Value(); // nil initially
     
     if (args.size() == 1) {
@@ -137,18 +138,18 @@ static Value async_promise(const std::vector<Value>& args) {
 }
 
 namespace neutron {
-    void register_async_functions(std::shared_ptr<Environment> env) {
-        env->define("run", Value(new NativeFn(async_run, 1)));
-        env->define("await", Value(new NativeFn(async_await, 1)));
-        env->define("sleep", Value(new NativeFn(async_sleep, 1)));
-        env->define("timer", Value(new NativeFn(async_timer, 2)));
-        env->define("promise", Value(new NativeFn(async_promise, -1))); // -1 means variable arity
+    void register_async_functions(VM& vm, std::shared_ptr<Environment> env) {
+        env->define("run", Value(vm.allocate<NativeFn>(async_run, 1, true)));
+        env->define("await", Value(vm.allocate<NativeFn>(async_await, 1, true)));
+        env->define("sleep", Value(vm.allocate<NativeFn>(async_sleep, 1, true)));
+        env->define("timer", Value(vm.allocate<NativeFn>(async_timer, 2, true)));
+        env->define("promise", Value(vm.allocate<NativeFn>(async_promise, -1, true))); // -1 means variable arity
     }
 }
 
 extern "C" void neutron_init_async_module(VM* vm) {
     auto async_env = std::make_shared<neutron::Environment>();
-    neutron::register_async_functions(async_env);
-    auto async_module = new neutron::Module("async", async_env);
+    neutron::register_async_functions(*vm, async_env);
+    auto async_module = vm->allocate<neutron::Module>("async", async_env);
     vm->define_module("async", async_module);
 }
