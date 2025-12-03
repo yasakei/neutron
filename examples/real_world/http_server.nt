@@ -19,7 +19,7 @@ fun handleRequest(req) {
             "endpoints": ["/api/status", "/api/echo"]
         });
         response.headers = {"Content-Type": "application/json"};
-    } else if (req.path == "/api/status") {
+    } elif (req.path == "/api/status") {
         response.status = 200;
         response.body = json.stringify({
             "status": "online",
@@ -27,6 +27,8 @@ fun handleRequest(req) {
             "version": "1.0.0"
         });
         response.headers = {"Content-Type": "application/json"};
+    } elif (req.path == "/api/echo") {
+           return "Hello world";
     } else {
         response.status = 404;
         response.body = json.stringify({
