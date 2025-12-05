@@ -234,10 +234,61 @@ jobs:
         path: release/
         retention-days: 7
 
+  build-windows7-x64:
+    name: Build for Windows 7 x64
+    runs-on: windows-2019
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+      
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: 'c82f74667287d3dc386bce81e44964370c91a289'
+        
+    - name: Install dependencies via vcpkg
+      run: |
+        vcpkg install curl:x64-windows jsoncpp:x64-windows
+      
+    - name: Configure CMake for Windows 7
+      run: |
+        cmake -B build -S . -G "Visual Studio 16 2019" -A x64 `
+          -DCMAKE_TOOLCHAIN_FILE="${env:VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DCMAKE_SYSTEM_VERSION=6.1 `
+          -DCMAKE_CXX_FLAGS="/D_WIN32_WINNT=0x0601"
+        
+    - name: Build
+      run: cmake --build build --config Release --parallel
+      
+    - name: Verify binary
+      run: |
+        dir build\Release\
+        .\build\Release\neutron.exe --version
+        
+    - name: Package artifacts
+      run: |
+        mkdir release
+        copy build\Release\neutron.exe release\
+        copy build\Release\*.dll release\ 2>$null; $true
+        copy README.md release\
+        copy LICENSE release\
+        xcopy /E /I docs release\docs
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: neutron-windows7-x64
+        path: release/
+        retention-days: 7
+
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [build-linux, build-macos-intel, build-macos-arm64, build-windows-msys2]
+    needs: [build-linux, build-macos-intel, build-macos-arm64, build-windows-msys2, build-windows7-x64]
     if: always()
     
     steps:
@@ -248,11 +299,13 @@ jobs:
         echo "macOS Intel: ${{ needs.build-macos-intel.result }}"
         echo "macOS ARM64: ${{ needs.build-macos-arm64.result }}"
         echo "Windows: ${{ needs.build-windows-msys2.result }}"
+        echo "Windows 7 x64: ${{ needs.build-windows7-x64.result }}"
         
     - name: Fail if any build failed
       if: |
         needs.build-linux.result != 'success' || 
         needs.build-macos-intel.result != 'success' || 
         needs.build-macos-arm64.result != 'success' || 
-        needs.build-windows-msys2.result != 'success'
+        needs.build-windows-msys2.result != 'success' ||
+        needs.build-windows7-x64.result != 'success'
       run: exit 1
