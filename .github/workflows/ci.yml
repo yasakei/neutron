@@ -273,7 +273,7 @@ jobs:
       run: |
         mkdir release
         copy build\Release\neutron.exe release\
-        copy build\Release\*.dll release\ 2>$null; $true
+        Copy-Item build\Release\*.dll release\ -ErrorAction SilentlyContinue
         copy README.md release\
         copy LICENSE release\
         xcopy /E /I docs release\docs
@@ -306,6 +306,6 @@ jobs:
         needs.build-linux.result != 'success' || 
         needs.build-macos-intel.result != 'success' || 
         needs.build-macos-arm64.result != 'success' || 
-        needs.build-windows-msys2.result != 'success' ||
+        needs.build-windows-msys2.result != 'success' || 
         needs.build-windows7-x64.result != 'success'
       run: exit 1
