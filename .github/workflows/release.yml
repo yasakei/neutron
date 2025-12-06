@@ -233,6 +233,7 @@ jobs:
           mingw-w64-x86_64-cmake
           mingw-w64-x86_64-curl
           mingw-w64-x86_64-jsoncpp
+          mingw-w64-x86_64-nsis
           make
           zip
           
@@ -255,17 +256,8 @@ jobs:
         cp neutron_runtime.lib neutron-windows-x64/ 2>/dev/null || true
         cp libneutron_runtime.a neutron-windows-x64/ 2>/dev/null || true
         cp build/*.dll neutron-windows-x64/ 2>/dev/null || true
-        # Copy runtime dependencies
-        cp /mingw64/bin/libcurl-4.dll neutron-windows-x64/
-        cp /mingw64/bin/libstdc++-6.dll neutron-windows-x64/
-        cp /mingw64/bin/libgcc_s_seh-1.dll neutron-windows-x64/
-        cp /mingw64/bin/libwinpthread-1.dll neutron-windows-x64/
-        cp /mingw64/bin/libbrotlidec.dll neutron-windows-x64/
-        cp /mingw64/bin/libbrotlicommon.dll neutron-windows-x64/
-        cp /mingw64/bin/libidn2-0.dll neutron-windows-x64/
-        cp /mingw64/bin/libnghttp2-14.dll neutron-windows-x64/
-        cp /mingw64/bin/libnghttp3-9.dll neutron-windows-x64/
-        cp /mingw64/bin/zlib1.dll neutron-windows-x64/
+        # Copy ALL runtime dependencies
+        cp /mingw64/bin/*.dll neutron-windows-x64/ 2>/dev/null || true
         cp README.md LICENSE neutron-windows-x64/
         cp -r docs neutron-windows-x64/
         cp -r include neutron-windows-x64/
@@ -273,11 +265,16 @@ jobs:
         cp -r libs neutron-windows-x64/
         cp scripts/install.sh neutron-windows-x64/
         cp nt-box/build/box.exe neutron-windows-x64/ 2>/dev/null || true
+        
+        # Create Installer
+        makensis -DVERSION="${{ needs.create-release.outputs.version }}" installer.nsi
+        mv NeutronInstaller.exe neutron-${{ needs.create-release.outputs.version }}-installer.exe
+        
         cd neutron-windows-x64
         zip -r ../neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip .
         cd ..
         
-    - name: Upload Release Asset
+    - name: Upload Release Asset (Zip)
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -286,6 +283,16 @@ jobs:
         asset_path: ./neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip
         asset_name: neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip
         asset_content_type: application/zip
+
+    - name: Upload Release Asset (Installer)
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-installer.exe
+        asset_name: neutron-${{ needs.create-release.outputs.version }}-installer.exe
+        asset_content_type: application/vnd.microsoft.portable-executable
 
   # NOTE: Windows ARM64 build is complex to cross-compile from x64 runner
   # We'll focus on native Windows x64, and Linux multi-arch builds below

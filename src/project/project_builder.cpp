@@ -413,7 +413,7 @@ bool ProjectBuilder::buildProjectExecutable(
         linkFlags = "/link /LIBPATH:\"" + executableDir + "\" CURL::libcurl.lib JsonCpp::JsonCpp.lib";
     } else if (isWindows && isMingw) {
         compiler = "g++";
-        linkFlags = "-lcurl -ljsoncpp";
+        linkFlags = "-lcurl -ljsoncpp -lws2_32";
     } else {
         compiler = "g++";
         if (isMacOS) {
@@ -579,6 +579,34 @@ bool ProjectBuilder::buildProjectExecutable(
         compileCommand += linkFlags + " -o \"" + finalOutputPath + "\"";
     }
     
+    // Check if compiler is available
+    std::string checkCmd;
+    if (isWindows) {
+        if (compiler == "cl") {
+            checkCmd = "cl > nul 2>&1"; // cl returns 0 even with no args (prints usage) or non-zero? Actually cl usually returns non-zero if no files.
+            // Better check for cl:
+            checkCmd = "where cl > nul 2>&1";
+        } else {
+            checkCmd = compiler + " --version > nul 2>&1";
+        }
+    } else {
+        checkCmd = "which " + compiler + " > /dev/null 2>&1";
+    }
+    
+    if (system(checkCmd.c_str()) != 0) {
+        std::cerr << "Error: Compiler '" << compiler << "' not found in PATH." << std::endl;
+        if (isWindows && isMingw) {
+            std::cerr << "Neutron requires a C++ compiler to build projects." << std::endl;
+            std::cerr << "Please install MinGW-w64 and add 'bin' to your PATH." << std::endl;
+            std::cerr << "Download: https://winlibs.com/ or via MSYS2" << std::endl;
+        } else if (isWindows) {
+            std::cerr << "Please install Visual Studio C++ workload." << std::endl;
+        } else {
+            std::cerr << "Please install g++ or clang++." << std::endl;
+        }
+        return false;
+    }
+
     std::cout << "Compiling..." << std::endl;
     // std::cout << "Command: " << compileCommand << std::endl;  // DEBUG: Commented out for clean output
     

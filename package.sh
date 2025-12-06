@@ -54,7 +54,7 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]] || [[ "$OSTYPE" == "linux-musl"* ]]; then
     
     echo -e "${YELLOW}Detected Linux ${ARCH_TYPE}${NC}"
     
-elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
+elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
     OS_TYPE="windows"
     ARCH_TYPE="x64"
     PACKAGE_NAME="neutron-windows-x64"
@@ -243,6 +243,11 @@ if [[ "$OS_TYPE" == "windows" ]]; then
     cp build/*.dll "$TARGET_NAME/" 2>/dev/null || true  # Copy any DLL files, ignore if none exist
     cp build/*.lib "$TARGET_NAME/" 2>/dev/null || true  # Copy static libraries for -b flag functionality
     cp build/*.a "$TARGET_NAME/" 2>/dev/null || true  # Copy static libraries for MinGW builds
+    
+    # Copy ALL runtime dependencies from MinGW to avoid missing DLLs
+    echo -e "${YELLOW}Copying all MinGW64 DLLs (this may take a while and result in a large package)...${NC}"
+    cp /mingw64/bin/*.dll "$TARGET_NAME/" 2>/dev/null || true
+
     cp nt-box/build/box.exe "$TARGET_NAME/"
 else
     # Unix-like systems: copy from build directory
@@ -286,15 +291,7 @@ else
 fi
 
 if [[ "$OS_TYPE" == "windows" ]]; then
-    PACKAGE_FILE="neutron-${VERSION}-${OS_TYPE}-${ARCH_TYPE}.zip"
-    echo -e "${BLUE}Creating zip archive: $PACKAGE_FILE${NC}"
-    # Use zip on Windows/MSYS2, tar on Unix systems
-    if command -v zip &> /dev/null; then
-        cd "$TARGET_NAME" && zip -r "../$PACKAGE_FILE" . && cd ..
-    else
-        echo -e "${RED}zip command not found. Please install zip to package for Windows${NC}"
-        exit 1
-    fi
+    echo -e "${YELLOW}Skipping zip archive creation for Windows (Installer only)${NC}"
 else
     # Use tar for Unix-like systems
     PACKAGE_FILE="neutron-${VERSION}-${OS_TYPE}-${ARCH_TYPE}.tar.gz"
@@ -302,22 +299,51 @@ else
     tar -czf "$PACKAGE_FILE" "$TARGET_NAME"
 fi
 
+# Build Windows Installer if makensis is available
+if [[ "$OS_TYPE" == "windows" ]]; then
+    if command -v makensis &> /dev/null; then
+        echo -e "${BLUE}Building Windows Installer...${NC}"
+        if [ -f "installer.nsi" ]; then
+            makensis -DVERSION="$VERSION" installer.nsi
+            if [ -f "NeutronInstaller.exe" ]; then
+                echo -e "${GREEN}Installer created: NeutronInstaller.exe${NC}"
+                mv NeutronInstaller.exe "neutron-${VERSION}-installer.exe"
+                echo -e "${GREEN}Renamed to: neutron-${VERSION}-installer.exe${NC}"
+                PACKAGE_FILE="neutron-${VERSION}-installer.exe"
+            else
+                echo -e "${RED}Installer creation failed${NC}"
+                exit 1
+            fi
+        else
+            echo -e "${YELLOW}installer.nsi not found, skipping installer creation${NC}"
+        fi
+    else
+        echo -e "${RED}makensis not found. Please install NSIS to create the installer.${NC}"
+        echo -e "${YELLOW}You can install it via pacman: pacman -S mingw-w64-x86_64-nsis${NC}"
+        exit 1
+    fi
+fi
+
 # Clean up the temporary directory if requested
-echo -e "${GREEN}Package created: $PACKAGE_FILE${NC}"
+if [[ -n "$PACKAGE_FILE" ]]; then
+    echo -e "${GREEN}Package created: $PACKAGE_FILE${NC}"
+fi
 
 echo -e "${GREEN}Packaging completed successfully!${NC}"
 echo ""
 echo -e "${BLUE}Package information:${NC}"
-echo "  Created file: $PACKAGE_FILE"
-echo "  Size: $(ls -lah "$PACKAGE_FILE" | awk '{print $5}')"
+if [[ -n "$PACKAGE_FILE" ]]; then
+    echo "  Created file: $PACKAGE_FILE"
+    echo "  Size: $(ls -lah "$PACKAGE_FILE" | awk '{print $5}')"
+fi
 echo "  Target system: $TARGET_NAME"
 echo ""
 echo -e "${YELLOW}To extract and use:${NC}"
 if [[ "$OS_TYPE" == "windows" ]]; then
-    echo "  unzip $PACKAGE_FILE"
+    echo "  Run the installer: ./$PACKAGE_FILE"
 else
     echo "  tar -xzf $PACKAGE_FILE"
+    echo "  cd $TARGET_NAME"
+    echo "  # Binaries are now available: neutron, box"
 fi
-echo "  cd $TARGET_NAME"
-echo "  # Binaries are now available: neutron, box"
 echo ""

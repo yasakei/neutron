@@ -1,4 +1,4 @@
-//v2.1.0
+//v2.1.1
 #ifndef NEUTRON_VERSION_H
 #define NEUTRON_VERSION_H
 
@@ -11,7 +11,7 @@ public:
     // Version components
     static constexpr int MAJOR = 2;
     static constexpr int MINOR = 1;
-    static constexpr int PATCH = 0;
+    static constexpr int PATCH = 1;
     static constexpr const char* STAGE = "beta";
     
     // Full version string

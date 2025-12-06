@@ -223,17 +223,8 @@ jobs:
         mkdir -p release
         cp build/neutron.exe release/
         cp build/*.dll release/ 2>/dev/null || true
-        # Copy runtime dependencies
-        cp /mingw64/bin/libcurl-4.dll release/
-        cp /mingw64/bin/libstdc++-6.dll release/
-        cp /mingw64/bin/libgcc_s_seh-1.dll release/
-        cp /mingw64/bin/libwinpthread-1.dll release/
-        cp /mingw64/bin/libbrotlidec.dll release/
-        cp /mingw64/bin/libbrotlicommon.dll release/
-        cp /mingw64/bin/libidn2-0.dll release/
-        cp /mingw64/bin/libnghttp2-14.dll release/
-        cp /mingw64/bin/libnghttp3-9.dll release/
-        cp /mingw64/bin/zlib1.dll release/
+        # Copy ALL runtime dependencies
+        cp /mingw64/bin/*.dll release/ 2>/dev/null || true
         cp README.md LICENSE release/
         cp -r docs release/
         cp nt-box/build/box.exe release/ 2>/dev/null || true
