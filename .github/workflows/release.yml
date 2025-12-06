@@ -260,6 +260,12 @@ jobs:
         cp /mingw64/bin/libstdc++-6.dll neutron-windows-x64/
         cp /mingw64/bin/libgcc_s_seh-1.dll neutron-windows-x64/
         cp /mingw64/bin/libwinpthread-1.dll neutron-windows-x64/
+        cp /mingw64/bin/libbrotlidec.dll neutron-windows-x64/
+        cp /mingw64/bin/libbrotlicommon.dll neutron-windows-x64/
+        cp /mingw64/bin/libidn2-0.dll neutron-windows-x64/
+        cp /mingw64/bin/libnghttp2-14.dll neutron-windows-x64/
+        cp /mingw64/bin/libnghttp3-9.dll neutron-windows-x64/
+        cp /mingw64/bin/zlib1.dll neutron-windows-x64/
         cp README.md LICENSE neutron-windows-x64/
         cp -r docs neutron-windows-x64/
         cp -r include neutron-windows-x64/
