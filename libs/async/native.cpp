@@ -178,7 +178,6 @@ static Value async_timer(VM& vm, const std::vector<Value>& args) {
 }
 
 void neutron_init_async_module(VM* vm) {
-    std::cout << "Async module initialized (New)" << std::endl;
     vm->define_native("async_run", new NativeFn(async_run, 1, true));
     vm->define_native("async_await", new NativeFn(async_await, 1, true));
     vm->define_native("async_sleep", new NativeFn(async_sleep, 1, true));
