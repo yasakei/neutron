@@ -61,10 +61,10 @@ run_benchmark() {
     total_benchmarks=$((total_benchmarks + 1))
     
     # Run Python version and capture output
-    python_start=$(date +%s.%N)
+    python_start=$(python3 -c 'import time; print(time.time())')
     python_output=$(python3 "$python_file" 2>&1)
     python_exit=$?
-    python_end=$(date +%s.%N)
+    python_end=$(python3 -c 'import time; print(time.time())')
     
     if [ $python_exit -eq 0 ]; then
         python_time=$(echo "$python_end - $python_start" | bc -l)
@@ -75,10 +75,10 @@ run_benchmark() {
     fi
     
     # Run Neutron version and capture output
-    neutron_start=$(date +%s.%N)
+    neutron_start=$(python3 -c 'import time; print(time.time())')
     neutron_output=$("$NEUTRON_BIN" "$neutron_file" 2>&1)
     neutron_exit=$?
-    neutron_end=$(date +%s.%N)
+    neutron_end=$(python3 -c 'import time; print(time.time())')
     
     if [ $neutron_exit -eq 0 ]; then
         neutron_time=$(echo "$neutron_end - $neutron_start" | bc -l)
