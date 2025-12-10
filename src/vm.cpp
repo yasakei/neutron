@@ -142,6 +142,46 @@ VM::~VM() {
     heap.clear();
 }
 
+// Thread safety implementation
+void VM::lock() {
+    std::thread::id this_id = std::this_thread::get_id();
+    if (owner_thread == this_id) {
+        lock_count++;
+    } else {
+        vm_mutex.lock();
+        owner_thread = this_id;
+        lock_count = 1;
+    }
+}
+
+void VM::unlock() {
+    if (owner_thread != std::this_thread::get_id()) {
+        return;
+    }
+    lock_count--;
+    if (lock_count == 0) {
+        owner_thread = std::thread::id();
+        vm_mutex.unlock();
+    }
+}
+
+int VM::unlock_fully() {
+    if (owner_thread != std::this_thread::get_id()) {
+        return 0;
+    }
+    int count = lock_count;
+    lock_count = 0;
+    owner_thread = std::thread::id();
+    vm_mutex.unlock();
+    return count;
+}
+
+void VM::relock(int count) {
+    vm_mutex.lock();
+    owner_thread = std::this_thread::get_id();
+    lock_count = count;
+}
+
 Function::Function(const FunctionStmt* declaration, std::shared_ptr<Environment> closure) 
     : name(), arity_val(0), chunk(new Chunk()), declaration(declaration), closure(closure) {}
 
@@ -166,9 +206,11 @@ std::string Function::toString() const {
 int Function::arity() { return arity_val; }
 
 void VM::interpret(Function* function) {
+    lock();
     push(Value(function));
-    call(function, 0);
+    callValue(Value(function), 0);
     run();
+    unlock();
 }
 
 void VM::push(const Value& value) {
@@ -192,14 +234,13 @@ Value VM::pop() {
 bool VM::call(Function* function, int argCount) {
     if (argCount != function->arity_val) {
         std::string funcName = function->declaration ? function->declaration->name.lexeme : "<anonymous>";
-        ErrorHandler::argumentError(function->arity_val, argCount, funcName, currentFileName, 
-                                   frames.empty() ? -1 : frames.back().currentLine);
-        exit(1);
+        runtimeError(this, "Expected " + std::to_string(function->arity_val) + " arguments but got " + std::to_string(argCount) + " for function '" + funcName + "'.", frames.empty() ? -1 : frames.back().currentLine);
+        return false;
     }
 
     if (frames.size() == 256) {
-        ErrorHandler::stackOverflowError(currentFileName, frames.empty() ? -1 : frames.back().currentLine);
-        exit(1);
+        runtimeError(this, "Stack overflow.", frames.empty() ? -1 : frames.back().currentLine);
+        return false;
     }
 
     CallFrame* frame = &frames.emplace_back();
@@ -243,14 +284,13 @@ bool VM::callValue(Value callee, int argCount) {
             if (boundMethod->method->arity_val != argCount) {
                 std::string funcName = boundMethod->method->declaration ? 
                                      boundMethod->method->declaration->name.lexeme : "<method>";
-                ErrorHandler::argumentError(boundMethod->method->arity_val, argCount, funcName, 
-                                          currentFileName, frames.empty() ? -1 : frames.back().currentLine);
-                exit(1);
+                runtimeError(this, "Expected " + std::to_string(boundMethod->method->arity_val) + " arguments but got " + std::to_string(argCount) + " for method '" + funcName + "'.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
             }
             // Manually set up the call frame to include receiver at slot 0
             if (frames.size() == 256) {
-                ErrorHandler::stackOverflowError(currentFileName, frames.empty() ? -1 : frames.back().currentLine);
-                exit(1);
+                runtimeError(this, "Stack overflow.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
             }
             CallFrame* frame = &frames.emplace_back();
             frame->function = boundMethod->method;
@@ -269,9 +309,8 @@ bool VM::callValue(Value callee, int argCount) {
             return call(function, argCount);
         } else if (NativeFn* native = dynamic_cast<NativeFn*>(callable)) {
             if (native->arity() != -1 && native->arity() != argCount) {
-                ErrorHandler::argumentError(native->arity(), argCount, "<native function>", 
-                                          currentFileName, frames.empty() ? -1 : frames.back().currentLine);
-                exit(1);
+                runtimeError(this, "Expected " + std::to_string(native->arity()) + " arguments but got " + std::to_string(argCount) + " for native function.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
             }
             std::vector<Value> args;
             for (int i = 0; i < argCount; i++) {
@@ -287,9 +326,8 @@ bool VM::callValue(Value callee, int argCount) {
             return true;
         } else if (callable->isCNativeFn()) {
             if (callable->arity() != -1 && callable->arity() != argCount) {
-                ErrorHandler::argumentError(callable->arity(), argCount, "<native function>",
-                                          currentFileName, frames.empty() ? -1 : frames.back().currentLine);
-                exit(1);
+                runtimeError(this, "Expected " + std::to_string(callable->arity()) + " arguments but got " + std::to_string(argCount) + " for native function.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
             }
             std::vector<Value> args;
             for (int i = 0; i < argCount; i++) {
@@ -309,28 +347,61 @@ bool VM::callValue(Value callee, int argCount) {
     // Handle CLASS type
     if (callee.type == ValueType::CLASS) {
         Class* klass = std::get<Class*>(callee.as);
-        if (klass->arity() != -1 && klass->arity() != argCount) {
-            ErrorHandler::argumentError(klass->arity(), argCount, klass->name,
-                                      currentFileName, frames.empty() ? -1 : frames.back().currentLine);
-            exit(1);
+        
+        // Create instance
+        Instance* instance = allocate<Instance>(klass);
+        Value instanceVal(instance);
+        
+        // Check for initializer
+        auto it = klass->methods.find("initialize");
+        if (it != klass->methods.end()) {
+             if (it->second.type == ValueType::CALLABLE && std::holds_alternative<Callable*>(it->second.as)) {
+                Callable* callable = std::get<Callable*>(it->second.as);
+                if (Function* initializer = dynamic_cast<Function*>(callable)) {
+                
+                if (initializer->arity_val != argCount) {
+                     runtimeError(this, "Expected " + std::to_string(initializer->arity_val) + " arguments but got " + std::to_string(argCount) + " for constructor.", frames.empty() ? -1 : frames.back().currentLine);
+                     return false;
+                }
+                
+                // Replace the class on the stack with the instance (this)
+                stack[stack.size() - argCount - 1] = instanceVal;
+                
+                // Manually set up the call frame
+                if (frames.size() == 256) {
+                    runtimeError(this, "Stack overflow.", frames.empty() ? -1 : frames.back().currentLine);
+                    return false;
+                }
+
+                CallFrame* frame = &frames.emplace_back();
+                frame->function = initializer;
+                if (initializer->chunk->code.empty()) {
+                    frame->ip = nullptr;
+                } else {
+                    frame->ip = initializer->chunk->code.data();
+                }
+                frame->slot_offset = stack.size() - argCount - 1; // Include receiver
+                frame->fileName = currentFileName;
+                frame->currentLine = -1;
+                frame->isBoundMethod = true;
+                return true;
+                }
+             }
+        } 
+        
+        // No initializer or not a function
+        if (argCount != 0) {
+            runtimeError(this, "Expected 0 arguments but got " + std::to_string(argCount) + " for constructor.", frames.empty() ? -1 : frames.back().currentLine);
+            return false;
         }
-        std::vector<Value> args;
-        for (int i = 0; i < argCount; i++) {
-            args.push_back(stack[stack.size() - argCount + i]);
-        }
-        try {
-            Value result = klass->call(*this, args);
-            stack.resize(stack.size() - argCount - 1);
-            push(result);
-        } catch (const std::runtime_error& e) {
-            runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
-        }
+        
+        stack.resize(stack.size() - argCount - 1);
+        push(instanceVal);
         return true;
     }
 
-    ErrorHandler::reportRuntimeError("Can only call functions and classes", currentFileName,
-                                    frames.empty() ? -1 : frames.back().currentLine, {});
-    exit(1);
+    runtimeError(this, "Can only call functions and classes.", frames.empty() ? -1 : frames.back().currentLine);
+    return false;
 }
 
 bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
@@ -352,39 +423,34 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
         if (methodName == "length") {
             // length() - return array size
             if (argCount != 0) {
-                ErrorHandler::argumentError(0, argCount, "Array.length", currentFileName, 
-                                          frames.empty() ? -1 : frames.back().currentLine);
-                exit(1);
+                runtimeError(this, "Expected 0 arguments but got " + std::to_string(argCount) + " for Array.length.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
             }
             result = Value(static_cast<double>(arr->size()));
         } else if (methodName == "push") {
             // push(value) - add element to end
             if (argCount != 1) {
-                ErrorHandler::argumentError(1, argCount, "Array.push", currentFileName, 
-                                          frames.empty() ? -1 : frames.back().currentLine);
-                exit(1);
+                runtimeError(this, "Expected 1 argument but got " + std::to_string(argCount) + " for Array.push.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
             }
             arr->push(args[0]);
             result = Value(); // nil
         } else if (methodName == "pop") {
             // pop() - remove and return last element
             if (argCount != 0) {
-                ErrorHandler::argumentError(0, argCount, "Array.pop", currentFileName,
-                                          frames.empty() ? -1 : frames.back().currentLine);
-                exit(1);
+                runtimeError(this, "Expected 0 arguments but got " + std::to_string(argCount) + " for Array.pop.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
             }
             result = arr->pop();
         } else if (methodName == "slice") {
             // slice(start, end) - return subarray
             if (argCount != 2) {
-                ErrorHandler::argumentError(2, argCount, "Array.slice", currentFileName,
-                                          frames.empty() ? -1 : frames.back().currentLine);
-                exit(1);
+                runtimeError(this, "Expected 2 arguments but got " + std::to_string(argCount) + " for Array.slice.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
             }
             if (args[0].type != ValueType::NUMBER || args[1].type != ValueType::NUMBER) {
-                ErrorHandler::typeError("numbers", "other type", currentFileName,
-                                      frames.empty() ? -1 : frames.back().currentLine);
-                exit(1);
+                runtimeError(this, "Array.slice expects number arguments.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
             }
             int start = static_cast<int>(std::get<double>(args[0].as));
             int end = static_cast<int>(std::get<double>(args[1].as));
@@ -1690,50 +1756,89 @@ void VM::define(const std::string& name, const Value& value) {
 }
 
 Value VM::call(const Value& callee, const std::vector<Value>& arguments) {
-    if (callee.type != ValueType::CALLABLE) {
-        throw std::runtime_error("Can only call functions.");
-    }
-    
-    Callable* function = std::get<Callable*>(callee.as);
-    if (function->arity() != -1 && function->arity() != (int)arguments.size()) {
-        throw std::runtime_error("Expected " + std::to_string(function->arity()) + " arguments but got " + std::to_string(arguments.size()) + ".");
-    }
-    
-    // Save current stack state
-    size_t stack_size = stack.size();
-    
-    // Push arguments onto the stack
-    for (const auto& arg : arguments) {
-        push(arg);
-    }
-    
-    // Call the function
-    Value result = function->call(*this, arguments);
-    
-    // Restore stack state (in case the function didn't clean up properly)
-    // Note: Native functions usually handle their own stack, but interpreted functions rely on VM::run
-    // If this is a native function, it returns immediately.
-    // If it's an interpreted function, call() pushes a frame and returns NIL (usually), 
-    // and we need to call run() to execute it.
-    
-    if (function->isCNativeFn()) {
-        while (stack.size() > stack_size) {
-            pop();
+    lock();
+    try {
+        if (callee.type != ValueType::CALLABLE) {
+            throw std::runtime_error("Can only call functions.");
         }
-        return result;
-    } else {
-        // For interpreted functions, call() just sets up the frame.
-        // We need to run the VM to execute the function.
         
-        // If we are calling from C++, we need to drive the VM.
-        run(frames.size() - 1); // Run until we return from this function
+        Callable* function = std::get<Callable*>(callee.as);
         
-        // The result should be on top of the stack
-        // Note: run() leaves the return value on the stack
-        if (stack.size() > stack_size) {
-            result = stack.back(); // Don't pop yet, we need to clean up
+        // Save current stack state
+        size_t stack_size = stack.size();
+        
+        Value result;
+
+        if (BoundMethod* bound = dynamic_cast<BoundMethod*>(function)) {
+             if (bound->method->arity() != -1 && bound->method->arity() != (int)arguments.size()) {
+                 throw std::runtime_error("Expected " + std::to_string(bound->method->arity()) + " arguments but got " + std::to_string(arguments.size()) + ".");
+             }
+
+             // Push receiver and arguments
+             push(bound->receiver);
+             for (const auto& arg : arguments) {
+                 push(arg);
+             }
+             
+             // Manually set up frame for BoundMethod
+             if (frames.size() == 256) {
+                throw std::runtime_error("Stack overflow.");
+             }
+             CallFrame* frame = &frames.emplace_back();
+             frame->function = bound->method;
+             if (bound->method->chunk->code.empty()) {
+                 frame->ip = nullptr;
+             } else {
+                 frame->ip = bound->method->chunk->code.data();
+             }
+             // slot_offset points to the receiver (one position before args)
+             frame->slot_offset = stack.size() - arguments.size() - 1;
+             frame->fileName = currentFileName;
+             frame->currentLine = -1;
+             frame->isBoundMethod = true;
+
+             run(frames.size() - 1);
+             
+             if (stack.size() > stack_size) {
+                 result = stack.back();
+             } else {
+                 result = Value();
+             }
+
+        } else if (Function* func = dynamic_cast<Function*>(function)) {
+             if (func->arity() != -1 && func->arity() != (int)arguments.size()) {
+                 throw std::runtime_error("Expected " + std::to_string(func->arity()) + " arguments but got " + std::to_string(arguments.size()) + ".");
+             }
+
+             // Push callee (for OP_RETURN cleanup consistency)
+             push(callee);
+             for (const auto& arg : arguments) {
+                 push(arg);
+             }
+             
+             call(func, arguments.size());
+             
+             run(frames.size() - 1);
+             
+             if (stack.size() > stack_size) {
+                 result = stack.back();
+             } else {
+                 result = Value();
+             }
+
         } else {
-            result = Value(); // Nil
+             // NativeFn or other Callable
+             if (function->arity() != -1 && function->arity() != (int)arguments.size()) {
+                 throw std::runtime_error("Expected " + std::to_string(function->arity()) + " arguments but got " + std::to_string(arguments.size()) + ".");
+             }
+
+             // Push callee and args for consistency
+             push(callee);
+             for (const auto& arg : arguments) {
+                 push(arg);
+             }
+
+             result = function->call(*this, arguments);
         }
         
         // Clean up any remaining stack items
@@ -1741,42 +1846,54 @@ Value VM::call(const Value& callee, const std::vector<Value>& arguments) {
             pop();
         }
         
+        unlock();
         return result;
+    } catch (...) {
+        unlock();
+        throw;
     }
 }
 
 Value VM::execute_string(const std::string& source) {
-    // Parse and execute the Neutron code string
-    Scanner scanner(source);
-    std::vector<Token> tokens = scanner.scanTokens();
-    
-    Parser parser(tokens);
-    std::vector<std::unique_ptr<Stmt>> statements = parser.parse();
-    
-    // Compile and run the code
-    Compiler compiler(*this);
-    Function* function = compiler.compile(statements);
-    
-    if (function) {
-        // Save current state
-        size_t stack_size = stack.size();
+    lock();
+    try {
+        // Parse and execute the Neutron code string
+        Scanner scanner(source);
+        std::vector<Token> tokens = scanner.scanTokens();
         
-        // Execute the function
-        interpret(function);
+        Parser parser(tokens);
+        std::vector<std::unique_ptr<Stmt>> statements = parser.parse();
         
-        // Get the return value (if any)
-        Value result;
-        if (stack.size() > stack_size) {
-            result = pop();
+        // Compile and run the code
+        Compiler compiler(*this);
+        Function* function = compiler.compile(statements);
+        
+        if (function) {
+            // Save current state
+            size_t stack_size = stack.size();
+            
+            // Execute the function
+            interpret(function);
+            
+            // Get the return value (if any)
+            Value result;
+            if (stack.size() > stack_size) {
+                result = pop();
+            }
+            
+            // Clean up
+            delete function;
+            
+            unlock();
+            return result;
         }
         
-        // Clean up
-        delete function;
-        
-        return result;
+        unlock();
+        return Value(); // Return nil if compilation failed
+    } catch (...) {
+        unlock();
+        throw;
     }
-    
-    return Value(); // Return nil if compilation failed
 }
 
 void VM::load_module(const std::string& name) {
@@ -2149,6 +2266,9 @@ void VM::collectGarbage() {
     // Mark all reachable objects
     markRoots();
     
+    // Trace references
+    traceReferences();
+    
     // Sweep all unreachable objects
     sweep();
     
@@ -2171,12 +2291,7 @@ void VM::markRoots() {
     for (const auto& frame : frames) {
         if (frame.function) {
             // Mark the function itself
-            if (frame.function->chunk) {
-                // Mark constants in the function's chunk
-                for (const auto& constant : frame.function->chunk->constants) {
-                    markValue(constant);
-                }
-            }
+            markObject(frame.function);
         }
     }
 
@@ -2189,7 +2304,18 @@ void VM::markRoots() {
 void VM::markObject(Object* obj) {
     if (obj == nullptr || obj->is_marked) return;
     obj->mark();
-    
+    grayStack.push_back(obj);
+}
+
+void VM::traceReferences() {
+    while (!grayStack.empty()) {
+        Object* obj = grayStack.back();
+        grayStack.pop_back();
+        blackenObject(obj);
+    }
+}
+
+void VM::blackenObject(Object* obj) {
     if (auto* arr = dynamic_cast<Array*>(obj)) {
         for (const auto& element : arr->elements) markValue(element);
     } else if (auto* bam = dynamic_cast<BoundArrayMethod*>(obj)) {
@@ -2214,13 +2340,6 @@ void VM::markObject(Object* obj) {
         if (func->closure) {
             // Mark all values in the closure environment chain
             auto env = func->closure;
-            // We don't have a way to mark Environment itself as it's not an Object
-            // So we just traverse. To avoid infinite loops if environments are cyclic (unlikely for scope chain),
-            // we might need a set of visited environments. But scope chains are usually trees/lists.
-            // However, multiple functions can share the same environment.
-            // We rely on markValue checking is_marked to stop recursion on values.
-            // But we might re-scan the environment map many times.
-            // For now, simple traversal.
             while (env) {
                 for (const auto& pair : env->values) markValue(pair.second);
                 env = env->enclosing;

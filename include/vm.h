@@ -42,6 +42,8 @@
 #include <stack>
 #include <utility>
 #include <set>
+#include <mutex>
+#include <thread>
 
 // Forward declarations only for types defined elsewhere
 namespace neutron {
@@ -186,6 +188,16 @@ public:
         run(minFrameDepth);
     }
 
+    // Thread safety
+    std::mutex vm_mutex;
+    std::thread::id owner_thread;
+    int lock_count = 0;
+
+    void lock();
+    void unlock();
+    int unlock_fully();
+    void relock(int count);
+
 private:
     void interpret_module(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> module_env);
     
@@ -193,9 +205,12 @@ private:
     bool handleException(const Value& exception);
     
     // Garbage collection methods
+    std::vector<Object*> grayStack;
     void markRoots();
     void markValue(const Value& value);
     void markObject(Object* obj);
+    void traceReferences();
+    void blackenObject(Object* obj);
     void collectGarbage();
     void sweep();
 };

@@ -2,6 +2,73 @@
 
 ---
 
+### [FIXED] [NEUT-028] Class Constructor Implementation Fixes
+
+**Date:** 2023-10-27
+**Status:** Fixed
+**Priority:** High
+**Description:**
+Class constructors failed to initialize objects correctly. `Class::arity()` returned 0, rejecting arguments. `Class::call()` did not invoke the `initialize` method. Additionally, `OP_RETURN` corrupted the stack when returning from a constructor because the stack frame was not marked as a bound method call.
+
+**Root Cause:**
+1. `Class::arity` hardcoded to return 0.
+2. `Class::call` ignored arguments and `initialize` method.
+3. `VM::callValue` delegated to `Class::call` which couldn't handle stack frame setup for `initialize`.
+4. `OP_RETURN` logic for stack cleanup assumed non-bound-method calls for constructors, removing the instance from the stack.
+
+**Resolution:**
+Modified `VM::callValue` to handle `ValueType::CLASS` instantiation directly:
+1. Allocate instance.
+2. Look up `initialize` method.
+3. If found, verify arity, replace Class with Instance on stack, and manually set up a `CallFrame` for `initialize`.
+4. Set `frame->isBoundMethod = true` to ensure `OP_RETURN` preserves the instance (receiver) on the stack.
+
+**Verification:**
+`tests/core/test_gc_deep.nt` passes (constructors work correctly).
+
+---
+
+### [FIXED] [NEUT-027] Garbage Collector Stack Overflow
+
+**Date:** 2023-10-27
+**Status:** Fixed
+**Priority:** Critical
+**Description:**
+The Garbage Collector used deep recursion in `markObject` and `markRoots`, causing a C++ stack overflow when collecting deep object graphs (e.g., linked lists with depth > 10,000).
+
+**Root Cause:**
+Recursive implementation of Mark-and-Sweep algorithm.
+
+**Resolution:**
+Refactored GC to use an iterative approach with a `grayStack` (worklist).
+1. `markObject` now pushes objects to `grayStack` instead of recursing.
+2. `traceReferences` processes `grayStack` iteratively until empty.
+3. `blackenObject` pushes children to `grayStack`.
+
+**Verification:**
+`tests/core/test_gc_deep.nt` passes with 20,000 nodes.
+
+---
+
+### [FIXED] [NEUT-026] VM Fatal Errors (exit(1))
+
+**Date:** 2023-10-27
+**Status:** Fixed
+**Priority:** High
+**Description:**
+The VM used `exit(1)` for runtime errors (e.g., argument mismatch), causing the entire process to terminate immediately without cleanup or stack trace.
+
+**Root Cause:**
+Use of `exit(1)` in `VM::call` and other methods.
+
+**Resolution:**
+Replaced `exit(1)` with `runtimeError` (which throws a C++ exception or sets a flag). Modified `VM::call` to throw `std::runtime_error` or return `false` on failure.
+
+**Verification:**
+`tests/core/test_arg_mismatch.nt` passes (catches errors instead of crashing).
+
+---
+
 ### [FIXED] [NEUT-025] Multiple Variable Declaration Syntax Not Supported
 
 **Date:** 2023-10-27

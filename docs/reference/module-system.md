@@ -25,6 +25,7 @@ The following modules are built into the Neutron runtime and require explicit im
 - **fmt** - Type conversion and formatting utilities
 - **time** - Time and date functions
 - **http** - HTTP client operations
+- **async** - Asynchronous operations and multi-threading
 
 **Note:** Modules are lazily loaded - they're only initialized when you explicitly use `use modulename;`. This provides faster startup times and explicit dependencies.
 

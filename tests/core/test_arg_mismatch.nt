@@ -1,0 +1,37 @@
+
+say("=== Argument Mismatch Test ===");
+
+fun add(a, b) {
+    return a + b;
+}
+
+try {
+    say("Calling add(1)...");
+    add(1);
+    say("Should not reach here!");
+} catch (e) {
+    say("Caught expected error: " + e);
+}
+
+try {
+    say("Calling add(1, 2, 3)...");
+    add(1, 2, 3);
+    say("Should not reach here!");
+} catch (e) {
+    say("Caught expected error: " + e);
+}
+
+say("\n=== Stack Overflow Test ===");
+fun recurse() {
+    recurse();
+}
+
+try {
+    say("Starting recursion...");
+    recurse();
+    say("Should not reach here!");
+} catch (e) {
+    say("Caught expected error: " + e);
+}
+
+say("\n=== Tests Complete ===");

@@ -82,35 +82,18 @@ Executes a function after a specified delay.
 - `delay_ms` - Delay in milliseconds before executing the function
 
 **Returns:**
-- `true` immediately after scheduling the timer
+- An object representing the async task (can be awaited)
 
 **Example:**
 ```neutron
 use async;
 
-async.timer(fun() {
+var task = async.timer(fun() {
     say("Timer executed!");
 }, 2000);  // Execute after 2 seconds
 
 say("Timer scheduled");
-```
-
-### `async.promise([executor])`
-
-Creates a promise-like object for managing async operations.
-
-**Parameters:**
-- `executor` (optional) - Function that receives `resolve` and `reject` functions
-
-**Returns:**
-- A promise object with `state` and `result` properties
-
-**Example:**
-```neutron
-use async;
-
-var promise = async.promise();
-say("Promise state: " + promise.state);
+async.await(task); // Wait for timer to complete
 ```
 
 ## Examples
@@ -155,6 +138,9 @@ say("Operation completed");
 
 ## Notes
 
-- The async module provides basic async functionality suitable for simple concurrent operations
-- For complex async workflows, consider using multiple async operations in combination
+- The async module uses native OS threads for concurrent execution.
+- A Global Interpreter Lock (GIL) ensures thread safety for VM operations.
+- `async.run` spawns a new thread that acquires the GIL only when executing Neutron code.
+- `async.await` and `async.sleep` release the GIL, allowing other threads to run.
+- This model allows for true parallelism for blocking I/O operations or native code that releases the GIL, but Neutron bytecode execution is serialized.
 - The implementation provides a foundation for async programming in Neutron, with potential for enhancement in future versions

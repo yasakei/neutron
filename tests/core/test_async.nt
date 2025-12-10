@@ -1,0 +1,14 @@
+use async;
+
+fun task() {
+    say("Task running");
+    async.sleep(100);
+    say("Task finished");
+    return 42;
+}
+
+say("Starting async task");
+var future = async.run(task);
+say("Task started, waiting...");
+var result = async.await(future);
+say("Result: " + result);

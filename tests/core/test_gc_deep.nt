@@ -1,0 +1,25 @@
+
+say("=== Deep GC Test ===");
+
+class Node {
+    var next;
+    fun initialize(n) {
+        this.next = n;
+    }
+}
+
+var head = nil;
+say("Building deep list...");
+// 20000 depth might be enough to crash C++ stack if recursive
+for (var i = 0; i < 20000; i = i + 1) {
+    head = Node(head);
+}
+say("List built. Depth: 20000");
+
+say("Triggering GC...");
+// Allocate to trigger GC
+var arr = [];
+for (var i = 0; i < 10000; i = i + 1) {
+    arr.push(i);
+}
+say("GC survived!");

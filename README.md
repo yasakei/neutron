@@ -166,6 +166,9 @@ Timestamps, formatting, and delays
 **Arrays** (`arrays`)  
 Advanced array operations and manipulations
 
+**Concurrency** (`async`)  
+Native multi-threading support with async/await syntax
+
 </td>
 </tr>
 <tr>

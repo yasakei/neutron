@@ -35,14 +35,26 @@ struct AsyncHandle {
     std::promise<Value> promise;
     std::future<Value> future;
     std::thread thread;
-    bool completed = false;
     
-    AsyncHandle() = default;
+    AsyncHandle() {
+        future = promise.get_future();
+    }
     
     ~AsyncHandle() {
         if (thread.joinable()) {
-            thread.join();
+            thread.detach();
         }
+    }
+};
+
+class FutureObject : public Object {
+public:
+    std::shared_ptr<AsyncHandle> handle;
+    
+    FutureObject() : handle(std::make_shared<AsyncHandle>()) {}
+    
+    std::string toString() const override {
+        return "<Future>";
     }
 };
 
@@ -55,14 +67,30 @@ static Value async_run(VM& vm, const std::vector<Value>& args) {
         throw std::runtime_error("async.run() expects a function argument");
     }
     
-    // For now, we'll just return a simple object to represent an async task
-    // In a real implementation, this would involve actual threading
+    Value callable = args[0];
+    auto futureObj = vm.allocate<FutureObject>();
+    auto handle = futureObj->handle;
     
-    auto result_obj = vm.allocate<JsonObject>();
-    result_obj->properties["status"] = Value(vm.allocate<ObjString>("created"));
-    result_obj->properties["result"] = Value(); // nil initially
+    // Spawn thread
+    handle->thread = std::thread([&vm, callable, handle]() {
+        vm.lock();
+        try {
+            std::vector<Value> args; // No args for now
+            Value result = vm.call(callable, args);
+            handle->promise.set_value(result);
+        } catch (const std::exception& e) {
+            try {
+                handle->promise.set_exception(std::current_exception());
+            } catch (...) {}
+        } catch (...) {
+             try {
+                handle->promise.set_exception(std::current_exception());
+            } catch (...) {}
+        }
+        vm.unlock();
+    });
     
-    return Value(result_obj);
+    return Value(futureObj);
 }
 
 // Function to await the result of an async operation
@@ -74,8 +102,24 @@ static Value async_await(VM& vm, const std::vector<Value>& args) {
         throw std::runtime_error("async.await() expects an async handle object");
     }
     
-    // For now, just return the input object as we don't have full async implementation
-    return args[0];
+    Object* obj = std::get<Object*>(args[0].as);
+    FutureObject* futureObj = dynamic_cast<FutureObject*>(obj);
+    
+    if (!futureObj) {
+        throw std::runtime_error("async.await() expects a Future object");
+    }
+    
+    // Release lock to allow async thread to run
+    int count = vm.unlock_fully();
+    
+    try {
+        Value result = futureObj->handle->future.get();
+        vm.relock(count);
+        return result;
+    } catch (const std::exception& e) {
+        vm.relock(count);
+        throw std::runtime_error(e.what());
+    }
 }
 
 // Function to sleep asynchronously
@@ -88,7 +132,10 @@ static Value async_sleep(VM& vm, const std::vector<Value>& args) {
     }
     
     double ms = std::get<double>(args[0].as);
+    
+    int count = vm.unlock_fully();
     std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<long long>(ms)));
+    vm.relock(count);
     
     return Value(true);
 }
@@ -98,58 +145,52 @@ static Value async_timer(VM& vm, const std::vector<Value>& args) {
     if (args.size() != 2) {
         throw std::runtime_error("async.timer() expects 2 arguments (function, delay_ms)");
     }
-    if (args[0].type != ValueType::CALLABLE) {
-        throw std::runtime_error("async.timer() expects a function as first argument");
+     if (args[0].type != ValueType::CALLABLE) {
+        throw std::runtime_error("async.timer() expects a function argument");
     }
     if (args[1].type != ValueType::NUMBER) {
-        throw std::runtime_error("async.timer() expects a number (delay in ms) as second argument");
+        throw std::runtime_error("async.timer() expects a number argument (delay)");
     }
     
-    // For now, just simulate the timer behavior without actual threading
-    // In a full implementation, this would create a proper timer thread
-    double delay_ms = std::get<double>(args[1].as);
+    Value callable = args[0];
+    double ms = std::get<double>(args[1].as);
     
-    // Sleep in the current thread (not truly async, but for demonstration)
-    std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<long long>(delay_ms)));
+    auto futureObj = vm.allocate<FutureObject>();
+    auto handle = futureObj->handle;
     
-    return Value(true);
-}
-
-// Function to create a promise-like object for async operations
-static Value async_promise(VM& vm, const std::vector<Value>& args) {
-    if (args.size() != 1 && args.size() != 0) {
-        throw std::runtime_error("async.promise() expects 0 or 1 argument (executor function)");
-    }
-    
-    auto promise_obj = vm.allocate<JsonObject>();
-    promise_obj->properties["state"] = Value(vm.allocate<ObjString>("pending"));
-    promise_obj->properties["result"] = Value(); // nil initially
-    
-    if (args.size() == 1) {
-        if (args[0].type != ValueType::CALLABLE) {
-            throw std::runtime_error("async.promise() executor must be a function");
-        }
+    handle->thread = std::thread([&vm, callable, handle, ms]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<long long>(ms)));
         
-        // In a real implementation, we would pass resolve/reject functions to the executor
-        // For now, we just acknowledge the executor
-    }
+        vm.lock();
+        try {
+            std::vector<Value> args;
+            Value result = vm.call(callable, args);
+            handle->promise.set_value(result);
+        } catch (...) {
+             try {
+                handle->promise.set_exception(std::current_exception());
+            } catch (...) {}
+        }
+        vm.unlock();
+    });
     
-    return Value(promise_obj);
+    return Value(futureObj);
 }
 
-namespace neutron {
-    void register_async_functions(VM& vm, std::shared_ptr<Environment> env) {
-        env->define("run", Value(vm.allocate<NativeFn>(async_run, 1, true)));
-        env->define("await", Value(vm.allocate<NativeFn>(async_await, 1, true)));
-        env->define("sleep", Value(vm.allocate<NativeFn>(async_sleep, 1, true)));
-        env->define("timer", Value(vm.allocate<NativeFn>(async_timer, 2, true)));
-        env->define("promise", Value(vm.allocate<NativeFn>(async_promise, -1, true))); // -1 means variable arity
-    }
-}
-
-extern "C" void neutron_init_async_module(VM* vm) {
-    auto async_env = std::make_shared<neutron::Environment>();
-    neutron::register_async_functions(*vm, async_env);
-    auto async_module = vm->allocate<neutron::Module>("async", async_env);
-    vm->define_module("async", async_module);
+void neutron_init_async_module(VM* vm) {
+    std::cout << "Async module initialized (New)" << std::endl;
+    vm->define_native("async_run", new NativeFn(async_run, 1, true));
+    vm->define_native("async_await", new NativeFn(async_await, 1, true));
+    vm->define_native("async_sleep", new NativeFn(async_sleep, 1, true));
+    vm->define_native("async_timer", new NativeFn(async_timer, 2, true));
+    
+    // Create module object
+    auto env = std::make_shared<Environment>();
+    env->define("run", Value(vm->allocate<NativeFn>(async_run, 1, true)));
+    env->define("await", Value(vm->allocate<NativeFn>(async_await, 1, true)));
+    env->define("sleep", Value(vm->allocate<NativeFn>(async_sleep, 1, true)));
+    env->define("timer", Value(vm->allocate<NativeFn>(async_timer, 2, true)));
+    
+    auto module = vm->allocate<Module>("async", env);
+    vm->define_module("async", module);
 }

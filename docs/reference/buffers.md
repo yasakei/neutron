@@ -24,18 +24,24 @@ var val = buf[0]; // 255
 
 ## Bounds Checking
 
-Accessing indices outside the buffer's range will result in a runtime error and terminate the program.
+Accessing indices outside the buffer's range will throw a runtime error. This error can be caught using a `try-catch` block. If uncaught, it will terminate the program.
 
 ```js
-// This will cause a runtime error
-// buf[100] = 1; 
+try {
+    buf[100] = 1; 
+} catch (e) {
+    print(e); // "Buffer index out of bounds."
+}
 ```
 
 ## Value Validation
 
-Assigning values outside the range 0-255 will result in a runtime error and terminate the program.
+Assigning values outside the range 0-255 will throw a runtime error. This error can be caught using a `try-catch` block.
 
 ```js
-// This will cause a runtime error
-// buf[0] = 256;
+try {
+    buf[0] = 256;
+} catch (e) {
+    print(e); // "Buffer value must be a byte (0-255)."
+}
 ```
