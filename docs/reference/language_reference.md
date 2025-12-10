@@ -202,6 +202,9 @@ var bool flag = true;
 var array list = [1, 2, 3];
 var object data = {"key": "value"};
 var any flexible = "anything";
+
+// Multiple variables with the same type
+var int a = 1, b = 2, c = 3;
 ```
 
 #### Available Type Keywords
