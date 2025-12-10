@@ -13,6 +13,7 @@ class Callable;
 class Module;
 class Class;
 class Instance;
+class Buffer;
 
 enum class ValueType {
     NIL,
@@ -24,10 +25,11 @@ enum class ValueType {
     CALLABLE,
     MODULE,
     CLASS,
-    INSTANCE
+    INSTANCE,
+    BUFFER
 };
 
-using Literal = std::variant<std::nullptr_t, bool, double, ObjString*, Array*, Object*, Callable*, Module*, class Class*, class Instance*>;
+using Literal = std::variant<std::nullptr_t, bool, double, ObjString*, Array*, Object*, Callable*, Module*, class Class*, class Instance*, class Buffer*>;
 
 struct Value {
     ValueType type;
@@ -46,6 +48,7 @@ struct Value {
     Value(Module* module);
     Value(Class* klass);
     Value(Instance* instance);
+    Value(Buffer* buffer);
 
     std::string toString() const;
     
@@ -54,6 +57,9 @@ struct Value {
 
     bool isModule() const;
     Module* asModule() const;
+    
+    bool isBuffer() const;
+    Buffer* asBuffer() const;
 };
 
 }

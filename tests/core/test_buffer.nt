@@ -1,0 +1,75 @@
+use sys;
+
+say("=== Buffer Tests ===");
+
+// 1. Creation
+say("\n1. Creation:");
+var buf = sys.alloc(5);
+say("Buffer created: " + buf);
+
+// 2. Size
+say("\n2. Size:");
+// Assuming we don't have a .size() method exposed on Buffer yet, 
+// but the string representation shows size.
+// If we implemented .size() or len(buf), we would test it here.
+// Based on previous context, we only implemented get/set and toString.
+say("Buffer: " + buf);
+
+// 3. Read/Write
+say("\n3. Read/Write:");
+buf[0] = 10;
+buf[1] = 20;
+buf[4] = 255;
+
+say("buf[0] = " + buf[0]);
+say("buf[1] = " + buf[1]);
+say("buf[4] = " + buf[4]);
+
+// Verify default initialization (should be 0)
+say("buf[2] (default) = " + buf[2]);
+
+// 4. Out of bounds access
+say("\n4. Out of bounds access:");
+try {
+    say("Attempting to access index 10...");
+    var val = buf[10];
+    say("Should not reach here!");
+} catch (e) {
+    say("Caught expected error: " + e);
+}
+
+try {
+    say("Attempting to write to index -1...");
+    buf[-1] = 5;
+    say("Should not reach here!");
+} catch (e) {
+    say("Caught expected error: " + e);
+}
+
+// 5. Invalid value assignment
+say("\n5. Invalid value assignment:");
+try {
+    say("Attempting to write 256 (byte overflow)...");
+    buf[0] = 256;
+    say("Should not reach here!");
+} catch (e) {
+    say("Caught expected error: " + e);
+}
+
+try {
+    say("Attempting to write negative value...");
+    buf[0] = -1;
+    say("Should not reach here!");
+} catch (e) {
+    say("Caught expected error: " + e);
+}
+
+try {
+    say("Attempting to write non-number...");
+    buf[0] = "string";
+    say("Should not reach here!");
+} catch (e) {
+    say("Caught expected error: " + e);
+}
+
+say("\n=== Buffer Tests Complete ===");

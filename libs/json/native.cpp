@@ -103,6 +103,8 @@ std::string valueToJsonString(const Value& value, bool pretty, int indent) {
             }
             return "\"" + escaped + "\"";
         }
+        case ValueType::BUFFER:
+            return "\"<buffer>\""; // Buffers are not serializable to JSON directly
         case ValueType::OBJECT: {
             JsonObject* obj = dynamic_cast<JsonObject*>(std::get<Object*>(value.as));
             if (obj) {

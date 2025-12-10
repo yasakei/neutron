@@ -28,6 +28,7 @@
 #include "types/instance.h"
 #include "types/bound_method.h"
 #include "types/bound_array_method.h"
+#include "types/buffer.h"
 #include "types/bound_string_method.h"
 #include <iostream>
 #include <stdexcept>
@@ -60,6 +61,12 @@ extern "C" {
     [[maybe_unused]] const unsigned int bytecode_size = 0;       // Size is 0
 }
 
+// Exception used to unwind C++ stack when a runtime error is caught by Neutron code
+struct VMException {
+    Value value;
+    VMException(Value v) : value(v) {}
+};
+
 bool isTruthy(const Value& value) {
     switch (value.type) {
         case ValueType::NIL:
@@ -73,6 +80,23 @@ bool isTruthy(const Value& value) {
 
 // Helper function for error reporting with stack trace
 [[noreturn]] void runtimeError(VM* vm, const std::string& message, int line = -1) {
+    // Check if there is an active exception handler that covers the current instruction
+    if (!vm->frames.empty() && !vm->exceptionFrames.empty()) {
+        CallFrame* frame = &vm->frames.back();
+        if (frame->function && frame->function->chunk) {
+            int current_pos = frame->ip - frame->function->chunk->code.data() - 1;
+            
+            // Look for a handler in the current frame
+            for (int i = vm->exceptionFrames.size() - 1; i >= 0; i--) {
+                VM::ExceptionFrame& handler = vm->exceptionFrames[i];
+                if (current_pos >= handler.tryStart && current_pos <= handler.tryEnd) {
+                    // Found a handler, throw a VMException to be caught in VM::run
+                    throw VMException(Value(message));
+                }
+            }
+        }
+    }
+
     // Build stack trace
     std::vector<StackFrame> stackTrace;
     
@@ -257,7 +281,7 @@ bool VM::callValue(Value callee, int argCount) {
                 Value result = native->call(*this, args);
                 stack.resize(stack.size() - argCount - 1);
                 push(result);
-            } catch (const std::runtime_error& e) {
+            } catch (const std::exception& e) {
                 runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
             }
             return true;
@@ -275,7 +299,7 @@ bool VM::callValue(Value callee, int argCount) {
                 Value result = callable->call(*this, args);
                 stack.resize(stack.size() - argCount - 1);
                 push(result);
-            } catch (const std::runtime_error& e) {
+            } catch (const std::exception& e) {
                 runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
             }
             return true;
@@ -538,6 +562,8 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
         push(result);
         return true;
         
+    } catch (const VMException& e) {
+        throw;
     } catch (const std::runtime_error& e) {
         runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
         return false;
@@ -647,6 +673,8 @@ bool VM::callStringMethod(BoundStringMethod* method, int argCount) {
         push(result);
         return true;
         
+    } catch (const VMException& e) {
+        throw;
     } catch (const std::runtime_error& e) {
         runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
         return false;
@@ -671,8 +699,10 @@ void VM::run(size_t minFrameDepth) {
     }())
 #define READ_STRING() (std::get<ObjString*>(READ_CONSTANT().as)->chars)
 
-    for (;;) {
-        // Update currentLine from bytecode before processing instruction
+    while (true) {
+    try {
+        for (;;) {
+            // Update currentLine from bytecode before processing instruction
         size_t offset = frame->ip - frame->function->chunk->code.data();
         if (offset < frame->function->chunk->lines.size()) {
             frame->currentLine = frame->function->chunk->lines[offset];
@@ -1357,6 +1387,21 @@ void VM::run(size_t minFrameDepth) {
                     
                     // Return the character at the index as a string
                     push(Value(std::string(1, str[idx])));
+                } else if (object.type == ValueType::BUFFER) {
+                    if (index.type != ValueType::NUMBER) {
+                        runtimeError(this, "Buffer index must be a number.", frames.empty() ? -1 : frames.back().currentLine);
+                        return;
+                    }
+                    
+                    int idx = static_cast<int>(std::get<double>(index.as));
+                    Buffer* buffer = object.asBuffer();
+                    
+                    if (idx < 0 || idx >= static_cast<int>(buffer->size())) {
+                        runtimeError(this, "Buffer index out of bounds.", frames.empty() ? -1 : frames.back().currentLine);
+                        return;
+                    }
+                    
+                    push(Value(static_cast<double>(buffer->get(idx))));
                 } else if (object.type == ValueType::OBJECT) {
                     Object* objPtr = std::get<Object*>(object.as);
                     JsonObject* jsonObj = dynamic_cast<JsonObject*>(objPtr);
@@ -1377,7 +1422,7 @@ void VM::run(size_t minFrameDepth) {
                          return;
                     }
                 } else {
-                    runtimeError(this, "Only arrays, strings, and objects support index access.", frames.empty() ? -1 : frames.back().currentLine);
+                    runtimeError(this, "Only arrays, strings, buffers, and objects support index access.", frames.empty() ? -1 : frames.back().currentLine);
                     return;
                 }
                                 break;
@@ -1407,6 +1452,33 @@ void VM::run(size_t minFrameDepth) {
                     
                                         array->set(idx, value);
                     push(value); // Return the assigned value
+                } else if (object.type == ValueType::BUFFER) {
+                    if (index.type != ValueType::NUMBER) {
+                        runtimeError(this, "Buffer index must be a number.", frames.empty() ? -1 : frames.back().currentLine);
+                        return;
+                    }
+                    
+                    if (value.type != ValueType::NUMBER) {
+                        runtimeError(this, "Buffer value must be a number (byte).", frames.empty() ? -1 : frames.back().currentLine);
+                        return;
+                    }
+                    
+                    int idx = static_cast<int>(std::get<double>(index.as));
+                    int val = static_cast<int>(std::get<double>(value.as));
+                    Buffer* buffer = object.asBuffer();
+                    
+                    if (idx < 0 || idx >= static_cast<int>(buffer->size())) {
+                        runtimeError(this, "Buffer index out of bounds.", frames.empty() ? -1 : frames.back().currentLine);
+                        return;
+                    }
+                    
+                    if (val < 0 || val > 255) {
+                        runtimeError(this, "Buffer value must be a byte (0-255).", frames.empty() ? -1 : frames.back().currentLine);
+                        return;
+                    }
+                    
+                    buffer->set(idx, static_cast<uint8_t>(val));
+                    push(value);
                 } else if (object.type == ValueType::OBJECT) {
                     Object* objPtr = std::get<Object*>(object.as);
                     JsonObject* jsonObj = dynamic_cast<JsonObject*>(objPtr);
@@ -1424,7 +1496,7 @@ void VM::run(size_t minFrameDepth) {
                          return;
                     }
                 } else {
-                    runtimeError(this, "Only arrays and objects support index assignment.", frames.empty() ? -1 : frames.back().currentLine);
+                    runtimeError(this, "Only arrays, buffers, and objects support index assignment.", frames.empty() ? -1 : frames.back().currentLine);
                                         return;
                 }
                                 break;
@@ -1543,7 +1615,58 @@ void VM::run(size_t minFrameDepth) {
                 break;
             }
         }
+        }
+    } catch (const VMException& e) {
+        // Handle caught runtime exception
+        push(e.value); // Push exception value
+        
+        // We need to find the handler again because we unwound the C++ stack
+        // but the VM state (frames, exceptionFrames) is preserved.
+        
+        CallFrame* frame = &frames.back();
+        int current_pos = frame->ip - frame->function->chunk->code.data() - 1;
+        
+        ExceptionFrame* handler = nullptr;
+        for (int i = exceptionFrames.size() - 1; i >= 0; i--) {
+            ExceptionFrame& frame_handler = exceptionFrames[i];
+            if (current_pos >= frame_handler.tryStart && current_pos <= frame_handler.tryEnd) {
+                handler = &frame_handler;
+                break;
+            }
+        }
+        
+        if (handler) {
+            // Adjust stack
+            stack.resize(handler->frameBase);
+            
+            // Remove exception frames
+            while (!exceptionFrames.empty() && &exceptionFrames.back() != handler) {
+                exceptionFrames.pop_back();
+            }
+            exceptionFrames.pop_back(); // Remove handler itself
+            
+            push(e.value); // Push exception again after resize
+            
+            // Jump to catch block
+            frame->ip = frame->function->chunk->code.data() + handler->catchStart;
+            
+            // Refresh frame pointer
+            frame = &frames.back();
+            
+            // Continue outer loop
+            continue;
+        } else {
+            // Should not happen if runtimeError checked correctly, but just in case
+            runtimeError(this, e.value.toString(), frames.empty() ? -1 : frames.back().currentLine);
+            return;
+        }
+    } catch (const std::runtime_error& e) {
+        runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
+        return;
     }
+    break; // Break outer loop if for(;;) exited normally
+    } // End outer while(true)
+
 #undef READ_BYTE
 #undef READ_SHORT
 #undef READ_CONSTANT
@@ -2078,6 +2201,8 @@ void VM::markObject(Object* obj) {
     } else if (auto* inst = dynamic_cast<Instance*>(obj)) {
         for (const auto& field : inst->fields) markValue(field.second);
         markObject(inst->klass);
+    } else if (dynamic_cast<Buffer*>(obj)) {
+        // Buffer has no references to other objects
     } else if (auto* module = dynamic_cast<Module*>(obj)) {
         if (module->env) {
             for (const auto& pair : module->env->values) markValue(pair.second);

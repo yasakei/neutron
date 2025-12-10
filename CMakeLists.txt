@@ -101,6 +101,7 @@ set(NEUTRON_COMPILER_SOURCES
 set(NEUTRON_TYPES_SOURCES
     src/types/value.cpp
     src/types/array.cpp
+    src/types/buffer.cpp
     src/types/json_object.cpp
     src/types/json_array.cpp
     src/types/return.cpp

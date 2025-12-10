@@ -6,6 +6,7 @@
 #include "modules/module.h"
 #include "types/class.h"
 #include "types/instance.h"
+#include "types/buffer.h"
 #include <sstream>
 
 namespace neutron {
@@ -33,6 +34,8 @@ Value::Value(Module* module) : type(ValueType::MODULE), as(module) {}
 Value::Value(Class* klass) : type(ValueType::CLASS), as(klass) {}
 
 Value::Value(Instance* instance) : type(ValueType::INSTANCE), as(instance) {}
+
+Value::Value(Buffer* buffer) : type(ValueType::BUFFER), as(buffer) {}
 
 std::string Value::toString() const {
     switch (type) {
@@ -71,6 +74,8 @@ std::string Value::toString() const {
             return std::get<Class*>(as)->toString();
         case ValueType::INSTANCE:
             return std::get<Instance*>(as)->toString();
+        case ValueType::BUFFER:
+            return std::get<Buffer*>(as)->toString();
     }
     return "";
 }
@@ -93,6 +98,17 @@ bool Value::isString() const {
 ObjString* Value::asString() const {
     if (isString()) {
         return std::get<ObjString*>(as);
+    }
+    return nullptr;
+}
+
+bool Value::isBuffer() const {
+    return type == ValueType::BUFFER;
+}
+
+Buffer* Value::asBuffer() const {
+    if (isBuffer()) {
+        return std::get<Buffer*>(as);
     }
     return nullptr;
 }

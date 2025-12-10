@@ -13,6 +13,7 @@
 - [Classes and Objects](#classes-and-objects)
 - [Modules](#modules)
 - [Arrays](#arrays)
+- [Buffers](#buffers)
 - [Built-in Functions](#built-in-functions)
 
 ---
@@ -54,6 +55,7 @@ Neutron is dynamically typed. Variables can hold values of any type, and types a
 | **Object** | Key-value pairs | `{"key": "value"}` |
 | **Function** | Callable functions |
 | **Module** | Imported modules |
+| **Buffer** | Raw byte array | `sys.alloc(10)` |
 
 ### Numbers
 
@@ -482,6 +484,16 @@ say(result);  // 6
 ```
 
 ---
+
+## Buffers
+
+Buffers are raw byte arrays used for handling binary data. See [Buffers Reference](buffers.md) for more details.
+
+```js
+use sys;
+var buf = sys.alloc(10);
+buf[0] = 255;
+```
 
 ## Built-in Functions
 

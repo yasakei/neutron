@@ -21,6 +21,7 @@
 #include "types/obj_string.h"
 #include "types/json_object.h"
 #include "types/array.h"
+#include "types/buffer.h"
 #include "expr.h"
 #include "platform/platform.h"
 #include <iostream>
@@ -500,8 +501,23 @@ Value sys_exec(VM& vm, std::vector<Value> args) {
     return Value(static_cast<double>(exitCode));
 }
 
+Value sys_alloc(VM& vm, std::vector<Value> args) {
+    if (args.size() != 1) {
+        throw std::runtime_error("sys.alloc() expects 1 argument (size)");
+    }
+    if (args[0].type != ValueType::NUMBER) {
+        throw std::runtime_error("sys.alloc() expects a number size");
+    }
+    
+    size_t size = static_cast<size_t>(std::get<double>(args[0].as));
+    return Value(vm.allocate<Buffer>(size));
+}
+
 namespace neutron {
     void register_sys_functions(VM& vm, std::shared_ptr<Environment> env) {
+        // Memory Operations
+        env->define("alloc", Value(vm.allocate<NativeFn>(sys_alloc, 1, true)));
+
         // File Operations
         env->define("read", Value(vm.allocate<NativeFn>(sys_read, 1, true)));
         env->define("write", Value(vm.allocate<NativeFn>(sys_write, 2, true)));
