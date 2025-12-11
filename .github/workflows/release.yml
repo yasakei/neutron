@@ -107,10 +107,10 @@ jobs:
         asset_content_type: application/gzip
 
 
-  build-macos-intel:
-    name: Build macOS Intel Release
+  build-macos-universal:
+    name: Build macOS Universal Release
     needs: create-release
-    runs-on: macos-13  # Latest macOS with Intel support
+    runs-on: macos-14
     
     steps:
     - name: Checkout code
@@ -119,34 +119,40 @@ jobs:
         submodules: recursive
       
     - name: Install dependencies
-      run: brew install cmake curl jsoncpp
-      
-    - name: Build Neutron Intel
       run: |
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64"
+        brew install cmake
+        # Build universal jsoncpp
+        git clone https://github.com/open-source-parsers/jsoncpp.git
+        cd jsoncpp
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DBUILD_SHARED_LIBS=OFF -DJSONCPP_WITH_TESTS=OFF -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF
+        sudo cmake --build build --target install
+      
+    - name: Build Neutron Universal
+      run: |
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
         cmake --build build -j$(sysctl -n hw.ncpu)
         
-    - name: Build nt-box Intel
+    - name: Build nt-box Universal
       run: |
         cd nt-box
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64"
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
         cmake --build build
         cd ..
         
     - name: Package
       run: |
-        mkdir -p neutron-macos-intel
-        cp neutron neutron-macos-intel/
-        cp libneutron_runtime.a neutron-macos-intel/ 2>/dev/null || true
-        cp libneutron_runtime.dylib* neutron-macos-intel/ 2>/dev/null || true
-        cp README.md LICENSE neutron-macos-intel/
-        cp -r docs neutron-macos-intel/
-        cp -r include neutron-macos-intel/
-        cp -r src neutron-macos-intel/
-        cp -r libs neutron-macos-intel/
-        cp scripts/install.sh neutron-macos-intel/
-        cp nt-box/build/box neutron-macos-intel/ 2>/dev/null || true
-        tar -czf neutron-${{ needs.create-release.outputs.version }}-macos-intel.tar.gz neutron-macos-intel
+        mkdir -p neutron-macos-universal
+        cp neutron neutron-macos-universal/
+        cp libneutron_runtime.a neutron-macos-universal/ 2>/dev/null || true
+        cp libneutron_runtime.dylib* neutron-macos-universal/ 2>/dev/null || true
+        cp README.md LICENSE neutron-macos-universal/
+        cp -r docs neutron-macos-universal/
+        cp -r include neutron-macos-universal/
+        cp -r src neutron-macos-universal/
+        cp -r libs neutron-macos-universal/
+        cp scripts/install.sh neutron-macos-universal/
+        cp nt-box/build/box neutron-macos-universal/ 2>/dev/null || true
+        tar -czf neutron-${{ needs.create-release.outputs.version }}-macos-universal.tar.gz neutron-macos-universal
         
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
@@ -154,60 +160,11 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-macos-intel.tar.gz
-        asset_name: neutron-${{ needs.create-release.outputs.version }}-macos-intel.tar.gz
+        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-macos-universal.tar.gz
+        asset_name: neutron-${{ needs.create-release.outputs.version }}-macos-universal.tar.gz
         asset_content_type: application/gzip
 
-  build-macos-arm64:
-    name: Build macOS ARM64 Release
-    needs: create-release
-    runs-on: macos-14  # macOS Sonoma with ARM64 runner (Apple Silicon)
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-      
-    - name: Install dependencies
-      run: brew install cmake curl jsoncpp
-      
-    - name: Build Neutron ARM64
-      run: |
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64"
-        cmake --build build -j$(sysctl -n hw.ncpu)
-        
-    - name: Build nt-box ARM64
-      run: |
-        cd nt-box
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64"
-        cmake --build build
-        cd ..
-        
-    - name: Package
-      run: |
-        mkdir -p neutron-macos-arm64
-        cp neutron neutron-macos-arm64/
-        cp libneutron_runtime.a neutron-macos-arm64/ 2>/dev/null || true
-        cp libneutron_runtime.dylib* neutron-macos-arm64/ 2>/dev/null || true
-        cp README.md LICENSE neutron-macos-arm64/
-        cp -r docs neutron-macos-arm64/
-        cp -r include neutron-macos-arm64/
-        cp -r src neutron-macos-arm64/
-        cp -r libs neutron-macos-arm64/
-        cp scripts/install.sh neutron-macos-arm64/
-        cp nt-box/build/box neutron-macos-arm64/ 2>/dev/null || true
-        tar -czf neutron-${{ needs.create-release.outputs.version }}-macos-arm64.tar.gz neutron-macos-arm64
-        
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-macos-arm64.tar.gz
-        asset_name: neutron-${{ needs.create-release.outputs.version }}-macos-arm64.tar.gz
-        asset_content_type: application/gzip
+
 
   build-windows:
     name: Build Windows x64 Release

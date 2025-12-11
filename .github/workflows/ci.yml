@@ -65,9 +65,9 @@ jobs:
         path: release/
         retention-days: 7
 
-  build-macos-intel:
-    name: Build on macOS Intel
-    runs-on: macos-13  # Latest macOS with Intel support
+  build-macos-universal:
+    name: Build on macOS Universal
+    runs-on: macos-14
     
     steps:
     - name: Checkout code
@@ -77,10 +77,15 @@ jobs:
       
     - name: Install dependencies
       run: |
-        brew install cmake curl jsoncpp
+        brew install cmake
+        # Build universal jsoncpp
+        git clone https://github.com/open-source-parsers/jsoncpp.git
+        cd jsoncpp
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DBUILD_SHARED_LIBS=OFF -DJSONCPP_WITH_TESTS=OFF -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF
+        sudo cmake --build build --target install
         
     - name: Configure CMake
-      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
       
     - name: Build
       run: cmake --build build -j$(sysctl -n hw.ncpu)
@@ -88,6 +93,7 @@ jobs:
     - name: Verify binary
       run: |
         ls -lh neutron
+        file neutron
         ./neutron --version
         
     - name: Run tests
@@ -96,7 +102,7 @@ jobs:
     - name: Build nt-box
       run: |
         cd nt-box
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
         cmake --build build
         cd ..
       
@@ -112,60 +118,11 @@ jobs:
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: neutron-macos-x64
+        name: neutron-macos-universal
         path: release/
         retention-days: 7
 
-  build-macos-arm64:
-    name: Build on macOS ARM64
-    runs-on: macos-14  # macOS Sonoma with ARM64 runner (Apple Silicon)
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-      
-    - name: Install dependencies
-      run: |
-        brew install cmake curl jsoncpp
-        
-    - name: Configure CMake
-      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-      
-    - name: Build
-      run: cmake --build build -j$(sysctl -n hw.ncpu)
-      
-    - name: Verify binary
-      run: |
-        ls -lh neutron
-        ./neutron --version
-        
-    - name: Run tests
-      run: ./run_tests.sh
-      
-    - name: Build nt-box
-      run: |
-        cd nt-box
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-        cmake --build build
-        cd ..
-      
-    - name: Package artifacts
-      run: |
-        mkdir -p release
-        cp neutron release/
-        cp libneutron_runtime.dylib* release/ 2>/dev/null || true
-        cp README.md LICENSE release/
-        cp -r docs release/
-        cp nt-box/build/box release/ 2>/dev/null || true
-        
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: neutron-macos-arm64
-        path: release/
-        retention-days: 7
+
 
   build-windows-msys2:
     name: Build on Windows (MSYS2)
