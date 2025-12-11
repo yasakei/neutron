@@ -75,8 +75,7 @@ class Counter {
 var counters = arrays.new();
 var i = 0;
 while (i < 5) {
-    var c = Counter();
-    c.initialize(i * 10);
+    var c = Counter(i * 10);
     arrays.push(counters, c);
     i = i + 1;
 }

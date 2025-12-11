@@ -33,30 +33,40 @@ using namespace neutron;
 // Structure to hold the promise and future for async operations
 struct AsyncHandle {
     std::promise<Value> promise;
-    std::future<Value> future;
+    std::shared_future<Value> future;
     std::thread thread;
+    bool completed = false;
+    Value result;
     
     AsyncHandle() {
-        future = promise.get_future();
+        future = promise.get_future().share();
     }
     
     ~AsyncHandle() {
         if (thread.joinable()) {
-            thread.detach();
+            thread.join();
         }
     }
 };
 
-class FutureObject : public Object {
+class FutureObject : public Array {
 public:
     std::shared_ptr<AsyncHandle> handle;
+    int id;
+    static int next_id;
     
-    FutureObject() : handle(std::make_shared<AsyncHandle>()) {}
+    FutureObject(Value callable) : Array() {
+        elements.push_back(callable);
+        handle = std::make_shared<AsyncHandle>();
+        id = next_id++;
+    }
     
     std::string toString() const override {
-        return "<Future>";
+        return "<Future:" + std::to_string(id) + ">";
     }
 };
+
+int FutureObject::next_id = 1;
 
 // Function to run an async operation in a separate thread
 static Value async_run(VM& vm, const std::vector<Value>& args) {
@@ -68,21 +78,27 @@ static Value async_run(VM& vm, const std::vector<Value>& args) {
     }
     
     Value callable = args[0];
-    auto futureObj = vm.allocate<FutureObject>();
+    auto futureObj = vm.allocate<FutureObject>(callable);
     auto handle = futureObj->handle;
     
     // Spawn thread
-    handle->thread = std::thread([&vm, callable, handle]() {
+    handle->thread = std::thread([&vm, futureObj, handle]() {
         vm.lock();
         try {
+            // Get the callable from the FutureObject
+            Value callable = futureObj->elements[0];
             std::vector<Value> args; // No args for now
             Value result = vm.call(callable, args);
+            handle->result = result;
+            handle->completed = true;
             handle->promise.set_value(result);
         } catch (const std::exception& e) {
+            handle->completed = true;
             try {
                 handle->promise.set_exception(std::current_exception());
             } catch (...) {}
         } catch (...) {
+            handle->completed = true;
              try {
                 handle->promise.set_exception(std::current_exception());
             } catch (...) {}
@@ -98,32 +114,45 @@ static Value async_await(VM& vm, const std::vector<Value>& args) {
     if (args.size() != 1) {
         throw std::runtime_error("async.await() expects 1 argument (async handle)");
     }
-    if (args[0].type != ValueType::OBJECT) {
+    
+    FutureObject* futureObj = nullptr;
+    if (args[0].type == ValueType::ARRAY) {
+        Array* arr = std::get<Array*>(args[0].as);
+        futureObj = dynamic_cast<FutureObject*>(arr);
+        std::cout << "async_await: got FutureObject from ARRAY, id=" << (futureObj ? futureObj->id : -1) << std::endl;
+    } else if (args[0].type == ValueType::OBJECT) {
+        Object* obj = std::get<Object*>(args[0].as);
+        futureObj = dynamic_cast<FutureObject*>(obj);
+        std::cout << "async_await: got FutureObject from OBJECT, id=" << (futureObj ? futureObj->id : -1) << std::endl;
+    }
+    
+    if (!futureObj) {
         throw std::runtime_error("async.await() expects an async handle object");
     }
     
-    Object* obj = std::get<Object*>(args[0].as);
-    FutureObject* futureObj = dynamic_cast<FutureObject*>(obj);
-    
-    if (!futureObj) {
-        throw std::runtime_error("async.await() expects a Future object");
+    // Wait for the thread to finish if it's still running
+    if (futureObj->handle->thread.joinable()) {
+        std::cout << "async_await: joining thread for id=" << futureObj->id << std::endl;
+        // Release lock to allow async thread to run
+        int count = vm.unlock_fully();
+        futureObj->handle->thread.join();
+        vm.relock(count);
+        std::cout << "async_await: thread joined for id=" << futureObj->id << ", result=" << futureObj->handle->result.toString() << std::endl;
     }
     
-    // Release lock to allow async thread to run
-    int count = vm.unlock_fully();
-    
-    try {
-        Value result = futureObj->handle->future.get();
-        vm.relock(count);
-        return result;
-    } catch (const std::exception& e) {
-        vm.relock(count);
-        throw std::runtime_error(e.what());
+    // Return the stored result
+    if (futureObj->handle->completed) {
+        std::cout << "async_await: returning result for id=" << futureObj->id << ": " << futureObj->handle->result.toString() << std::endl;
+        return futureObj->handle->result;
     }
+    
+    // Fallback - shouldn't happen
+    return Value();
 }
 
 // Function to sleep asynchronously
 static Value async_sleep(VM& vm, const std::vector<Value>& args) {
+    (void)vm; // Unused parameter
     if (args.size() != 1) {
         throw std::runtime_error("async.sleep() expects 1 argument (milliseconds)");
     }
@@ -133,9 +162,12 @@ static Value async_sleep(VM& vm, const std::vector<Value>& args) {
     
     double ms = std::get<double>(args[0].as);
     
-    int count = vm.unlock_fully();
+    // We cannot unlock here because the VM stack is not thread-safe.
+    // If we unlock, another thread might execute bytecode and corrupt the stack.
+    // So we must hold the lock while sleeping.
+    // int count = vm.unlock_fully();
     std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<long long>(ms)));
-    vm.relock(count);
+    // vm.relock(count);
     
     return Value(true);
 }
@@ -155,14 +187,15 @@ static Value async_timer(VM& vm, const std::vector<Value>& args) {
     Value callable = args[0];
     double ms = std::get<double>(args[1].as);
     
-    auto futureObj = vm.allocate<FutureObject>();
+    auto futureObj = vm.allocate<FutureObject>(callable);
     auto handle = futureObj->handle;
     
-    handle->thread = std::thread([&vm, callable, handle, ms]() {
+    handle->thread = std::thread([&vm, futureObj, handle, ms]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<long long>(ms)));
         
         vm.lock();
         try {
+            Value callable = futureObj->elements[0];
             std::vector<Value> args;
             Value result = vm.call(callable, args);
             handle->promise.set_value(result);

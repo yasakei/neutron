@@ -28,8 +28,8 @@
 #include "types/instance.h"
 #include "types/bound_method.h"
 #include "types/bound_array_method.h"
-#include "types/buffer.h"
 #include "types/bound_string_method.h"
+#include "types/buffer.h"
 #include <iostream>
 #include <stdexcept>
 #include <fstream>
@@ -81,18 +81,61 @@ bool isTruthy(const Value& value) {
 // Helper function for error reporting with stack trace
 [[noreturn]] void runtimeError(VM* vm, const std::string& message, int line = -1) {
     // Check if there is an active exception handler that covers the current instruction
-    if (!vm->frames.empty() && !vm->exceptionFrames.empty()) {
-        CallFrame* frame = &vm->frames.back();
-        if (frame->function && frame->function->chunk) {
-            int current_pos = frame->ip - frame->function->chunk->code.data() - 1;
-            
-            // Look for a handler in the current frame
-            for (int i = vm->exceptionFrames.size() - 1; i >= 0; i--) {
-                VM::ExceptionFrame& handler = vm->exceptionFrames[i];
-                if (current_pos >= handler.tryStart && current_pos <= handler.tryEnd) {
-                    // Found a handler, throw a VMException to be caught in VM::run
-                    throw VMException(Value(message));
+    // We need to search up the call stack
+    
+    // Iterate exception frames backwards (most recent first)
+    for (int i = vm->exceptionFrames.size() - 1; i >= 0; i--) {
+        VM::ExceptionFrame& handler = vm->exceptionFrames[i];
+        
+        // Find the call frame that owns this handler
+        // The handler belongs to the frame where frame->slot_offset == handler.frameBase
+        CallFrame* frame = nullptr;
+        int frameIndex = -1;
+        
+        for (int j = vm->frames.size() - 1; j >= 0; j--) {
+            if (vm->frames[j].slot_offset == handler.frameBase) {
+                frame = &vm->frames[j];
+                frameIndex = j;
+                break;
+            }
+        }
+        
+        if (frame) {
+            // Calculate current position in that frame
+            int current_pos;
+            if (frame == &vm->frames.back()) {
+                // Current frame: use current IP
+                if (frame->function && frame->function->chunk) {
+                    current_pos = frame->ip - frame->function->chunk->code.data() - 1;
+                } else {
+                    continue;
                 }
+            } else {
+                // Parent frame: IP points to return address (instruction after call)
+                // The call instruction is what we are "in".
+                // We assume the call instruction is at least 1 byte.
+                if (frame->function && frame->function->chunk) {
+                    current_pos = frame->ip - frame->function->chunk->code.data() - 1;
+                } else {
+                    continue;
+                }
+            }
+            
+            if (current_pos >= handler.tryStart && current_pos <= handler.tryEnd) {
+                // Found a handler!
+                
+                // Unwind stack to this frame
+                // We need to pop frames until this frame is the top one
+                while (vm->frames.size() > (size_t)frameIndex + 1) {
+                    vm->frames.pop_back();
+                }
+                
+                // Unwind exception frames
+                // Keep handlers up to this one (inclusive)
+                vm->exceptionFrames.resize(i + 1);
+                
+                // Throw VMException to be caught in VM::run
+                throw VMException(Value(message));
             }
         }
     }
@@ -384,6 +427,7 @@ bool VM::callValue(Value callee, int argCount) {
                 frame->fileName = currentFileName;
                 frame->currentLine = -1;
                 frame->isBoundMethod = true;
+                frame->isInitializer = true;
                 return true;
                 }
              }
@@ -780,6 +824,16 @@ void VM::run(size_t minFrameDepth) {
                 Value result = pop();
                 size_t return_slot_offset = frame->slot_offset;  // Points to first argument
                 bool was_bound_method = frame->isBoundMethod;
+                bool was_initializer = frame->isInitializer;
+                
+                Value returnValue = result;
+                if (was_initializer) {
+                    // For initializers, return 'this' instead of the function result
+                    if (return_slot_offset < stack.size()) {
+                        returnValue = stack[return_slot_offset];
+                    }
+                }
+
                 frames.pop_back();
                 
                 if (frames.empty() || frames.size() <= minFrameDepth) {
@@ -799,7 +853,7 @@ void VM::run(size_t minFrameDepth) {
                         stack.clear();
                     }
                     
-                    push(result);
+                    push(returnValue);
                     return;
                 }
 
@@ -814,7 +868,7 @@ void VM::run(size_t minFrameDepth) {
                     // Edge case: top-level script or no arguments
                     stack.clear();
                 }
-                push(result);
+                push(returnValue);
                 break;
             }
             case (uint8_t)OpCode::OP_CONSTANT: {
@@ -1575,7 +1629,7 @@ void VM::run(size_t minFrameDepth) {
                 uint16_t finallyStart = READ_SHORT(); // Start of finally block (-1 if none)
                 
                 int currentIP = (frame->ip - 1) - frame->function->chunk->code.data(); // Position before reading shorts
-                int currentFrameBase = frame->slot_offset;
+                size_t currentFrameBase = frame->slot_offset;
                 
                 exceptionFrames.emplace_back(
                     currentIP, 
@@ -1757,6 +1811,8 @@ void VM::define(const std::string& name, const Value& value) {
 
 Value VM::call(const Value& callee, const std::vector<Value>& arguments) {
     lock();
+    size_t initial_frames_size = frames.size();
+    size_t initial_stack_size = stack.size();
     try {
         if (callee.type != ValueType::CALLABLE) {
             throw std::runtime_error("Can only call functions.");
@@ -1849,6 +1905,12 @@ Value VM::call(const Value& callee, const std::vector<Value>& arguments) {
         unlock();
         return result;
     } catch (...) {
+        while (frames.size() > initial_frames_size) {
+            frames.pop_back();
+        }
+        while (stack.size() > initial_stack_size) {
+            pop();
+        }
         unlock();
         throw;
     }

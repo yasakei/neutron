@@ -68,8 +68,9 @@ struct CallFrame {
     std::string fileName;  // Source file name for error reporting
     int currentLine;       // Current line number for error reporting
     bool isBoundMethod;    // True if this is a method call (receiver at slot 0)
+    bool isInitializer;    // True if this is a class initializer call
     
-    CallFrame() : function(nullptr), ip(nullptr), slot_offset(0), fileName(""), currentLine(-1), isBoundMethod(false) {}
+    CallFrame() : function(nullptr), ip(nullptr), slot_offset(0), fileName(""), currentLine(-1), isBoundMethod(false), isInitializer(false) {}
 };
 
 class Return {
@@ -151,11 +152,13 @@ public:
         int tryEnd;           // End of try block
         int catchStart;       // Start of catch block (or -1 if no catch)
         int finallyStart;     // Start of finally block (or -1 if no finally)
-        int frameBase;        // Stack frame base when exception frame was created
+        size_t frameBase;     // Stack frame base when exception frame was created
         std::string fileName;
         int line;
         
-        ExceptionFrame(int tryStart, int tryEnd, int catchStart, int finallyStart, int frameBase, const std::string& fileName, int line)
+        ExceptionFrame() : tryStart(0), tryEnd(0), catchStart(-1), finallyStart(-1), frameBase(0), fileName(""), line(-1) {}
+
+        ExceptionFrame(int tryStart, int tryEnd, int catchStart, int finallyStart, size_t frameBase, const std::string& fileName, int line)
             : tryStart(tryStart), tryEnd(tryEnd), catchStart(catchStart), finallyStart(finallyStart), 
               frameBase(frameBase), fileName(fileName), line(line) {}
     };

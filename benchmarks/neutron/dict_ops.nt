@@ -23,8 +23,7 @@ class Person {
 var people = arrays.new();
 var i = 0;
 while (i < 1000) {
-    var person = Person();
-    person.initialize("Person" + i, 20 + (i % 50), "City" + (i % 10));
+    var person = Person("Person" + i, 20 + (i % 50), "City" + (i % 10));
     arrays.push(people, person);
     i = i + 1;
 }

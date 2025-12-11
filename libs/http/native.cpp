@@ -648,7 +648,7 @@ Value http_listen(VM& vm, std::vector<Value> arguments) {
 }
 
 // Simple server start (just takes port, no handler)
-Value http_startServer(VM& vm, std::vector<Value> arguments) {
+Value http_startServer(VM& /*vm*/, std::vector<Value> arguments) {
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected 1 argument for http.startServer() (port).");
     }
@@ -673,7 +673,7 @@ Value http_startServer(VM& vm, std::vector<Value> arguments) {
 }
 
 // Stop HTTP server
-Value http_stopServer(VM& vm, std::vector<Value> /*arguments*/) {
+Value http_stopServer(VM& /*vm*/, std::vector<Value> /*arguments*/) {
     if (serverRunning) {
         serverRunning = false;
         if (serverSocket != INVALID_SOCKET) {
@@ -773,7 +773,7 @@ Value http_parseQuery(VM& vm, std::vector<Value> arguments) {
 }
 
 // Serve static HTML content
-Value http_serveHTML(VM& vm, std::vector<Value> arguments) {
+Value http_serveHTML(VM& /*vm*/, std::vector<Value> arguments) {
     if (arguments.size() != 2) {
         throw std::runtime_error("Expected 2 arguments for http.serveHTML() (port, html).");
     }

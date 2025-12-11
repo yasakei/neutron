@@ -20,8 +20,7 @@ class Person {
     }
 }
 
-var person = Person();
-person.initialize("Alice", 30);
+var person = Person("Alice", 30);
 person.greet();
 var age = person.getAge();
 if (age == 30) {
@@ -89,8 +88,7 @@ class Rectangle {
     }
 }
 
-var rect = Rectangle();
-rect.initialize(5, 3);
+var rect = Rectangle(5, 3);
 var area = rect.area();
 if (area == 15) {
     say("✓ Class methods with calculations work");

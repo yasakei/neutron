@@ -56,7 +56,10 @@ say("Async result: " + result);
 
 ### `async.sleep(milliseconds)`
 
-Pauses execution for the specified number of milliseconds without blocking the main thread.
+Pauses execution for the specified number of milliseconds.
+
+>[!NOTE]
+> Currently, this function holds the VM lock during sleep to ensure thread safety, which means it will block other Neutron threads from executing bytecode.
 
 **Parameters:**
 - `milliseconds` - Number of milliseconds to sleep

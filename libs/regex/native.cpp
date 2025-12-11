@@ -8,7 +8,7 @@
 namespace neutron {
 
 // Test if a string matches a regex pattern
-Value regex_test(VM& vm, std::vector<Value> arguments) {
+Value regex_test(VM& /*vm*/, std::vector<Value> arguments) {
     if (arguments.size() != 2) {
         throw std::runtime_error("Expected 2 arguments for regex.test(text, pattern).");
     }
@@ -33,7 +33,7 @@ Value regex_test(VM& vm, std::vector<Value> arguments) {
 }
 
 // Search for a pattern in text (returns true if found)
-Value regex_search(VM& vm, std::vector<Value> arguments) {
+Value regex_search(VM& /*vm*/, std::vector<Value> arguments) {
     if (arguments.size() != 2) {
         throw std::runtime_error("Expected 2 arguments for regex.search(text, pattern).");
     }
@@ -208,7 +208,7 @@ Value regex_split(VM& vm, std::vector<Value> arguments) {
 }
 
 // Test if pattern is valid
-Value regex_isValid(VM& vm, std::vector<Value> arguments) {
+Value regex_isValid(VM& /*vm*/, std::vector<Value> arguments) {
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected 1 argument for regex.isValid(pattern).");
     }

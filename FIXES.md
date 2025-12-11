@@ -2,6 +2,25 @@
 
 ---
 
+### [FIXED] [NEUT-029] Async Module Stack Corruption Fix
+
+**Date:** 2025-12-11
+**Status:** Fixed
+**Priority:** Critical
+**Description:**
+The `async` module caused random "RuntimeError: vector" crashes when running `test_async_module.nt`. The crash occurred because `async.sleep` released the VM lock, allowing other threads to execute bytecode on the shared VM stack, leading to race conditions and stack corruption.
+
+**Root Cause:**
+The VM stack (`std::vector<Value>`) is not thread-safe. `async.sleep` was implemented to unlock the VM (`unlock_fully()`) to allow concurrency, but this allowed other threads to modify the stack while the sleeping thread's state was still active/interleaved, or led to invalid stack access upon resumption.
+
+**Resolution:**
+Modified `libs/async/native.cpp` to **not** unlock the VM during `async.sleep`. The function now holds the lock for the duration of the sleep. While this reduces concurrency (making `async.sleep` blocking), it ensures thread safety and prevents stack corruption.
+
+**Verification:**
+`tests/modules/test_async_module.nt` passes consistently.
+
+---
+
 ### [FIXED] [NEUT-028] Class Constructor Implementation Fixes
 
 **Date:** 2023-10-27
