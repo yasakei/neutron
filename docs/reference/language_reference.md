@@ -462,6 +462,42 @@ match (command) {
 > [!TIP]
 > The `default` case is optional. If omitted and no case matches, execution continues normally.
 
+### Retry Statement
+
+The `retry` statement allows you to automatically retry a block of code a specified number of times if an exception occurs.
+
+```js
+retry (3) {
+    // Code that might fail
+    if (somethingWrong) {
+        throw "Error";
+    }
+} catch (e) {
+    // Executed if all retries fail
+    say("Failed after 3 attempts: " + e);
+}
+```
+
+**How it works:**
+1. The code block is executed.
+2. If an exception is thrown, the block is re-executed.
+3. This repeats up to the specified count (e.g., `3` times).
+4. If the block succeeds (completes without throwing), execution continues after the retry structure.
+5. If the block fails all attempts, the optional `catch` block is executed.
+
+**Example:**
+```js
+var attempts = 0;
+retry (3) {
+    attempts++;
+    say("Connecting... Attempt " + attempts);
+    if (attempts < 3) {
+        throw "Connection failed";
+    }
+    say("Connected!");
+}
+```
+
 ---
 
 ## Functions

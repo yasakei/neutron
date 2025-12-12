@@ -60,6 +60,7 @@ private:
     std::unique_ptr<Stmt> matchStatement();
     std::unique_ptr<Stmt> tryStatement();
     std::unique_ptr<Stmt> throwStatement();
+    std::unique_ptr<Stmt> retryStatement();
     
     std::unique_ptr<Stmt> block();
     

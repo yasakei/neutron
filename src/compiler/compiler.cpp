@@ -1176,4 +1176,94 @@ void Compiler::visitThrowStmt(const ThrowStmt* stmt) {
     emitByte((uint8_t)OpCode::OP_THROW);
 }
 
+void Compiler::visitRetryStmt(const RetryStmt* stmt) {
+    // 1. Compile retry count expression
+    compileExpression(stmt->count.get());
+    
+    // 2. Create a local variable for the retry count
+    // We need to store it in a local so we can decrement it
+    beginScope();
+    // Generate a unique name for the retry counter
+    std::string counterName = "$retry_counter_" + std::to_string(chunk->code.size());
+    locals.push_back(Local{Token(TokenType::IDENTIFIER, counterName, currentLine), scopeDepth, std::nullopt});
+    int counterSlot = locals.size() - 1;
+    
+    // 3. Start of the retry loop
+    int loopStart = chunk->code.size();
+    
+    // 4. Check if counter > 0
+    emitBytes((uint8_t)OpCode::OP_GET_LOCAL, (uint8_t)counterSlot);
+    emitConstant(Value(0.0));
+    emitByte((uint8_t)OpCode::OP_GREATER);
+    
+    // If counter <= 0, jump to failure handler (catch block or rethrow)
+    int exitJump = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE);
+    
+    // 5. Decrement counter
+    emitBytes((uint8_t)OpCode::OP_GET_LOCAL, counterSlot);
+    emitConstant(Value(1.0));
+    emitByte((uint8_t)OpCode::OP_SUBTRACT);
+    emitBytes((uint8_t)OpCode::OP_SET_LOCAL, counterSlot);
+    emitByte((uint8_t)OpCode::OP_POP); // Pop result of assignment
+    
+    // 6. Setup TRY block
+    emitByte((uint8_t)OpCode::OP_TRY);
+    int handlerInfoStart = chunk->code.size();
+    emitBytes(0x00, 0x00); // tryEnd
+    emitBytes(0x00, 0x00); // catchStart
+    emitBytes(0xFF, 0xFF); // finallyStart (none)
+    
+    // 7. Compile body
+    compileStatement(stmt->body.get());
+    
+    // 8. Success! Jump out of the loop and retry structure
+    int successJump = emitJump((uint8_t)OpCode::OP_JUMP);
+    
+    // 9. End of TRY block
+    int tryEnd = chunk->code.size();
+    int tryEndPos = handlerInfoStart;
+    chunk->code[tryEndPos] = (tryEnd >> 8) & 0xFF;
+    chunk->code[tryEndPos + 1] = tryEnd & 0xFF;
+    
+    // 10. Catch block (internal for retry logic)
+    int catchStart = chunk->code.size();
+    int catchStartPos = handlerInfoStart + 2;
+    chunk->code[catchStartPos] = (catchStart >> 8) & 0xFF;
+    chunk->code[catchStartPos + 1] = catchStart & 0xFF;
+    
+    // Exception is on stack. Pop it (we ignore it for now, just retry)
+    emitByte((uint8_t)OpCode::OP_POP);
+    
+    // 11. Loop back to retry
+    emitLoop(loopStart);
+    
+    // 12. End of TRY construct
+    emitByte((uint8_t)OpCode::OP_END_TRY);
+    
+    // 13. Failure handler (when retries exhausted)
+    patchJump(exitJump);
+    
+    if (stmt->catchBlock) {
+        if (stmt->catchVar.lexeme != "") {
+             // Push nil as placeholder for exception if we can't easily get it
+             emitByte((uint8_t)OpCode::OP_NIL); 
+             
+             beginScope();
+             locals.push_back(Local{stmt->catchVar, scopeDepth, std::nullopt});
+             int slot = locals.size() - 1;
+             emitBytes((uint8_t)OpCode::OP_SET_LOCAL, slot);
+             compileStatement(stmt->catchBlock.get());
+             endScope();
+        } else {
+            compileStatement(stmt->catchBlock.get());
+        }
+    }
+    
+    // 14. Success target
+    patchJump(successJump);
+    
+    // Clean up counter
+    endScope();
+}
+
 } // namespace neutron

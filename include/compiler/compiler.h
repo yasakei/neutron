@@ -73,6 +73,7 @@ public:
     void visitMatchStmt(const MatchStmt* stmt);
     void visitTryStmt(const TryStmt* stmt);
     void visitThrowStmt(const ThrowStmt* stmt);
+    void visitRetryStmt(const RetryStmt* stmt);
 
     Compiler* enclosing;
     Function* function;

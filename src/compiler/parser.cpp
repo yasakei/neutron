@@ -145,6 +145,10 @@ std::unique_ptr<Stmt> Parser::statement() {
         return throwStatement();
     }
     
+    if (match({TokenType::RETRY})) {
+        return retryStatement();
+    }
+    
     if (check(TokenType::LEFT_BRACE)) {
         return block();
     }
@@ -1059,6 +1063,10 @@ void ThrowStmt::accept(Compiler* compiler) const {
     compiler->visitThrowStmt(this);
 }
 
+void RetryStmt::accept(Compiler* compiler) const {
+    compiler->visitRetryStmt(this);
+}
+
 std::unique_ptr<Stmt> Parser::matchStatement() {
     consume(TokenType::LEFT_PAREN, "Expect '(' after 'match'.");
     auto expr = expression();
@@ -1141,6 +1149,26 @@ std::unique_ptr<Stmt> Parser::throwStatement() {
     auto value = expression();
     consume(TokenType::SEMICOLON, "Expect ';' after throw expression.");
     return std::make_unique<ThrowStmt>(std::move(value));
+}
+
+std::unique_ptr<Stmt> Parser::retryStatement() {
+    consume(TokenType::LEFT_PAREN, "Expect '(' after 'retry'.");
+    auto count = expression();
+    consume(TokenType::RIGHT_PAREN, "Expect ')' after retry count.");
+    
+    std::unique_ptr<Stmt> body = block();
+    
+    Token catchVar = Token(TokenType::IDENTIFIER, "", current);
+    std::unique_ptr<Stmt> catchBlock = nullptr;
+    
+    if (match({TokenType::CATCH})) {
+        consume(TokenType::LEFT_PAREN, "Expect '(' after 'catch'.");
+        catchVar = consume(TokenType::IDENTIFIER, "Expect exception variable name.");
+        consume(TokenType::RIGHT_PAREN, "Expect ')' after exception variable.");
+        catchBlock = block();
+    }
+    
+    return std::make_unique<RetryStmt>(std::move(count), std::move(body), catchVar, std::move(catchBlock));
 }
 
 } // namespace neutron

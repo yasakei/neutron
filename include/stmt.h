@@ -25,7 +25,8 @@ enum class StmtType {
     CONTINUE,
     MATCH,
     TRY,
-    THROW
+    THROW,
+    RETRY
 };
 
 // Base statement class
@@ -262,6 +263,27 @@ public:
     
     ThrowStmt(std::unique_ptr<Expr> value)
         : Stmt(StmtType::THROW), value(std::move(value)) {}
+    
+    void accept(Compiler* compiler) const override;
+};
+
+// Retry statement
+class RetryStmt : public Stmt {
+public:
+    std::unique_ptr<Expr> count; // Number of retries
+    std::unique_ptr<Stmt> body; // Code to retry
+    Token catchVar; // Optional catch variable
+    std::unique_ptr<Stmt> catchBlock; // Optional catch block
+    
+    RetryStmt(std::unique_ptr<Expr> count, 
+              std::unique_ptr<Stmt> body,
+              Token catchVar,
+              std::unique_ptr<Stmt> catchBlock)
+        : Stmt(StmtType::RETRY), 
+          count(std::move(count)), 
+          body(std::move(body)),
+          catchVar(catchVar),
+          catchBlock(std::move(catchBlock)) {}
     
     void accept(Compiler* compiler) const override;
 };

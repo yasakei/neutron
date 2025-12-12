@@ -1,0 +1,51 @@
+use sys;
+
+say("Testing Retry Block...");
+
+var attempts = 0;
+
+// Test 1: Success after retries
+say("Test 1: Success after 2 failures");
+retry (3) {
+    attempts = attempts + 1;
+    say("Attempt: " + attempts);
+    if (attempts < 3) {
+        throw "Fail";
+    }
+    say("Success!");
+} catch (e) {
+    say("Caught error: " + e);
+    sys.exit(1);
+}
+
+if (attempts != 3) {
+    say("Test 1 Failed: Expected 3 attempts, got " + attempts);
+    sys.exit(1);
+}
+
+// Test 2: Failure after all retries
+say("\nTest 2: Failure after all retries");
+attempts = 0;
+say("Attempts before loop: " + attempts);
+var caught = false;
+
+retry (2) {
+    attempts = attempts + 1;
+    say("Attempt: " + attempts);
+    throw "Always Fail";
+} catch (e) {
+    say("Caught expected error after retries");
+    caught = true;
+}
+
+if (attempts != 2) {
+    say("Test 2 Failed: Expected 2 attempts, got " + attempts);
+    sys.exit(1);
+}
+
+if (!caught) {
+    say("Test 2 Failed: Did not catch error after retries");
+    sys.exit(1);
+}
+
+say("\nRetry block tests passed!");

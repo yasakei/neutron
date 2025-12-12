@@ -1682,7 +1682,7 @@ void VM::run(size_t minFrameDepth) {
                 uint16_t finallyStart = READ_SHORT(); // Start of finally block (-1 if none)
                 
                 int currentIP = (frame->ip - 1) - frame->function->chunk->code.data(); // Position before reading shorts
-                size_t currentFrameBase = frame->slot_offset;
+                size_t currentFrameBase = stack.size();
                 
                 exceptionFrames.emplace_back(
                     currentIP, 

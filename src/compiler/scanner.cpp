@@ -35,6 +35,7 @@ Scanner::Scanner(const std::string& source)
     keywords["catch"] = TokenType::CATCH;
     keywords["finally"] = TokenType::FINALLY;
     keywords["throw"] = TokenType::THROW;
+    keywords["retry"] = TokenType::RETRY;
     keywords["use"] = TokenType::USE;
     keywords["using"] = TokenType::USING;
     keywords["from"] = TokenType::FROM;

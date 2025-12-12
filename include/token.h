@@ -29,7 +29,7 @@ enum class TokenType {
     SAY, RETURN, STATIC, SUPER, THIS, TRUE, VAR, WHILE, DO,
     BREAK, CONTINUE,
     MATCH, CASE, DEFAULT,  // Match statement
-    TRY, CATCH, FINALLY, THROW,  // Exception handling
+    TRY, CATCH, FINALLY, THROW, RETRY,  // Exception handling
     
     // Library features
     USE, USING, FROM,
