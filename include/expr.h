@@ -30,7 +30,8 @@ enum class ExprType {
     INDEX_SET,
     MEMBER_SET,
     THIS,
-    FUNCTION  // Lambda/anonymous function expression
+    FUNCTION,  // Lambda/anonymous function expression
+    TERNARY
 };
 
 // Literal types
@@ -245,6 +246,19 @@ public:
     
     FunctionExpr(std::vector<Token> params, std::vector<std::unique_ptr<Stmt>> body)
         : Expr(ExprType::FUNCTION), params(std::move(params)), body(std::move(body)) {}
+        
+    void accept(Compiler* compiler) const override;
+};
+
+// Ternary expression (condition ? then : else)
+class TernaryExpr : public Expr {
+public:
+    std::unique_ptr<Expr> condition;
+    std::unique_ptr<Expr> thenBranch;
+    std::unique_ptr<Expr> elseBranch;
+    
+    TernaryExpr(std::unique_ptr<Expr> condition, std::unique_ptr<Expr> thenBranch, std::unique_ptr<Expr> elseBranch)
+        : Expr(ExprType::TERNARY), condition(std::move(condition)), thenBranch(std::move(thenBranch)), elseBranch(std::move(elseBranch)) {}
         
     void accept(Compiler* compiler) const override;
 };

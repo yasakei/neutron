@@ -25,6 +25,7 @@ Scanner::Scanner(const std::string& source)
     keywords["true"] = TokenType::TRUE;
     keywords["var"] = TokenType::VAR;
     keywords["while"] = TokenType::WHILE;
+    keywords["do"] = TokenType::DO;
     keywords["break"] = TokenType::BREAK;
     keywords["continue"] = TokenType::CONTINUE;
     keywords["match"] = TokenType::MATCH;
@@ -81,6 +82,9 @@ void Scanner::scanToken() {
         case '&': addToken(match('&') ? TokenType::AND_SYM : TokenType::AMPERSAND); break;
         case '|': addToken(match('|') ? TokenType::OR_SYM : TokenType::PIPE); break;
         case '%': addToken(TokenType::PERCENT); break;
+        case '^': addToken(TokenType::CARET); break;
+        case '~': addToken(TokenType::TILDE); break;
+        case '?': addToken(TokenType::QUESTION); break;
         case '!': addToken(match('=') ? TokenType::BANG_EQUAL : TokenType::BANG); break;
         case '=': 
             if (match('=')) {
@@ -91,8 +95,24 @@ void Scanner::scanToken() {
                 addToken(TokenType::EQUAL);
             }
             break;
-        case '<': addToken(match('=') ? TokenType::LESS_EQUAL : TokenType::LESS); break;
-        case '>': addToken(match('=') ? TokenType::GREATER_EQUAL : TokenType::GREATER); break;
+        case '<': 
+            if (match('=')) {
+                addToken(TokenType::LESS_EQUAL);
+            } else if (match('<')) {
+                addToken(TokenType::LESS_LESS);
+            } else {
+                addToken(TokenType::LESS);
+            }
+            break;
+        case '>': 
+            if (match('=')) {
+                addToken(TokenType::GREATER_EQUAL);
+            } else if (match('>')) {
+                addToken(TokenType::GREATER_GREATER);
+            } else {
+                addToken(TokenType::GREATER);
+            }
+            break;
         case '/':
             if (match('/')) {
                 while (peek() != '\n' && !isAtEnd()) advance();

@@ -16,6 +16,7 @@ enum class StmtType {
     BLOCK,
     IF,
     WHILE,
+    DO_WHILE,
     USE,
     FUNCTION,
     RETURN,
@@ -129,6 +130,18 @@ public:
           condition(std::move(condition)),
           body(std::move(body)) {}
           
+    void accept(Compiler* compiler) const override;
+};
+
+// Do-While statement
+class DoWhileStmt : public Stmt {
+public:
+    std::unique_ptr<Stmt> body;
+    std::unique_ptr<Expr> condition;
+    
+    DoWhileStmt(std::unique_ptr<Stmt> body, std::unique_ptr<Expr> condition)
+        : Stmt(StmtType::DO_WHILE), body(std::move(body)), condition(std::move(condition)) {}
+        
     void accept(Compiler* compiler) const override;
 };
 

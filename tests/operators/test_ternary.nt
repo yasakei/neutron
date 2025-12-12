@@ -1,0 +1,41 @@
+use sys;
+
+say("Testing Ternary Operator...");
+
+// Basic true condition
+var result = true ? "yes" : "no";
+if (result != "yes") {
+    say("Ternary true condition failed: expected 'yes', got '" + result + "'");
+    sys.exit(1);
+}
+
+// Basic false condition
+result = false ? "yes" : "no";
+if (result != "no") {
+    say("Ternary false condition failed: expected 'no', got '" + result + "'");
+    sys.exit(1);
+}
+
+// Expression evaluation
+var x = 10;
+var y = x > 5 ? x * 2 : x / 2;
+if (y != 20) {
+    say("Ternary expression evaluation failed: expected 20, got " + y);
+    sys.exit(1);
+}
+
+// Nested ternary
+// a ? b : c ? d : e  should be parsed as a ? b : (c ? d : e)
+var z = true ? 1 : false ? 2 : 3;
+if (z != 1) {
+    say("Nested ternary 1 failed: expected 1, got " + z);
+    sys.exit(1);
+}
+
+var w = false ? 1 : true ? 2 : 3;
+if (w != 2) {
+    say("Nested ternary 2 failed: expected 2, got " + w);
+    sys.exit(1);
+}
+
+say("Ternary operator tests passed!");

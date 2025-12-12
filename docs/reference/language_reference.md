@@ -302,6 +302,31 @@ say(7 >= 7);    // true
 > [!WARNING]
 > Chained comparisons like `a < b < c` are not currently supported. Use `a < b and b < c` instead.
 
+### Bitwise Operators
+
+Bitwise operators treat their operands as integers (converting from floating-point if necessary).
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `&` | Bitwise AND | `5 & 1` → `1` |
+| `|` | Bitwise OR | `5 | 1` → `5` |
+| `^` | Bitwise XOR | `5 ^ 1` → `4` |
+| `~` | Bitwise NOT | `~5` → `-6` |
+| `<<` | Left Shift | `5 << 1` → `10` |
+| `>>` | Right Shift | `5 >> 1` → `2` |
+
+```js
+var a = 5;  // 0101
+var b = 1;  // 0001
+
+say(a & b); // 1  (0001)
+say(a | b); // 5  (0101)
+say(a ^ b); // 4  (0100)
+say(~a);    // -6
+say(a << 1); // 10 (1010)
+say(a >> 1); // 2  (0010)
+```
+
 ### Logical Operators
 
 | Operator | Alternative | Description | Example |
@@ -314,6 +339,21 @@ say(7 >= 7);    // true
 var result = (x > 5) and (x < 10);
 var valid = (status == "ready") or (status == "running");
 var inactive = !active;
+```
+
+### Ternary Operator
+
+The ternary operator `? :` is a shorthand for `if-else` statements.
+
+```js
+condition ? expressionIfTrue : expressionIfFalse
+```
+
+Example:
+```js
+var age = 20;
+var status = age >= 18 ? "Adult" : "Minor";
+say(status); // "Adult"
 ```
 
 ---
@@ -360,6 +400,18 @@ while (i < 5) {
     say(i);
     i++;
 }
+```
+
+#### Do-While Loop
+
+Executes a block at least once, and then repeats while a condition remains true.
+
+```js
+var i = 0;
+do {
+    say(i);
+    i++;
+} while (i < 5);
 ```
 
 #### For Loop

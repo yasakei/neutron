@@ -10,13 +10,13 @@ enum class TokenType {
     // Single-character tokens
     LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, RIGHT_BRACE,
     LEFT_BRACKET, RIGHT_BRACKET,
-    COMMA, DOT, MINUS, PLUS, SEMICOLON, SLASH, STAR, COLON, PERCENT, AMPERSAND, PIPE,
+    COMMA, DOT, MINUS, PLUS, SEMICOLON, SLASH, STAR, COLON, PERCENT, AMPERSAND, PIPE, CARET, TILDE, QUESTION,
 
     // One or two character tokens
     BANG, BANG_EQUAL,
     EQUAL, EQUAL_EQUAL,
-    GREATER, GREATER_EQUAL,
-    LESS, LESS_EQUAL,
+    GREATER, GREATER_EQUAL, GREATER_GREATER,
+    LESS, LESS_EQUAL, LESS_LESS,
     PLUS_PLUS, MINUS_MINUS,  // ++ and --
     AND_SYM, OR_SYM,        // && and ||
     ARROW,  // => for match cases
@@ -26,7 +26,7 @@ enum class TokenType {
 
     // Keywords
     AND, CLASS, ELSE, ELIF, FALSE, FUN, FOR, IF, NIL, OR,
-    SAY, RETURN, STATIC, SUPER, THIS, TRUE, VAR, WHILE,
+    SAY, RETURN, STATIC, SUPER, THIS, TRUE, VAR, WHILE, DO,
     BREAK, CONTINUE,
     MATCH, CASE, DEFAULT,  // Match statement
     TRY, CATCH, FINALLY, THROW,  // Exception handling

@@ -27,10 +27,15 @@ private:
     // Parsing methods
     std::unique_ptr<Expr> expression();
     std::unique_ptr<Expr> assignment();
+    std::unique_ptr<Expr> ternary();
     std::unique_ptr<Expr> logic_or();
     std::unique_ptr<Expr> logic_and();
+    std::unique_ptr<Expr> bitwise_or();
+    std::unique_ptr<Expr> bitwise_xor();
+    std::unique_ptr<Expr> bitwise_and();
     std::unique_ptr<Expr> equality();
     std::unique_ptr<Expr> comparison();
+    std::unique_ptr<Expr> bitwise_shift();
     std::unique_ptr<Expr> term();
     std::unique_ptr<Expr> factor();
     std::unique_ptr<Expr> unary();
@@ -46,6 +51,7 @@ private:
     std::unique_ptr<Stmt> varDeclaration(bool isStatic = false);
     std::unique_ptr<Stmt> ifStatement();
     std::unique_ptr<Stmt> whileStatement();
+    std::unique_ptr<Stmt> doWhileStatement();
     std::unique_ptr<Stmt> forStatement();
     std::unique_ptr<Stmt> classDeclaration();
     std::unique_ptr<Stmt> useStatement();

@@ -99,6 +99,10 @@ std::unique_ptr<Stmt> Parser::statement() {
         return whileStatement();
     }
 
+    if (match({TokenType::DO})) {
+        return doWhileStatement();
+    }
+
     if (match({TokenType::FOR})) {
         return forStatement();
     }
@@ -248,6 +252,17 @@ std::unique_ptr<Stmt> Parser::whileStatement() {
     return std::make_unique<WhileStmt>(std::move(condition), std::move(body));
 }
 
+std::unique_ptr<Stmt> Parser::doWhileStatement() {
+    std::unique_ptr<Stmt> body = statement();
+    consume(TokenType::WHILE, "Expect 'while' after do-while body.");
+    consume(TokenType::LEFT_PAREN, "Expect '(' after 'while'.");
+    std::unique_ptr<Expr> condition = expression();
+    consume(TokenType::RIGHT_PAREN, "Expect ')' after condition.");
+    consume(TokenType::SEMICOLON, "Expect ';' after do-while condition.");
+    
+    return std::make_unique<DoWhileStmt>(std::move(body), std::move(condition));
+}
+
 std::unique_ptr<Stmt> Parser::forStatement() {
     consume(TokenType::LEFT_PAREN, "Expect '(' after 'for'.");
 
@@ -379,7 +394,7 @@ std::unique_ptr<Expr> Parser::expression() {
 }
 
 std::unique_ptr<Expr> Parser::assignment() {
-    std::unique_ptr<Expr> expr = logic_or();
+    std::unique_ptr<Expr> expr = ternary();
 
     if (match({TokenType::EQUAL})) {
         Token equals = previous();
@@ -412,6 +427,19 @@ std::unique_ptr<Expr> Parser::assignment() {
     return expr;
 }
 
+std::unique_ptr<Expr> Parser::ternary() {
+    std::unique_ptr<Expr> expr = logic_or();
+
+    if (match({TokenType::QUESTION})) {
+        std::unique_ptr<Expr> thenBranch = expression();
+        consume(TokenType::COLON, "Expect ':' after then branch of ternary operator.");
+        std::unique_ptr<Expr> elseBranch = ternary();
+        return std::make_unique<TernaryExpr>(std::move(expr), std::move(thenBranch), std::move(elseBranch));
+    }
+
+    return expr;
+}
+
 std::unique_ptr<Expr> Parser::logic_or() {
     std::unique_ptr<Expr> expr = logic_and();
 
@@ -425,9 +453,45 @@ std::unique_ptr<Expr> Parser::logic_or() {
 }
 
 std::unique_ptr<Expr> Parser::logic_and() {
-    std::unique_ptr<Expr> expr = equality();
+    std::unique_ptr<Expr> expr = bitwise_or();
 
     while (match({TokenType::AND, TokenType::AND_SYM})) {
+        Token op = previous();
+        std::unique_ptr<Expr> right = bitwise_or();
+        expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
+    }
+
+    return expr;
+}
+
+std::unique_ptr<Expr> Parser::bitwise_or() {
+    std::unique_ptr<Expr> expr = bitwise_xor();
+
+    while (match({TokenType::PIPE})) {
+        Token op = previous();
+        std::unique_ptr<Expr> right = bitwise_xor();
+        expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
+    }
+
+    return expr;
+}
+
+std::unique_ptr<Expr> Parser::bitwise_xor() {
+    std::unique_ptr<Expr> expr = bitwise_and();
+
+    while (match({TokenType::CARET})) {
+        Token op = previous();
+        std::unique_ptr<Expr> right = bitwise_and();
+        expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
+    }
+
+    return expr;
+}
+
+std::unique_ptr<Expr> Parser::bitwise_and() {
+    std::unique_ptr<Expr> expr = equality();
+
+    while (match({TokenType::AMPERSAND})) {
         Token op = previous();
         std::unique_ptr<Expr> right = equality();
         expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
@@ -450,14 +514,26 @@ std::unique_ptr<Expr> Parser::equality() {
 }
 
 std::unique_ptr<Expr> Parser::comparison() {
-    std::unique_ptr<Expr> expr = term();
+    std::unique_ptr<Expr> expr = bitwise_shift();
     
     while (match({TokenType::GREATER, TokenType::GREATER_EQUAL, 
                   TokenType::LESS, TokenType::LESS_EQUAL,
                   TokenType::BANG_EQUAL, TokenType::EQUAL_EQUAL})) {
         Token operatorToken = previous();
-        std::unique_ptr<Expr> right = term();
+        std::unique_ptr<Expr> right = bitwise_shift();
         expr = std::make_unique<BinaryExpr>(std::move(expr), operatorToken, std::move(right));
+    }
+    
+    return expr;
+}
+
+std::unique_ptr<Expr> Parser::bitwise_shift() {
+    std::unique_ptr<Expr> expr = term();
+    
+    while (match({TokenType::LESS_LESS, TokenType::GREATER_GREATER})) {
+        Token op = previous();
+        std::unique_ptr<Expr> right = term();
+        expr = std::make_unique<BinaryExpr>(std::move(expr), op, std::move(right));
     }
     
     return expr;
@@ -488,7 +564,7 @@ std::unique_ptr<Expr> Parser::factor() {
 }
 
 std::unique_ptr<Expr> Parser::unary() {
-    if (match({TokenType::BANG, TokenType::MINUS})) {
+    if (match({TokenType::BANG, TokenType::MINUS, TokenType::TILDE})) {
         Token op = previous();
         std::unique_ptr<Expr> right = unary();
         return std::make_unique<UnaryExpr>(op, std::move(right));
@@ -963,7 +1039,13 @@ void FunctionExpr::accept(Compiler* compiler) const {
     compiler->visitFunctionExpr(this);
 }
 
+void TernaryExpr::accept(Compiler* compiler) const {
+    compiler->visitTernaryExpr(this);
+}
 
+void DoWhileStmt::accept(Compiler* compiler) const {
+    compiler->visitDoWhileStmt(this);
+}
 
 void MatchStmt::accept(Compiler* compiler) const {
     compiler->visitMatchStmt(this);

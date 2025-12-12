@@ -56,12 +56,14 @@ public:
     void visitMemberSetExpr(const MemberSetExpr* expr);
     void visitThisExpr(const ThisExpr* expr);
     void visitFunctionExpr(const FunctionExpr* expr);
+    void visitTernaryExpr(const TernaryExpr* expr);
     void visitExpressionStmt(const ExpressionStmt* stmt);
     void visitSayStmt(const SayStmt* stmt);
     void visitVarStmt(const VarStmt* stmt);
     void visitBlockStmt(const BlockStmt* stmt);
     void visitIfStmt(const IfStmt* stmt);
     void visitWhileStmt(const WhileStmt* stmt);
+    void visitDoWhileStmt(const DoWhileStmt* stmt);
     void visitClassStmt(const ClassStmt* stmt);
     void visitUseStmt(const UseStmt* stmt);
     void visitFunctionStmt(const FunctionStmt* stmt);

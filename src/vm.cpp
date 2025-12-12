@@ -1396,6 +1396,59 @@ void VM::run(size_t minFrameDepth) {
                 push(Value(-value));
                 break;
             }
+            case (uint8_t)OpCode::OP_BITWISE_AND: {
+                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+                    runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
+                }
+                double b = std::get<double>(pop().as);
+                double a = std::get<double>(pop().as);
+                push(Value((double)((long long)a & (long long)b)));
+                break;
+            }
+            case (uint8_t)OpCode::OP_BITWISE_OR: {
+                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+                    runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
+                }
+                double b = std::get<double>(pop().as);
+                double a = std::get<double>(pop().as);
+                push(Value((double)((long long)a | (long long)b)));
+                break;
+            }
+            case (uint8_t)OpCode::OP_BITWISE_XOR: {
+                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+                    runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
+                }
+                double b = std::get<double>(pop().as);
+                double a = std::get<double>(pop().as);
+                push(Value((double)((long long)a ^ (long long)b)));
+                break;
+            }
+            case (uint8_t)OpCode::OP_BITWISE_NOT: {
+                if (stack.back().type != ValueType::NUMBER) {
+                    runtimeError(this, "Operand must be a number.", frames.empty() ? -1 : frames.back().currentLine);
+                }
+                double value = std::get<double>(pop().as);
+                push(Value((double)(~(long long)value)));
+                break;
+            }
+            case (uint8_t)OpCode::OP_LEFT_SHIFT: {
+                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+                    runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
+                }
+                double b = std::get<double>(pop().as);
+                double a = std::get<double>(pop().as);
+                push(Value((double)((long long)a << (long long)b)));
+                break;
+            }
+            case (uint8_t)OpCode::OP_RIGHT_SHIFT: {
+                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+                    runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
+                }
+                double b = std::get<double>(pop().as);
+                double a = std::get<double>(pop().as);
+                push(Value((double)((long long)a >> (long long)b)));
+                break;
+            }
             case (uint8_t)OpCode::OP_SAY: {
                 std::cout << pop().toString() << std::endl;
                 break;

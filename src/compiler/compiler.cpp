@@ -160,6 +160,7 @@ void Compiler::visitUnaryExpr(const UnaryExpr* expr) {
     switch (expr->op.type) {
         case TokenType::MINUS: emitByte((uint8_t)OpCode::OP_NEGATE); break;
         case TokenType::BANG: emitByte((uint8_t)OpCode::OP_NOT); break;
+        case TokenType::TILDE: emitByte((uint8_t)OpCode::OP_BITWISE_NOT); break;
         default:
             return; // Unreachable.
     }
@@ -231,6 +232,11 @@ void Compiler::visitBinaryExpr(const BinaryExpr* expr) {
         case TokenType::GREATER_EQUAL: emitBytes((uint8_t)OpCode::OP_LESS, (uint8_t)OpCode::OP_NOT); break;
         case TokenType::LESS:          emitByte((uint8_t)OpCode::OP_LESS); break;
         case TokenType::LESS_EQUAL:    emitBytes((uint8_t)OpCode::OP_GREATER, (uint8_t)OpCode::OP_NOT); break;
+        case TokenType::AMPERSAND:     emitByte((uint8_t)OpCode::OP_BITWISE_AND); break;
+        case TokenType::PIPE:          emitByte((uint8_t)OpCode::OP_BITWISE_OR); break;
+        case TokenType::CARET:         emitByte((uint8_t)OpCode::OP_BITWISE_XOR); break;
+        case TokenType::LESS_LESS:     emitByte((uint8_t)OpCode::OP_LEFT_SHIFT); break;
+        case TokenType::GREATER_GREATER: emitByte((uint8_t)OpCode::OP_RIGHT_SHIFT); break;
         default:
             return; // Should not reach for logical operators due to early return
     }
@@ -508,6 +514,54 @@ void Compiler::visitWhileStmt(const WhileStmt* stmt) {
     continueTargets.pop_back();
 }
 
+void Compiler::visitDoWhileStmt(const DoWhileStmt* stmt) {
+    int loopStart = chunk->code.size();
+    
+    // Push loop info for break/continue tracking
+    loopStarts.push_back(loopStart);
+    breakJumps.push_back(std::vector<int>());
+    continueJumps.push_back(std::vector<int>());
+    continueTargets.push_back(-1); // Will be set later
+    
+    // Compile body
+    compileStatement(stmt->body.get());
+    
+    // Set continue target (before condition)
+    int continueTarget = chunk->code.size();
+    continueTargets.back() = continueTarget;
+    
+    // Compile condition
+    compileExpression(stmt->condition.get());
+    
+    // If true, jump back to loopStart
+    // We use OP_JUMP_IF_FALSE to exit, and OP_LOOP to repeat
+    int exitJump = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE);
+    emitLoop(loopStart);
+    
+    patchJump(exitJump);
+    
+    // Patch break jumps (jump to end)
+    for (int breakJump : breakJumps.back()) {
+        patchJump(breakJump);
+    }
+    
+    // Patch continue jumps (jump to condition check)
+    for (int jump : continueJumps.back()) {
+        int target = continueTarget;
+        int offset = target - jump - 2;
+        
+        // Forward jump
+        chunk->code[jump] = (offset >> 8) & 0xff;
+        chunk->code[jump + 1] = offset & 0xff;
+    }
+    
+    // Pop loop info
+    loopStarts.pop_back();
+    breakJumps.pop_back();
+    continueJumps.pop_back();
+    continueTargets.pop_back();
+}
+
 void Compiler::visitClassStmt(const ClassStmt* stmt) {
     // Create a new class object
     auto klass = vm.allocate<Class>(stmt->name.lexeme);
@@ -772,6 +826,29 @@ void Compiler::visitFunctionExpr(const FunctionExpr* expr) {
     
     // Create a closure for the lambda
     emitBytes((uint8_t)OpCode::OP_CLOSURE, makeConstant(Value(compiler.function)));
+}
+
+void Compiler::visitTernaryExpr(const TernaryExpr* expr) {
+    // Compile condition
+    compileExpression(expr->condition.get());
+    
+    // Jump to else if false (pops condition)
+    int elseJump = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE);
+    
+    // Compile then branch
+    compileExpression(expr->thenBranch.get());
+    
+    // Jump to end
+    int endJump = emitJump((uint8_t)OpCode::OP_JUMP);
+    
+    // Patch else jump
+    patchJump(elseJump);
+    
+    // Compile else branch
+    compileExpression(expr->elseBranch.get());
+    
+    // Patch end jump
+    patchJump(endJump);
 }
 
 void Compiler::visitBreakStmt(const BreakStmt* stmt) {

@@ -1,0 +1,42 @@
+use sys;
+
+say("Testing Bitwise Operators...");
+
+// Bitwise AND
+if ((5 & 3) != 1) {
+    say("Bitwise AND failed: 5 & 3 should be 1, got " + (5 & 3));
+    sys.exit(1);
+}
+
+// Bitwise OR
+if ((5 | 3) != 7) {
+    say("Bitwise OR failed: 5 | 3 should be 7, got " + (5 | 3));
+    sys.exit(1);
+}
+
+// Bitwise XOR
+if ((5 ^ 3) != 6) {
+    say("Bitwise XOR failed: 5 ^ 3 should be 6, got " + (5 ^ 3));
+    sys.exit(1);
+}
+
+// Bitwise NOT
+// ~5 is -6 in 2's complement
+if (~5 != -6) {
+    say("Bitwise NOT failed: ~5 should be -6, got " + (~5));
+    sys.exit(1);
+}
+
+// Left Shift
+if ((5 << 1) != 10) {
+    say("Left Shift failed: 5 << 1 should be 10, got " + (5 << 1));
+    sys.exit(1);
+}
+
+// Right Shift
+if ((5 >> 1) != 2) {
+    say("Right Shift failed: 5 >> 1 should be 2, got " + (5 >> 1));
+    sys.exit(1);
+}
+
+say("Bitwise operator tests passed!");

@@ -58,7 +58,13 @@ enum class OpCode : uint8_t {
     OP_THROW,
     OP_NOT_EQUAL,
     OP_LOGICAL_AND,
-    OP_LOGICAL_OR
+    OP_LOGICAL_OR,
+    OP_BITWISE_AND,
+    OP_BITWISE_OR,
+    OP_BITWISE_XOR,
+    OP_BITWISE_NOT,
+    OP_LEFT_SHIFT,
+    OP_RIGHT_SHIFT
 };
 
 class Chunk {
