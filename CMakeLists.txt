@@ -25,6 +25,7 @@ endif()
 # Include directories
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/include/core
     ${CMAKE_SOURCE_DIR}/libs
 )
 
@@ -139,10 +140,10 @@ set(NEUTRON_PLATFORM_SOURCES_LIST
 
 # Core system source files (excluding main.cpp which is only for the executable)
 set(NEUTRON_CORE_SOURCES
-    src/vm.cpp
-    src/checkpoint.cpp
+    src/core/vm.cpp
+    src/core/checkpoint.cpp
+    src/core/capi.cpp
     src/token.cpp
-    src/capi.cpp
     ${NEUTRON_COMPILER_SOURCES}
     ${NEUTRON_TYPES_SOURCES}
     ${NEUTRON_RUNTIME_SOURCES}
@@ -257,7 +258,7 @@ set_target_properties(neutron_runtime PROPERTIES
 )
 
 # Create executable
-add_executable(neutron src/main.cpp)
+add_executable(neutron src/core/main.cpp)
 
 # Link with whole-archive to ensure C API symbols are included (Linux only)
 if(UNIX AND NOT APPLE)
