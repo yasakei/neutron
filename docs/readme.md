@@ -9,6 +9,7 @@
 **[guides/project-system.md](guides/project-system.md)** - Project management and native builds  
 **[guides/build.md](guides/build.md)** - Complete build instructions for all platforms  
 **[guides/test-suite.md](guides/test-suite.md)** - Running and writing tests
+**[guides/durable-execution.md](guides/durable-execution.md)** - Guide to Checkpoint & Resume features
 
 ### Language Reference
 

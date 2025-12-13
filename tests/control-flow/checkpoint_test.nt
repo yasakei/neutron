@@ -1,0 +1,41 @@
+// Checkpoint Test Script
+// Run this script to test the checkpoint feature.
+// Usage:
+// 1. ./build/neutron checkpoint_test.nt
+// 2. (Script will crash/exit after checkpoint)
+// 3. ./build/neutron --resume checkpoint.snap
+
+use sys;
+
+fun main() {
+    var counter = 0;
+    var data = ["start"];
+    
+    say("Phase 1: Initializing...");
+    counter = counter + 1;
+    data.push("phase1");
+    
+    say("Creating checkpoint...");
+    sys.checkpoint("checkpoint.snap");
+    
+    // Everything below this line happens AFTER resume
+    say("Phase 2: Resumed!");
+    
+    if (counter != 1) {
+        say("ERROR: Counter state lost! Expected 1, got " + counter);
+        sys.exit(1);
+    }
+    
+    if (data[1] != "phase1") {
+        say("ERROR: Data state lost!");
+        sys.exit(1);
+    }
+    
+    counter = counter + 1;
+    data.push("phase2");
+    
+    say("Final State: Counter=" + counter + ", Data=" + data);
+    say("Test Passed!");
+}
+
+main();

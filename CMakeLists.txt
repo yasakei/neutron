@@ -140,6 +140,7 @@ set(NEUTRON_PLATFORM_SOURCES_LIST
 # Core system source files (excluding main.cpp which is only for the executable)
 set(NEUTRON_CORE_SOURCES
     src/vm.cpp
+    src/checkpoint.cpp
     src/token.cpp
     src/capi.cpp
     ${NEUTRON_COMPILER_SOURCES}

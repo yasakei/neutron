@@ -26,6 +26,7 @@
 #include "compiler/scanner.h"
 #include "compiler/parser.h"
 #include "vm.h"
+#include "checkpoint.h"
 #include "compiler/compiler.h"
 #include "compiler/bytecode.h"
 #include "modules/module_loader.h"
@@ -130,6 +131,24 @@ int main(int argc, char* argv[]) {
         if (arg == "--version" || arg == "-v") {
             std::cout << neutron::Version::getFullVersion() << std::endl;
             std::cout << "Build: " << neutron::Version::getBuildDate() << std::endl;
+            return 0;
+        }
+
+        else if (arg == "--resume") {
+            if (argc < 3) {
+                std::cerr << "Usage: neutron --resume <checkpoint_file>" << std::endl;
+                return 1;
+            }
+            std::string checkpointFile = argv[2];
+            neutron::VM vm;
+            try {
+                neutron::CheckpointManager::loadCheckpoint(vm, checkpointFile);
+                // Resume execution
+                vm.runPublic();
+            } catch (const std::exception& e) {
+                std::cerr << "Error resuming checkpoint: " << e.what() << std::endl;
+                return 1;
+            }
             return 0;
         }
         

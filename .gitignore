@@ -107,3 +107,6 @@ neutron-macos-arm64/
 neutron-*.zip
 neutron-*.tar.gz
 neutron-*.rar
+
+# Snaps
+*.snap

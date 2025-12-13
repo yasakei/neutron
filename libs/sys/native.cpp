@@ -16,6 +16,7 @@
 
 #include "native.h"
 #include "vm.h"
+#include "checkpoint.h"
 #include "runtime/environment.h"
 #include "types/value.h"
 #include "types/obj_string.h"
@@ -38,6 +39,21 @@
 
 using namespace neutron;
 namespace fs = std::filesystem;
+
+// Checkpoint Operations
+Value sys_checkpoint(VM& vm, std::vector<Value> args) {
+    if (args.size() != 1) {
+        throw std::runtime_error("sys.checkpoint() expects 1 argument (filepath)");
+    }
+    if (args[0].type != ValueType::OBJ_STRING) {
+        throw std::runtime_error("sys.checkpoint() expects a string filepath");
+    }
+    
+    std::string filepath = args[0].asString()->chars;
+    // Pop 2 values (function + arg) and push true
+    CheckpointManager::saveCheckpoint(vm, filepath, Value(true), 1);
+    return Value(true);
+}
 
 // File Operations
 
@@ -515,6 +531,9 @@ Value sys_alloc(VM& vm, std::vector<Value> args) {
 
 namespace neutron {
     void register_sys_functions(VM& vm, std::shared_ptr<Environment> env) {
+        // Checkpoint
+        env->define("checkpoint", Value(vm.allocate<NativeFn>(sys_checkpoint, 1, true)));
+
         // Memory Operations
         env->define("alloc", Value(vm.allocate<NativeFn>(sys_alloc, 1, true)));
 

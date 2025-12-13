@@ -433,6 +433,29 @@ say("You entered: " + age);
 
 ## Process Control
 
+### `sys.checkpoint(filepath)`
+Saves the current execution state (stack, heap, globals) to a file. The program can be resumed later from this exact point using `neutron --resume <filepath>`.
+
+**Parameters:**
+- `filepath` (string): Path to save the snapshot file (e.g., "backup.snap")
+
+**Returns:** `true` on success
+
+**Example:**
+```neutron
+use sys;
+
+// Save state
+sys.checkpoint("backup.snap");
+
+// If resumed, execution continues here
+say("Resumed!");
+```
+
+**See Also:** [Durable Execution Guide](../guides/durable-execution.md)
+
+---
+
 ### `sys.exit([code])`
 Exits the program with an optional exit code.
 

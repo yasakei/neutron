@@ -12,8 +12,15 @@ class FunctionStmt;
 
 class Function : public Callable {
     friend class VM;
+    friend class CheckpointManager;
 public:
     Function(const FunctionStmt* declaration, std::shared_ptr<Environment> closure);
+    
+    // Constructor for deserialization
+    Function(std::string name, int arity) : name(name), arity_val(arity), declaration(nullptr), closure(nullptr) {
+        chunk = new Chunk();
+    }
+
     ~Function();
     int arity() override;
     Value call(VM& vm, std::vector<Value> arguments) override;
