@@ -41,14 +41,31 @@ include_directories(
 
 # Find required packages
 
-# Find CURL using specific system paths
-find_path(CURL_INCLUDE_DIR NAMES curl/curl.h PATHS /usr/include /usr/local/include NO_DEFAULT_PATH)
-find_library(CURL_LIBRARY NAMES curl PATHS /usr/lib /usr/local/lib NO_DEFAULT_PATH)
-if(CURL_INCLUDE_DIR AND CURL_LIBRARY)
-    set(CURL_FOUND TRUE)
-    message(STATUS "Found CURL in system paths: ${CURL_LIBRARY}")
-else()
+# Find CURL differently for different platforms
+if(WIN32)
+    # On Windows, use find_package which works with vcpkg, MSYS2, or standard installations
     find_package(CURL REQUIRED)
+    # Ensure CURL_INCLUDE_DIRS and CURL_LIBRARIES are set properly for Windows
+    if(CURL_FOUND)
+        set(CURL_INCLUDE_DIR ${CURL_INCLUDE_DIRS})
+        set(CURL_LIBRARY ${CURL_LIBRARIES})
+        message(STATUS "Found CURL for Windows: ${CURL_LIBRARY}")
+    endif()
+else()
+    # On Unix-like systems (Linux/macOS/WSL), try specific system paths first
+    find_path(CURL_INCLUDE_DIR NAMES curl/curl.h PATHS /usr/include /usr/local/include)
+    find_library(CURL_LIBRARY NAMES curl PATHS /usr/lib /usr/local/lib)
+    if(CURL_INCLUDE_DIR AND CURL_LIBRARY)
+        message(STATUS "Found CURL in system paths: ${CURL_LIBRARY}")
+    else()
+        # If not found in standard paths, use find_package which might work via pkg-config
+        find_package(CURL REQUIRED)
+        if(CURL_FOUND)
+            set(CURL_INCLUDE_DIR ${CURL_INCLUDE_DIRS})
+            set(CURL_LIBRARY ${CURL_LIBRARIES})
+            message(STATUS "Found CURL via package manager: ${CURL_LIBRARY}")
+        endif()
+    endif()
 endif()
 
 # find_package(PkgConfig REQUIRED)
@@ -58,8 +75,15 @@ endif()
 if(WIN32)
     find_package(jsoncpp CONFIG REQUIRED)
     set(JSONCPP_LIBRARY JsonCpp::JsonCpp)
-    # Find the include directory for Windows if needed
-    get_filename_component(JSONCPP_INCLUDE_DIR "${JsonCpp_INCLUDE_DIRS}" DIRECTORY)
+    # Get the include directory from the imported target
+    if(TARGET JsonCpp::JsonCpp)
+        get_target_property(JSONCPP_INCLUDE_DIR JsonCpp::JsonCpp INTERFACE_INCLUDE_DIRECTORIES)
+        if(JSONCPP_INCLUDE_DIR)
+            # Take the first directory if it's a list
+            list(GET JSONCPP_INCLUDE_DIR 0 FIRST_INCLUDE_DIR)
+            set(JSONCPP_INCLUDE_DIR ${FIRST_INCLUDE_DIR})
+        endif()
+    endif()
     message(STATUS "Found jsoncpp for Windows: ${JSONCPP_LIBRARY}")
 elseif(APPLE)
     find_library(JSONCPP_LIBRARY
