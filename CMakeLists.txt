@@ -22,8 +22,6 @@ else()
     add_compile_options(-Wall -Wextra -O2)
 endif()
 
-# Platform-specific compiler optimizations can be added here if needed
-
 # Include directories
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
@@ -32,53 +30,11 @@ include_directories(
 )
 
 # Find required packages
-
-# Find CURL differently for different platforms
-if(WIN32)
-    # On Windows, use find_package which works with vcpkg, MSYS2, or standard installations
-    find_package(CURL REQUIRED)
-    # Ensure CURL_INCLUDE_DIRS and CURL_LIBRARIES are set properly for Windows
-    if(CURL_FOUND)
-        set(CURL_INCLUDE_DIR ${CURL_INCLUDE_DIRS})
-        set(CURL_LIBRARY ${CURL_LIBRARIES})
-        message(STATUS "Found CURL for Windows: ${CURL_LIBRARY}")
-    endif()
-else()
-    # On Unix-like systems (Linux, macOS), find CURL using standard CMake methods
-    find_path(CURL_INCLUDE_DIR NAMES curl/curl.h)
-    find_library(CURL_LIBRARY NAMES curl)
-
-    if(CURL_INCLUDE_DIR AND CURL_LIBRARY)
-        message(STATUS "Found CURL in standard paths: ${CURL_LIBRARY}")
-    else()
-        # If not found with standard methods, use find_package
-        find_package(CURL REQUIRED)
-        if(CURL_FOUND)
-            set(CURL_INCLUDE_DIR ${CURL_INCLUDE_DIRS})
-            set(CURL_LIBRARY ${CURL_LIBRARIES})
-            message(STATUS "Found CURL via package manager: ${CURL_LIBRARY}")
-        endif()
-    endif()
-endif()
-
+find_package(CURL REQUIRED)
 # find_package(PkgConfig REQUIRED)
 # pkg_check_modules(JSONCPP REQUIRED jsoncpp)
 
-# Handle jsoncpp differently for different platforms
-if(WIN32)
-    find_package(jsoncpp CONFIG REQUIRED)
-    set(JSONCPP_LIBRARY JsonCpp::JsonCpp)
-    # Get the include directory from the imported target
-    if(TARGET JsonCpp::JsonCpp)
-        get_target_property(JSONCPP_INCLUDE_DIR JsonCpp::JsonCpp INTERFACE_INCLUDE_DIRECTORIES)
-        if(JSONCPP_INCLUDE_DIR)
-            # Take the first directory if it's a list
-            list(GET JSONCPP_INCLUDE_DIR 0 FIRST_INCLUDE_DIR)
-            set(JSONCPP_INCLUDE_DIR ${FIRST_INCLUDE_DIR})
-        endif()
-    endif()
-    message(STATUS "Found jsoncpp for Windows: ${JSONCPP_LIBRARY}")
-elseif(APPLE)
+if(APPLE)
     find_library(JSONCPP_LIBRARY
         NAMES jsoncpp
         PATHS /opt/homebrew/lib /usr/local/lib
@@ -89,22 +45,9 @@ elseif(APPLE)
     )
     set(JSONCPP_LIBRARIES ${JSONCPP_LIBRARY})
     set(JSONCPP_INCLUDE_DIRS ${JSONCPP_INCLUDE_DIR})
-    message(STATUS "Found jsoncpp for macOS: ${JSONCPP_LIBRARY}")
 else()
-    # For Unix-like systems (Linux, macOS, WSL), find jsoncpp using standard CMake methods
-    find_path(JSONCPP_INCLUDE_DIR NAMES json/json.h)
-    find_library(JSONCPP_LIBRARY NAMES jsoncpp)
-
-    if(JSONCPP_INCLUDE_DIR AND JSONCPP_LIBRARY)
-        message(STATUS "Found jsoncpp in standard paths: ${JSONCPP_LIBRARY}")
-    else()
-        # If not found with standard methods, try pkg-config
-        find_package(PkgConfig REQUIRED)
-        pkg_check_modules(JSONCPP REQUIRED jsoncpp)
-        set(JSONCPP_LIBRARY ${JSONCPP_LIBRARIES})
-        set(JSONCPP_INCLUDE_DIR ${JSONCPP_INCLUDE_DIRS})
-        message(STATUS "Found jsoncpp via pkg-config: ${JSONCPP_LIBRARIES}")
-    endif()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(JSONCPP REQUIRED jsoncpp)
 endif()
 
 # Function to add a new module easily
@@ -273,6 +216,8 @@ if(WIN32)
         # Add the shim implementation to the platform sources
         list(APPEND NEUTRON_PLATFORM_SOURCES_LIST src/platform/dlfcn_compat_win.cpp)
     endif()
+    find_package(jsoncpp CONFIG REQUIRED)
+    set( JSONCPP_LIBRARIES JsonCpp::JsonCpp)
 endif()
 
 # Add all component sources together (excluding main.cpp) - must be done after platform sources are determined
@@ -297,14 +242,13 @@ add_library(neutron_runtime STATIC
 )
 
 target_link_libraries(neutron_runtime
-    ${CURL_LIBRARY}
-    ${JSONCPP_LIBRARY}
+    CURL::libcurl
+    ${JSONCPP_LIBRARIES}
     ${DLFCN_WIN}
 )
 
 target_include_directories(neutron_runtime PUBLIC
-    ${CURL_INCLUDE_DIR}
-    ${JSONCPP_INCLUDE_DIR}
+    ${JSONCPP_INCLUDE_DIRS}
 )
 
 # Set output names
