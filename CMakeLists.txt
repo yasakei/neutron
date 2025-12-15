@@ -22,6 +22,16 @@ else()
     add_compile_options(-Wall -Wextra -O2)
 endif()
 
+# In WSL environments, exclude Windows paths to prevent including Windows headers
+if(UNIX AND NOT APPLE)
+    # Set CMAKE_FIND_ROOT_PATH to only include standard Linux paths
+    set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+    set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+    set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+    set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+    set(CMAKE_FIND_ROOT_PATH "/usr;/usr/local" CACHE STRING "Root path for finding libraries" FORCE)
+endif()
+
 # Include directories
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
@@ -30,7 +40,23 @@ include_directories(
 )
 
 # Find required packages
-find_package(CURL REQUIRED)
+# Prevent finding Windows libraries in WSL by forcing system paths
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+set(CMAKE_FIND_ROOT_PATH "/usr;/usr/local" CACHE STRING "Root path for finding libraries" FORCE)
+
+# Find CURL using specific system paths
+find_path(CURL_INCLUDE_DIR NAMES curl/curl.h PATHS /usr/include /usr/local/include NO_DEFAULT_PATH)
+find_library(CURL_LIBRARY NAMES curl PATHS /usr/lib /usr/local/lib NO_DEFAULT_PATH)
+if(CURL_INCLUDE_DIR AND CURL_LIBRARY)
+    set(CURL_FOUND TRUE)
+    message(STATUS "Found CURL in system paths: ${CURL_LIBRARY}")
+else()
+    find_package(CURL REQUIRED)
+endif()
+
 # find_package(PkgConfig REQUIRED)
 # pkg_check_modules(JSONCPP REQUIRED jsoncpp)
 
@@ -46,8 +72,18 @@ if(APPLE)
     set(JSONCPP_LIBRARIES ${JSONCPP_LIBRARY})
     set(JSONCPP_INCLUDE_DIRS ${JSONCPP_INCLUDE_DIR})
 else()
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(JSONCPP REQUIRED jsoncpp)
+    # Force finding jsoncpp only from system paths
+    find_path(JSONCPP_INCLUDE_DIR NAMES json/json.h PATHS /usr/include /usr/local/include NO_DEFAULT_PATH)
+    find_library(JSONCPP_LIBRARY NAMES jsoncpp PATHS /usr/lib /usr/local/lib NO_DEFAULT_PATH)
+    if(JSONCPP_INCLUDE_DIR AND JSONCPP_LIBRARY)
+        set(JSONCPP_FOUND TRUE)
+        message(STATUS "Found jsoncpp in system paths: ${JSONCPP_LIBRARY}")
+    else()
+        find_package(PkgConfig REQUIRED)
+        # Force pkg-config to look in standard Linux locations
+        set(ENV{PKG_CONFIG_PATH} "/usr/lib/pkgconfig:/usr/local/lib/pkgconfig")
+        pkg_check_modules(JSONCPP REQUIRED jsoncpp)
+    endif()
 endif()
 
 # Function to add a new module easily
@@ -242,13 +278,14 @@ add_library(neutron_runtime STATIC
 )
 
 target_link_libraries(neutron_runtime
-    CURL::libcurl
-    ${JSONCPP_LIBRARIES}
+    ${CURL_LIBRARY}
+    ${JSONCPP_LIBRARY}
     ${DLFCN_WIN}
 )
 
 target_include_directories(neutron_runtime PUBLIC
-    ${JSONCPP_INCLUDE_DIRS}
+    ${CURL_INCLUDE_DIR}
+    ${JSONCPP_INCLUDE_DIR}
 )
 
 # Set output names
