@@ -40,12 +40,6 @@ include_directories(
 )
 
 # Find required packages
-# Prevent finding Windows libraries in WSL by forcing system paths
-set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
-set(CMAKE_FIND_ROOT_PATH "/usr;/usr/local" CACHE STRING "Root path for finding libraries" FORCE)
 
 # Find CURL using specific system paths
 find_path(CURL_INCLUDE_DIR NAMES curl/curl.h PATHS /usr/include /usr/local/include NO_DEFAULT_PATH)
@@ -60,7 +54,14 @@ endif()
 # find_package(PkgConfig REQUIRED)
 # pkg_check_modules(JSONCPP REQUIRED jsoncpp)
 
-if(APPLE)
+# Handle jsoncpp differently for different platforms
+if(WIN32)
+    find_package(jsoncpp CONFIG REQUIRED)
+    set(JSONCPP_LIBRARY JsonCpp::JsonCpp)
+    # Find the include directory for Windows if needed
+    get_filename_component(JSONCPP_INCLUDE_DIR "${JsonCpp_INCLUDE_DIRS}" DIRECTORY)
+    message(STATUS "Found jsoncpp for Windows: ${JSONCPP_LIBRARY}")
+elseif(APPLE)
     find_library(JSONCPP_LIBRARY
         NAMES jsoncpp
         PATHS /opt/homebrew/lib /usr/local/lib
@@ -71,18 +72,21 @@ if(APPLE)
     )
     set(JSONCPP_LIBRARIES ${JSONCPP_LIBRARY})
     set(JSONCPP_INCLUDE_DIRS ${JSONCPP_INCLUDE_DIR})
+    message(STATUS "Found jsoncpp for macOS: ${JSONCPP_LIBRARY}")
 else()
-    # Force finding jsoncpp only from system paths
-    find_path(JSONCPP_INCLUDE_DIR NAMES json/json.h PATHS /usr/include /usr/local/include NO_DEFAULT_PATH)
-    find_library(JSONCPP_LIBRARY NAMES jsoncpp PATHS /usr/lib /usr/local/lib NO_DEFAULT_PATH)
+    # For Linux and WSL, try multiple approaches
+    find_path(JSONCPP_INCLUDE_DIR NAMES json/json.h PATHS /usr/include /usr/local/include)
+    find_library(JSONCPP_LIBRARY NAMES jsoncpp PATHS /usr/lib /usr/local/lib)
+
     if(JSONCPP_INCLUDE_DIR AND JSONCPP_LIBRARY)
-        set(JSONCPP_FOUND TRUE)
-        message(STATUS "Found jsoncpp in system paths: ${JSONCPP_LIBRARY}")
+        message(STATUS "Found jsoncpp in standard paths: ${JSONCPP_LIBRARY}")
     else()
+        # If not found in standard paths, try pkg-config
         find_package(PkgConfig REQUIRED)
-        # Force pkg-config to look in standard Linux locations
-        set(ENV{PKG_CONFIG_PATH} "/usr/lib/pkgconfig:/usr/local/lib/pkgconfig")
         pkg_check_modules(JSONCPP REQUIRED jsoncpp)
+        set(JSONCPP_LIBRARY ${JSONCPP_LIBRARIES})
+        set(JSONCPP_INCLUDE_DIR ${JSONCPP_INCLUDE_DIRS})
+        message(STATUS "Found jsoncpp via pkg-config: ${JSONCPP_LIBRARIES}")
     endif()
 endif()
 
@@ -252,8 +256,6 @@ if(WIN32)
         # Add the shim implementation to the platform sources
         list(APPEND NEUTRON_PLATFORM_SOURCES_LIST src/platform/dlfcn_compat_win.cpp)
     endif()
-    find_package(jsoncpp CONFIG REQUIRED)
-    set( JSONCPP_LIBRARIES JsonCpp::JsonCpp)
 endif()
 
 # Add all component sources together (excluding main.cpp) - must be done after platform sources are determined
