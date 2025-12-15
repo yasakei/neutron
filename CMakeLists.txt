@@ -22,15 +22,7 @@ else()
     add_compile_options(-Wall -Wextra -O2)
 endif()
 
-# In WSL environments, exclude Windows paths to prevent including Windows headers
-if(UNIX AND NOT APPLE)
-    # Set CMAKE_FIND_ROOT_PATH to only include standard Linux paths
-    set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-    set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-    set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-    set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
-    set(CMAKE_FIND_ROOT_PATH "/usr;/usr/local" CACHE STRING "Root path for finding libraries" FORCE)
-endif()
+# Platform-specific compiler optimizations can be added here if needed
 
 # Include directories
 include_directories(
@@ -52,13 +44,14 @@ if(WIN32)
         message(STATUS "Found CURL for Windows: ${CURL_LIBRARY}")
     endif()
 else()
-    # On Unix-like systems (Linux/macOS/WSL), try specific system paths first
-    find_path(CURL_INCLUDE_DIR NAMES curl/curl.h PATHS /usr/include /usr/local/include)
-    find_library(CURL_LIBRARY NAMES curl PATHS /usr/lib /usr/local/lib)
+    # On Unix-like systems (Linux, macOS), find CURL using standard CMake methods
+    find_path(CURL_INCLUDE_DIR NAMES curl/curl.h)
+    find_library(CURL_LIBRARY NAMES curl)
+
     if(CURL_INCLUDE_DIR AND CURL_LIBRARY)
-        message(STATUS "Found CURL in system paths: ${CURL_LIBRARY}")
+        message(STATUS "Found CURL in standard paths: ${CURL_LIBRARY}")
     else()
-        # If not found in standard paths, use find_package which might work via pkg-config
+        # If not found with standard methods, use find_package
         find_package(CURL REQUIRED)
         if(CURL_FOUND)
             set(CURL_INCLUDE_DIR ${CURL_INCLUDE_DIRS})
@@ -98,14 +91,14 @@ elseif(APPLE)
     set(JSONCPP_INCLUDE_DIRS ${JSONCPP_INCLUDE_DIR})
     message(STATUS "Found jsoncpp for macOS: ${JSONCPP_LIBRARY}")
 else()
-    # For Linux and WSL, try multiple approaches
-    find_path(JSONCPP_INCLUDE_DIR NAMES json/json.h PATHS /usr/include /usr/local/include)
-    find_library(JSONCPP_LIBRARY NAMES jsoncpp PATHS /usr/lib /usr/local/lib)
+    # For Unix-like systems (Linux, macOS, WSL), find jsoncpp using standard CMake methods
+    find_path(JSONCPP_INCLUDE_DIR NAMES json/json.h)
+    find_library(JSONCPP_LIBRARY NAMES jsoncpp)
 
     if(JSONCPP_INCLUDE_DIR AND JSONCPP_LIBRARY)
         message(STATUS "Found jsoncpp in standard paths: ${JSONCPP_LIBRARY}")
     else()
-        # If not found in standard paths, try pkg-config
+        # If not found with standard methods, try pkg-config
         find_package(PkgConfig REQUIRED)
         pkg_check_modules(JSONCPP REQUIRED jsoncpp)
         set(JSONCPP_LIBRARY ${JSONCPP_LIBRARIES})
