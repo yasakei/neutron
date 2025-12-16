@@ -1,0 +1,5 @@
+let xs: array<int> = [10, 20, 30];
+print(len(xs));
+print(xs[0]);
+print(xs[2]);
+

@@ -1,0 +1,31 @@
+fn add(a: int, b: int) -> int { return a + b; }
+
+class Counter {
+    let value: int;
+    fn inc(self: Counter, d: int) -> int { self.value = self.value + d; return self.value; }
+}
+
+let s: string = "count:";
+let xs: array<int> = [1,2,3,4];
+print(s + " " + " " + "len=" + " " + "");  // demonstrates strings; no formatting yet
+print(len(xs));
+
+let c: Counter = new Counter;
+c.value = 0;
+print(c.value);
+c.inc(2);
+print(c.value);
+
+let sum: int = add(xs[0], xs[2]);
+print(sum);
+
+let i: int = 0;
+while i < 2 {
+    if i == 0 {
+        print(100);
+    } else {
+        print(200);
+    }
+    i = i + 1;
+}
+

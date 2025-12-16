@@ -1,0 +1,30 @@
+let a: int = 5 + 3;
+print(a);
+let b: int = 10 - 4;
+print(b);
+let c: int = 6 * 7;
+print(c);
+let d: int = 15 / 3;
+print(d);
+let e: int = 10 % 3;
+print(e);
+let s1: str = "hi";
+let s2: str = " there";
+print(s1 + s2);
+let x: int = 1;
+x++;
+print(x);
+let y: int = 2;
+y--;
+print(y);
+class Counter {
+    let v: int;
+    fn inc(self: Counter) -> int {
+        self.v = self.v + 1;
+        return 0;
+    }
+}
+let cnt: Counter = new Counter;
+cnt.v = 0;
+cnt.inc();
+print(cnt.v);

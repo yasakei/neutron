@@ -1,0 +1,13 @@
+let i: int = 0;
+while i < 5 {
+    i = i + 1;
+    if i == 3 {
+        retry;
+    }
+    print(i);
+}
+
+for let j: int = 0; j < 5; j++ {
+    if j == 2 { retry; }
+    print(j);
+}

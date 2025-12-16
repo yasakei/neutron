@@ -1,0 +1,18 @@
+let tp: string = "tmp.toml";
+let ts: string = "{}";
+let ts1: string = toml_set(ts, "title", "Axity");
+write_toml(tp, ts1);
+let tsr: string = read_toml(tp);
+print(toml_get(tsr, "title"));
+let ts2: string = toml_set(tsr, "title", "NewAxity");
+write_toml(tp, ts2);
+print(toml_get(ts2, "title"));
+
+let ep: string = "tmp.env";
+write_env(ep, "A=1");
+let es: string = read_env(ep);
+print(env_get(es, "A"));
+let es2: string = env_set(es, "B", "2");
+write_env(ep, es2);
+let es3: string = read_env(ep);
+print(env_get(es3, "B"));

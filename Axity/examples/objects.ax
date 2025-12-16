@@ -1,0 +1,16 @@
+let names: obj = {
+    "name": "George",
+    "name2": "John"
+};
+print(names.name);
+print(names.name2);
+
+let user: obj = {
+    "name": "Alice",
+    "meta": {
+        "age": 30,
+        "city": "NY"
+    }
+};
+print(user.name);
+print(user.meta.city);

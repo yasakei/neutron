@@ -1,0 +1,57 @@
+fn imod(a: int, b: int) -> int {
+    let r: int = a;
+    while r >= b {
+        r = r - b;
+    }
+    return r;
+}
+
+fn is_prime(n: int) -> bool {
+    if n < 2 {
+        return false;
+    }
+    if n == 2 {
+        return true;
+    }
+    if (n % 2) == 0 {
+        return false;
+    }
+    let i: int = 3;
+    while (i * i) <= n {
+        if (n % i) == 0 {
+            return false;
+        }
+        i = i + 2;
+    }
+    return true;
+}
+
+fn count_primes(limit: int) -> int {
+    let flags: array<int> = [0];
+    // initialize flags with zeros up to limit
+    for let i: int = 0; i < limit; i++ {
+        push(flags, 0);
+    }
+    pop(flags);
+    let p: int = 2;
+    while p < limit {
+        if flags[p] == 0 {
+            let m: int = p + p;
+            while m < limit {
+                set(flags, m, 1);
+                m = m + p;
+            }
+        }
+        p = p + 1;
+    }
+    let count: int = 0;
+    for let i: int = 2; i < limit; i++ {
+        if flags[i] == 0 {
+            count = count + 1;
+        }
+    }
+    return count;
+}
+
+let result_count: int = count_primes(1000);
+print("Found !{result_count} primes");

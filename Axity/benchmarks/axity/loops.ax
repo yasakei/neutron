@@ -1,0 +1,35 @@
+fn sum_with_for_loop(n: int) -> int {
+    let total: int = 0;
+    for let i: int = 0; i < n; i++ {
+        total = total + i;
+    }
+    return total;
+}
+
+fn sum_with_while_loop(n: int) -> int {
+    let total: int = 0;
+    let i: int = 0;
+    while i < n {
+        total = total + i;
+        i++;
+    }
+    return total;
+}
+
+fn nested_loops(depth: int, size: int) -> int {
+    let count: int = 0;
+    for let i: int = 0; i < depth; i++ {
+        for let j: int = 0; j < size; j++ {
+            for let k: int = 0; k < size; k++ {
+                count = count + 1;
+            }
+        }
+    }
+    return count;
+}
+
+let for_result: int = sum_with_for_loop(100000);
+let while_result: int = sum_with_while_loop(100000);
+let nested_result: int = nested_loops(10, 50);
+
+print("Loops: for=!{for_result} while=!{while_result} nested=!{nested_result}");

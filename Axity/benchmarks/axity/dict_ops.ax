@@ -1,0 +1,56 @@
+class Person {
+    let name: str;
+    let age: int;
+    let city: str;
+
+    fn init(self: Person, name: str, age: int, city: str) -> int {
+        self.name = name;
+        self.age = age;
+        self.city = city;
+        return 0;
+    }
+
+    fn get_info(self: Person) -> str {
+        return "!{self.name} is !{self.age} years old from !{self.city}";
+    }
+}
+
+let people: array<Person> = [new Person()];
+pop(people);
+for let i: int = 0; i < 1000; i++ {
+    let name: str = "Person!{i}";
+    let age: int = 20 + (i % 50);
+    let city: str = "City" + to_string(i % 10);
+    let p: Person = new Person();
+    p.init(name, age, city);
+    push(people, p);
+}
+print("Created 1000 person objects");
+
+let total_age: int = 0;
+for p in people {
+    total_age = total_age + p.age;
+}
+print("Total age: !{total_age}");
+
+let count_calls: int = 0;
+for let i: int = 0; i < 100; i++ {
+    let info: str = people[i].get_info();
+    count_calls = count_calls + 1;
+}
+print("Called getInfo() !{count_calls} times");
+
+for let i: int = 0; i < 500; i++ {
+    let current: Person = people[i];
+    current.age = current.age + 1;
+    set(people, i, current);
+}
+print("Modified 500 objects");
+
+let city_counts: int = 0;
+for p in people {
+    if p.city == "City0" {
+        city_counts = city_counts + 1;
+    }
+}
+print("People in City0: !{city_counts}");

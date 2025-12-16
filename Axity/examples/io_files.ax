@@ -1,0 +1,6 @@
+let path: string = "tmp_test.txt";
+write_file(path, "hello");
+print(exists(path));
+let c: string = read_file(path);
+print(strlen(c));
+

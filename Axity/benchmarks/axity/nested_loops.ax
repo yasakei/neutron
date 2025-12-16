@@ -1,0 +1,52 @@
+let total: int = 0;
+let iterations: int = 0;
+
+let i: int = 0;
+while i < 50 {
+    let j: int = 0;
+    while j < 50 {
+        let k: int = 0;
+        while k < 50 {
+            total = total + (i + j + k);
+            iterations = iterations + 1;
+            k++;
+        }
+        j++;
+    }
+    i++;
+}
+
+print("Triple nested loop completed");
+print("Iterations: !{iterations}");
+print("Total sum: !{total}");
+
+let count: int = 0;
+let x: int = 0;
+while x < 100 {
+    let y: int = 0;
+    while y < 100 {
+        if (x % 2) == 0 {
+            if (y % 3) == 0 {
+                count = count + 1;
+            }
+        }
+        y++;
+    }
+    x++;
+}
+print("Conditional nested loop count: !{count}");
+
+let found: int = 0;
+let a: int = 0;
+while a < 100 {
+    let b: int = 0;
+    while b < 100 {
+        if (a * b) == 2500 {
+            found = found + 1;
+            b = 101;
+        }
+        b++;
+    }
+    a++;
+}
+print("Found matches: !{found}");

@@ -1,0 +1,47 @@
+fn bubble_sort(arr: array<int>) -> array<int> {
+    let n: int = 0;
+    for _ in arr {
+        n = n + 1;
+    }
+    for let i: int = 0; i < (n - 1); i++ {
+        for let j: int = 0; j < (n - i - 1); j++ {
+            let a: int = arr[j];
+            let b: int = arr[j + 1];
+            if a > b {
+                set(arr, j, b);
+                set(arr, j + 1, a);
+            }
+        }
+    }
+    return arr;
+}
+
+let arr: array<int> = [
+    64,
+    34,
+    25,
+    12,
+    22,
+    11,
+    90,
+    88,
+    45,
+    50,
+    33,
+    77,
+    99,
+    18,
+    7
+];
+
+bubble_sort(arr);
+
+print("Sorting completed");
+print(
+    "First 5: "
+    + to_string(arr[0]) + ", "
+    + to_string(arr[1]) + ", "
+    + to_string(arr[2]) + ", "
+    + to_string(arr[3]) + ", "
+    + to_string(arr[4])
+);

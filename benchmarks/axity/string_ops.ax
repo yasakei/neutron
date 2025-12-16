@@ -1,0 +1,47 @@
+let text: str = "";
+let i: int = 0;
+while i < 1000 {
+    text = text + "x";
+    i++;
+}
+print("Built string of length: " + to_string(strlen(text)));
+
+let result: str = "";
+let j: int = 0;
+while j < 100 {
+    result = "Number " + to_string(j) + " squared is " + to_string(j * j);
+    j++;
+}
+print("String operations: " + result);
+
+let haystack: str = "The quick brown fox jumps over the lazy dog";
+let found_count: int = 0;
+let k: int = 0;
+while k < 100 {
+    if haystack == "The quick brown fox jumps over the lazy dog" {
+        found_count = found_count + 4;
+    }
+    k++;
+}
+print("String searches completed: " + to_string(found_count));
+
+let repeated: str = "";
+let m: int = 0;
+while m < 50 {
+    repeated = repeated + "abc";
+    m++;
+}
+print("Repeated string length: " + to_string(strlen(repeated)));
+
+let upper_count: int = 0;
+let lower_count: int = 0;
+let test_str: str = "ABCdef123XYZ";
+let n: int = 0;
+while n < 1000 {
+    if test_str == "ABCdef123XYZ" {
+        upper_count = upper_count + 3;
+        lower_count = lower_count + 3;
+    }
+    n++;
+}
+print("Case operations: upper=" + to_string(upper_count) + ", lower=" + to_string(lower_count));

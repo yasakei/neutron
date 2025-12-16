@@ -1,0 +1,14 @@
+class Box {
+    let v: int;
+}
+
+let arr: array<int> = [1, 2, 3];
+let m: map<int> = map_new_int();
+map_set(m, "x", 1);
+map_set(m, "y", 2);
+let b: Box = new Box;
+b.v = 99;
+print(arr);
+print(m);
+print(b);
+

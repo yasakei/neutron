@@ -1,0 +1,56 @@
+fn power(base: int, exp: int) -> int {
+    let result: int = 1;
+    for let i: int = 0; i < exp; i++ {
+        result = result * base;
+    }
+    return result;
+}
+
+fn sqrt_newton(n: flt) -> flt {
+    if n < 0 {
+        return 0;
+    }
+    if n == 0 {
+        return 0;
+    }
+    if n == 1 {
+        return 1;
+    }
+    let guess: flt = n / 2;
+    let epsilon: flt = 0.00001;
+    let iterations: int = 0;
+    while iterations < 100 {
+        let new_guess: flt = (guess + (n / guess)) / 2;
+        let diff: flt = guess - new_guess;
+        if diff < 0 {
+            diff = -diff;
+        }
+        if diff < epsilon {
+            return new_guess;
+        }
+        guess = new_guess;
+        iterations++;
+    }
+    return guess;
+}
+
+fn gcd(a_in: int, b_in: int) -> int {
+    let a: int = a_in;
+    let b: int = b_in;
+    while b != 0 {
+        let t: int = b;
+        b = a % b;
+        a = t;
+    }
+    return a;
+}
+
+let pow1: int = power(2, 20);
+let pow2: int = power(3, 15);
+let sq1: flt = sqrt_newton(144);
+let sq2: flt = sqrt_newton(2);
+let gcd1: int = gcd(48, 18);
+let gcd2: int = gcd(100, 75);
+
+print("Math operations completed");
+print("Results: !{pow1}, !{pow2}, !{gcd1}, !{gcd2}");

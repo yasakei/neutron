@@ -1,0 +1,8 @@
+let m: map<int> = map_new_int();
+map_set(m, "a", 10);
+map_set(m, "b", 20);
+print(map_get(m, "a"));
+print(map_has(m, "c"));
+let ks: array<string> = map_keys(m);
+print(ks);
+

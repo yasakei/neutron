@@ -1,0 +1,49 @@
+fn create_matrix(size: int) -> array<int> {
+    let matrix: array<int> = [0];
+    for let i: int = 0; i < size; i++ {
+        for let j: int = 0; j < size; j++ {
+            push(matrix, (i * size) + j + 1);
+        }
+    }
+    pop(matrix);
+    return matrix;
+}
+
+fn multiply_matrices(a: array<int>, b: array<int>, size: int) -> array<int> {
+    let result: array<int> = [0];
+    pop(result);
+    for let i: int = 0; i < size; i++ {
+        for let j: int = 0; j < size; j++ {
+            let sum: int = 0;
+            for let k: int = 0; k < size; k++ {
+                let aij: int = a[(i * size) + k];
+                let bjk: int = b[(k * size) + j];
+                sum = sum + (aij * bjk);
+            }
+            push(result, sum);
+        }
+    }
+    return result;
+}
+
+fn multiply_direct(size: int) -> array<int> {
+    let result: array<int> = [0];
+    pop(result);
+    for let i: int = 0; i < size; i++ {
+        for let j: int = 0; j < size; j++ {
+            let sum: int = 0;
+            for let k: int = 0; k < size; k++ {
+                let aij: int = (i * size) + k + 1;
+                let bjk: int = (k * size) + j + 1;
+                sum = sum + (aij * bjk);
+            }
+            push(result, sum);
+        }
+    }
+    return result;
+}
+
+let size: int = 20;
+let result: array<int> = multiply_direct(size);
+
+print("Matrix " + to_string(size) + "x" + to_string(size) + " = " + to_string(result[0]));

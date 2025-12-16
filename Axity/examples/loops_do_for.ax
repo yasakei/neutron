@@ -1,0 +1,14 @@
+let x: int = 0;
+do {
+    print(x);
+    x = x + 1;
+} while x < 3;
+
+for let i: int = 0; i < 3; i++ {
+    print(i);
+}
+
+let xs: array<int> = [1,2,3];
+for n in xs {
+    print(n);
+}

@@ -1,0 +1,94 @@
+let numbers: array<int> = [0];
+for let i: int = 1; i < 1000; i++ {
+    push(numbers, i);
+}
+print("Created array with 1000 elements");
+
+let sum_val: int = 0;
+for n in numbers {
+    sum_val = sum_val + n;
+}
+print("Sum of all numbers: !{sum_val}");
+
+let even_count: int = 0;
+for n in numbers {
+    if (n % 2) == 0 {
+        even_count = even_count + 1;
+    }
+}
+print("Filtered !{even_count} even numbers");
+
+let found: int = -1;
+for n in numbers {
+    if n == 500 {
+        found = n;
+    }
+}
+print("Found element: !{found}");
+
+fn bubble_sort(arr: array<int>) -> array<int> {
+    let n: int = 0;
+    for _ in arr {
+        n = n + 1;
+    }
+    for let i: int = 0; i < (n - 1); i++ {
+        for let j: int = 0; j < (n - i - 1); j++ {
+            let a: int = arr[j];
+            let b: int = arr[j + 1];
+            if a > b {
+                set(arr, j, b);
+                set(arr, j + 1, a);
+            }
+        }
+    }
+    return arr;
+}
+
+let unsorted: array<int> = [
+    64,
+    34,
+    25,
+    12,
+    22,
+    11,
+    90
+];
+let sorted_arr: array<int> = bubble_sort(unsorted);
+
+let sorted_str: str = "";
+let first: bool = true;
+for v in sorted_arr {
+    if first {
+        sorted_str = to_string(v);
+        first = false;
+    } else {
+        sorted_str = sorted_str + ", " + to_string(v);
+    }
+}
+print("Sorted array: " + sorted_str);
+
+fn reverse(arr: array<int>) -> array<int> {
+    let res: array<int> = [0];
+    pop(res);
+    let count: int = 0;
+    for _ in arr {
+        count = count + 1;
+    }
+    for let i: int = (count - 1); i >= 0; i-- {
+        push(res, arr[i]);
+    }
+    return res;
+}
+
+let reversed_arr: array<int> = reverse(sorted_arr);
+let reversed_str: str = "";
+let first_r: bool = true;
+for v in reversed_arr {
+    if first_r {
+        reversed_str = to_string(v);
+        first_r = false;
+    } else {
+        reversed_str = reversed_str + ", " + to_string(v);
+    }
+}
+print("Reversed array: " + reversed_str);

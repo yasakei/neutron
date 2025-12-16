@@ -1,0 +1,16 @@
+fn fibonacci(n: int) -> int {
+    if n <= 1 {
+        return n;
+    }
+    let a: int = 0;
+    let b: int = 1;
+    for let i: int = 2; i <= n; i++ {
+        let c: int = a + b;
+        a = b;
+        b = c;
+    }
+    return b;
+}
+
+let result: int = fibonacci(35);
+print(result);

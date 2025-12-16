@@ -1,0 +1,21 @@
+class Point {
+    let x: int;
+    let y: int;
+    fn move(self: Point, dx: int, dy: int) -> int {
+        self.x = self.x + dx;
+        self.y = self.y + dy;
+        return 0;
+    }
+    fn sum(self: Point) -> int {
+        return self.x + self.y;
+    }
+}
+
+let p: Point = new Point;
+p.x = 1;
+p.y = 2;
+print(p.sum());
+p.move(3, 4);
+print(p.x);
+print(p.y);
+

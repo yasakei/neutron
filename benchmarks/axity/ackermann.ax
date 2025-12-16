@@ -1,0 +1,36 @@
+fn factorial(n: int) -> int {
+    if n <= 1 {
+        return 1;
+    }
+    let acc: int = 1;
+    for let i: int = 2; i <= n; i++ {
+        acc = acc * i;
+    }
+    return acc;
+}
+
+fn power(base: int, exp: int) -> int {
+    let result: int = 1;
+    for let i: int = 0; i < exp; i++ {
+        result = result * base;
+    }
+    return result;
+}
+
+let r1: int = factorial(10);
+print("Factorial(10) = !{r1}");
+
+let r2: int = factorial(12);
+print("Factorial(12) = !{r2}");
+
+let r3: int = factorial(15);
+print("Factorial(15) = !{r3}");
+
+let p1: int = power(2, 10);
+print("Power(2, 10) = !{p1}");
+
+let p2: int = power(3, 8);
+print("Power(3, 8) = !{p2}");
+
+let p3: int = power(5, 7);
+print("Power(5, 7) = !{p3}");

@@ -1,0 +1,46 @@
+fn reverse_string(s: str) -> str {
+    let res: str = "";
+    let len: int = strlen(s);
+    for let i: int = (len - 1); i >= 0; i-- {
+        res = res + substr(s, i, 1);
+    }
+    return res;
+}
+
+fn count_occurrences(haystack: str, needle_char: str) -> int {
+    let count: int = 0;
+    let len: int = strlen(haystack);
+    for let i: int = 0; i < len; i++ {
+        let ch: str = substr(haystack, i, 1);
+        if ch == needle_char {
+            count = count + 1;
+        }
+    }
+    return count;
+}
+
+fn simple_concatenate(base: str, addition: str, times: int) -> str {
+    let result: str = base;
+    for let i: int = 0; i < times; i++ {
+        result = result + addition;
+    }
+    return result;
+}
+
+let long_string: str = "";
+for let i: int = 0; i < 100; i++ {
+    long_string = long_string + "Neutron programming language is fast and efficient. ";
+}
+
+let reversed_result: str = reverse_string(long_string);
+let char_count: int = count_occurrences(long_string, "a");
+let concatenated: str = simple_concatenate("", "Hello World from Python! ", 50);
+
+print(
+    "String ops: len="
+    + to_string(strlen(long_string))
+    + " rev="
+    + to_string(strlen(reversed_result))
+    + " count="
+    + to_string(char_count)
+);

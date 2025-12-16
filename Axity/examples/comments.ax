@@ -1,0 +1,10 @@
+// single-line comment
+let x: int = 1; // inline comment after code
+print(x);
+
+///
+this is a multi-line
+comment block
+///
+let y: int = 2;
+print(y);

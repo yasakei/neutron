@@ -1,0 +1,25 @@
+let x: int = 2;
+match x {
+  case 1: {
+    print("one");
+  }
+  case 2: {
+    print("two");
+  }
+  default: {
+    print("other");
+  }
+}
+
+let s: str = "hi";
+match s {
+  case "bye": {
+    print("bye");
+  }
+  case "hi": {
+    print("greet");
+  }
+  default: {
+    print("none");
+  }
+}

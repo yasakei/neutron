@@ -1,0 +1,11 @@
+let p: string = "tmp.json";
+let j: string = "{}";
+let j1: string = json_set(j, "name", "axity");
+let j2: string = json_set(j1, "count", "1");
+write_json(p, j2);
+let s: string = read_json(p);
+print(strlen(s));
+print(json_get(s, "name"));
+let s2: string = json_set(s, "name", "newname");
+write_json(p, s2);
+print(json_get(s2, "name"));

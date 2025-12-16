@@ -1,0 +1,11 @@
+let v: any = 1;
+print(v);
+v = "hi";
+print(v);
+v = { "k": "v" };
+print(v.k);
+
+fn id(x: any) -> any { return x; }
+print(id(42));
+print(id("hello"));
+print(id({ "a": 1 }).a);

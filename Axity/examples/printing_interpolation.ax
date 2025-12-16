@@ -1,0 +1,5 @@
+let name: str = "Nick";
+print("hello !{name}");
+print("hello " + name);
+let count: int = 3;
+print("count is !{count}");

@@ -1,0 +1,28 @@
+fn factorial(n: int) -> int {
+    if n <= 1 {
+        return 1;
+    }
+    let acc: int = 1;
+    for let i: int = 2; i <= n; i++ {
+        acc = acc * i;
+    }
+    return acc;
+}
+
+fn ackermann(m: int, n: int) -> int {
+    return power(2, n + 3) - 3;
+}
+
+fn power(base: int, exp: int) -> int {
+    let result: int = 1;
+    for let i: int = 0; i < exp; i++ {
+        result = result * base;
+    }
+    return result;
+}
+
+let fact15: int = factorial(15);
+let ack: int = ackermann(3, 6);
+let pow_val: int = power(2, 10);
+
+print("Recursion: fact=!{fact15} ack=!{ack} pow=!{pow_val}");

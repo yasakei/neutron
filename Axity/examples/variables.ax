@@ -1,0 +1,10 @@
+let a: int = 1;
+let b: int = 2;
+print(a);
+a = a + b;
+print(a);
+
+let s: string = "hello";
+s = s + " world";
+print(s);
+
