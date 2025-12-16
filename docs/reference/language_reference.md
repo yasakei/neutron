@@ -755,7 +755,20 @@ var home = sys.env("HOME");
 var args = sys.args();
 ```
 
-**Categories:** File system, environment variables, process control, command execution
+**Command Line Arguments:**
+**`sys.args()`** - Returns an array of command line arguments passed to the script
+
+```js
+use sys;
+
+var arguments = sys.args();
+say("Number of arguments: " + arguments.length);
+for (var i = 0; i < arguments.length; i = i + 1) {
+    say("Argument " + i + ": " + arguments[i]);
+}
+```
+
+**Functions:** File system, environment variables, process control, command execution, command line arguments
 
 > [!TIP]
 > See [Sys Module Documentation](../modules/sys_module.md) for complete API reference.
