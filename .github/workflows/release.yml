@@ -113,6 +113,11 @@ jobs:
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
 
+    - name: Install NSIS
+      run: |
+        choco install nsis -y
+        refreshenv
+
     - name: Install dependencies (vcpkg)
       run: |
         vcpkg install jsoncpp:x64-windows curl:x64-windows
