@@ -120,6 +120,18 @@ def build_box(os_type, arch_type, build_dir="nt-box/build"):
     
     cmake_cmd = ["cmake", "..", "-DCMAKE_BUILD_TYPE=Release"]
     
+    if os_type == "windows":
+        if "CMAKE_TOOLCHAIN_FILE" in os.environ:
+             cmake_cmd.append(f"-DCMAKE_TOOLCHAIN_FILE={os.environ['CMAKE_TOOLCHAIN_FILE']}")
+        if "VCPKG_TARGET_TRIPLET" in os.environ:
+             cmake_cmd.append(f"-DVCPKG_TARGET_TRIPLET={os.environ['VCPKG_TARGET_TRIPLET']}")
+    
+    if os_type == "windows":
+        if "CMAKE_TOOLCHAIN_FILE" in os.environ:
+             cmake_cmd.append(f"-DCMAKE_TOOLCHAIN_FILE={os.environ['CMAKE_TOOLCHAIN_FILE']}")
+        if "VCPKG_TARGET_TRIPLET" in os.environ:
+             cmake_cmd.append(f"-DVCPKG_TARGET_TRIPLET={os.environ['VCPKG_TARGET_TRIPLET']}")
+    
     # Configure
     if not run_command(cmake_cmd, cwd=build_dir):
         return False
@@ -144,7 +156,62 @@ def main():
     build_dir = os.path.join(root_dir, "build")
     box_build_dir = os.path.join(root_dir, "nt-box", "build")
     
-    # ... (binary finding logic remains same) ...
+    # Binaries check
+    neutron_exe = "neutron.exe" if os_type == "windows" else "neutron"
+    box_exe = "box.exe" if os_type == "windows" else "box"
+    
+    # On Windows with MSVC, binaries might be in Release/ subdirectory
+    neutron_bin_paths = [
+        os.path.join(build_dir, neutron_exe),
+        os.path.join(build_dir, "Release", neutron_exe),
+        os.path.join(build_dir, "Debug", neutron_exe)
+    ]
+    
+    box_bin_paths = [
+        os.path.join(box_build_dir, box_exe),
+        os.path.join(box_build_dir, "Release", box_exe),
+        os.path.join(box_build_dir, "Debug", box_exe)
+    ]
+    
+    # Check if we need to build
+    need_build = True
+    real_neutron_path = None
+    real_box_path = None
+
+    for p in neutron_bin_paths:
+        if os.path.exists(p):
+            real_neutron_path = p
+            break
+            
+    for p in box_bin_paths:
+        if os.path.exists(p):
+            real_box_path = p
+            break
+            
+    if real_neutron_path and real_box_path:
+        # Prompt logic could go here, but for now we auto-build if missing or just rebuild to be safe?
+        # The bash script checks if files strictly don't exist.
+        Colors.print("Binaries found, but rebuilding to ensure latest version...", Colors.YELLOW)
+        
+    build_neutron(os_type, arch_type, build_dir)
+    build_box(os_type, arch_type, box_build_dir)
+    
+    # Re-find binaries after build
+    real_neutron_path = None
+    real_box_path = None
+    
+    for p in neutron_bin_paths:
+        if os.path.exists(p):
+            real_neutron_path = p
+            break
+    for p in box_bin_paths:
+        if os.path.exists(p):
+            real_box_path = p
+            break
+            
+    if not real_neutron_path or not real_box_path:
+        Colors.print("Build seemed successful but could not locate binaries!", Colors.RED)
+        sys.exit(1)
 
     # Packaging
     if args.output:
