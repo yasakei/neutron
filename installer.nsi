@@ -35,6 +35,7 @@
 
   !insertmacro MUI_PAGE_WELCOME
   !insertmacro MUI_PAGE_LICENSE "LICENSE"
+  !insertmacro MUI_PAGE_COMPONENTS
   !insertmacro MUI_PAGE_DIRECTORY
   !insertmacro MUI_PAGE_INSTFILES
   !insertmacro MUI_PAGE_FINISH
@@ -72,10 +73,11 @@ Section "Neutron Core" SecNeutron
   File /nonfatal "README.md"
   
   ; Copy directories
-  File /r /nonfatal "docs"
-  File /r /nonfatal "include"
-  File /r /nonfatal "libs"
-  File /r /nonfatal "src"
+  File /nonfatal /r "docs"
+  File /nonfatal /r "include"
+  File /nonfatal /r "libs"
+  File /nonfatal /r "src"
+  File /nonfatal /r "lib"
 
   ;Store installation folder
   WriteRegStr HKCU "Software\Neutron" "" $INSTDIR
@@ -97,6 +99,78 @@ Section "Neutron Core" SecNeutron
 
 SectionEnd
 
+Section /o "C++ Build Tools (Required for native modules)" SecBuildTools
+  
+  DetailPrint "Downloading Microsoft C++ Build Tools installer..."
+  
+  ; Download Build Tools installer
+  NSISdl::download "https://aka.ms/vs/17/release/vs_BuildTools.exe" "$TEMP\vs_BuildTools.exe"
+  Pop $0
+  
+  ${If} $0 == "success"
+    DetailPrint "Download complete. Launching installer..."
+    
+    ; Launch installer with C++ workload pre-selected (silent install)
+    DetailPrint "Installing C++ Build Tools (this may take several minutes)..."
+    ExecWait '"$TEMP\vs_BuildTools.exe" --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --wait'
+    
+    ; Clean up
+    Delete "$TEMP\vs_BuildTools.exe"
+    
+    ; Create a helper batch script to setup MSVC environment
+    DetailPrint "Creating MSVC environment helper script..."
+    FileOpen $0 "$INSTDIR\setup-msvc-env.bat" w
+    FileWrite $0 "@echo off$\r$\n"
+    FileWrite $0 "REM Neutron MSVC Environment Setup$\r$\n"
+    FileWrite $0 "REM Run this script to add MSVC to your PATH for the current session$\r$\n"
+    FileWrite $0 "$\r$\n"
+    FileWrite $0 "echo Setting up MSVC environment...$\r$\n"
+    FileWrite $0 "$\r$\n"
+    FileWrite $0 "if exist $\"C:\Program Files\Microsoft Visual Studio\2026\BuildTools\VC\Auxiliary\Build\vcvars64.bat$\" ($\r$\n"
+    FileWrite $0 "  call $\"C:\Program Files\Microsoft Visual Studio\2026\BuildTools\VC\Auxiliary\Build\vcvars64.bat$\"$\r$\n"
+    FileWrite $0 ") else if exist $\"C:\Program Files\Microsoft Visual Studio\2026\Community\VC\Auxiliary\Build\vcvars64.bat$\" ($\r$\n"
+    FileWrite $0 "  call $\"C:\Program Files\Microsoft Visual Studio\2026\Community\VC\Auxiliary\Build\vcvars64.bat$\"$\r$\n"
+    FileWrite $0 ") else if exist $\"C:\Program Files\Microsoft Visual Studio\2025\BuildTools\VC\Auxiliary\Build\vcvars64.bat$\" ($\r$\n"
+    FileWrite $0 "  call $\"C:\Program Files\Microsoft Visual Studio\2025\BuildTools\VC\Auxiliary\Build\vcvars64.bat$\"$\r$\n"
+    FileWrite $0 ") else if exist $\"C:\Program Files\Microsoft Visual Studio\2025\Community\VC\Auxiliary\Build\vcvars64.bat$\" ($\r$\n"
+    FileWrite $0 "  call $\"C:\Program Files\Microsoft Visual Studio\2025\Community\VC\Auxiliary\Build\vcvars64.bat$\"$\r$\n"
+    FileWrite $0 ") else if exist $\"C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat$\" ($\r$\n"
+    FileWrite $0 "  call $\"C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat$\"$\r$\n"
+    FileWrite $0 ") else if exist $\"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat$\" ($\r$\n"
+    FileWrite $0 "  call $\"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat$\"$\r$\n"
+    FileWrite $0 ") else if exist $\"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat$\" ($\r$\n"
+    FileWrite $0 "  call $\"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat$\"$\r$\n"
+    FileWrite $0 ") else ($\r$\n"
+    FileWrite $0 "  echo Error: Could not find MSVC installation$\r$\n"
+    FileWrite $0 "  exit /b 1$\r$\n"
+    FileWrite $0 ")$\r$\n"
+    FileWrite $0 "$\r$\n"
+    FileWrite $0 "echo.$\r$\n"
+    FileWrite $0 "echo MSVC environment is now active for this terminal session.$\r$\n"
+    FileWrite $0 "echo You can now use 'cl', 'link', and other MSVC tools.$\r$\n"
+    FileWrite $0 "echo.$\r$\n"
+    FileWrite $0 "echo Note: box install will work automatically without running this script.$\r$\n"
+    FileClose $0
+    
+    DetailPrint "Build Tools installation complete."
+    Goto done
+      
+  ${Else}
+    DetailPrint "Failed to download Build Tools installer."
+  ${EndIf}
+  
+  done:
+
+SectionEnd
+
+;--------------------------------
+;Component Descriptions
+
+!insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecNeutron} "Neutron programming language runtime, compiler, and Box package manager. (Required)"
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecBuildTools} "Microsoft C++ Build Tools for compiling native modules. Required to use 'box install' for native extensions. (~1.2GB download)"
+!insertmacro MUI_FUNCTION_DESCRIPTION_END
+
 ;--------------------------------
 ;Uninstaller Section
 
@@ -109,6 +183,7 @@ Section "Uninstall"
   Delete "$INSTDIR\Uninstall.exe"
   Delete "$INSTDIR\neutron.exe"
   Delete "$INSTDIR\box.exe"
+  Delete "$INSTDIR\setup-msvc-env.bat"
   Delete "$INSTDIR\*.dll"
   Delete "$INSTDIR\*.a"
   Delete "$INSTDIR\*.lib"
@@ -119,6 +194,7 @@ Section "Uninstall"
   RMDir /r "$INSTDIR\include"
   RMDir /r "$INSTDIR\libs"
   RMDir /r "$INSTDIR\src"
+  RMDir /r "$INSTDIR\lib"
 
   RMDir "$INSTDIR"
 

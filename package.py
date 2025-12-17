@@ -23,10 +23,51 @@ class Colors:
         else:
              print(text)
 
-def run_command(command, cwd=None, fail_exit=True):
+def sanitize_path_for_msvc(os_type):
+    # On Windows, sanitize PATH to avoid MinGW/MSYS conflicts when using MSVC
+    if os_type == "windows":
+        Colors.print("Sanitizing PATH for MSVC compatibility...", Colors.YELLOW)
+        
+        # Determine where cmake is currently
+        cmake_path = shutil.which("cmake")
+        cmake_dir = os.path.dirname(cmake_path) if cmake_path else None
+        
+        new_path = []
+        for p in os.environ["PATH"].split(os.pathsep):
+            # Filter out MinGW/MSYS paths
+            lower_p = p.lower()
+            if "mingw" in lower_p or "msys" in lower_p:
+                # If cmake is in this directory, we might need to keep it, 
+                # OR we copy it/assume user has another cmake. 
+                # If we must use MSYS cmake, we keep it but warn.
+                if cmake_dir and os.path.normcase(p) == os.path.normcase(cmake_dir):
+                    Colors.print(f"Keeping CMake at {p}", Colors.BLUE)
+                    new_path.append(p)
+                    continue
+                continue
+            new_path.append(p)
+            
+        os.environ["PATH"] = os.pathsep.join(new_path)
+        
+        # Also clear INCLUDE and LIB env vars if they contain MinGW stuff
+        for var in ["INCLUDE", "LIB", "CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH"]:
+            if var in os.environ:
+                 # Just clear them or filter? Safest to clear if we suspect pollution
+                 # but if we are in VS Dev Prompt, INCLUDE has MSVC paths.
+                 parts = os.environ[var].split(os.pathsep)
+                 new_parts = [p for p in parts if "mingw" not in p.lower() and "msys" not in p.lower()]
+                 os.environ[var] = os.pathsep.join(new_parts)
+        
+    return True
+
+def run_command(command, cwd=None, fail_exit=True, env=None):
     try:
         Colors.print(f"Running: {' '.join(command)}", Colors.BLUE)
-        subprocess.check_call(command, cwd=cwd)
+        # Use sanitized env if not provided
+        if env is None:
+            env = os.environ.copy()
+            
+        subprocess.check_call(command, cwd=cwd, env=env)
         return True
     except subprocess.CalledProcessError:
         Colors.print(f"Command failed: {' '.join(command)}", Colors.RED)
@@ -69,38 +110,53 @@ def get_os_info():
     
     return os_type, arch_type
 
+    return os_type, arch_type
+
+def get_cmake_command():
+    # Check if cmake is in PATH
+    if shutil.which("cmake"):
+        return "cmake"
+    
+    # Check common locations
+    paths = [
+        r"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe",
+        r"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe",
+        r"C:\Program Files\Microsoft Visual Studio\2022\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe",
+        r"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+    ]
+    
+    for p in paths:
+        if os.path.exists(p):
+            return p
+            
+    return "cmake" # Fallback to hoping it's in PATH or will fail later
+
 def build_neutron(os_type, arch_type, build_dir="build"):
     Colors.print("Configuring and building Neutron...", Colors.BLUE)
     os.makedirs(build_dir, exist_ok=True)
     
-    cmake_cmd = ["cmake", "..", "-DCMAKE_BUILD_TYPE=Release"]
+    cmake_exe = get_cmake_command()
+    cmake_cmd = [cmake_exe, "..", "-DCMAKE_BUILD_TYPE=Release"]
     
     if os_type == "windows":
-        # Let CMake choose default generator (likely VS or Ninja)
-        # Check for vcpkg toolchain environment variable from CI
-        if "CMAKE_TOOLCHAIN_FILE" in os.environ:
-             cmake_cmd.append(f"-DCMAKE_TOOLCHAIN_FILE={os.environ['CMAKE_TOOLCHAIN_FILE']}")
-             
-        # Also respect VCPKG_TARGET_TRIPLET if set
-        if "VCPKG_TARGET_TRIPLET" in os.environ:
-             cmake_cmd.append(f"-DVCPKG_TARGET_TRIPLET={os.environ['VCPKG_TARGET_TRIPLET']}")
-             
-        pass 
+        # Use vcpkg preset
+        cmake_cmd = [cmake_exe, "--preset", "winmsvc"]
     elif os_type == "macos":
         if arch_type == "arm64":
             cmake_cmd.append("-DCMAKE_OSX_ARCHITECTURES=arm64")
         elif arch_type == "intel":
             cmake_cmd.append("-DCMAKE_OSX_ARCHITECTURES=x86_64")
-            
-        # Try to find jsoncpp (simplified logic compared to bash, assuming user environment is sane or vcpkg used)
-        # If user has specific paths, they should set env vars or CMAKE_PREFIX_PATH
     
     # Configure
-    if not run_command(cmake_cmd, cwd=build_dir):
+    run_cwd = build_dir
+    if os_type == "windows":
+        run_cwd = os.getcwd() # Run from root for presets
+        
+    if not run_command(cmake_cmd, cwd=run_cwd):
         return False
 
     # Build
-    build_cmd = ["cmake", "--build", ".", "--config", "Release"]
+    build_cmd = [cmake_exe, "--build", ".", "--config", "Release"]
     # Parallel build
     import multiprocessing
     try:
@@ -118,7 +174,8 @@ def build_box(os_type, arch_type, build_dir="nt-box/build"):
     Colors.print("Configuring and building Box package manager...", Colors.BLUE)
     os.makedirs(build_dir, exist_ok=True)
     
-    cmake_cmd = ["cmake", "..", "-DCMAKE_BUILD_TYPE=Release"]
+    cmake_exe = get_cmake_command()
+    cmake_cmd = [cmake_exe, "..", "-DCMAKE_BUILD_TYPE=Release"]
     
     if os_type == "windows":
         if "CMAKE_TOOLCHAIN_FILE" in os.environ:
@@ -126,14 +183,13 @@ def build_box(os_type, arch_type, build_dir="nt-box/build"):
         if "VCPKG_TARGET_TRIPLET" in os.environ:
              cmake_cmd.append(f"-DVCPKG_TARGET_TRIPLET={os.environ['VCPKG_TARGET_TRIPLET']}")
     
-
-    
     # Configure
     if not run_command(cmake_cmd, cwd=build_dir):
         return False
 
     # Build
-    build_cmd = ["cmake", "--build", ".", "--config", "Release"]
+    # Build
+    build_cmd = [cmake_exe, "--build", ".", "--config", "Release"]
     if not run_command(build_cmd, cwd=build_dir):
         return False
         
@@ -142,6 +198,7 @@ def build_box(os_type, arch_type, build_dir="nt-box/build"):
 def main():
     parser = argparse.ArgumentParser(description="Neutron Packaging Script")
     parser.add_argument("--output", help="Output directory name for the package", default=None)
+    parser.add_argument("--installer", help="Build NSIS installer (Windows only)", action="store_true")
     args = parser.parse_args()
 
     os_type, arch_type = get_os_info()
@@ -225,8 +282,37 @@ def main():
     shutil.copy2(real_neutron_path, target_name)
     shutil.copy2(real_box_path, target_name)
     
+    # Create lib directory and copy runtime library
+    lib_dir = os.path.join(target_name, "lib")
+    os.makedirs(lib_dir, exist_ok=True)
+    
     # Libraries stuff
     if os_type == "windows":
+        Colors.print(f"Copying libraries to {lib_dir}...", Colors.BLUE)
+        num_copied = 0
+        
+        # Copy runtime library to lib directory
+        # Check standard MSVC locations
+        search_paths = [
+            os.path.join(build_dir, "*.lib"),
+            os.path.join(build_dir, "neutron.lib"), # Import library for the executable
+            os.path.join(build_dir, "Release", "*.lib"),
+            os.path.join(build_dir, "Release", "neutron.lib"),
+            os.path.join(build_dir, "MinSizeRel", "*.lib"),
+            os.path.join(build_dir, "RelWithDebInfo", "*.lib"),
+            os.path.join(build_dir, "*.a") # Just in case
+        ]
+        
+        for p in search_paths:
+            for lib_file in glob.glob(p):
+                print(f"  Copying {lib_file}")
+                # Copy to root directory instead of lib/ so it's with the executable
+                shutil.copy2(lib_file, target_name)
+                num_copied += 1
+                
+        if num_copied == 0:
+             Colors.print("WARNING: No .lib or .a files found to copy!", Colors.YELLOW)
+
         # Copy DLLs from build dir if any
         # With MSVC dynamic linking, we might rely on system installed runtimes or vcpkg dlls
         # Search for .dll in build dir
@@ -236,8 +322,8 @@ def main():
              shutil.copy2(dll, target_name)
     else:
         # Unix
-        # Copy libneutron_runtime
-        lib_extensions = ["st", "so", "dylib", "dll", "a"]
+        # Copy libneutron_runtime to lib directory
+        lib_extensions = ["a", "so", "dylib"]
         for ext in lib_extensions:
             for f in glob.glob(os.path.join(build_dir, f"*.{ext}*")):
                 shutil.copy2(f, target_name)
@@ -280,12 +366,18 @@ def main():
     # Optional: NSIS Installer (keep if simple, or remove if considered "packaging")
     # User said "remove zipping support", but installer is useful. 
     # Let's keep NSIS check if on Windows but DO NOT ZIP.
-    if os_type == "windows" and shutil.which("makensis"):
+    if args.installer and os_type == "windows" and shutil.which("makensis"):
          Colors.print("Building Windows Installer...", Colors.BLUE)
          if os.path.exists("installer.nsi"):
              # Copy binaries and libs to root for NSIS to find
              shutil.copy2(real_neutron_path, root_dir)
              shutil.copy2(real_box_path, root_dir)
+             
+             # Copy DLLs (needed for vcpkg dynamic linking)
+             for dll in glob.glob(os.path.join(build_dir, "Release", "*.dll")):
+                 shutil.copy2(dll, root_dir)
+             for dll in glob.glob(os.path.join(build_dir, "*.dll")):
+                 shutil.copy2(dll, root_dir)
              
              # Copy runtime lib if it exists
              for lib_file in glob.glob(os.path.join(build_dir, "*.lib")):

@@ -30,29 +30,15 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/libs
 )
 
-# Find required packages
-# Find required packages
-find_package(CURL REQUIRED)
+# Dependencies
+include(FetchContent)
 
-if(APPLE)
-    find_library(JSONCPP_LIBRARY
-        NAMES jsoncpp
-        PATHS /opt/homebrew/lib /usr/local/lib
-    )
-    find_path(JSONCPP_INCLUDE_DIR
-        NAMES json/json.h
-        PATHS /opt/homebrew/include /usr/local/include
-    )
-    set(JSONCPP_LIBRARIES ${JSONCPP_LIBRARY})
-    set(JSONCPP_INCLUDE_DIRS ${JSONCPP_INCLUDE_DIR})
-elseif(UNIX)
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(JSONCPP REQUIRED jsoncpp)
-elseif(WIN32)
-    find_package(jsoncpp CONFIG REQUIRED)
-    set(JSONCPP_LIBRARIES JsonCpp::JsonCpp)
-    set(JSONCPP_INCLUDE_DIRS "") # Config package usually handles includes via target link
-endif()
+# JSONCPP
+find_package(jsoncpp CONFIG REQUIRED)
+set(JSONCPP_LIBRARIES JsonCpp::JsonCpp)
+
+# CURL
+find_package(CURL CONFIG REQUIRED)
 
 # Function to add a new module easily
 function(add_neutron_module MODULE_NAME)
@@ -245,14 +231,16 @@ add_library(neutron_runtime STATIC
 )
 
 target_link_libraries(neutron_runtime
-    CURL::libcurl
     ${JSONCPP_LIBRARIES}
     ${DLFCN_WIN}
 )
 
-target_include_directories(neutron_runtime PUBLIC
-    ${JSONCPP_INCLUDE_DIRS}
-)
+if(TARGET CURL::libcurl)
+    target_link_libraries(neutron_runtime CURL::libcurl)
+    target_compile_definitions(neutron_runtime PRIVATE HAVE_CURL)
+endif()
+
+
 
 # Set output names
 if(WIN32)
@@ -300,6 +288,13 @@ elseif(APPLE)
 elseif(WIN32)
     # Windows-specific settings
     target_compile_definitions(neutron_runtime PRIVATE _CRT_SECURE_NO_WARNINGS)
+    
+    # Export symbols for native modules
+    set_target_properties(neutron PROPERTIES ENABLE_EXPORTS ON)
+    target_compile_definitions(neutron PRIVATE BUILDING_NEUTRON)
+    # Also need to define it for runtime lib as the functions are there
+    target_compile_definitions(neutron_runtime PRIVATE BUILDING_NEUTRON)
+    
     # Link with Windows library for dynamic loading (LoadLibrary, GetProcAddress, etc.)
     # Also link with Ws2_32 for socket functions
     target_link_libraries(neutron_runtime kernel32 ws2_32)

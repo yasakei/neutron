@@ -3,6 +3,7 @@ build/
 bin/
 obj/
 out/
+box-modules/
 
 # Compiled binaries and libraries
 neutronc
