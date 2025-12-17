@@ -243,7 +243,7 @@ def main():
                 shutil.copy2(f, target_name)
     
     # Copy assets
-    for item in ["README.md", "LICENSE", "docs", "include", "src", "libs"]:
+    for item in ["README.md", "LICENSE", "docs", "include", "src", "libs", "scripts"]:
         src_path = os.path.join(root_dir, item)
         if os.path.exists(src_path):
             dst_path = os.path.join(target_name, item)
@@ -277,6 +277,16 @@ def main():
     if os_type == "windows" and shutil.which("makensis"):
          Colors.print("Building Windows Installer...", Colors.BLUE)
          if os.path.exists("installer.nsi"):
+             # Copy binaries and libs to root for NSIS to find
+             shutil.copy2(real_neutron_path, root_dir)
+             shutil.copy2(real_box_path, root_dir)
+             
+             # Copy runtime lib if it exists
+             for lib_file in glob.glob(os.path.join(build_dir, "*.lib")):
+                 shutil.copy2(lib_file, root_dir)
+             for lib_file in glob.glob(os.path.join(build_dir, "Release", "*.lib")):
+                 shutil.copy2(lib_file, root_dir)
+             
              subprocess.call(["makensis", f"/DVERSION={version}", "installer.nsi"])
              if os.path.exists("NeutronInstaller.exe"):
                  inst_name = f"neutron-{version}-installer.exe"

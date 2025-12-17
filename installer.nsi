@@ -56,8 +56,27 @@ Section "Neutron Core" SecNeutron
 
   SetOutPath "$INSTDIR"
   
-  ;ADD YOUR OWN FILES HERE...
-  File /r "neutron-windows-x64\*.*"
+  ; Copy main binaries
+  File "neutron.exe"
+  File "box.exe"
+  
+  ; Copy runtime library
+  File /nonfatal "neutron_runtime.lib"
+  File /nonfatal "libneutron_runtime.a"
+  
+  ; Copy any DLLs
+  File /nonfatal "*.dll"
+  
+  ; Copy documentation
+  File /nonfatal "LICENSE"
+  File /nonfatal "README.md"
+  
+  ; Copy directories
+  File /r /nonfatal "docs"
+  File /r /nonfatal "include"
+  File /r /nonfatal "libs"
+  File /r /nonfatal "src"
+  File /r /nonfatal "scripts"
 
   ;Store installation folder
   WriteRegStr HKCU "Software\Neutron" "" $INSTDIR

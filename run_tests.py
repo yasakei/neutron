@@ -17,10 +17,19 @@ class Colors:
 
     @staticmethod
     def print(text, color=NC, end='\n'):
-        if sys.stdout.isatty() and platform.system() != "Windows":
-             print(f"{color}{text}{Colors.NC}", end=end)
-        else:
-             print(text, end=end)
+        # Handle encoding issues on Windows
+        try:
+            if sys.stdout.isatty() and platform.system() != "Windows":
+                print(f"{color}{text}{Colors.NC}", end=end)
+            else:
+                print(text, end=end)
+        except UnicodeEncodeError:
+            # Fallback: encode with error handling
+            if sys.stdout.isatty() and platform.system() != "Windows":
+                safe_text = f"{color}{text}{Colors.NC}".encode(sys.stdout.encoding, errors='replace').decode(sys.stdout.encoding)
+            else:
+                safe_text = text.encode(sys.stdout.encoding, errors='replace').decode(sys.stdout.encoding)
+            print(safe_text, end=end)
 
 def main():
     root_dir = os.path.dirname(os.path.abspath(__file__))
@@ -62,10 +71,10 @@ def main():
     total_failed = 0
     failed_tests = []
     
-    padding = "╔" + "═" * 32 + "╗"
+    padding = "+" + "=" * 32 + "+"
     Colors.print(padding, Colors.CYAN)
-    Colors.print("║  Neutron Test Suite v2.0 (Py)  ║", Colors.CYAN)
-    Colors.print("╚" + "═" * 32 + "╝", Colors.CYAN)
+    Colors.print("|  Neutron Test Suite v2.0 (Py)  |", Colors.CYAN)
+    Colors.print("+" + "=" * 32 + "+", Colors.CYAN)
     print() # newline
 
     for test_dir in test_dirs:
@@ -99,13 +108,13 @@ def main():
                 
                 if result.returncode == 0:
                     print(f"  ", end="")
-                    Colors.print("✓", Colors.GREEN, end="")
+                    Colors.print("[PASS]", Colors.GREEN, end="")
                     print(f" {test_name}")
                     dir_passed += 1
                     total_passed += 1
                 else:
                     print(f"  ", end="")
-                    Colors.print("✗", Colors.RED, end="")
+                    Colors.print("[FAIL]", Colors.RED, end="")
                     print(f" {test_name}")
                     
                     # Print stderr/stdout indented
@@ -119,7 +128,7 @@ def main():
                     
             except Exception as e:
                 print(f"  ", end="")
-                Colors.print("✗", Colors.RED, end="")
+                Colors.print("[FAIL]", Colors.RED, end="")
                 print(f" {test_name} (Exception)")
                 print(f"    {str(e)}")
                 failed_tests.append(os.path.relpath(test_file, root_dir))
@@ -133,7 +142,7 @@ def main():
         print()
 
     # Final summary
-    Colors.print("════ FINAL SUMMARY ═══", Colors.CYAN)
+    Colors.print("==== FINAL SUMMARY ====", Colors.CYAN)
     print(f"Total: {total_passed + total_failed}")
     print("Passed: ", end="")
     Colors.print(f"{total_passed}", Colors.GREEN)
@@ -144,13 +153,13 @@ def main():
         print()
         Colors.print("Failed tests:", Colors.RED)
         for t in failed_tests:
-            Colors.print(f"  ✗ {t}", Colors.RED)
+            Colors.print(f"  - {t}", Colors.RED)
         sys.exit(1)
     else:
         print("Failed: ", end="")
         Colors.print("0", Colors.RED)
         print()
-        Colors.print("🎉 All tests passed! 🎉", Colors.GREEN)
+        Colors.print("*** All tests passed! ***", Colors.GREEN)
         sys.exit(0)
 
 if __name__ == "__main__":
