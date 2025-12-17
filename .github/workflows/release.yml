@@ -70,13 +70,10 @@ jobs:
           libjsoncpp-dev
           
     - name: Build and Package
-      run: python3 package.py
+      run: python3 package.py --output neutron-linux-x64
 
     - name: Create Release Archive
-      run: |
-        cd release
-        tar -czf ../neutron-${{ needs.create-release.outputs.version }}-linux-x64.tar.gz *
-        cd ..
+      run: tar -czf neutron-${{ needs.create-release.outputs.version }}-linux-x64.tar.gz neutron-linux-x64
         
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
@@ -110,13 +107,10 @@ jobs:
         sudo cmake --build build --target install
       
     - name: Build and Package
-      run: python3 package.py
-      
+      run: python3 package.py --output neutron-macos-universal
+        
     - name: Create Release Archive
-      run: |
-        cd release
-        tar -czf ../neutron-${{ needs.create-release.outputs.version }}-macos-universal.tar.gz *
-        cd ..
+      run: tar -czf neutron-${{ needs.create-release.outputs.version }}-macos-universal.tar.gz neutron-macos-universal
 
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
@@ -149,14 +143,14 @@ jobs:
         vcpkg integrate install
           
     - name: Build and Package
-      run: python package.py
+      run: python package.py --output neutron-windows-x64
       env:
         CMAKE_TOOLCHAIN_FILE: C:/vcpkg/scripts/buildsystems/vcpkg.cmake
         
     - name: Create Release Archive
       run: |
         $Version = "${{ needs.create-release.outputs.version }}"
-        Compress-Archive -Path release\* -DestinationPath "neutron-${Version}-windows-x64.zip"
+        Compress-Archive -Path neutron-windows-x64 -DestinationPath "neutron-${Version}-windows-x64.zip"
         
     - name: Upload Release Asset (Zip)
       uses: actions/upload-release-asset@v1
