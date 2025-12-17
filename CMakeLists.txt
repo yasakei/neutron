@@ -302,7 +302,7 @@ elseif(WIN32)
     target_compile_definitions(neutron_runtime PRIVATE _CRT_SECURE_NO_WARNINGS)
     # Link with Windows library for dynamic loading (LoadLibrary, GetProcAddress, etc.)
     # Also link with Ws2_32 for socket functions
-    target_link_libraries(neutron_runtime "-lkernel32" "-lws2_32")
+    target_link_libraries(neutron_runtime kernel32 ws2_32)
 endif()
 
 # Install targets
@@ -337,7 +337,7 @@ elseif(WIN32)
     # For MSVC Windows, just copy the executable and static library to project root
     add_custom_command(TARGET neutron POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neutron> ${CMAKE_SOURCE_DIR}/$<TARGET_FILE_NAME:neutron>
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/build/neutron_runtime.lib ${CMAKE_SOURCE_DIR}/neutron_runtime.lib
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neutron_runtime> ${CMAKE_SOURCE_DIR}/neutron_runtime.lib
         COMMENT "Copying binaries to project root"
     )
 endif()

@@ -164,12 +164,12 @@ jobs:
 
     # NOTE: package.py handles installer creation if NSIS is available
     - name: Upload Release Asset (Installer)
-      if: hashFiles('./release/*-installer.exe') != ''
+      if: hashFiles('*-installer.exe') != ''
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./release/neutron-windows-installer.exe
+        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-installer.exe
         asset_name: neutron-${{ needs.create-release.outputs.version }}-installer.exe
         asset_content_type: application/vnd.microsoft.portable-executable

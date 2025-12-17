@@ -126,11 +126,7 @@ def build_box(os_type, arch_type, build_dir="nt-box/build"):
         if "VCPKG_TARGET_TRIPLET" in os.environ:
              cmake_cmd.append(f"-DVCPKG_TARGET_TRIPLET={os.environ['VCPKG_TARGET_TRIPLET']}")
     
-    if os_type == "windows":
-        if "CMAKE_TOOLCHAIN_FILE" in os.environ:
-             cmake_cmd.append(f"-DCMAKE_TOOLCHAIN_FILE={os.environ['CMAKE_TOOLCHAIN_FILE']}")
-        if "VCPKG_TARGET_TRIPLET" in os.environ:
-             cmake_cmd.append(f"-DVCPKG_TARGET_TRIPLET={os.environ['VCPKG_TARGET_TRIPLET']}")
+
     
     # Configure
     if not run_command(cmake_cmd, cwd=build_dir):
