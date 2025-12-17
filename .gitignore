@@ -39,6 +39,7 @@ Thumbs.db
 desktop.ini
 
 # Temporary files
+.vs/
 *.tmp
 *.log
 *.bak
