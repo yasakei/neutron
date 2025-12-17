@@ -69,32 +69,14 @@ jobs:
           libcurl4-openssl-dev \
           libjsoncpp-dev
           
-    - name: Build Neutron
+    - name: Build and Package
+      run: python3 package.py
+
+    - name: Create Release Archive
       run: |
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-        cmake --build build -j$(nproc)
-        
-    - name: Build nt-box
-      run: |
-        cd nt-box
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-        cmake --build build
+        cd release
+        tar -czf ../neutron-${{ needs.create-release.outputs.version }}-linux-x64.tar.gz *
         cd ..
-        
-    - name: Package
-      run: |
-        mkdir -p neutron-linux-x64
-        cp neutron neutron-linux-x64/
-        cp libneutron_runtime.a neutron-linux-x64/ 2>/dev/null || true
-        cp libneutron_runtime.so* neutron-linux-x64/ 2>/dev/null || true
-        cp README.md LICENSE neutron-linux-x64/
-        cp -r docs neutron-linux-x64/
-        cp -r include neutron-linux-x64/
-        cp -r src neutron-linux-x64/
-        cp -r libs neutron-linux-x64/
-        cp scripts/install.sh neutron-linux-x64/
-        cp nt-box/build/box neutron-linux-x64/ 2>/dev/null || true
-        tar -czf neutron-${{ needs.create-release.outputs.version }}-linux-x64.tar.gz neutron-linux-x64
         
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
@@ -127,33 +109,15 @@ jobs:
         cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DBUILD_SHARED_LIBS=OFF -DJSONCPP_WITH_TESTS=OFF -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF
         sudo cmake --build build --target install
       
-    - name: Build Neutron Universal
+    - name: Build and Package
+      run: python3 package.py
+      
+    - name: Create Release Archive
       run: |
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
-        cmake --build build -j$(sysctl -n hw.ncpu)
-        
-    - name: Build nt-box Universal
-      run: |
-        cd nt-box
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
-        cmake --build build
+        cd release
+        tar -czf ../neutron-${{ needs.create-release.outputs.version }}-macos-universal.tar.gz *
         cd ..
-        
-    - name: Package
-      run: |
-        mkdir -p neutron-macos-universal
-        cp neutron neutron-macos-universal/
-        cp libneutron_runtime.a neutron-macos-universal/ 2>/dev/null || true
-        cp libneutron_runtime.dylib* neutron-macos-universal/ 2>/dev/null || true
-        cp README.md LICENSE neutron-macos-universal/
-        cp -r docs neutron-macos-universal/
-        cp -r include neutron-macos-universal/
-        cp -r src neutron-macos-universal/
-        cp -r libs neutron-macos-universal/
-        cp scripts/install.sh neutron-macos-universal/
-        cp nt-box/build/box neutron-macos-universal/ 2>/dev/null || true
-        tar -czf neutron-${{ needs.create-release.outputs.version }}-macos-universal.tar.gz neutron-macos-universal
-        
+
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
       env:
@@ -165,14 +129,10 @@ jobs:
         asset_content_type: application/gzip
 
 
-
   build-windows:
     name: Build Windows x64 Release
     needs: create-release
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: msys2 {0}
     
     steps:
     - name: Checkout code
@@ -180,56 +140,23 @@ jobs:
       with:
         submodules: recursive
       
-    - name: Setup MSYS2
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: MINGW64
-        update: true
-        install: >-
-          mingw-w64-x86_64-gcc
-          mingw-w64-x86_64-cmake
-          mingw-w64-x86_64-curl
-          mingw-w64-x86_64-jsoncpp
-          mingw-w64-x86_64-nsis
-          make
-          zip
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install dependencies (vcpkg)
+      run: |
+        vcpkg install jsoncpp:x64-windows curl:x64-windows
+        vcpkg integrate install
           
-    - name: Build Neutron
+    - name: Build and Package
+      run: python package.py
+      env:
+        CMAKE_TOOLCHAIN_FILE: C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+        
+    - name: Create Release Archive
       run: |
-        cmake -B build -S . -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release
-        cmake --build build -j$(nproc)
-        
-    - name: Build nt-box
-      run: |
-        cd nt-box
-        cmake -B build -S . -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release
-        cmake --build build
-        cd ..
-        
-    - name: Package
-      run: |
-        mkdir -p neutron-windows-x64
-        cp build/neutron.exe neutron-windows-x64/
-        cp neutron_runtime.lib neutron-windows-x64/ 2>/dev/null || true
-        cp libneutron_runtime.a neutron-windows-x64/ 2>/dev/null || true
-        cp build/*.dll neutron-windows-x64/ 2>/dev/null || true
-        # Copy ALL runtime dependencies
-        cp /mingw64/bin/*.dll neutron-windows-x64/ 2>/dev/null || true
-        cp README.md LICENSE neutron-windows-x64/
-        cp -r docs neutron-windows-x64/
-        cp -r include neutron-windows-x64/
-        cp -r src neutron-windows-x64/
-        cp -r libs neutron-windows-x64/
-        cp scripts/install.sh neutron-windows-x64/
-        cp nt-box/build/box.exe neutron-windows-x64/ 2>/dev/null || true
-        
-        # Create Installer
-        makensis -DVERSION="${{ needs.create-release.outputs.version }}" installer.nsi
-        mv NeutronInstaller.exe neutron-${{ needs.create-release.outputs.version }}-installer.exe
-        
-        cd neutron-windows-x64
-        zip -r ../neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip .
-        cd ..
+        $Version = "${{ needs.create-release.outputs.version }}"
+        Compress-Archive -Path release\* -DestinationPath "neutron-${Version}-windows-x64.zip"
         
     - name: Upload Release Asset (Zip)
       uses: actions/upload-release-asset@v1
@@ -241,15 +168,14 @@ jobs:
         asset_name: neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip
         asset_content_type: application/zip
 
+    # NOTE: package.py handles installer creation if NSIS is available
     - name: Upload Release Asset (Installer)
+      if: hashFiles('./release/*-installer.exe') != ''
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-installer.exe
+        asset_path: ./release/neutron-windows-installer.exe
         asset_name: neutron-${{ needs.create-release.outputs.version }}-installer.exe
         asset_content_type: application/vnd.microsoft.portable-executable
-
-  # NOTE: Windows ARM64 build is complex to cross-compile from x64 runner
-  # We'll focus on native Windows x64, and Linux multi-arch builds below

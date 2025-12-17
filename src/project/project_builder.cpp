@@ -410,7 +410,7 @@ bool ProjectBuilder::buildProjectExecutable(
     
     if (isWindows && !isMingw) {
         compiler = "cl";
-        linkFlags = "/link /LIBPATH:\"" + executableDir + "\" CURL::libcurl.lib JsonCpp::JsonCpp.lib";
+        linkFlags = "/link /LIBPATH:\"" + executableDir + "\" libcurl.lib jsoncpp.lib";
     } else if (isWindows && isMingw) {
         compiler = "g++";
         linkFlags = "-lcurl -ljsoncpp -lws2_32";

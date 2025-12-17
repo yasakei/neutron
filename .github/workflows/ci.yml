@@ -28,41 +28,28 @@ jobs:
           libcurl4-openssl-dev \
           libjsoncpp-dev
           
-    - name: Configure CMake
-      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-      
-    - name: Build
-      run: cmake --build build -j$(nproc)
+    - name: Build and Package
+      run: python3 package.py
       
     - name: Verify binary
       run: |
-        ls -lh neutron
-        ./neutron --version
+        ls -lh build/neutron
+        ./build/neutron --version
         
     - name: Run tests
-      run: ./run_tests.sh
+      run: python3 run_tests.py
       
-    - name: Build nt-box
+    - name: Create Archive
       run: |
-        cd nt-box
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-        cmake --build build
+        cd release
+        tar -czf ../neutron-linux-x64.tar.gz *
         cd ..
       
-    - name: Package artifacts
-      run: |
-        mkdir -p release
-        cp neutron release/
-        cp libneutron_runtime.so* release/ 2>/dev/null || true
-        cp README.md LICENSE release/
-        cp -r docs release/
-        cp nt-box/build/box release/ 2>/dev/null || true
-        
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: neutron-linux-x64
-        path: release/
+        path: neutron-linux-x64.tar.gz
         retention-days: 7
 
   build-macos-universal:
@@ -84,119 +71,77 @@ jobs:
         cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DBUILD_SHARED_LIBS=OFF -DJSONCPP_WITH_TESTS=OFF -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF
         sudo cmake --build build --target install
         
-    - name: Configure CMake
-      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
-      
-    - name: Build
-      run: cmake --build build -j$(sysctl -n hw.ncpu)
+    - name: Build and Package
+      run: python3 package.py
       
     - name: Verify binary
       run: |
-        ls -lh neutron
-        file neutron
-        ./neutron --version
+        ls -lh build/neutron
+        file build/neutron
+        ./build/neutron --version
         
     - name: Run tests
-      run: ./run_tests.sh
-      
-    - name: Build nt-box
+      run: python3 run_tests.py
+
+    - name: Create Archive
       run: |
-        cd nt-box
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
-        cmake --build build
+        cd release
+        tar -czf ../neutron-macos-universal.tar.gz *
         cd ..
       
-    - name: Package artifacts
-      run: |
-        mkdir -p release
-        cp neutron release/
-        cp libneutron_runtime.dylib* release/ 2>/dev/null || true
-        cp README.md LICENSE release/
-        cp -r docs release/
-        cp nt-box/build/box release/ 2>/dev/null || true
-        
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: neutron-macos-universal
-        path: release/
+        path: neutron-macos-universal.tar.gz
         retention-days: 7
 
-
-
-  build-windows-msys2:
-    name: Build on Windows (MSYS2)
+  build-windows-msvc:
+    name: Build on Windows (MSVC)
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: msys2 {0}
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         submodules: recursive
-      
-    - name: Setup MSYS2
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: MINGW64
-        update: true
-        install: >-
-          mingw-w64-x86_64-gcc
-          mingw-w64-x86_64-cmake
-          mingw-w64-x86_64-curl
-          mingw-w64-x86_64-jsoncpp
-          make
-          
-    - name: Configure CMake
-      run: cmake -B build -S . -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release
-      
-    - name: Build
-      run: cmake --build build -j$(nproc)
-      
-    - name: Copy binaries to root for testing
-      run: |
-        cp build/neutron.exe ./
-        cp build/*.dll ./ 2>/dev/null || true
         
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install dependencies (vcpkg)
+      run: |
+        vcpkg install jsoncpp:x64-windows curl:x64-windows
+        vcpkg integrate install
+      
+    - name: Build and Package
+      run: python package.py
+      env:
+        CMAKE_TOOLCHAIN_FILE: C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+      
     - name: Verify binary
       run: |
-        ls -lh neutron.exe
-        ./neutron.exe --version
+        dir build\Release\neutron.exe
+        .\build\Release\neutron.exe --version
         
     - name: Run tests
-      run: bash run_tests.sh
-      
-    - name: Build nt-box
+      run: python run_tests.py
+        
+    - name: Create Archive
       run: |
-        cd nt-box
-        cmake -B build -S . -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release
-        cmake --build build
-        cd ..
-      
-    - name: Package artifacts
-      run: |
-        mkdir -p release
-        cp build/neutron.exe release/
-        cp build/*.dll release/ 2>/dev/null || true
-        # Copy ALL runtime dependencies
-        cp /mingw64/bin/*.dll release/ 2>/dev/null || true
-        cp README.md LICENSE release/
-        cp -r docs release/
-        cp nt-box/build/box.exe release/ 2>/dev/null || true
+        Compress-Archive -Path release\* -DestinationPath neutron-windows-x64.zip
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: neutron-windows-x64
-        path: release/
+        path: neutron-windows-x64.zip
         retention-days: 7
 
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [build-linux, build-macos-universal, build-windows-msys2]
+    needs: [build-linux, build-macos-universal, build-windows-msvc]
     if: always()
     
     steps:
@@ -205,11 +150,11 @@ jobs:
         echo "Build Summary:"
         echo "Linux: ${{ needs.build-linux.result }}"
         echo "macOS Universal: ${{ needs.build-macos-universal.result }}"
-        echo "Windows: ${{ needs.build-windows-msys2.result }}"
+        echo "Windows: ${{ needs.build-windows-msvc.result }}"
         
     - name: Fail if any build failed
       if: |
         needs.build-linux.result != 'success' || 
         needs.build-macos-universal.result != 'success' || 
-        needs.build-windows-msys2.result != 'success'
+        needs.build-windows-msvc.result != 'success'
       run: exit 1

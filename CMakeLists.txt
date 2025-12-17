@@ -9,6 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Platform detection
 if(WIN32)
     add_definitions(-DNEUTRON_WINDOWS)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS) # Common MSVC warning suppression
 elseif(APPLE)
     add_definitions(-DNEUTRON_MACOS)
 elseif(UNIX)
@@ -17,7 +18,7 @@ endif()
 
 # Compiler options
 if(MSVC)
-    add_compile_options(/W4 /utf-8)
+    add_compile_options(/W4 /utf-8 /EHsc)
 else()
     add_compile_options(-Wall -Wextra -O2)
 endif()
@@ -30,9 +31,8 @@ include_directories(
 )
 
 # Find required packages
+# Find required packages
 find_package(CURL REQUIRED)
-# find_package(PkgConfig REQUIRED)
-# pkg_check_modules(JSONCPP REQUIRED jsoncpp)
 
 if(APPLE)
     find_library(JSONCPP_LIBRARY
@@ -45,9 +45,13 @@ if(APPLE)
     )
     set(JSONCPP_LIBRARIES ${JSONCPP_LIBRARY})
     set(JSONCPP_INCLUDE_DIRS ${JSONCPP_INCLUDE_DIR})
-else()
+elseif(UNIX)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(JSONCPP REQUIRED jsoncpp)
+elseif(WIN32)
+    find_package(jsoncpp CONFIG REQUIRED)
+    set(JSONCPP_LIBRARIES JsonCpp::JsonCpp)
+    set(JSONCPP_INCLUDE_DIRS "") # Config package usually handles includes via target link
 endif()
 
 # Function to add a new module easily
@@ -216,8 +220,7 @@ if(WIN32)
         # Add the shim implementation to the platform sources
         list(APPEND NEUTRON_PLATFORM_SOURCES_LIST src/platform/dlfcn_compat_win.cpp)
     endif()
-    find_package(jsoncpp CONFIG REQUIRED)
-    set( JSONCPP_LIBRARIES JsonCpp::JsonCpp)
+    # jsoncpp is already found above
 endif()
 
 # Add all component sources together (excluding main.cpp) - must be done after platform sources are determined
@@ -252,10 +255,16 @@ target_include_directories(neutron_runtime PUBLIC
 )
 
 # Set output names
-set_target_properties(neutron_runtime PROPERTIES
-    OUTPUT_NAME neutron_runtime
-    PREFIX "lib"
-)
+if(WIN32)
+    set_target_properties(neutron_runtime PROPERTIES
+        OUTPUT_NAME neutron_runtime
+    )
+else()
+    set_target_properties(neutron_runtime PROPERTIES
+        OUTPUT_NAME neutron_runtime
+        PREFIX "lib"
+    )
+endif()
 
 # Create executable
 add_executable(neutron src/core/main.cpp)
