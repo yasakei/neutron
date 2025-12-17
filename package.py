@@ -243,7 +243,13 @@ def main():
                 shutil.copy2(f, target_name)
     
     # Copy assets
-    for item in ["README.md", "LICENSE", "docs", "include", "src", "libs", "scripts"]:
+    items_to_copy = ["README.md", "LICENSE", "docs", "include", "src", "libs"]
+    
+    # Only include scripts on Unix systems (contains shell scripts)
+    if os_type != "windows":
+        items_to_copy.append("scripts")
+    
+    for item in items_to_copy:
         src_path = os.path.join(root_dir, item)
         if os.path.exists(src_path):
             dst_path = os.path.join(target_name, item)

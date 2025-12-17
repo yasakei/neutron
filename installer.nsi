@@ -76,7 +76,6 @@ Section "Neutron Core" SecNeutron
   File /r /nonfatal "include"
   File /r /nonfatal "libs"
   File /r /nonfatal "src"
-  File /r /nonfatal "scripts"
 
   ;Store installation folder
   WriteRegStr HKCU "Software\Neutron" "" $INSTDIR
@@ -120,7 +119,6 @@ Section "Uninstall"
   RMDir /r "$INSTDIR\include"
   RMDir /r "$INSTDIR\libs"
   RMDir /r "$INSTDIR\src"
-  RMDir /r "$INSTDIR\scripts"
 
   RMDir "$INSTDIR"
 
