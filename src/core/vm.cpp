@@ -2213,7 +2213,7 @@ void VM::load_module(const std::string& name) {
             runtimeError(this, full_error, frames.empty() ? -1 : frames.back().currentLine);
         }
         
-        init_func(this);
+        init_func(reinterpret_cast<NeutronVM*>(this));
         
         // Copy the defined values from globals to the module environment
         for (const auto& pair : globals) {
