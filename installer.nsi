@@ -77,6 +77,14 @@ Section "Neutron Core" SecNeutron
   File /nonfatal "include\core\vm.h"
   File /nonfatal "include\core\checkpoint.h"
   
+  ; Install native shim (required for building native modules)
+  SetOutPath "$INSTDIR\nt-box\src"
+  File "nt-box\src\native_shim.cpp"
+  
+  ; Install platform header (required by native_shim.cpp)
+  SetOutPath "$INSTDIR\nt-box\include"
+  File /nonfatal "nt-box\include\platform.h"
+  
   ; Install import library (required for linking native modules)
   SetOutPath "$INSTDIR\lib"
   File /nonfatal "neutron_runtime.lib"

@@ -199,11 +199,14 @@ Neutron supports creating native C++ modules that extend the language with custo
 
 ### Using Box Package Manager
 
-Box is Neutron's official package manager for managing native modules:
+Box is Neutron's official package manager for native modules. Modules are available in the [Neutron Universal Registry (NUR)](https://github.com/neutron-modules/nur):
 
 ```sh
-# Install a module from NUR
+# Install a module from NUR (downloads and builds automatically)
 box install base64
+
+# Or build from local source files
+box build native base64
 
 # Use in your code
 use base64;
@@ -216,48 +219,66 @@ To create your own native C++ module:
 
 1. **Set up module structure:**
    ```sh
-   mkdir my-module
-   cd my-module
+   mkdir mymodule
+   cd mymodule
    ```
 
-2. **Create module.json:**
-   ```json
-   {
-     "name": "mymodule",
-     "version": "1.0.0",
-     "description": "My custom module",
-     "entry": "mymodule.cpp"
-   }
-   ```
-
-3. **Write C++ code using Neutron C API:**
+2. **Create native.cpp:**
    ```cpp
-   #include <neutron/capi.h>
+   // Tell the header we're building Neutron to avoid dllimport
+   #define BUILDING_NEUTRON
+   #include <neutron.h>
+   #undef BUILDING_NEUTRON
    
-   extern "C" {
-   void hello(NeutronVM* vm, int argc, NeutronValue* args) {
-       neutron_return(vm, neutron_new_string(vm, "Hello!"));
+   #include <string>
+   
+   // Native function example
+   NeutronValue* hello(NeutronVM* vm, int argCount, NeutronValue** args) {
+       return neutron_new_string(vm, "Hello from my module!", 21);
    }
    
-   void neutron_module_init(NeutronVM* vm) {
-       neutron_define_native(vm, "hello", hello);
+   // Module initialization - this is the entry point
+   extern "C" __declspec(dllexport) void neutron_module_init(NeutronVM* vm) {
+       neutron_define_native(vm, "hello", hello, 0);
    }
-   }
+   ```
+
+3. **Create module definition file (Windows only) - mymodule.def:**
+   ```
+   EXPORTS
+   neutron_module_init
    ```
 
 4. **Build the module:**
    ```sh
-   box build
+   box build native mymodule
    ```
 
-### Comprehensive Documentation
+### Neutron C API
 
-For complete module development documentation, see the Box documentation:
+The Neutron C API provides functions for creating native modules:
 
-- **[Module Development Guide](../nt-box/docs/MODULE_DEVELOPMENT.md)** - Complete C API reference and examples
-- **[Box Commands](../nt-box/docs/COMMANDS.md)** - All Box commands
-- **[Cross-Platform Guide](../nt-box/docs/CROSS_PLATFORM.md)** - Building on Linux, macOS, Windows
-- **[MINGW64 Support](../nt-box/docs/MINGW64_SUPPORT.md)** - Windows GCC toolchain
+**Type Checking:**
+- `bool neutron_is_nil(NeutronValue* value)`
+- `bool neutron_is_boolean(NeutronValue* value)`
+- `bool neutron_is_number(NeutronValue* value)`
+- `bool neutron_is_string(NeutronValue* value)`
+
+**Value Getters:**
+- `bool neutron_get_boolean(NeutronValue* value)`
+- `double neutron_get_number(NeutronValue* value)`
+- `const char* neutron_get_string(NeutronValue* value, size_t* length)`
+
+**Value Creators:**
+- `NeutronValue* neutron_new_nil()`
+- `NeutronValue* neutron_new_boolean(bool value)`
+- `NeutronValue* neutron_new_number(double value)`
+- `NeutronValue* neutron_new_string(NeutronVM* vm, const char* chars, size_t length)`
+
+**Function Registration:**
+- `void neutron_define_native(NeutronVM* vm, const char* name, NeutronNativeFn function, int arity)`
+
+See `include/core/neutron.h` for the complete API reference.
 
 ### Module Installation
 

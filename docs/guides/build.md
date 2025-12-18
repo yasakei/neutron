@@ -1,9 +1,10 @@
 # Building Neutron from Source
 
-This guide provides comprehensive instructions for building Neutron on all supported platforms.
+This guide provides comprehensive instructions for building Neutron and the Box package manager on all supported platforms.
 
 ## Table of Contents
 - [Prerequisites](#prerequisites)
+- [Quick Build](#quick-build)
 - [Linux](#linux)
 - [macOS](#macos)
 - [Windows](#windows)
@@ -14,6 +15,7 @@ This guide provides comprehensive instructions for building Neutron on all suppo
 
 ### Required Software
 
+- **Python 3.6+** - For the build and packaging script
 - **CMake** 3.15 or higher
 - **C++17 compiler**:
   - GCC 7.0+
@@ -25,6 +27,29 @@ This guide provides comprehensive instructions for building Neutron on all suppo
 
 - **libcurl** - HTTP client functionality
 - **jsoncpp** - JSON parsing and generation
+
+---
+
+## Quick Build
+
+The easiest way to build Neutron is using the Python packaging script:
+
+```bash
+# Linux
+python3 package.py --output neutron-linux-x64
+
+# macOS
+python3 package.py --output neutron-macos-universal
+
+# Windows
+python package.py --output neutron-windows-x64
+```
+
+This will:
+1. Build the Neutron runtime
+2. Build the Box package manager
+3. Package everything into a distributable directory
+4. Copy all required DLLs and dependencies
 
 ---
 
@@ -46,15 +71,23 @@ sudo apt-get install -y \
 git clone https://github.com/yasakei/neutron.git
 cd neutron
 
-# Build
-cmake -B build -S .
+# Build using package script (recommended)
+python3 package.py --output neutron-linux-x64
+
+# Or build manually
+cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 
+# Build Box package manager
+cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
+cmake --build nt-box/build -j$(nproc)
+
 # Verify build
-./neutron --version
+./build/neutron --version
+./nt-box/build/box --version
 
 # Run tests
-./run_tests.sh
+python3 run_tests.py
 ```
 
 ### Fedora / RHEL / CentOS
@@ -66,7 +99,8 @@ sudo dnf install -y \
     cmake \
     pkgconfig \
     libcurl-devel \
-    jsoncpp-devel
+    jsoncpp-devel \
+    python3
 
 # RHEL/CentOS (enable EPEL first)
 sudo yum install -y epel-release
@@ -75,14 +109,15 @@ sudo yum install -y \
     cmake3 \
     pkgconfig \
     libcurl-devel \
-    jsoncpp-devel
+    jsoncpp-devel \
+    python3
 
-# Build
-cmake -B build -S .
-cmake --build build -j$(nproc)
+# Build using package script
+python3 package.py --output neutron-linux-x64
 
 # Verify
-./neutron --version
+./neutron-linux-x64/neutron --version
+./neutron-linux-x64/box --version
 ```
 
 ### Arch Linux
@@ -132,21 +167,21 @@ cmake --build build -j$(nproc)
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 # Install dependencies
-brew install cmake curl jsoncpp
+brew install cmake curl jsoncpp python3
 
 # Clone repository
 git clone https://github.com/yasakei/neutron.git
 cd neutron
 
-# Build
-cmake -B build -S .
-cmake --build build -j$(sysctl -n hw.ncpu)
+# Build using package script (recommended)
+python3 package.py --output neutron-macos-universal
 
 # Verify
-./neutron --version
+./neutron-macos-universal/neutron --version
+./neutron-macos-universal/box --version
 
 # Run tests
-./run_tests.sh
+python3 run_tests.py
 ```
 
 ### Apple Silicon (M1/M2/M3)
@@ -216,19 +251,23 @@ pacman -S --needed \
 git clone https://github.com/yasakei/neutron.git
 cd neutron
 
-# 6. Build
-cmake -B build -S . -G "MSYS Makefiles"
+# 6. Build using package script (recommended)
+python package.py --output neutron-windows-x64
+
+# Or build manually
+cmake -B build -S . -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 
-# MinGW runtime DLLs are automatically copied to the build directory
-# so the executable works from PowerShell or outside the MSYS environment
+# Build Box package manager
+cmake -B nt-box/build -S nt-box -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release
+cmake --build nt-box/build -j$(nproc)
 
 # 7. Verify
-./build/neutron.exe --version
+./neutron-windows-x64/neutron.exe --version
+./neutron-windows-x64/box.exe --version
 
 # 8. Run tests
-bash run_tests.sh
-# Or from PowerShell: ./run_tests.ps1
+python run_tests.py
 ```
 
 ### Visual Studio 2019/2022 with vcpkg [powershell]
@@ -249,17 +288,23 @@ REM 4. Install dependencies
 ./vcpkg/vcpkg install dlfcn-win32 curl:x64-windows jsoncpp:x64-windows                                
 
 
-REM 5. Generate Visual Studio solution
-cmake --preset winmsvc
+REM 5. Build using package script (recommended)
+python package.py --output neutron-windows-x64
 
-REM 6. Build
+REM Or build manually
+cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake
 cmake --build build --config Release
 
-REM 7. Verify
-.\build\Release\neutron.exe --version
+REM Build Box package manager
+cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
+cmake --build nt-box/build --config Release
 
-REM 8. Run tests (PowerShell)
-.\run_tests.ps1
+REM 6. Verify
+.\neutron-windows-x64\neutron.exe --version
+.\neutron-windows-x64\box.exe --version
+
+REM 7. Run tests
+python run_tests.py
 ```
 
 ### MinGW-w64 (Alternative)
@@ -455,16 +500,16 @@ vcpkg list
 After successful build, verify your installation:
 
 ```bash
-# Check version
+# Check versions
 ./neutron --version
+./box --version
 
 # Run a simple script
 echo 'say("Hello from Neutron!");' > test.nt
 ./neutron test.nt
 
 # Run test suite (all 21 tests should pass)
-./run_tests.sh           # Linux/macOS/MSYS2
-./run_tests.ps1          # Windows PowerShell
+python3 run_tests.py     # All platforms
 
 # Expected output:
 # ================================

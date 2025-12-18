@@ -28,13 +28,26 @@ jobs:
           libcurl4-openssl-dev \
           libjsoncpp-dev
           
-    - name: Build and Package
+    - name: Build Neutron Runtime
+      run: |
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+        cmake --build build
+      
+    - name: Build Box Package Manager
+      run: |
+        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
+        cmake --build nt-box/build
+        cp nt-box/build/box .
+      
+    - name: Package
       run: python3 package.py --output neutron-linux-x64
       
-    - name: Verify binary
+    - name: Verify binaries
       run: |
         ls -lh build/neutron
+        ls -lh box
         ./build/neutron --version
+        ./box --version
         
     - name: Run tests
       run: python3 run_tests.py
@@ -68,14 +81,28 @@ jobs:
         cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DBUILD_SHARED_LIBS=OFF -DJSONCPP_WITH_TESTS=OFF -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF
         sudo cmake --build build --target install
         
-    - name: Build and Package
+    - name: Build Neutron Runtime
+      run: |
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
+        cmake --build build
+      
+    - name: Build Box Package Manager
+      run: |
+        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
+        cmake --build nt-box/build
+        cp nt-box/build/box .
+      
+    - name: Package
       run: python3 package.py --output neutron-macos-universal
       
-    - name: Verify binary
+    - name: Verify binaries
       run: |
         ls -lh build/neutron
+        ls -lh box
         file build/neutron
+        file box
         ./build/neutron --version
+        ./box --version
         
     - name: Run tests
       run: python3 run_tests.py
@@ -108,15 +135,26 @@ jobs:
         vcpkg install jsoncpp:x64-windows curl:x64-windows
         vcpkg integrate install
       
-    - name: Build and Package
-      run: python package.py --output neutron-windows-x64
-      env:
-        CMAKE_TOOLCHAIN_FILE: C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+    - name: Build Neutron Runtime
+      run: |
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+        cmake --build build --config Release
       
-    - name: Verify binary
+    - name: Build Box Package Manager
+      run: |
+        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
+        cmake --build nt-box/build --config Release
+        copy nt-box\build\Release\box.exe .
+      
+    - name: Package
+      run: python package.py --output neutron-windows-x64
+      
+    - name: Verify binaries
       run: |
         dir build\Release\neutron.exe
+        dir box.exe
         .\build\Release\neutron.exe --version
+        .\box.exe --version
         
     - name: Run tests
       run: python run_tests.py

@@ -1,75 +1,207 @@
-# Adding New Features and Modules to Neutron
+# Extending Neutron with Native Modules
 
-This document explains how to easily extend the Neutron programming language with new features and modules.
+This document explains how to create native C++ modules for Neutron using the Box package manager.
 
-## Adding New Features
+## Overview
 
-To add a new feature to Neutron, place your source files in the `src/features/` directory. Then use the CMake function to add it:
+Neutron supports native C++ modules that can be loaded at runtime. These modules use the Neutron C API to expose functions to Neutron code. The Box package manager handles building and installing these modules with automatic compiler detection.
 
-```cmake
-add_neutron_feature("MyFeature" "src/features/my_feature.cpp")
+## Creating a Native Module
+
+Native modules can be shared via the [Neutron Universal Registry (NUR)](https://github.com/neutron-modules/nur). Browse existing modules or contribute your own!
+
+### 1. Module Structure
+
+Create a directory for your module with a `native.cpp` file:
+
+```bash
+mkdir mymodule
+cd mymodule
 ```
 
-## Adding New Extensions
+### 2. Write the Module Code
 
-For more complex extensions, place your source files in the `src/extensions/` directory:
-
-```cmake
-add_neutron_extension("MyExtension" "src/extensions/my_extension.cpp")
-```
-
-## Adding New Utilities
-
-For utility functions that can be shared across the codebase:
-
-```cmake
-add_neutron_utility("MyUtility" "src/utils/my_utility.cpp")
-```
-
-## Adding New Modules
-
-To add a new built-in module to Neutron:
-
-1. Create a new directory in `libs/` for your module:
-   ```bash
-   mkdir libs/my_module
-   ```
-
-2. Create the module implementation files:
-   ```bash
-   touch libs/my_module/native.cpp
-   touch libs/my_module/native.h
-   ```
-
-3. Use the existing modules (like `libs/sys/`) as examples for the required structure.
-
-4. The module will be automatically included in the build system.
-
-## Example Module Structure
-
-A typical module in the `libs/` directory should have:
-
-- `native.h`: Contains function declarations and initialization function
-- `native.cpp`: Contains implementation and proper module registration
-
-For example, the initialization function should follow this pattern:
+Create `native.cpp` with your module implementation:
 
 ```cpp
-extern "C" void neutron_init_MODULENAME_module(VM* vm) {
-    auto module_env = std::make_shared<Environment>();
-    register_MODULENAME_functions(module_env);
-    auto module = new Module("MODULENAME", module_env);
-    vm->define_module("MODULENAME", module);
+// Tell the header we're building to avoid dllimport
+#define BUILDING_NEUTRON
+#include <neutron.h>
+#undef BUILDING_NEUTRON
+
+#include <string>
+
+// Example native function
+NeutronValue* greet(NeutronVM* vm, int argCount, NeutronValue** args) {
+    if (argCount != 1 || !neutron_is_string(args[0])) {
+        return neutron_new_string(vm, "Error: Expected one string argument", 35);
+    }
+    
+    size_t length;
+    const char* name = neutron_get_string(args[0], &length);
+    
+    std::string greeting = "Hello, " + std::string(name, length) + "!";
+    return neutron_new_string(vm, greeting.c_str(), greeting.length());
+}
+
+// Module initialization - required entry point
+extern "C" __declspec(dllexport) void neutron_module_init(NeutronVM* vm) {
+    neutron_define_native(vm, "greet", greet, 1);
 }
 ```
 
-## Build System Functions
+### 3. Create Module Definition File (Windows)
 
-The CMake build system provides helper functions to make adding new components easier:
+For Windows, create `mymodule.def`:
 
-- `add_neutron_module(name)` - For built-in modules in libs/
-- `add_neutron_feature(name, path)` - For core language features
-- `add_neutron_extension(name, path)` - For extensions
-- `add_neutron_utility(name, path)` - For utility components
+```
+EXPORTS
+neutron_module_init
+```
 
-These functions will automatically add the files to the build, perform error checking, and provide feedback during the build process.
+### 4. Build the Module
+
+Use Box to build your local module:
+
+```bash
+box build native mymodule
+```
+
+This will:
+- Detect your system's C++ compiler (GCC, Clang, MSVC, MinGW)
+- Compile `native.cpp` with the Neutron headers
+- Link against the Neutron runtime (using dynamic symbol resolution)
+- Install to `.box/modules/mymodule/`
+
+To share your module with others, contribute it to [NUR](https://github.com/neutron-modules/nur). Then users can install it with:
+
+```bash
+box install mymodule
+```
+
+### 5. Use the Module
+
+```js
+use mymodule;
+
+say(mymodule.greet("World"));  // Output: Hello, World!
+```
+
+## Neutron C API Reference
+
+### Type Checking
+
+```cpp
+bool neutron_is_nil(NeutronValue* value);
+bool neutron_is_boolean(NeutronValue* value);
+bool neutron_is_number(NeutronValue* value);
+bool neutron_is_string(NeutronValue* value);
+```
+
+### Value Getters
+
+```cpp
+bool neutron_get_boolean(NeutronValue* value);
+double neutron_get_number(NeutronValue* value);
+const char* neutron_get_string(NeutronValue* value, size_t* length);
+```
+
+### Value Creators
+
+```cpp
+NeutronValue* neutron_new_nil();
+NeutronValue* neutron_new_boolean(bool value);
+NeutronValue* neutron_new_number(double value);
+NeutronValue* neutron_new_string(NeutronVM* vm, const char* chars, size_t length);
+```
+
+### Function Registration
+
+```cpp
+void neutron_define_native(NeutronVM* vm, const char* name, NeutronNativeFn function, int arity);
+```
+
+## Platform-Specific Notes
+
+### Windows
+
+- Use `__declspec(dllexport)` on `neutron_module_init`
+- Create a `.def` file to export the init function
+- Box supports both MSVC and MinGW compilers
+
+### Linux/macOS
+
+- No special export declarations needed
+- Box automatically uses `-fPIC` and `-shared` flags
+- Modules are `.so` (Linux) or `.dylib` (macOS)
+
+## Advanced Example
+
+Here's a more complete example with multiple functions and error handling:
+
+```cpp
+#define BUILDING_NEUTRON
+#include <neutron.h>
+#undef BUILDING_NEUTRON
+
+#include <string>
+#include <cmath>
+
+// Add two numbers
+NeutronValue* add(NeutronVM* vm, int argCount, NeutronValue** args) {
+    if (argCount != 2) {
+        return neutron_new_string(vm, "Error: Expected 2 arguments", 27);
+    }
+    
+    if (!neutron_is_number(args[0]) || !neutron_is_number(args[1])) {
+        return neutron_new_string(vm, "Error: Arguments must be numbers", 32);
+    }
+    
+    double a = neutron_get_number(args[0]);
+    double b = neutron_get_number(args[1]);
+    
+    return neutron_new_number(a + b);
+}
+
+// Calculate square root
+NeutronValue* sqrt_func(NeutronVM* vm, int argCount, NeutronValue** args) {
+    if (argCount != 1 || !neutron_is_number(args[0])) {
+        return neutron_new_string(vm, "Error: Expected one number", 26);
+    }
+    
+    double value = neutron_get_number(args[0]);
+    if (value < 0) {
+        return neutron_new_string(vm, "Error: Cannot take sqrt of negative", 35);
+    }
+    
+    return neutron_new_number(std::sqrt(value));
+}
+
+// Module initialization
+extern "C" __declspec(dllexport) void neutron_module_init(NeutronVM* vm) {
+    neutron_define_native(vm, "add", add, 2);
+    neutron_define_native(vm, "sqrt", sqrt_func, 1);
+}
+```
+
+## Troubleshooting
+
+### Module Not Found
+
+Ensure the module is in `.box/modules/<modulename>/` and the shared library has the correct name:
+- Windows: `<modulename>.dll`
+- Linux: `<modulename>.so`
+- macOS: `<modulename>.dylib`
+
+### Linking Errors
+
+Box uses runtime symbol resolution, so you don't need to link against import libraries. The native shim (`nt-box/src/native_shim.cpp`) handles dynamic loading of the Neutron API.
+
+### Compiler Not Found
+
+Box automatically detects compilers. If detection fails:
+- **Linux**: Install `gcc` or `clang`
+- **macOS**: Install Xcode Command Line Tools
+- **Windows**: Install Visual Studio or MSYS2 MinGW
+
+See the [Build Guide](guides/build.md) for detailed compiler setup instructions.
