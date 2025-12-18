@@ -195,8 +195,10 @@ jobs:
     - name: Install NSIS
       run: |
         choco install nsis -y
+        # Refresh PATH to include NSIS
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
         Write-Host "NSIS installed, checking version:"
-        makensis /VERSION
+        & "C:\Program Files (x86)\NSIS\makensis.exe" /VERSION
       shell: pwsh
 
     - name: Install dependencies (vcpkg)

@@ -893,8 +893,20 @@ def main():
          # Check for makensis
          makensis_path = shutil.which("makensis")
          if not makensis_path:
-             Colors.print("ERROR: makensis not found in PATH. Install NSIS first.", Colors.RED)
-             sys.exit(1)
+             # Try common NSIS installation paths
+             common_paths = [
+                 r"C:\Program Files (x86)\NSIS\makensis.exe",
+                 r"C:\Program Files\NSIS\makensis.exe",
+             ]
+             for path in common_paths:
+                 if os.path.exists(path):
+                     makensis_path = path
+                     Colors.print(f"Found makensis at: {makensis_path}", Colors.GREEN)
+                     break
+             
+             if not makensis_path:
+                 Colors.print("ERROR: makensis not found in PATH or common locations. Install NSIS first.", Colors.RED)
+                 sys.exit(1)
          
          if not os.path.exists("installer.nsi"):
              Colors.print("ERROR: installer.nsi not found", Colors.RED)
@@ -939,8 +951,8 @@ def main():
              changed = sanitize_nsi_for_globs("installer.nsi", temp_nsi, root_dir)
              nsi_to_use = temp_nsi if changed else "installer.nsi"
              Colors.print(f"Running NSIS with version {version}...", Colors.BLUE)
-             Colors.print(f"Command: makensis /DVERSION={version} {nsi_to_use}", Colors.BLUE)
-             result = subprocess.call(["makensis", f"/DVERSION={version}", nsi_to_use])
+             Colors.print(f"Command: {makensis_path} /DVERSION={version} {nsi_to_use}", Colors.BLUE)
+             result = subprocess.call([makensis_path, f"/DVERSION={version}", nsi_to_use])
              if result == 0:
                  if os.path.exists("NeutronInstaller.exe"):
                      Colors.print("✓ Installer created successfully: NeutronInstaller.exe", Colors.GREEN)
