@@ -249,6 +249,13 @@ add_library(neutron_runtime STATIC
     ${NEUTRON_LIBRARY_SOURCES}
 )
 
+# On Unix-like systems, static libraries need -fPIC if they'll be linked into shared libraries
+if(NOT WIN32)
+    set_target_properties(neutron_runtime PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+    )
+endif()
+
 target_link_libraries(neutron_runtime
     ${JSONCPP_LIBRARIES}
     ${DLFCN_WIN}
