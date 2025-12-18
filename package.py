@@ -886,68 +886,77 @@ def main():
     # Instead of creating zip/tar, we just leave the directory there
     Colors.print(f"Build artifacts are in directory: {target_name}", Colors.GREEN)
     
-    # Optional: NSIS Installer (keep if simple, or remove if considered "packaging")
-    # User said "remove zipping support", but installer is useful. 
-    # Let's keep NSIS check if on Windows but DO NOT ZIP.
-    if args.installer and os_type == "windows" and shutil.which("makensis"):
+    # Optional: NSIS Installer
+    if args.installer and os_type == "windows":
          Colors.print("Building Windows Installer...", Colors.BLUE)
-         if os.path.exists("installer.nsi"):
-             # Copy binaries and libs to root for NSIS to find (only if they exist)
-             if real_neutron_path and os.path.exists(real_neutron_path):
-                 shutil.copy2(real_neutron_path, root_dir)
-             else:
-                 Colors.print("Note: neutron executable not present; installer will not include it.", Colors.YELLOW)
-             if real_box_path and os.path.exists(real_box_path):
-                 shutil.copy2(real_box_path, root_dir)
-             else:
-                 Colors.print("Note: box executable not present; installer will not include it.", Colors.YELLOW)
+         
+         # Check for makensis
+         makensis_path = shutil.which("makensis")
+         if not makensis_path:
+             Colors.print("ERROR: makensis not found in PATH. Install NSIS first.", Colors.RED)
+             sys.exit(1)
+         
+         if not os.path.exists("installer.nsi"):
+             Colors.print("ERROR: installer.nsi not found", Colors.RED)
+             sys.exit(1)
              
-             # Copy DLLs (needed for vcpkg dynamic linking)
-             for dll in glob.glob(os.path.join(build_dir, "Release", "*.dll")):
-                 shutil.copy2(dll, root_dir)
-             for dll in glob.glob(os.path.join(build_dir, "*.dll")):
-                 shutil.copy2(dll, root_dir)
+         # Copy binaries and libs to root for NSIS to find (only if they exist)
+         if real_neutron_path and os.path.exists(real_neutron_path):
+             shutil.copy2(real_neutron_path, root_dir)
+             Colors.print(f"Copied {real_neutron_path} to root", Colors.GREEN)
+         else:
+             Colors.print("WARNING: neutron executable not present; installer will not include it.", Colors.YELLOW)
              
-             # Copy runtime lib if it exists
-             for lib_file in glob.glob(os.path.join(build_dir, "*.lib")):
-                 shutil.copy2(lib_file, root_dir)
-             for lib_file in glob.glob(os.path.join(build_dir, "Release", "*.lib")):
-                 shutil.copy2(lib_file, root_dir)
+         if real_box_path and os.path.exists(real_box_path):
+             shutil.copy2(real_box_path, root_dir)
+             Colors.print(f"Copied {real_box_path} to root", Colors.GREEN)
+         else:
+             Colors.print("WARNING: box executable not present; installer will not include it.", Colors.YELLOW)
+         
+         # Copy DLLs (needed for vcpkg dynamic linking)
+         dll_count = 0
+         for dll in glob.glob(os.path.join(build_dir, "Release", "*.dll")):
+             shutil.copy2(dll, root_dir)
+             dll_count += 1
+         for dll in glob.glob(os.path.join(build_dir, "*.dll")):
+             shutil.copy2(dll, root_dir)
+             dll_count += 1
+         Colors.print(f"Copied {dll_count} DLL files", Colors.GREEN)
+         
+         # Copy runtime lib if it exists
+         lib_count = 0
+         for lib_file in glob.glob(os.path.join(build_dir, "*.lib")):
+             shutil.copy2(lib_file, root_dir)
+             lib_count += 1
+         for lib_file in glob.glob(os.path.join(build_dir, "Release", "*.lib")):
+             shutil.copy2(lib_file, root_dir)
+             lib_count += 1
+         Colors.print(f"Copied {lib_count} LIB files", Colors.GREEN)
 
-             # Sanitize installer.nsi by commenting out File lines that glob to nothing
-             temp_nsi = "installer.temp.nsi"
-             try:
-                 changed = sanitize_nsi_for_globs("installer.nsi", temp_nsi, root_dir)
-                 nsi_to_use = temp_nsi if changed else "installer.nsi"
-                 Colors.print(f"Running NSIS with version {version}...", Colors.BLUE)
-                 result = subprocess.call(["makensis", f"/DVERSION={version}", nsi_to_use])
-                 if result == 0:
+         # Sanitize installer.nsi by commenting out File lines that glob to nothing
+         temp_nsi = "installer.temp.nsi"
+         try:
+             changed = sanitize_nsi_for_globs("installer.nsi", temp_nsi, root_dir)
+             nsi_to_use = temp_nsi if changed else "installer.nsi"
+             Colors.print(f"Running NSIS with version {version}...", Colors.BLUE)
+             Colors.print(f"Command: makensis /DVERSION={version} {nsi_to_use}", Colors.BLUE)
+             result = subprocess.call(["makensis", f"/DVERSION={version}", nsi_to_use])
+             if result == 0:
+                 if os.path.exists("NeutronInstaller.exe"):
                      Colors.print("✓ Installer created successfully: NeutronInstaller.exe", Colors.GREEN)
                  else:
-                     Colors.print(f"✗ NSIS failed with exit code {result}", Colors.RED)
-             finally:
-                 # Clean up temporary file if it was created
-                 if os.path.exists(temp_nsi):
-                     try:
-                         os.remove(temp_nsi)
-                     except Exception:
-                         pass
-         else:
-             Colors.print("installer.nsi not found, skipping installer creation", Colors.YELLOW)
-
-             if os.path.exists("NeutronInstaller.exe"):
-                 inst_name = f"neutron-{version}-installer.exe"
-                 # Remove old installer file safely (it may be locked by antivirus or other process)
-                 if os.path.exists(inst_name):
-                     if not safe_remove(inst_name, retries=20, delay=0.5):
-                         Colors.print(f"Could not remove existing installer {inst_name}; keeping previous installer.", Colors.YELLOW)
-
-                 # Move new installer into place
+                     Colors.print("✗ NSIS returned success but NeutronInstaller.exe not found!", Colors.RED)
+                     sys.exit(1)
+             else:
+                 Colors.print(f"✗ NSIS failed with exit code {result}", Colors.RED)
+                 sys.exit(1)
+         finally:
+             # Clean up temporary file if it was created
+             if os.path.exists(temp_nsi):
                  try:
-                     shutil.move("NeutronInstaller.exe", inst_name)
-                     Colors.print(f"Installer created: {inst_name}", Colors.GREEN)
-                 except Exception as e:
-                     Colors.print(f"Failed to move installer into place: {e}", Colors.RED)
+                     os.remove(temp_nsi)
+                 except Exception:
+                     pass
 
     Colors.print("Packaging flow completed successfully!", Colors.GREEN)
 

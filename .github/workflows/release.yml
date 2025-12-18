@@ -122,8 +122,8 @@ jobs:
         path: neutron-${{ steps.get_version.outputs.version }}-macos-universal.tar.gz
 
 
-  build-windows:
-    name: Build Windows x64 Release
+  build-windows-zip:
+    name: Build Windows x64 Zip
     runs-on: windows-latest
     
     steps:
@@ -134,11 +134,6 @@ jobs:
       
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
-
-    - name: Install NSIS
-      run: |
-        choco install nsis -y
-      shell: pwsh
 
     - name: Install dependencies (vcpkg)
       run: |
@@ -177,10 +172,6 @@ jobs:
         $Version = "${{ steps.get_version.outputs.version }}"
         Compress-Archive -Path neutron-windows-x64 -DestinationPath "neutron-${Version}-windows-x64.zip"
       shell: pwsh
-    
-    - name: Create Installer
-      run: python package.py --installer
-      shell: pwsh
         
     - name: Upload Release Asset (Zip)
       uses: actions/upload-artifact@v4
@@ -188,16 +179,95 @@ jobs:
         name: neutron-windows-x64-zip
         path: neutron-${{ steps.get_version.outputs.version }}-windows-x64.zip
 
+  build-windows-installer:
+    name: Build Windows x64 Installer
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+      
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install NSIS
+      run: |
+        choco install nsis -y
+        Write-Host "NSIS installed, checking version:"
+        makensis /VERSION
+      shell: pwsh
+
+    - name: Install dependencies (vcpkg)
+      run: |
+        vcpkg install jsoncpp:x64-windows curl:x64-windows
+        vcpkg integrate install
+          
+    - name: Build Neutron Runtime
+      run: |
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+        cmake --build build --config Release
+      
+    - name: Build Box Package Manager
+      run: |
+        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
+        cmake --build nt-box/build --config Release
+        copy nt-box\build\Release\box.exe .
+      
+    - name: Get version
+      id: get_version
+      shell: bash
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.tag }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "Version: ${VERSION}"
+    
+    - name: List files before installer creation
+      run: |
+        Write-Host "=== Files in root directory ==="
+        Get-ChildItem | Format-Table Name, Length, LastWriteTime
+        Write-Host "`n=== Checking for required files ==="
+        if (Test-Path "neutron.exe") { Write-Host "✓ neutron.exe found" } else { Write-Host "✗ neutron.exe NOT found" }
+        if (Test-Path "box.exe") { Write-Host "✓ box.exe found" } else { Write-Host "✗ box.exe NOT found" }
+        if (Test-Path "installer.nsi") { Write-Host "✓ installer.nsi found" } else { Write-Host "✗ installer.nsi NOT found" }
+        if (Test-Path "LICENSE") { Write-Host "✓ LICENSE found" } else { Write-Host "✗ LICENSE NOT found" }
+        Write-Host "`n=== Build directory contents ==="
+        if (Test-Path "build/Release") {
+          Get-ChildItem build/Release | Format-Table Name, Length
+        }
+      shell: pwsh
+    
+    - name: Create Installer
+      run: |
+        Write-Host "=== Creating Windows Installer ==="
+        python package.py --installer
+        Write-Host "`n=== Checking if installer was created ==="
+        if (Test-Path "NeutronInstaller.exe") {
+          Write-Host "✓ NeutronInstaller.exe created successfully"
+          $size = (Get-Item NeutronInstaller.exe).Length
+          Write-Host "File size: $size bytes ($([math]::Round($size/1MB, 2)) MB)"
+        } else {
+          Write-Host "✗ NeutronInstaller.exe NOT created"
+          Write-Host "`nListing all .exe files in current directory:"
+          Get-ChildItem *.exe
+          exit 1
+        }
+      shell: pwsh
+        
     - name: Upload Release Asset (Installer)
       uses: actions/upload-artifact@v4
-      if: hashFiles('NeutronInstaller.exe') != ''
       with:
         name: neutron-windows-x64-installer
         path: NeutronInstaller.exe
 
   create-release:
     name: Create GitHub Release
-    needs: [build-linux-x64, build-macos-universal, build-windows]
+    needs: [build-linux-x64, build-macos-universal, build-windows-zip, build-windows-installer]
     runs-on: ubuntu-latest
     permissions:
       contents: write

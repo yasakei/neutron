@@ -72,14 +72,14 @@ Section "Neutron Core" SecNeutron
   
   ; Install headers (required for building native modules)
   SetOutPath "$INSTDIR\include\core"
-  File "include\core\neutron.h"
-  File "include\core\capi.h"
+  File /nonfatal "include\core\neutron.h"
+  File /nonfatal "include\core\capi.h"
   File /nonfatal "include\core\vm.h"
   File /nonfatal "include\core\checkpoint.h"
   
   ; Install native shim (required for building native modules)
   SetOutPath "$INSTDIR\nt-box\src"
-  File "nt-box\src\native_shim.cpp"
+  File /nonfatal "nt-box\src\native_shim.cpp"
   
   ; Install platform header (required by native_shim.cpp)
   SetOutPath "$INSTDIR\nt-box\include"
