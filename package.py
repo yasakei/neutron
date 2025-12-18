@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import os
 import sys
 import platform
@@ -11,6 +12,12 @@ import zipfile
 import re
 import time
 
+# Set UTF-8 encoding for stdout on Windows
+if platform.system() == "Windows":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 # Colors
 class Colors:
     RED = '\033[0;31m'
@@ -21,10 +28,14 @@ class Colors:
 
     @staticmethod
     def print(text, color=NC):
-        if sys.stdout.isatty() and platform.system() != "Windows":
-             print(f"{color}{text}{Colors.NC}")
-        else:
-             print(text)
+        try:
+            if sys.stdout.isatty() and platform.system() != "Windows":
+                print(f"{color}{text}{Colors.NC}")
+            else:
+                print(text)
+        except UnicodeEncodeError:
+            # Fallback for Windows console encoding issues
+            print(text.encode('ascii', 'replace').decode('ascii'))
 
 def sanitize_path_for_msvc(os_type):
     # On Windows, sanitize PATH to avoid MinGW/MSYS conflicts when using MSVC
@@ -955,12 +966,12 @@ def main():
              result = subprocess.call([makensis_path, f"/DVERSION={version}", nsi_to_use])
              if result == 0:
                  if os.path.exists("NeutronInstaller.exe"):
-                     Colors.print("✓ Installer created successfully: NeutronInstaller.exe", Colors.GREEN)
+                     Colors.print("Installer created successfully: NeutronInstaller.exe", Colors.GREEN)
                  else:
-                     Colors.print("✗ NSIS returned success but NeutronInstaller.exe not found!", Colors.RED)
+                     Colors.print("NSIS returned success but NeutronInstaller.exe not found!", Colors.RED)
                      sys.exit(1)
              else:
-                 Colors.print(f"✗ NSIS failed with exit code {result}", Colors.RED)
+                 Colors.print(f"NSIS failed with exit code {result}", Colors.RED)
                  sys.exit(1)
          finally:
              # Clean up temporary file if it was created
