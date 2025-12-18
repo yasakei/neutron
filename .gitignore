@@ -35,6 +35,7 @@ libneutron_runtime.a
 *.swo
 .vs/
 *.txt
+tools/
 
 # OS files
 .DS_Store

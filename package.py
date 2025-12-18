@@ -830,10 +830,6 @@ def main():
     # Copy assets
     items_to_copy = ["README.md", "LICENSE", "docs", "include", "src", "libs"]
     
-    # Only include scripts on Unix systems (contains shell scripts)
-    if os_type != "windows":
-        items_to_copy.append("scripts")
-    
     for item in items_to_copy:
         src_path = os.path.join(root_dir, item)
         if os.path.exists(src_path):
@@ -914,33 +910,17 @@ def main():
              for lib_file in glob.glob(os.path.join(build_dir, "Release", "*.lib")):
                  shutil.copy2(lib_file, root_dir)
 
-             # Bundle vcpkg-managed tools (powershell, 7zip) into the installer by default
-             vcpkg_tools_dir = os.path.join(root_dir, 'vcpkg', 'downloads', 'tools')
-             if os.path.isdir(vcpkg_tools_dir):
-                 Colors.print(f"Bundling vcpkg tools from {vcpkg_tools_dir} into installer assets...", Colors.BLUE)
-                 tools_dst = os.path.join(root_dir, 'tools')
-                 os.makedirs(tools_dst, exist_ok=True)
-                 for entry in os.listdir(vcpkg_tools_dir):
-                     entry_l = entry.lower()
-                     if 'powershell' in entry_l or '7zip' in entry_l or '7-zip' in entry_l:
-                         src = os.path.join(vcpkg_tools_dir, entry)
-                         dst = os.path.join(tools_dst, entry)
-                         try:
-                             if os.path.exists(dst):
-                                 shutil.rmtree(dst)
-                             shutil.copytree(src, dst)
-                             Colors.print(f"  Bundled tool: {entry}", Colors.GREEN)
-                         except Exception as e:
-                             Colors.print(f"Failed to bundle tool {entry}: {e}", Colors.YELLOW)
-             else:
-                 Colors.print("No vcpkg tools folder found; skipping bundling of runtimes.", Colors.YELLOW)
-
              # Sanitize installer.nsi by commenting out File lines that glob to nothing
              temp_nsi = "installer.temp.nsi"
              try:
                  changed = sanitize_nsi_for_globs("installer.nsi", temp_nsi, root_dir)
                  nsi_to_use = temp_nsi if changed else "installer.nsi"
-                 subprocess.call(["makensis", f"/DVERSION={version}", nsi_to_use])
+                 Colors.print(f"Running NSIS with version {version}...", Colors.BLUE)
+                 result = subprocess.call(["makensis", f"/DVERSION={version}", nsi_to_use])
+                 if result == 0:
+                     Colors.print("✓ Installer created successfully: NeutronInstaller.exe", Colors.GREEN)
+                 else:
+                     Colors.print(f"✗ NSIS failed with exit code {result}", Colors.RED)
              finally:
                  # Clean up temporary file if it was created
                  if os.path.exists(temp_nsi):
@@ -948,6 +928,8 @@ def main():
                          os.remove(temp_nsi)
                      except Exception:
                          pass
+         else:
+             Colors.print("installer.nsi not found, skipping installer creation", Colors.YELLOW)
 
              if os.path.exists("NeutronInstaller.exe"):
                  inst_name = f"neutron-{version}-installer.exe"

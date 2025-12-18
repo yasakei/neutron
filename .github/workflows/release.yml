@@ -156,8 +156,12 @@ jobs:
         cmake --build nt-box/build --config Release
         copy nt-box\build\Release\box.exe .
       
-    - name: Package and Create Installer
-      run: python package.py --output neutron-windows-x64 --installer
+    - name: Package
+      run: python package.py --output neutron-windows-x64
+      shell: pwsh
+      
+    - name: Create Installer
+      run: python package.py --installer
       shell: pwsh
 
     - name: Get version

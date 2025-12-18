@@ -111,36 +111,6 @@ Section "Neutron Core" SecNeutron
 
 SectionEnd
 
-;--------------------------------
-;Bundled runtimes (copied from vcpkg tools) - installed by default
-Section "Bundled Runtimes (recommended)" SecBundledRuntimes
-  DetailPrint "Installing bundled runtimes (PowerShell, 7-Zip) if present..."
-
-  ; Copy bundled tools into $INSTDIR\tools
-  SetOutPath "$INSTDIR\tools"
-  File /nonfatal /r "tools\*"
-
-  ; If a bundled PowerShell exists, create a small wrapper and add tools to PATH
-  IfFileExists "$INSTDIR\tools\powershell\pwsh.exe" 0 +3
-    FileOpen $0 "$INSTDIR\pwsh.bat" w
-    FileWrite $0 "@echo off$\r$\n"
-    FileWrite $0 '"$INSTDIR\\tools\\powershell\\pwsh.exe" %*$\r$\n'
-    FileClose $0
-    Push "$INSTDIR\tools"
-    Call AddToPath
-
-  ; If we couldn't bundle VC runtime, download and run the VC redist silently
-  DetailPrint "Ensuring Visual C++ redistributable (x64) is present..."
-  NSISdl::download "https://aka.ms/vs/17/release/vc_redist.x64.exe" "$TEMP\vc_redist.x64.exe"
-  Pop $0
-  ${If} $0 == "success"
-    DetailPrint "Installing VC++ Redistributable..."
-    ExecWait '"$TEMP\vc_redist.x64.exe" /install /quiet /norestart'
-    Delete "$TEMP\vc_redist.x64.exe"
-  ${EndIf}
-
-SectionEnd
-
 Section "Add $INSTDIR to PATH (optional)" SecAddPath
   ; Optional user-controlled PATH addition
   Push "$INSTDIR"
@@ -219,7 +189,6 @@ SectionEnd
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
   !insertmacro MUI_DESCRIPTION_TEXT ${SecNeutron} "Neutron programming language runtime, compiler, Box package manager, headers, and libraries for building native modules. (Required)"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecAddPath} "Add Neutron installation directory to system PATH for easy command-line access (optional)"
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecBundledRuntimes} "Bundled runtimes (PowerShell, 7-Zip) and Visual C++ redistributable. Installed automatically to ensure 'box' and vcpkg tools work on your system."
   !insertmacro MUI_DESCRIPTION_TEXT ${SecBuildTools} "Microsoft C++ Build Tools for compiling native modules. Required to use 'box build native' for native extensions. (~1.2GB download)"
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
