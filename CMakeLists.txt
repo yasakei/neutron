@@ -34,11 +34,30 @@ include_directories(
 include(FetchContent)
 
 # JSONCPP
-find_package(jsoncpp CONFIG REQUIRED)
-set(JSONCPP_LIBRARIES JsonCpp::JsonCpp)
+find_package(jsoncpp CONFIG QUIET)
+if(NOT jsoncpp_FOUND)
+    # Try to find jsoncpp using pkg-config
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(JSONCPP jsoncpp IMPORTED_TARGET)
+    if(NOT JSONCPP_FOUND)
+        message(FATAL_ERROR "Could not find jsoncpp library via CMake or pkg-config")
+    endif()
+    # Use the imported target
+    set(JSONCPP_LIBRARIES PkgConfig::JSONCPP)
+else()
+    set(JSONCPP_LIBRARIES JsonCpp::JsonCpp)
+endif()
 
 # CURL
-find_package(CURL CONFIG REQUIRED)
+find_package(CURL CONFIG QUIET)
+if(NOT CURL_FOUND)
+    # Use system CURL if CMake config not available
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(CURL libcurl IMPORTED_TARGET)
+    if(NOT CURL_FOUND)
+        find_package(CURL REQUIRED)  # Fallback to basic find
+    endif()
+endif()
 
 # Function to add a new module easily
 function(add_neutron_module MODULE_NAME)
@@ -238,9 +257,10 @@ target_link_libraries(neutron_runtime
 if(TARGET CURL::libcurl)
     target_link_libraries(neutron_runtime CURL::libcurl)
     target_compile_definitions(neutron_runtime PRIVATE HAVE_CURL)
+elseif(TARGET PkgConfig::CURL)
+    target_link_libraries(neutron_runtime PkgConfig::CURL)
+    target_compile_definitions(neutron_runtime PRIVATE HAVE_CURL)
 endif()
-
-
 
 # Set output names
 if(WIN32)
@@ -254,14 +274,54 @@ else()
     )
 endif()
 
+# Create shared library for modules to link against
+# This library contains the C API functions that external modules need
+add_library(neutron_shared SHARED
+    src/core/capi.cpp
+    src/types/value.cpp
+    src/types/obj_string.cpp
+)
+
+target_link_libraries(neutron_shared
+    neutron_runtime
+    ${JSONCPP_LIBRARIES}
+    ${DLFCN_WIN}
+)
+
+if(TARGET CURL::libcurl)
+    target_link_libraries(neutron_shared CURL::libcurl)
+    target_compile_definitions(neutron_shared PRIVATE HAVE_CURL)
+elseif(TARGET PkgConfig::CURL)
+    target_link_libraries(neutron_shared PkgConfig::CURL)
+    target_compile_definitions(neutron_shared PRIVATE HAVE_CURL)
+endif()
+
+# Define BUILDING_NEUTRON so C API functions are exported properly
+target_compile_definitions(neutron_shared PRIVATE BUILDING_NEUTRON)
+
+# Set output names
+if(WIN32)
+    set_target_properties(neutron_shared PROPERTIES
+        OUTPUT_NAME neutron_shared
+    )
+else()
+    set_target_properties(neutron_shared PROPERTIES
+        OUTPUT_NAME neutron_shared
+        PREFIX "lib"
+    )
+endif()
+
 # Create executable
 add_executable(neutron src/core/main.cpp)
 
-# Link with whole-archive to ensure C API symbols are included (Linux only)
+# Define BUILDING_NEUTRON for the main executable so functions are exported
+target_compile_definitions(neutron PRIVATE BUILDING_NEUTRON)
+
+# Link executable against both static runtime and shared library
 if(UNIX AND NOT APPLE)
-    target_link_libraries(neutron -Wl,--whole-archive neutron_runtime -Wl,--no-whole-archive)
+    target_link_libraries(neutron -Wl,--whole-archive neutron_runtime -Wl,--no-whole-archive neutron_shared)
 else()
-    target_link_libraries(neutron neutron_runtime)
+    target_link_libraries(neutron neutron_runtime neutron_shared)
 endif()
 
 # On macOS, also link jsoncpp to the main executable to ensure the library can be found at runtime
@@ -288,24 +348,27 @@ elseif(APPLE)
 elseif(WIN32)
     # Windows-specific settings
     target_compile_definitions(neutron_runtime PRIVATE _CRT_SECURE_NO_WARNINGS)
-    
-    # Export symbols for native modules
+
+    # Export symbols for native modules via the shared library
     set_target_properties(neutron PROPERTIES ENABLE_EXPORTS ON)
-    target_compile_definitions(neutron PRIVATE BUILDING_NEUTRON)
-    # Also need to define it for runtime lib as the functions are there
-    target_compile_definitions(neutron_runtime PRIVATE BUILDING_NEUTRON)
-    
+
     # Link with Windows library for dynamic loading (LoadLibrary, GetProcAddress, etc.)
     # Also link with Ws2_32 for socket functions
     target_link_libraries(neutron_runtime kernel32 ws2_32)
 endif()
 
 # Install targets
-install(TARGETS neutron neutron_runtime
+install(TARGETS neutron neutron_runtime neutron_shared
     RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib-native
+    ARCHIVE DESTINATION lib-native
 )
+
+# Build the main Box package manager from the nt-box directory
+# Add the nt-box as a subdirectory to incorporate it into the build
+if(EXISTS "${CMAKE_SOURCE_DIR}/nt-box/CMakeLists.txt")
+    add_subdirectory(nt-box)
+endif()
 
 
 # Copy binaries to project root for convenience

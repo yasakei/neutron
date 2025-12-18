@@ -269,17 +269,13 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        // Legacy box build command
-        
-        // Legacy box build command
+        // Legacy --build-box command - deprecated in favor of nt-box system
         else if (arg == "--build-box" && argc > 2) {
             std::string module_name = argv[2];
-            std::string command = "make build-box MODULE=" + module_name;
-            int result = system(command.c_str());
-            if (result != 0) {
-                std::cerr << "Failed to build box module: " << module_name << std::endl;
-            }
-            return result;
+            std::cerr << "Warning: --build-box is deprecated." << std::endl;
+            std::cerr << "Use: box build native " << module_name << " instead" << std::endl;
+            std::cerr << "Run 'box help' for more information." << std::endl;
+            return 1;
         }
 
     }

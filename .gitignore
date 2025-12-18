@@ -4,6 +4,7 @@ bin/
 obj/
 out/
 box-modules/
+vcpkg_installed/
 
 # Compiled binaries and libraries
 neutronc
@@ -32,6 +33,8 @@ libneutron_runtime.a
 .idea/
 *.swp
 *.swo
+.vs/
+*.txt
 
 # OS files
 .DS_Store

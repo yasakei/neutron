@@ -1,0 +1,43 @@
+# This file provides build configuration for external modules
+# It helps the box build system locate neutron libraries and headers
+
+# Neutron installation directory - relative to current working directory typically
+NEUTRON_DIR=.
+
+# Include directories for Neutron headers
+INCLUDE_DIRS=[
+    "${NEUTRON_DIR}/include",
+    "${NEUTRON_DIR}/include/core",
+    "${NEUTRON_DIR}/include/types",
+    "${NEUTRON_DIR}/include/runtime",
+    "${NEUTRON_DIR}/include/compiler"
+]
+
+# Library directories for linking
+LIBRARY_DIRS=[
+    "${NEUTRON_DIR}/build/Release",  # Windows Release
+    "${NEUTRON_DIR}/build",          # General build directory
+    "${NEUTRON_DIR}/lib"             # Alternative lib directory
+]
+
+# Libraries to link against
+LIBRARIES=[
+    "neutron_shared",   # The main neutron shared library that exports C API
+    "neutron_runtime"   # Alternative if shared library not available
+]
+
+# Platform-specific settings
+[windows]
+SHARED_LIBRARY_EXTENSION=.dll
+STATIC_LIBRARY_EXTENSION=.lib
+COMPILER_FLAGS=["/std:c++17", "/EHsc", "/LD"]
+
+[unix]
+SHARED_LIBRARY_EXTENSION=.so
+STATIC_LIBRARY_EXTENSION=.a
+COMPILER_FLAGS=["-std=c++17", "-fPIC", "-shared"]
+
+[macos]
+SHARED_LIBRARY_EXTENSION=.dylib
+STATIC_LIBRARY_EXTENSION=.a
+COMPILER_FLAGS=["-std=c++17", "-fPIC", "-dynamiclib"]

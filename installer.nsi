@@ -55,29 +55,37 @@
 
 Section "Neutron Core" SecNeutron
 
+  ; Install runtime binaries to the installation root ($INSTDIR)
   SetOutPath "$INSTDIR"
   
-  ; Copy main binaries
+  ; Core executables
   File "neutron.exe"
   File "box.exe"
   
-  ; Copy runtime library
+  ; Shared runtime DLL (required for native modules)
+  File "neutron_shared.dll"
+  
+  ; Copy dependency DLLs
+  File /nonfatal "libcurl.dll"
+  File /nonfatal "zlib1.dll"
+  File /nonfatal "dl.dll"
+  
+  ; Install headers (required for building native modules)
+  SetOutPath "$INSTDIR\include\core"
+  File "include\core\neutron.h"
+  File "include\core\capi.h"
+  File /nonfatal "include\core\vm.h"
+  File /nonfatal "include\core\checkpoint.h"
+  
+  ; Install import library (required for linking native modules)
+  SetOutPath "$INSTDIR\lib"
   File /nonfatal "neutron_runtime.lib"
-  File /nonfatal "libneutron_runtime.a"
-  
-  ; Copy any DLLs
-  File /nonfatal "*.dll"
-  
-  ; Copy documentation
+  File /nonfatal "build\Release\neutron_shared.lib"
+
+  ; Copy README/License to root
+  SetOutPath "$INSTDIR"
   File /nonfatal "LICENSE"
   File /nonfatal "README.md"
-  
-  ; Copy directories
-  File /nonfatal /r "docs"
-  File /nonfatal /r "include"
-  File /nonfatal /r "libs"
-  File /nonfatal /r "src"
-  File /nonfatal /r "lib"
 
   ;Store installation folder
   WriteRegStr HKCU "Software\Neutron" "" $INSTDIR
@@ -92,12 +100,46 @@ Section "Neutron Core" SecNeutron
   
   ;Create uninstaller
   WriteUninstaller "$INSTDIR\Uninstall.exe"
-  
-  ; Add to PATH
-  Push "$INSTDIR"
-  Call AddToPath
 
 SectionEnd
+
+;--------------------------------
+;Bundled runtimes (copied from vcpkg tools) - installed by default
+Section "Bundled Runtimes (recommended)" SecBundledRuntimes
+  DetailPrint "Installing bundled runtimes (PowerShell, 7-Zip) if present..."
+
+  ; Copy bundled tools into $INSTDIR\tools
+  SetOutPath "$INSTDIR\tools"
+  File /nonfatal /r "tools\*"
+
+  ; If a bundled PowerShell exists, create a small wrapper and add tools to PATH
+  IfFileExists "$INSTDIR\tools\powershell\pwsh.exe" 0 +3
+    FileOpen $0 "$INSTDIR\pwsh.bat" w
+    FileWrite $0 "@echo off$\r$\n"
+    FileWrite $0 '"$INSTDIR\\tools\\powershell\\pwsh.exe" %*$\r$\n'
+    FileClose $0
+    Push "$INSTDIR\tools"
+    Call AddToPath
+
+  ; If we couldn't bundle VC runtime, download and run the VC redist silently
+  DetailPrint "Ensuring Visual C++ redistributable (x64) is present..."
+  NSISdl::download "https://aka.ms/vs/17/release/vc_redist.x64.exe" "$TEMP\vc_redist.x64.exe"
+  Pop $0
+  ${If} $0 == "success"
+    DetailPrint "Installing VC++ Redistributable..."
+    ExecWait '"$TEMP\vc_redist.x64.exe" /install /quiet /norestart'
+    Delete "$TEMP\vc_redist.x64.exe"
+  ${EndIf}
+
+SectionEnd
+
+Section "Add $INSTDIR to PATH (optional)" SecAddPath
+  ; Optional user-controlled PATH addition
+  Push "$INSTDIR"
+  Call AddToPath
+SectionEnd
+
+
 
 Section /o "C++ Build Tools (Required for native modules)" SecBuildTools
   
@@ -167,8 +209,10 @@ SectionEnd
 ;Component Descriptions
 
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecNeutron} "Neutron programming language runtime, compiler, and Box package manager. (Required)"
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecBuildTools} "Microsoft C++ Build Tools for compiling native modules. Required to use 'box install' for native extensions. (~1.2GB download)"
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecNeutron} "Neutron programming language runtime, compiler, Box package manager, headers, and libraries for building native modules. (Required)"
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecAddPath} "Add Neutron installation directory to system PATH for easy command-line access (optional)"
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecBundledRuntimes} "Bundled runtimes (PowerShell, 7-Zip) and Visual C++ redistributable. Installed automatically to ensure 'box' and vcpkg tools work on your system."
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecBuildTools} "Microsoft C++ Build Tools for compiling native modules. Required to use 'box build native' for native extensions. (~1.2GB download)"
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 ;--------------------------------
@@ -176,7 +220,7 @@ SectionEnd
 
 Section "Uninstall"
 
-  ; Remove from PATH
+  ; Optionally remove $INSTDIR from PATH
   Push "$INSTDIR"
   Call un.RemoveFromPath
 
@@ -185,16 +229,16 @@ Section "Uninstall"
   Delete "$INSTDIR\box.exe"
   Delete "$INSTDIR\setup-msvc-env.bat"
   Delete "$INSTDIR\*.dll"
-  Delete "$INSTDIR\*.a"
-  Delete "$INSTDIR\*.lib"
   Delete "$INSTDIR\LICENSE"
   Delete "$INSTDIR\README.md"
   
-  RMDir /r "$INSTDIR\docs"
+  ; Remove libraries
+  Delete "$INSTDIR\lib\*.lib"
+  Delete "$INSTDIR\lib\*.a"
+  RMDir "$INSTDIR\lib"
+  
+  ; Remove headers
   RMDir /r "$INSTDIR\include"
-  RMDir /r "$INSTDIR\libs"
-  RMDir /r "$INSTDIR\src"
-  RMDir /r "$INSTDIR\lib"
 
   RMDir "$INSTDIR"
 
