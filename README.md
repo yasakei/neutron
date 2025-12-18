@@ -221,19 +221,15 @@ Write performance-critical code in C++ and call it from Neutron
 ```bash
 # Linux (Debian/Ubuntu)
 sudo apt-get install build-essential cmake libcurl4-openssl-dev libjsoncpp-dev
-python3 package.py --output neutron-linux-x64
+cmake -B build && cmake --build build -j$(nproc)
 
 # macOS
 brew install cmake curl jsoncpp
-python3 package.py --output neutron-macos-universal
+cmake -B build && cmake --build build -j$(sysctl -n hw.ncpu)
 
 # Windows (MSYS2 MINGW64)
 pacman -S mingw-w64-x86_64-{gcc,cmake,curl,jsoncpp} make
-python package.py --output neutron-windows-x64
-
-# Windows (Visual Studio with vcpkg)
-vcpkg install jsoncpp:x64-windows curl:x64-windows
-python package.py --output neutron-windows-x64
+cmake -B build -G "MSYS Makefiles" && cmake --build build
 ```
 
 > [!WARNING]
@@ -242,7 +238,8 @@ python package.py --output neutron-windows-x64
 ### Running Tests
 
 ```bash
-python3 run_tests.py    # All platforms
+./run_tests.sh          # Linux/macOS
+.\run_tests.ps1         # Windows PowerShell
 ```
 
 The test suite includes 21 comprehensive tests covering all language features. See [Test Suite Documentation](docs/guides/test-suite.md) for details.
@@ -447,16 +444,13 @@ say("  Warnings: ${warnings}");
 
 ## Box Package Manager
 
-> **Native C++ modules for Neutron** - Install and build high-performance native extensions with zero configuration. Box automatically detects your system's C++ compiler and builds modules for your platform. Modules are available in the [Neutron Universal Registry (NUR)](https://github.com/neutron-modules/nur).
+> **Native C++ modules for Neutron** - Install, manage, and use high-performance native extensions with zero configuration. Box automatically detects Neutron projects and installs modules locally.
 
 ### Installation Example
 
 ```bash
-# Install a module from NUR (downloads and builds automatically)
+# Install a native module (auto-installs to .box/modules/ in projects)
 box install base64
-
-# Or build from local source files
-box build native base64
 ```
 
 ```js
@@ -479,20 +473,20 @@ say(decoded);  // Hello, World!
 **Auto-Detection**  
 Automatically finds and configures your system's C++ compiler (GCC, Clang, MSVC, MinGW)
 
-**Dynamic Loading**  
-Native modules use runtime symbol resolution - no import libraries needed
+**Version Control**  
+Pin specific versions with `box install module@1.2.3`
 
 </td>
 <td width="50%">
 
 **Project-Local**  
-Modules install to `.box/modules/` in your current directory
+Modules install to `.box/modules/` in your project directory
 
 **Cross-Platform**  
 Works seamlessly on Linux (`.so`), macOS (`.dylib`), and Windows (`.dll`)
 
 **Build Tools**  
-Create your own native modules with the Neutron C API
+Create your own native modules with `box build`
 
 </td>
 </tr>
@@ -502,13 +496,14 @@ Create your own native modules with the Neutron C API
 
 | Command | Description |
 |---------|-------------|
-| `box install <module>` | Install a module from NUR (downloads and builds) |
-| `box build native <module>` | Build a module from local source files |
+| `box install <module>[@version]` | Install a module from NUR |
 | `box list` | Show all installed modules |
 | `box remove <module>` | Uninstall a module |
+| `box build` | Build a native module from source |
+| `box search <query>` | Search available modules |
 
 > [!NOTE]
-> Browse available modules at [NUR (Neutron Universal Registry)](https://github.com/neutron-modules/nur). See the [Module System Guide](docs/reference/module-system.md) for creating your own modules.
+> See [Box Documentation](nt-box/docs/) for creating native modules and the [Box Modules Guide](docs/reference/box-modules.md) for advanced usage.
 
 ## Language Syntax
 

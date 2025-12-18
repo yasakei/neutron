@@ -160,10 +160,6 @@ jobs:
       run: python package.py --output neutron-windows-x64
       shell: pwsh
       
-    - name: Create Installer
-      run: python package.py --installer
-      shell: pwsh
-
     - name: Get version
       id: get_version
       shell: bash
@@ -181,13 +177,9 @@ jobs:
         $Version = "${{ steps.get_version.outputs.version }}"
         Compress-Archive -Path neutron-windows-x64 -DestinationPath "neutron-${Version}-windows-x64.zip"
       shell: pwsh
-        
-    - name: Rename Installer
-      run: |
-        $Version = "${{ steps.get_version.outputs.version }}"
-        if (Test-Path "NeutronInstaller.exe") {
-          Move-Item "NeutronInstaller.exe" "neutron-${Version}-installer.exe"
-        }
+    
+    - name: Create Installer
+      run: python package.py --installer
       shell: pwsh
         
     - name: Upload Release Asset (Zip)
@@ -198,10 +190,10 @@ jobs:
 
     - name: Upload Release Asset (Installer)
       uses: actions/upload-artifact@v4
-      if: hashFiles('neutron-${{ steps.get_version.outputs.version }}-installer.exe') != ''
+      if: hashFiles('NeutronInstaller.exe') != ''
       with:
         name: neutron-windows-x64-installer
-        path: neutron-${{ steps.get_version.outputs.version }}-installer.exe
+        path: NeutronInstaller.exe
 
   create-release:
     name: Create GitHub Release
@@ -234,7 +226,6 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ steps.get_version.outputs.version }}
-        name: Neutron ${{ steps.get_version.outputs.version }}
         draft: false
         prerelease: ${{ contains(steps.get_version.outputs.version, 'alpha') || contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'rc') }}
         files: |
@@ -242,23 +233,6 @@ jobs:
           artifacts/neutron-macos-universal/*
           artifacts/neutron-windows-x64-zip/*
           artifacts/neutron-windows-x64-installer/*
-        body: |
-          ## Neutron ${{ steps.get_version.outputs.version }}
-          
-          ### Downloads
-          - **Linux x64**: `neutron-${{ steps.get_version.outputs.version }}-linux-x64.tar.gz`
-          - **macOS Universal**: `neutron-${{ steps.get_version.outputs.version }}-macos-universal.tar.gz`
-          - **Windows x64 (Zip)**: `neutron-${{ steps.get_version.outputs.version }}-windows-x64.zip`
-          - **Windows x64 (Installer)**: `neutron-${{ steps.get_version.outputs.version }}-installer.exe`
-          
-          ### What's Included
-          - Neutron runtime and compiler
-          - Box package manager for native modules
-          - Headers and libraries for building native extensions
-          - All required DLLs and dependencies
-          
-          ### Installation
-          - **Linux/macOS**: Extract the archive and add the `bin` directory to your PATH
-          - **Windows**: Run the installer or extract the zip file
+        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -828,14 +828,18 @@ def main():
                 shutil.copy2(f, target_name)
     
     # Copy assets
-    items_to_copy = ["README.md", "LICENSE", "docs", "include", "src", "libs"]
+    items_to_copy = ["README.md", "LICENSE", "docs", "include", "src", "libs", "nt-box"]
     
     for item in items_to_copy:
         src_path = os.path.join(root_dir, item)
         if os.path.exists(src_path):
             dst_path = os.path.join(target_name, item)
             if os.path.isdir(src_path):
-                shutil.copytree(src_path, dst_path)
+                # For nt-box, exclude build artifacts and git
+                if item == "nt-box":
+                    shutil.copytree(src_path, dst_path, ignore=shutil.ignore_patterns('build', '.git', '*.o', '*.obj', '*.exe', '*.dll'))
+                else:
+                    shutil.copytree(src_path, dst_path)
             else:
                 shutil.copy2(src_path, target_name)
 
