@@ -492,7 +492,7 @@ def preflight_check_windows():
     return ok
 
 
-def build_neutron(os_type, arch_type, build_dir="build", skip_vcpkg=False):
+def build_neutron(os_type, arch_type, build_dir="build", skip_vcpkg=False, debug=False):
     """Configure and build Neutron. If vcpkg fails due to third-party tool issues
     (e.g. PowerShell extraction toolchain), we will warn and continue so that
     other parts (like Box) can still be built and the packaging flow can proceed.
@@ -517,7 +517,7 @@ def build_neutron(os_type, arch_type, build_dir="build", skip_vcpkg=False):
         cmake_cmd = [cmake_exe, "--preset", "winmsvc"]
         run_cwd = os.getcwd()  # Run from root for presets
     else:
-        build_type = "Debug" if args.debug else "Release"
+        build_type = "Debug" if debug else "Release"
         cmake_cmd = [cmake_exe, "..", f"-DCMAKE_BUILD_TYPE={build_type}"]
         run_cwd = build_dir
         os.chdir(build_dir)  # Change to build directory for Unix systems
@@ -563,7 +563,7 @@ def build_neutron(os_type, arch_type, build_dir="build", skip_vcpkg=False):
 
     # Attempt to build if configure generated files
     if os.path.exists(build_dir):
-        build_config = "Debug" if args.debug else "Release"
+        build_config = "Debug" if debug else "Release"
         build_cmd = [cmake_exe, "--build", ".", "--config", build_config]
         # Parallel build
         import multiprocessing
@@ -584,7 +584,7 @@ def build_neutron(os_type, arch_type, build_dir="build", skip_vcpkg=False):
 
     return True
 
-def build_box(os_type, arch_type, build_dir="nt-box/build", skip_vcpkg=False):
+def build_box(os_type, arch_type, build_dir="nt-box/build", skip_vcpkg=False, debug=False):
     Colors.print("Configuring and building Box package manager...", Colors.BLUE)
 
     # Initialize vcpkg first if needed
@@ -605,11 +605,11 @@ def build_box(os_type, arch_type, build_dir="nt-box/build", skip_vcpkg=False):
     if os_type == "windows":
         # Use vcpkg toolchain for Box too
         vcpkg_toolchain = os.path.join(root_dir, "vcpkg", "scripts", "buildsystems", "vcpkg.cmake")
-        build_type = "Debug" if args.debug else "Release"
+        build_type = "Debug" if debug else "Release"
         cmake_cmd = [cmake_exe, "..", f"-DCMAKE_TOOLCHAIN_FILE={vcpkg_toolchain}", f"-DCMAKE_BUILD_TYPE={build_type}"]
         run_cwd = build_dir
     else:
-        build_type = "Debug" if args.debug else "Release"
+        build_type = "Debug" if debug else "Release"
         cmake_cmd = [cmake_exe, "..", f"-DCMAKE_BUILD_TYPE={build_type}"]
         run_cwd = build_dir
 
@@ -619,7 +619,7 @@ def build_box(os_type, arch_type, build_dir="nt-box/build", skip_vcpkg=False):
         return False
 
     # Build
-    build_config = "Debug" if args.debug else "Release"
+    build_config = "Debug" if debug else "Release"
     build_cmd = [cmake_exe, "--build", ".", "--config", build_config]
     import multiprocessing
     try:
@@ -698,8 +698,8 @@ def main():
                 sys.exit(1)
 
         # Build both executables
-        neutron_success = build_neutron(os_type, arch_type, build_dir, args.skip_vcpkg)
-        box_success = build_box(os_type, arch_type, box_build_dir, args.skip_vcpkg)
+        neutron_success = build_neutron(os_type, arch_type, build_dir, args.skip_vcpkg, args.debug)
+        box_success = build_box(os_type, arch_type, box_build_dir, args.skip_vcpkg, args.debug)
 
         # Ensure we have found both binaries after building
         # Wait a bit in case build process is still copying files
