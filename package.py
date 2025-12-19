@@ -517,7 +517,8 @@ def build_neutron(os_type, arch_type, build_dir="build", skip_vcpkg=False):
         cmake_cmd = [cmake_exe, "--preset", "winmsvc"]
         run_cwd = os.getcwd()  # Run from root for presets
     else:
-        cmake_cmd = [cmake_exe, "..", "-DCMAKE_BUILD_TYPE=Release"]
+        build_type = "Debug" if args.debug else "Release"
+        cmake_cmd = [cmake_exe, "..", f"-DCMAKE_BUILD_TYPE={build_type}"]
         run_cwd = build_dir
         os.chdir(build_dir)  # Change to build directory for Unix systems
 
@@ -562,7 +563,8 @@ def build_neutron(os_type, arch_type, build_dir="build", skip_vcpkg=False):
 
     # Attempt to build if configure generated files
     if os.path.exists(build_dir):
-        build_cmd = [cmake_exe, "--build", ".", "--config", "Release"]
+        build_config = "Debug" if args.debug else "Release"
+        build_cmd = [cmake_exe, "--build", ".", "--config", build_config]
         # Parallel build
         import multiprocessing
         try:
@@ -603,10 +605,12 @@ def build_box(os_type, arch_type, build_dir="nt-box/build", skip_vcpkg=False):
     if os_type == "windows":
         # Use vcpkg toolchain for Box too
         vcpkg_toolchain = os.path.join(root_dir, "vcpkg", "scripts", "buildsystems", "vcpkg.cmake")
-        cmake_cmd = [cmake_exe, "..", f"-DCMAKE_TOOLCHAIN_FILE={vcpkg_toolchain}", "-DCMAKE_BUILD_TYPE=Release"]
+        build_type = "Debug" if args.debug else "Release"
+        cmake_cmd = [cmake_exe, "..", f"-DCMAKE_TOOLCHAIN_FILE={vcpkg_toolchain}", f"-DCMAKE_BUILD_TYPE={build_type}"]
         run_cwd = build_dir
     else:
-        cmake_cmd = [cmake_exe, "..", "-DCMAKE_BUILD_TYPE=Release"]
+        build_type = "Debug" if args.debug else "Release"
+        cmake_cmd = [cmake_exe, "..", f"-DCMAKE_BUILD_TYPE={build_type}"]
         run_cwd = build_dir
 
     # Configure
@@ -615,7 +619,8 @@ def build_box(os_type, arch_type, build_dir="nt-box/build", skip_vcpkg=False):
         return False
 
     # Build
-    build_cmd = [cmake_exe, "--build", ".", "--config", "Release"]
+    build_config = "Debug" if args.debug else "Release"
+    build_cmd = [cmake_exe, "--build", ".", "--config", build_config]
     import multiprocessing
     try:
         cpu_count = multiprocessing.cpu_count()
@@ -634,6 +639,7 @@ def main():
     parser.add_argument("--output", help="Output directory name for the package", default=None)
     parser.add_argument("--installer", help="Build NSIS installer (Windows only)", action="store_true")
     parser.add_argument("--skip-vcpkg", help="Skip vcpkg bootstrap and proceed (may fail if runtime deps missing)", action="store_true")
+    parser.add_argument("--debug", help="Build with debug symbols (CMAKE_BUILD_TYPE=Debug)", action="store_true")
     args = parser.parse_args()
 
     os_type, arch_type = get_os_info()
