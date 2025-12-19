@@ -61,7 +61,8 @@ private:
     static bool useColor;
     static bool showStackTrace;
     static std::string currentFileName;
-    static std::vector<std::string> sourceLines;  // Cache of source code lines
+    static std::vector<std::string>* sourceLines;  // Cache of source code lines (pointer to avoid destruction order issues)
+    static bool cleanedUp;  // Flag to prevent double cleanup
 
     // ANSI color codes (cross-platform compatible)
     static const std::string RESET;
