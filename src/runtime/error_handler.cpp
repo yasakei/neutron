@@ -20,7 +20,9 @@ namespace neutron {
 bool ErrorHandler::useColor = true;
 bool ErrorHandler::showStackTrace = true;
 std::string ErrorHandler::currentFileName = "";
-std::vector<std::string> ErrorHandler::sourceLines;
+// Use a pointer to avoid destructor issues when shared library unloads on Linux
+// The vector is never deleted, but that's OK - it's cleaned up on process exit
+std::vector<std::string>* ErrorHandler::sourceLines = new std::vector<std::string>();
 
 // ANSI color codes
 const std::string ErrorHandler::RESET = "\033[0m";
@@ -62,7 +64,7 @@ void ErrorHandler::setCurrentFile(const std::string& fileName) {
 }
 
 void ErrorHandler::setSourceLines(const std::vector<std::string>& lines) {
-    sourceLines = lines;
+    *sourceLines = lines;
 }
 
 std::string ErrorHandler::getErrorTypeName(ErrorType type) {
@@ -304,8 +306,8 @@ void ErrorHandler::reportSyntaxError(const std::string& message, const Token& to
     ErrorInfo error(ErrorType::SYNTAX_ERROR, message, currentFileName, token.line, 0);
     
     // Try to get the source line
-    if (token.line > 0 && token.line <= static_cast<int>(sourceLines.size())) {
-        error.sourceLine = sourceLines[token.line - 1];
+    if (token.line > 0 && token.line <= static_cast<int>(sourceLines->size())) {
+        error.sourceLine = (*sourceLines)[token.line - 1];
         // Try to find column position
         if (!token.lexeme.empty()) {
             size_t pos = error.sourceLine.find(token.lexeme);
@@ -326,8 +328,8 @@ void ErrorHandler::reportRuntimeError(const std::string& message, const std::str
     error.stackTrace = trace;
     
     // Try to get the source line
-    if (line > 0 && line <= static_cast<int>(sourceLines.size())) {
-        error.sourceLine = sourceLines[line - 1];
+    if (line > 0 && line <= static_cast<int>(sourceLines->size())) {
+        error.sourceLine = (*sourceLines)[line - 1];
     }
     
     error.suggestion = getSuggestion(ErrorType::RUNTIME_ERROR, message);
@@ -341,8 +343,8 @@ void ErrorHandler::reportLexicalError(const std::string& message, int line, int 
                    line, column);
     
     // Try to get the source line
-    if (line > 0 && line <= static_cast<int>(sourceLines.size())) {
-        error.sourceLine = sourceLines[line - 1];
+    if (line > 0 && line <= static_cast<int>(sourceLines->size())) {
+        error.sourceLine = (*sourceLines)[line - 1];
     }
     
     error.suggestion = getSuggestion(ErrorType::LEXICAL_ERROR, message);
