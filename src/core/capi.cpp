@@ -3,22 +3,25 @@
 #include "capi.h"
 #include "types/obj_string.h"
 #include <cstring>
+#include <vector>
 
 // Thread-local storage for return values to avoid cross-library memory issues
 // Each thread gets its own return value slot that persists between calls
 static thread_local neutron::Value tls_return_value;
 
+// Thread-local storage for arguments to avoid cross-library memory issues
+static thread_local std::vector<neutron::Value> tls_args;
+
 // A C++ class that wraps a C native function
 neutron::Value CNativeFn::call(neutron::VM& vm, std::vector<neutron::Value> args) {
 
-    // Create temporary argument copies on heap
-    std::vector<neutron::Value*> temp_arg_ptrs;
-    std::vector<NeutronValue*> c_args;
+    // Use thread-local storage for arguments to avoid heap allocation/deallocation
+    // that can cause issues across shared library boundaries
+    tls_args = args;
     
-    for (const auto& arg : args) {
-        neutron::Value* temp_arg = new neutron::Value(arg);
-        temp_arg_ptrs.push_back(temp_arg);
-        c_args.push_back(reinterpret_cast<NeutronValue*>(temp_arg));
+    std::vector<NeutronValue*> c_args;
+    for (auto& arg : tls_args) {
+        c_args.push_back(reinterpret_cast<NeutronValue*>(&arg));
     }
 
     // Call the C function
@@ -27,12 +30,7 @@ neutron::Value CNativeFn::call(neutron::VM& vm, std::vector<neutron::Value> args
     // Copy the result value
     neutron::Value cpp_result = *reinterpret_cast<neutron::Value*>(result);
     
-    // Clean up our temporary argument allocations
-    for (auto ptr : temp_arg_ptrs) {
-        delete ptr;
-    }
-    
-    // No need to delete result - it points to thread-local storage managed by neutron_new_* functions
+    // No cleanup needed - tls_args persists and result points to tls_return_value
     
     return cpp_result;
 }
