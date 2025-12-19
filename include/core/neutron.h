@@ -24,6 +24,11 @@ typedef struct NeutronValue NeutronValue;
     #define NEUTRON_API
     // On Unix, use visibility attribute for shared library exports
     #define NEUTRON_MODULE_EXPORT __attribute__((visibility("default")))
+    // Compatibility: define __declspec as no-op on non-Windows so modules
+    // that hardcode __declspec(dllexport) still compile on Linux/macOS
+    #ifndef __declspec
+        #define __declspec(x)
+    #endif
 #endif
 
 // --- Value Management ---

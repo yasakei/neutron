@@ -863,27 +863,6 @@ def main():
             os.chmod(os.path.join(target_name, "install.sh"), 0o755)
             Colors.print("Added install.sh script", Colors.GREEN)
 
-    # Always attempt to bundle vcpkg-managed tools into the package directory
-    vcpkg_tools_dir = os.path.join(root_dir, 'vcpkg', 'downloads', 'tools')
-    if os.path.isdir(vcpkg_tools_dir):
-        Colors.print(f"Bundling vcpkg tools into package ({target_name}/tools)...", Colors.BLUE)
-        pkg_tools_dir = os.path.join(target_name, 'tools')
-        os.makedirs(pkg_tools_dir, exist_ok=True)
-        for entry in os.listdir(vcpkg_tools_dir):
-            entry_l = entry.lower()
-            if 'powershell' in entry_l or '7zip' in entry_l or '7-zip' in entry_l:
-                src = os.path.join(vcpkg_tools_dir, entry)
-                dst = os.path.join(pkg_tools_dir, entry)
-                try:
-                    if os.path.exists(dst):
-                        shutil.rmtree(dst)
-                    shutil.copytree(src, dst)
-                    Colors.print(f"  Bundled tool: {entry}", Colors.GREEN)
-                except Exception as e:
-                    Colors.print(f"Failed to bundle tool {entry}: {e}", Colors.YELLOW)
-    else:
-        Colors.print("No vcpkg tools found to include in package.", Colors.YELLOW)
-
     # Version check (only if neutron executable present)
     version = "unknown"
     if real_neutron_path and os.path.exists(real_neutron_path):
