@@ -853,6 +853,15 @@ def main():
                     shutil.copytree(src_path, dst_path)
             else:
                 shutil.copy2(src_path, target_name)
+    
+    # Copy install.sh for Linux/macOS
+    if os_type in ["linux", "macos"]:
+        install_script = os.path.join(root_dir, "scripts", "install.sh")
+        if os.path.exists(install_script):
+            shutil.copy2(install_script, target_name)
+            # Make it executable
+            os.chmod(os.path.join(target_name, "install.sh"), 0o755)
+            Colors.print("Added install.sh script", Colors.GREEN)
 
     # Always attempt to bundle vcpkg-managed tools into the package directory
     vcpkg_tools_dir = os.path.join(root_dir, 'vcpkg', 'downloads', 'tools')

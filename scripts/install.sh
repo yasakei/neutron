@@ -103,6 +103,10 @@ if [ ! -d "./include" ]; then
     exit 1
 fi
 
+if [ ! -d "./nt-box" ]; then
+    echo "Warning: nt-box directory not found - native module building may not work"
+fi
+
 # Create installation directories
 echo "Creating installation directories..."
 sudo mkdir -p "$BIN_DIR"
@@ -145,6 +149,15 @@ if [ -d "./libs" ]; then
     sudo cp -r "./libs/." "$SHARE_DIR/neutron/libs/"
 fi
 
+# Install nt-box (Box package manager source and headers for native modules)
+# This should be in the same directory as the box binary
+if [ -d "./nt-box" ]; then
+    echo "Installing nt-box components for native module building..."
+    sudo mkdir -p "$BIN_DIR/nt-box"
+    sudo cp -r "./nt-box/." "$BIN_DIR/nt-box/"
+    echo "  nt-box installed to: $BIN_DIR/nt-box"
+fi
+
 # Set NEUTRON_HOME environment variable hint
 echo ""
 echo "Note: For global installations, set NEUTRON_HOME:"
@@ -172,6 +185,9 @@ echo "Components installed:"
 echo "  Executables: $BIN_DIR/neutron, $BIN_DIR/box"
 echo "  Headers: $INCLUDE_DIR/"
 echo "  Libraries: $LIB_DIR/libneutron_runtime.*"
+if [ -d "$BIN_DIR/nt-box" ]; then
+    echo "  Box components: $BIN_DIR/nt-box/"
+fi
 echo "  Documentation: $SHARE_DIR/neutron/docs/"
 echo "  License: $SHARE_DIR/neutron/LICENSE"
 echo ""
