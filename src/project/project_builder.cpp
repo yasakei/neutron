@@ -140,7 +140,7 @@ bool ProjectBuilder::buildProjectExecutable(
     const std::string& neutronExecutablePath,
     bool bundleLibs
 ) {
-    std::cout << "Building project executable..." << std::endl;
+    std::cout << "\n[1/4] Preparing build..." << std::endl;
     
     // Platform detection
     bool isWindows = false;
@@ -411,39 +411,34 @@ bool ProjectBuilder::buildProjectExecutable(
     
     if (isWindows && !isMingw) {
         compiler = "cl";
-        linkFlags = "/link /LIBPATH:\"" + executableDir + "\" libcurl.lib jsoncpp.lib";
+        // Add both executable dir and vcpkg lib path for linking
+        std::string vcpkgLibPath = executableDir + "/vcpkg_installed/x64-windows/lib";
+        // Include Windows system libraries required by the runtime (ws2_32 for sockets, advapi32 for registry/security)
+        linkFlags = "/link /nologo /LIBPATH:\"" + executableDir + "\" /LIBPATH:\"" + vcpkgLibPath + "\" libcurl.lib jsoncpp.lib ws2_32.lib advapi32.lib";
         
-        // Check if cl is in PATH, if not try to find vcvars64.bat
+        // Check if cl is in PATH, if not try to find vcvarsall.bat
         if (system("where cl > nul 2>&1") != 0) {
-            // Try to find vcvars64.bat to initialize MSVC environment
+            // Try to find vcvarsall.bat to initialize MSVC environment (same paths as box uses)
             std::vector<std::string> vcvarsPaths = {
-                "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat",
-                "C:\\Program Files\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat",
-                "C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional\\VC\\Auxiliary\\Build\\vcvars64.bat",
-                "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Auxiliary\\Build\\vcvars64.bat",
-                "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat",
-                "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat"
+                "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat",
+                "C:\\Program Files\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Auxiliary\\Build\\vcvarsall.bat",
+                "C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional\\VC\\Auxiliary\\Build\\vcvarsall.bat",
+                "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Auxiliary\\Build\\vcvarsall.bat",
+                "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat",
+                "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Auxiliary\\Build\\vcvarsall.bat",
+                "C:\\Program Files\\Microsoft Visual Studio\\2019\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat",
+                "C:\\Program Files\\Microsoft Visual Studio\\2019\\BuildTools\\VC\\Auxiliary\\Build\\vcvarsall.bat"
             };
             
             for (const auto& path : vcvarsPaths) {
                 if (std::filesystem::exists(path)) {
                     vcvarsPath = path;
-                    std::cout << "Note: Initializing MSVC environment..." << std::endl;
                     break;
                 }
             }
             
-            if (vcvarsPath.empty()) {
-                std::cerr << "\nError: Microsoft Visual C++ compiler not found." << std::endl;
-                std::cerr << "\nNeutron requires MSVC to build projects on Windows." << std::endl;
-                std::cerr << "\nTo install MSVC Build Tools:" << std::endl;
-                std::cerr << "  1. Download: https://aka.ms/vs/17/release/vs_BuildTools.exe" << std::endl;
-                std::cerr << "  2. Run the installer" << std::endl;
-                std::cerr << "  3. Select 'Desktop development with C++' workload" << std::endl;
-                std::cerr << "  4. Restart your terminal after installation" << std::endl;
-                std::cerr << "\nAlternatively, run 'neutron build' from a Visual Studio Developer Command Prompt." << std::endl;
-                return false;
-            }
+            // Don't fail here - we'll try to use vcvarsPath later when compiling
+            // If it's still not found, the compile will fail with a better error message
         }
     } else if (isWindows && isMingw) {
         compiler = "g++";
@@ -506,24 +501,23 @@ bool ProjectBuilder::buildProjectExecutable(
         }
     }
     
-    // Validate directories
+    // Validate directories (silently continue if not found - will fail at compile time if needed)
     if (!std::filesystem::exists(includeDir) || !std::filesystem::exists(libsDir)) {
-        std::cerr << "Warning: Could not find Neutron include or libs directories." << std::endl;
-        std::cerr << "Executable Dir: " << executableDir << std::endl;
-        std::cerr << "Checked Neutron Home: " << neutronSrcDir << std::endl;
-        std::cerr << "Expected include: " << includeDir << std::endl;
-        std::cerr << "Expected libs: " << libsDir << std::endl;
-        std::cerr << "Please set NEUTRON_HOME environment variable or run from a valid installation." << std::endl;
+        // Don't spam warnings - the compile will fail with a clear error if headers are missing
     }
     
     // Try to find a static runtime archive
     std::string runtimeLibPath;
     std::vector<std::string> libCandidates = {
+        // Windows paths
+        neutronSrcDir + "/neutron_runtime.lib",
+        neutronSrcDir + "/lib/neutron_runtime.lib",
+        neutronSrcDir + "/build/Release/neutron_runtime.lib",
+        neutronSrcDir + "/build/neutron_runtime.lib",
+        // Unix paths
         neutronSrcDir + "/libneutron_runtime.a",
         neutronSrcDir + "/lib/libneutron_runtime.a",
-        neutronSrcDir + "/build/libneutron_runtime.a",
-        neutronSrcDir + "/neutron_runtime.lib", // Windows
-        neutronSrcDir + "/build/neutron_runtime.lib" // Windows
+        neutronSrcDir + "/build/libneutron_runtime.a"
     };
     
     for (const auto& path : libCandidates) {
@@ -536,10 +530,22 @@ bool ProjectBuilder::buildProjectExecutable(
     // Build compile command
     std::string compileCommand;
     
+    // Add all necessary include paths
+    std::string includePaths;
     if (isWindows && !isMingw) {
-        compileCommand = compiler + " /std:c++17 /EHsc /W4 /O2 /I\"" + includeDir + "\" /I\"" + neutronSrcDir + "\" /I\"" + libsDir + "\" \"" + tempSourcePath + "\" ";
+        includePaths = "/I\"" + includeDir + "\" /I\"" + includeDir + "/core\" /I\"" + includeDir + "/compiler\" /I\"" + includeDir + "/runtime\" /I\"" + includeDir + "/types\" /I\"" + includeDir + "/utils\" /I\"" + includeDir + "/cross-platfrom\" /I\"" + neutronSrcDir + "\" /I\"" + neutronSrcDir + "/src\" /I\"" + libsDir + "\"";
+        
+        // Add vcpkg headers if available (for curl, jsoncpp)
+        std::string vcpkgInclude = neutronSrcDir + "/vcpkg_installed/x64-windows/include";
+        if (std::filesystem::exists(vcpkgInclude)) {
+            includePaths += " /I\"" + vcpkgInclude + "\"";
+        }
+        
+        // Use /MD to match the runtime library, suppress warnings for cleaner output
+        compileCommand = compiler + " /std:c++17 /EHsc /W3 /O2 /MD /D_CRT_SECURE_NO_WARNINGS /nologo " + includePaths + " \"" + tempSourcePath + "\" ";
     } else {
-        compileCommand = compiler + " -std=c++17 -Wall -Wextra -O2 -I\"" + includeDir + "\" -I\"" + neutronSrcDir + "\" -I\"" + libsDir + "\" \"" + tempSourcePath + "\" ";
+        includePaths = "-I\"" + includeDir + "\" -I\"" + includeDir + "/core\" -I\"" + includeDir + "/compiler\" -I\"" + includeDir + "/runtime\" -I\"" + includeDir + "/types\" -I\"" + includeDir + "/utils\" -I\"" + neutronSrcDir + "\" -I\"" + libsDir + "\"";
+        compileCommand = compiler + " -std=c++17 -Wall -Wextra -O2 " + includePaths + " \"" + tempSourcePath + "\" ";
     }
     
     // If we found the runtime library, link it. Otherwise, compile sources (slow fallback).
@@ -551,8 +557,17 @@ bool ProjectBuilder::buildProjectExecutable(
         } else {
             compileCommand += "\"" + runtimeLibPath + "\" ";
         }
+        
+        // On Windows, we need to compile dlfcn_compat_win.cpp to provide dlopen/dlsym/dlclose
+        // These are Unix functions that the runtime uses, but Windows needs a compatibility shim
+        if (isWindows && !isMingw) {
+            std::string dlfcnCompat = neutronSrcDir + "/src/platform/dlfcn_compat_win.cpp";
+            if (std::filesystem::exists(dlfcnCompat)) {
+                compileCommand += "\"" + dlfcnCompat + "\" ";
+            }
+        }
     } else {
-        std::cout << "Note: libneutron_runtime.a not found. Compiling from source (slower)..." << std::endl;
+        std::cout << "[2/4] Compiling runtime..." << std::endl;
         // Add runtime sources
         auto runtimeSources = getRuntimeSources();
         for (const auto& src : runtimeSources) {
@@ -582,9 +597,14 @@ bool ProjectBuilder::buildProjectExecutable(
     
     if (!boxModules.empty()) {
         if (bundleLibs) {
-            std::cout << "Bundling " << boxModules.size() << " Box module(s) as embedded shared libraries..." << std::endl;
+            std::cout << "  Bundling " << boxModules.size() << " module(s): ";
+            for (size_t i = 0; i < boxModules.size(); i++) {
+                std::cout << boxModules[i];
+                if (i < boxModules.size() - 1) std::cout << ", ";
+            }
+            std::cout << std::endl;
             for (const auto& moduleName : boxModules) {
-                std::cout << "  - " << moduleName << " (embedded)" << std::endl;
+                (void)moduleName; // Suppress unused warning
             }
             // No need to add -L or -l flags or copy files, as we embedded them in the source
         } else {
@@ -613,64 +633,73 @@ bool ProjectBuilder::buildProjectExecutable(
         compileCommand += linkFlags + " -o \"" + finalOutputPath + "\"";
     }
     
-    // Check if compiler is available
-    std::string checkCmd;
-    if (isWindows) {
-        if (compiler == "cl") {
-            checkCmd = "cl > nul 2>&1"; // cl returns 0 even with no args (prints usage) or non-zero? Actually cl usually returns non-zero if no files.
-            // Better check for cl:
-            checkCmd = "where cl > nul 2>&1";
-        } else {
+    // Check if compiler is available (skip for MSVC on Windows - we handle it later with vcvarsall)
+    if (!(isWindows && compiler == "cl")) {
+        std::string checkCmd;
+        if (isWindows) {
             checkCmd = compiler + " --version > nul 2>&1";
-        }
-    } else {
-        checkCmd = "which " + compiler + " > /dev/null 2>&1";
-    }
-    
-    if (system(checkCmd.c_str()) != 0) {
-        std::cerr << "Error: Compiler '" << compiler << "' not found in PATH." << std::endl;
-        if (isWindows && isMingw) {
-            std::cerr << "Neutron requires a C++ compiler to build projects." << std::endl;
-            std::cerr << "Please install MinGW-w64 and add 'bin' to your PATH." << std::endl;
-            std::cerr << "Download: https://winlibs.com/ or via MSYS2" << std::endl;
-        } else if (isWindows) {
-            std::cerr << "Please install Visual Studio C++ workload." << std::endl;
         } else {
-            std::cerr << "Please install g++ or clang++." << std::endl;
+            checkCmd = "which " + compiler + " > /dev/null 2>&1";
         }
-        return false;
+        
+        if (system(checkCmd.c_str()) != 0) {
+            std::cerr << "Error: Compiler '" << compiler << "' not found in PATH." << std::endl;
+            if (isWindows && isMingw) {
+                std::cerr << "Neutron requires a C++ compiler to build projects." << std::endl;
+                std::cerr << "Please install MinGW-w64 and add 'bin' to your PATH." << std::endl;
+                std::cerr << "Download: https://winlibs.com/ or via MSYS2" << std::endl;
+            } else {
+                std::cerr << "Please install g++ or clang++." << std::endl;
+            }
+            return false;
+        }
     }
 
-    std::cout << "Compiling..." << std::endl;
+    std::cout << "[3/4] Compiling and linking..." << std::endl;
     // std::cout << "Command: " << compileCommand << std::endl;  // DEBUG: Commented out for clean output
     
-    // If we found vcvars but cl is not in PATH, wrap the command with vcvars
-    std::string finalCommand = compileCommand;
-    if (!vcvarsPath.empty() && isWindows && !isMingw) {
-        // Create a temporary batch file that calls vcvars and then runs the compile command
-        std::string tempBat = tempSourcePath + "_build.bat";
-        std::ofstream batFile(tempBat);
-        batFile << "@echo off\n";
-        batFile << "call \"" << vcvarsPath << "\" > nul\n";
-        batFile << compileCommand << "\n";
-        batFile.close();
-        finalCommand = tempBat;
-    }
+    int result;
     
-    int result = system(finalCommand.c_str());
-    
-    // Clean up temp batch file if created
-    if (!vcvarsPath.empty() && isWindows && !isMingw) {
-        std::string tempBat = tempSourcePath + "_build.bat";
-        std::filesystem::remove(tempBat);
+    // On Windows with MSVC, check if cl is in PATH and wrap with vcvarsall if needed
+    #ifdef _WIN32
+    if (compiler == "cl") {
+        // Check if cl.exe is in PATH
+        int checkResult = system("where cl >nul 2>&1");
+        if (checkResult != 0) {
+            // cl.exe not in PATH
+            if (vcvarsPath.empty()) {
+                // No vcvarsall.bat found either
+                std::cerr << "\nError: Microsoft Visual C++ compiler not found." << std::endl;
+                std::cerr << "\nNeutron requires MSVC to build projects on Windows." << std::endl;
+                std::cerr << "\nTo install MSVC Build Tools:" << std::endl;
+                std::cerr << "  1. Download: https://aka.ms/vs/17/release/vs_BuildTools.exe" << std::endl;
+                std::cerr << "  2. Run the installer" << std::endl;
+                std::cerr << "  3. Select 'Desktop development with C++' workload" << std::endl;
+                std::cerr << "  4. Restart your terminal after installation" << std::endl;
+                std::cerr << "\nAlternatively, run 'neutron build' from a Visual Studio Developer Command Prompt." << std::endl;
+                return false;
+            }
+            
+            // Found vcvarsall.bat, wrap command with it (suppress setup output)
+            std::string wrappedCmd = "cmd /c \"\"" + vcvarsPath + "\" x64 >nul 2>&1 && " + compileCommand + "\"";
+            result = system(wrappedCmd.c_str());
+        } else {
+            // cl is in PATH, use it directly
+            result = system(compileCommand.c_str());
+        }
+    } else {
+        result = system(compileCommand.c_str());
     }
+    #else
+    result = system(compileCommand.c_str());
+    #endif
     
     // Clean up temp file
     std::filesystem::remove(tempSourcePath);
     
     if (result == 0) {
-        std::cout << "✓ Build successful!" << std::endl;
-        std::cout << "Executable: " << finalOutputPath << std::endl;
+        std::cout << "[4/4] Build complete!" << std::endl;
+        std::cout << "\nOutput: " << finalOutputPath << std::endl;
         
         // Make executable on Unix
 #ifndef _WIN32

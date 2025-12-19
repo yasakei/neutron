@@ -41,7 +41,7 @@
   !insertmacro MUI_PAGE_INSTFILES
   
   !define MUI_FINISHPAGE_TITLE "Neutron Installation Complete"
-  !define MUI_FINISHPAGE_TEXT "Neutron has been installed successfully!$\r$\n$\r$\nQuick Start:$\r$\n  1. Open a new terminal (Command Prompt or PowerShell)$\r$\n  2. Run: neutron --version$\r$\n  3. Create a project: neutron init myproject$\r$\n$\r$\nIf you didn't install C++ Build Tools, you can:$\r$\n  - Download from: https://aka.ms/vs/17/release/vs_BuildTools.exe$\r$\n  - Or run the installer again and select the Build Tools option$\r$\n$\r$\nDocumentation: https://github.com/neutron-lang/neutron"
+  !define MUI_FINISHPAGE_TEXT "Neutron has been installed successfully!$\r$\n$\r$\nQuick Start:$\r$\n  1. Open a new terminal (Command Prompt or PowerShell)$\r$\n  2. Run: neutron --version$\r$\n  3. Create a project: neutron init myproject$\r$\n$\r$\nIf you didn't install C++ Build Tools, you can:$\r$\n  - Download from: https://aka.ms/vs/17/release/vs_BuildTools.exe$\r$\n  - Or run the installer again and select the Build Tools option$\r$\n$\r$\nDocumentation: https://neutron.ct.ws/docs"
   !insertmacro MUI_PAGE_FINISH
 
   !insertmacro MUI_UNPAGE_WELCOME
@@ -75,15 +75,25 @@ Section "Neutron Core" SecNeutron
   File /nonfatal "dl.dll"
   
   ; Install headers (required for building native modules)
-  SetOutPath "$INSTDIR\include\core"
-  File /nonfatal "include\core\neutron.h"
-  File /nonfatal "include\core\capi.h"
-  File /nonfatal "include\core\vm.h"
-  File /nonfatal "include\core\checkpoint.h"
+  ; Copy the entire include directory structure
+  SetOutPath "$INSTDIR"
+  File /r /x ".git" /x "neutron-*" /x "build" /x "*.obj" "include"
   
-  ; Install all include files recursively
-  SetOutPath "$INSTDIR\include"
-  File /r /x ".git" "include\*.*"
+  ; Install libs directory (Neutron standard library source)
+  SetOutPath "$INSTDIR"
+  File /r /x ".git" /x "neutron-*" /x "build" /x "*.obj" "libs"
+  
+  ; Install vcpkg headers (curl and jsoncpp) for http module
+  SetOutPath "$INSTDIR\vcpkg_installed\x64-windows\include\curl"
+  File /nonfatal "build\vcpkg_installed\x64-windows\include\curl\*.h"
+  
+  SetOutPath "$INSTDIR\vcpkg_installed\x64-windows\include\json"
+  File /nonfatal "build\vcpkg_installed\x64-windows\include\json\*.h"
+  
+  ; Install vcpkg libs to root directory for linking
+  SetOutPath "$INSTDIR"
+  File /nonfatal "build\vcpkg_installed\x64-windows\lib\libcurl.lib"
+  File /nonfatal "build\vcpkg_installed\x64-windows\lib\jsoncpp.lib"
   
   ; Install native shim (required for building native modules)
   SetOutPath "$INSTDIR\nt-box\src"
@@ -93,9 +103,19 @@ Section "Neutron Core" SecNeutron
   SetOutPath "$INSTDIR\nt-box\include"
   File /nonfatal "nt-box\include\platform.h"
   
-  ; Install import library (required for linking native modules)
-  SetOutPath "$INSTDIR\lib"
+  ; Install dlfcn compatibility shim (required for neutron build on Windows)
+  SetOutPath "$INSTDIR\src\platform"
+  File /nonfatal "src\platform\dlfcn_compat_win.cpp"
+  
+  ; Install dlfcn header
+  SetOutPath "$INSTDIR\include\cross-platfrom"
+  File /nonfatal "include\cross-platfrom\dlfcn_compat.h"
+  
+  ; Install runtime library (required for neutron build) - copy to root like Linux
+  SetOutPath "$INSTDIR"
   File /nonfatal "neutron_runtime.lib"
+  File /nonfatal "neutron_shared.lib"
+  File /nonfatal "build\Release\neutron_runtime.lib"
   File /nonfatal "build\Release\neutron_shared.lib"
 
   ; Copy README/License to root
@@ -176,11 +196,11 @@ Section /o "C++ Build Tools (Required for native modules)" SecBuildTools
   
   DetailPrint "MSVC not found. Downloading Microsoft C++ Build Tools installer..."
   
-  ; Download Build Tools installer
-  inetc::get "https://aka.ms/vs/17/release/vs_BuildTools.exe" "$TEMP\vs_BuildTools.exe" /END
+  ; Download Build Tools installer using built-in NSISdl plugin
+  NSISdl::download "https://aka.ms/vs/17/release/vs_BuildTools.exe" "$TEMP\vs_BuildTools.exe"
   Pop $0
   
-  ${If} $0 == "OK"
+  ${If} $0 == "success"
     DetailPrint "Download complete. Launching installer..."
     
     ; Launch installer with C++ workload pre-selected (silent install)
