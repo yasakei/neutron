@@ -459,13 +459,19 @@ const char* NeutronException::what() const noexcept {
     return formattedMessage.c_str();
 }
 
-// Cleanup function to clear static data before library unload
-// This prevents crashes on Linux when the shared library destructor tries to free
-// memory that was allocated by a different allocator
-static void cleanupErrorHandler() __attribute__((destructor));
-static void cleanupErrorHandler() {
-    ErrorHandler::sourceLines.clear();
-    ErrorHandler::sourceLines.shrink_to_fit();
+void ErrorHandler::cleanup() {
+    sourceLines.clear();
+    sourceLines.shrink_to_fit();
 }
 
 } // namespace neutron
+
+// Cleanup function to clear static data before library unload
+// This prevents crashes on Linux when the shared library destructor tries to free
+// memory that was allocated by a different allocator
+#ifndef _WIN32
+__attribute__((destructor))
+#endif
+static void cleanupErrorHandler() {
+    neutron::ErrorHandler::cleanup();
+}

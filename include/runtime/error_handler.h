@@ -116,6 +116,9 @@ public:
     // Exit with error code
     [[noreturn]] static void fatal(const ErrorInfo& error);
     [[noreturn]] static void fatal(const std::string& message, ErrorType type = ErrorType::RUNTIME_ERROR);
+    
+    // Cleanup static data (called before library unload on Linux)
+    static void cleanup();
 };
 
 // Exception class for recoverable errors (e.g., in REPL mode)
