@@ -407,10 +407,44 @@ bool ProjectBuilder::buildProjectExecutable(
     
     // Determine compiler
     std::string compiler, linkFlags;
+    std::string vcvarsPath; // Store vcvars path if found
     
     if (isWindows && !isMingw) {
         compiler = "cl";
         linkFlags = "/link /LIBPATH:\"" + executableDir + "\" libcurl.lib jsoncpp.lib";
+        
+        // Check if cl is in PATH, if not try to find vcvars64.bat
+        if (system("where cl > nul 2>&1") != 0) {
+            // Try to find vcvars64.bat to initialize MSVC environment
+            std::vector<std::string> vcvarsPaths = {
+                "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat",
+                "C:\\Program Files\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat",
+                "C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional\\VC\\Auxiliary\\Build\\vcvars64.bat",
+                "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Auxiliary\\Build\\vcvars64.bat",
+                "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat",
+                "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat"
+            };
+            
+            for (const auto& path : vcvarsPaths) {
+                if (std::filesystem::exists(path)) {
+                    vcvarsPath = path;
+                    std::cout << "Note: Initializing MSVC environment..." << std::endl;
+                    break;
+                }
+            }
+            
+            if (vcvarsPath.empty()) {
+                std::cerr << "\nError: Microsoft Visual C++ compiler not found." << std::endl;
+                std::cerr << "\nNeutron requires MSVC to build projects on Windows." << std::endl;
+                std::cerr << "\nTo install MSVC Build Tools:" << std::endl;
+                std::cerr << "  1. Download: https://aka.ms/vs/17/release/vs_BuildTools.exe" << std::endl;
+                std::cerr << "  2. Run the installer" << std::endl;
+                std::cerr << "  3. Select 'Desktop development with C++' workload" << std::endl;
+                std::cerr << "  4. Restart your terminal after installation" << std::endl;
+                std::cerr << "\nAlternatively, run 'neutron build' from a Visual Studio Developer Command Prompt." << std::endl;
+                return false;
+            }
+        }
     } else if (isWindows && isMingw) {
         compiler = "g++";
         linkFlags = "-lcurl -ljsoncpp -lws2_32";
@@ -610,7 +644,26 @@ bool ProjectBuilder::buildProjectExecutable(
     std::cout << "Compiling..." << std::endl;
     // std::cout << "Command: " << compileCommand << std::endl;  // DEBUG: Commented out for clean output
     
-    int result = system(compileCommand.c_str());
+    // If we found vcvars but cl is not in PATH, wrap the command with vcvars
+    std::string finalCommand = compileCommand;
+    if (!vcvarsPath.empty() && isWindows && !isMingw) {
+        // Create a temporary batch file that calls vcvars and then runs the compile command
+        std::string tempBat = tempSourcePath + "_build.bat";
+        std::ofstream batFile(tempBat);
+        batFile << "@echo off\n";
+        batFile << "call \"" << vcvarsPath << "\" > nul\n";
+        batFile << compileCommand << "\n";
+        batFile.close();
+        finalCommand = tempBat;
+    }
+    
+    int result = system(finalCommand.c_str());
+    
+    // Clean up temp batch file if created
+    if (!vcvarsPath.empty() && isWindows && !isMingw) {
+        std::string tempBat = tempSourcePath + "_build.bat";
+        std::filesystem::remove(tempBat);
+    }
     
     // Clean up temp file
     std::filesystem::remove(tempSourcePath);

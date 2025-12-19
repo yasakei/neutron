@@ -121,7 +121,13 @@ sudo cp "./box" "$BIN_DIR/"
 
 # Install include files
 echo "Installing header files..."
+sudo mkdir -p "$INCLUDE_DIR"
 sudo cp -r "./include/." "$INCLUDE_DIR/"
+# Also ensure core headers are accessible
+if [ -d "./include/core" ]; then
+    sudo mkdir -p "$INCLUDE_DIR/core"
+    sudo cp -r "./include/core/." "$INCLUDE_DIR/core/"
+fi
 
 # Install library files (runtime libraries and other library files)
 echo "Installing library files..."
