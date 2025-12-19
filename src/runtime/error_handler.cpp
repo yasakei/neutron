@@ -65,15 +65,6 @@ void ErrorHandler::setSourceLines(const std::vector<std::string>& lines) {
     sourceLines = lines;
 }
 
-// Cleanup function to clear static data before library unload
-// This prevents crashes on Linux when the shared library destructor tries to free
-// memory that was allocated by a different allocator
-static void cleanupErrorHandler() __attribute__((destructor));
-static void cleanupErrorHandler() {
-    neutron::ErrorHandler::sourceLines.clear();
-    neutron::ErrorHandler::sourceLines.shrink_to_fit();
-}
-
 std::string ErrorHandler::getErrorTypeName(ErrorType type) {
     switch (type) {
         case ErrorType::SYNTAX_ERROR:     return "SyntaxError";
@@ -466,6 +457,15 @@ NeutronException::NeutronException(ErrorType type, const std::string& message,
 
 const char* NeutronException::what() const noexcept {
     return formattedMessage.c_str();
+}
+
+// Cleanup function to clear static data before library unload
+// This prevents crashes on Linux when the shared library destructor tries to free
+// memory that was allocated by a different allocator
+static void cleanupErrorHandler() __attribute__((destructor));
+static void cleanupErrorHandler() {
+    ErrorHandler::sourceLines.clear();
+    ErrorHandler::sourceLines.shrink_to_fit();
 }
 
 } // namespace neutron
