@@ -18,8 +18,12 @@ typedef struct NeutronValue NeutronValue;
     #else
         #define NEUTRON_API __declspec(dllimport)
     #endif
+    // For native module exports (always dllexport when building a module)
+    #define NEUTRON_MODULE_EXPORT __declspec(dllexport)
 #else
     #define NEUTRON_API
+    // On Unix, use visibility attribute for shared library exports
+    #define NEUTRON_MODULE_EXPORT __attribute__((visibility("default")))
 #endif
 
 // --- Value Management ---
