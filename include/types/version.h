@@ -1,4 +1,4 @@
-//v2.3.1
+//v3.0.0
 #ifndef NEUTRON_VERSION_H
 #define NEUTRON_VERSION_H
 
@@ -9,9 +9,9 @@ namespace neutron {
 class Version {
 public:
     // Version components
-    static constexpr int MAJOR = 2;
-    static constexpr int MINOR = 3;
-    static constexpr int PATCH = 1;
+    static constexpr int MAJOR = 3;
+    static constexpr int MINOR = 0;
+    static constexpr int PATCH = 0;
     static constexpr const char* STAGE = "beta";
     
     // Full version string

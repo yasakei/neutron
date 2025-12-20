@@ -9,8 +9,8 @@ This directory contains CI/CD workflows for the Neutron programming language.
 **Trigger:** On every push/PR to `main`, `release`, or `develop` branches
 
 **What it does:**
-- ✅ Builds Neutron on **Linux (Ubuntu)**, **macOS**, and **Windows (MSYS2)**
-- ✅ Runs the full test suite (`run_tests.sh`) on all platforms
+- ✅ Builds Neutron on **Linux (Ubuntu)**, **macOS**, and **Windows (Visual Studio)**
+- ✅ Runs the full test suite (`python3 run_tests.py`) on all platforms
 - ✅ Uploads build artifacts for 7 days
 - ✅ Verifies binary with `--version` check
 - ✅ Fails if any platform fails
@@ -70,7 +70,12 @@ Add these to your README.md:
 - **Dependencies:** curl, jsoncpp
 - **Package manager:** Homebrew
 
-### Windows (MSYS2 MINGW64)
+### Windows (Visual Studio)
+- **Compiler:** MSVC
+- **Dependencies:** vcpkg (curl, jsoncpp)
+- **Package manager:** vcpkg
+
+### Windows (MSYS2 MINGW64 - Alternative)
 - **Compiler:** GCC (mingw-w64)
 - **Dependencies:** mingw-w64-x86_64-{gcc,cmake,curl,jsoncpp}
 - **Package manager:** pacman

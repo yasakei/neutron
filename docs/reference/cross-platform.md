@@ -193,7 +193,19 @@ cmake --build build -j$(nproc)
 
 ### Windows
 
-**MSYS2 (Recommended):**
+**Visual Studio (Recommended):**
+```cmd
+# Install Visual Studio with C++ workload
+
+# Build
+cmake -B build -S .
+cmake --build build --config Release
+
+# Test
+build\Release\neutron.exe tests\test_cross_platform.nt
+```
+
+**MSYS2 (Alternative):**
 ```bash
 # Install MSYS2 from https://www.msys2.org/
 # Open MSYS2 MINGW64 terminal

@@ -144,7 +144,7 @@ Compile the project to a standalone native executable in the `build/` directory.
 
 **Requirements:**
 - Must be in a Neutron project directory
-- C++ compiler must be available (GCC, Clang, or MSVC)
+- C++ compiler must be available (MSVC, GCC, or Clang)
 - Entry file must exist
 
 **Output:**
@@ -476,7 +476,7 @@ Failed to create executable
 ```
 
 **Solution:**
-- Ensure C++ compiler is installed (GCC, Clang, or MSVC)
+- Ensure C++ compiler is installed (MSVC, GCC, or Clang)
 - Check compiler availability: `gcc --version` or `clang --version`
 - See [Build Guide](../guides/build.md) for platform-specific setup
 

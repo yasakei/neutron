@@ -39,7 +39,17 @@ brew install cmake curl jsoncpp
 </details>
 
 <details>
-<summary><b>Windows (MSYS2)</b></summary>
+<summary><b>Windows (Visual Studio)</b></summary>
+
+```cmd
+# Install Visual Studio with C++ workload, then:
+cmake -B build -S .
+cmake --build build --config Release
+```
+</details>
+
+<details>
+<summary><b>Windows (MSYS2 - Alternative)</b></summary>
 
 ```bash
 # In MSYS2 MINGW64 terminal:
@@ -58,22 +68,22 @@ cmake --build build -j$(nproc)
 ./neutron --version
 ```
 
-### Windows (MSYS2)
+### Windows (Visual Studio)
+```cmd
+git clone https://github.com/yasakei/neutron.git
+cd neutron
+cmake -B build -S .
+cmake --build build --config Release
+build\Release\neutron.exe --version
+```
+
+### Windows (MSYS2 - Alternative)
 ```bash
 git clone https://github.com/yasakei/neutron.git
 cd neutron
 cmake -B build -S . -G "MSYS Makefiles"
 cmake --build build -j$(nproc)
 ./neutron.exe --version
-```
-
-### Windows (Visual Studio)
-```cmd
-git clone https://github.com/yasakei/neutron.git
-cd neutron
-cmake -B build -S . -G "Visual Studio 17 2022" -DCMAKE_TOOLCHAIN_FILE=[vcpkg-root]\scripts\buildsystems\vcpkg.cmake
-cmake --build build --config Release
-build\Release\neutron.exe --version
 ```
 
 ## First Program
@@ -96,11 +106,8 @@ Run it:
 Verify your installation:
 
 ```bash
-# Linux/macOS/MSYS2
-./run_tests.sh
-
-# Windows PowerShell
-.\run_tests.ps1
+# Linux/macOS/Windows
+python3 run_tests.py
 ```
 
 Expected output:
@@ -236,6 +243,10 @@ See the [Common Pitfalls Guide](common-pitfalls.md) for more tips!
 
 **"CMake version too old"**
 - Install CMake 3.15+ from cmake.org or your package manager
+
+**Visual Studio: Missing dependencies**
+- Install Visual Studio with "Desktop development with C++" workload
+- Dependencies (curl, jsoncpp) are often available through vcpkg
 
 **MSYS2: Wrong terminal**
 - Use MINGW64 terminal, not MSYS terminal

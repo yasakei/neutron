@@ -7,9 +7,16 @@ Module::Module(const std::string& name, std::shared_ptr<Environment> env, void* 
     : name(name), env(env), handle(handle) {}
 
 Module::~Module() {
-    if (handle) {
-        dlclose(handle);
-    }
+    // NOTE: We intentionally do NOT call dlclose here.
+    // On Linux, calling dlclose can cause "free(): invalid pointer" crashes
+    // if the shared library allocated memory that's still referenced.
+    // The OS will clean up when the process exits anyway.
+    // This is a known issue with dynamic loading on Linux.
+    // 
+    // if (handle) {
+    //     dlclose(handle);
+    // }
+    (void)handle; // Suppress unused warning
 }
 
 Value Module::get(const std::string& name) {

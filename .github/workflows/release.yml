@@ -13,44 +13,8 @@ on:
         type: string
 
 jobs:
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-      version: ${{ steps.get_version.outputs.version }}
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-      
-    - name: Get version
-      id: get_version
-      run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          VERSION="${{ github.event.inputs.tag }}"
-        else
-          VERSION=${GITHUB_REF#refs/tags/}
-        fi
-        echo "version=${VERSION}" >> $GITHUB_OUTPUT
-        echo "Version: ${VERSION}"
-        
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.get_version.outputs.version }}
-        release_name: Neutron ${{ steps.get_version.outputs.version }}
-        draft: false
-        prerelease: ${{ contains(steps.get_version.outputs.version, 'alpha') || contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'rc') }}
-
   build-linux-x64:
     name: Build Linux x64 Release
-    needs: create-release
     runs-on: ubuntu-latest
     
     steps:
@@ -69,47 +33,43 @@ jobs:
           libcurl4-openssl-dev \
           libjsoncpp-dev
           
-    - name: Build Neutron
+    - name: Build Neutron Runtime
       run: |
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-        cmake --build build -j$(nproc)
-        
-    - name: Build nt-box
-      run: |
-        cd nt-box
         cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
         cmake --build build
-        cd ..
-        
-    - name: Package
+      
+    - name: Build Box Package Manager
       run: |
-        mkdir -p neutron-linux-x64
-        cp neutron neutron-linux-x64/
-        cp libneutron_runtime.a neutron-linux-x64/ 2>/dev/null || true
-        cp libneutron_runtime.so* neutron-linux-x64/ 2>/dev/null || true
-        cp README.md LICENSE neutron-linux-x64/
-        cp -r docs neutron-linux-x64/
-        cp -r include neutron-linux-x64/
-        cp -r src neutron-linux-x64/
-        cp -r libs neutron-linux-x64/
-        cp scripts/install.sh neutron-linux-x64/
-        cp nt-box/build/box neutron-linux-x64/ 2>/dev/null || true
-        tar -czf neutron-${{ needs.create-release.outputs.version }}-linux-x64.tar.gz neutron-linux-x64
+        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
+        cmake --build nt-box/build
+        cp nt-box/build/box .
+      
+    - name: Package
+      run: python3 package.py --output neutron-linux-x64
+
+    - name: Get version
+      id: get_version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.tag }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "Version: ${VERSION}"
+
+    - name: Create Release Archive
+      run: tar -czf neutron-${{ steps.get_version.outputs.version }}-linux-x64.tar.gz neutron-linux-x64
         
     - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: actions/upload-artifact@v4
       with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-linux-x64.tar.gz
-        asset_name: neutron-${{ needs.create-release.outputs.version }}-linux-x64.tar.gz
-        asset_content_type: application/gzip
+        name: neutron-linux-x64
+        path: neutron-${{ steps.get_version.outputs.version }}-linux-x64.tar.gz
 
 
   build-macos-universal:
     name: Build macOS Universal Release
-    needs: create-release
     runs-on: macos-14
     
     steps:
@@ -127,52 +87,44 @@ jobs:
         cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DBUILD_SHARED_LIBS=OFF -DJSONCPP_WITH_TESTS=OFF -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF
         sudo cmake --build build --target install
       
-    - name: Build Neutron Universal
+    - name: Build Neutron Runtime
       run: |
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
-        cmake --build build -j$(sysctl -n hw.ncpu)
-        
-    - name: Build nt-box Universal
-      run: |
-        cd nt-box
         cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
         cmake --build build
-        cd ..
-        
-    - name: Package
+      
+    - name: Build Box Package Manager
       run: |
-        mkdir -p neutron-macos-universal
-        cp neutron neutron-macos-universal/
-        cp libneutron_runtime.a neutron-macos-universal/ 2>/dev/null || true
-        cp libneutron_runtime.dylib* neutron-macos-universal/ 2>/dev/null || true
-        cp README.md LICENSE neutron-macos-universal/
-        cp -r docs neutron-macos-universal/
-        cp -r include neutron-macos-universal/
-        cp -r src neutron-macos-universal/
-        cp -r libs neutron-macos-universal/
-        cp scripts/install.sh neutron-macos-universal/
-        cp nt-box/build/box neutron-macos-universal/ 2>/dev/null || true
-        tar -czf neutron-${{ needs.create-release.outputs.version }}-macos-universal.tar.gz neutron-macos-universal
+        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
+        cmake --build nt-box/build
+        cp nt-box/build/box .
+      
+    - name: Package
+      run: python3 package.py --output neutron-macos-universal
+
+    - name: Get version
+      id: get_version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.tag }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "Version: ${VERSION}"
         
+    - name: Create Release Archive
+      run: tar -czf neutron-${{ steps.get_version.outputs.version }}-macos-universal.tar.gz neutron-macos-universal
+
     - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: actions/upload-artifact@v4
       with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-macos-universal.tar.gz
-        asset_name: neutron-${{ needs.create-release.outputs.version }}-macos-universal.tar.gz
-        asset_content_type: application/gzip
+        name: neutron-macos-universal
+        path: neutron-${{ steps.get_version.outputs.version }}-macos-universal.tar.gz
 
 
-
-  build-windows:
-    name: Build Windows x64 Release
-    needs: create-release
+  build-windows-zip:
+    name: Build Windows x64 Zip
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: msys2 {0}
     
     steps:
     - name: Checkout code
@@ -180,76 +132,179 @@ jobs:
       with:
         submodules: recursive
       
-    - name: Setup MSYS2
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: MINGW64
-        update: true
-        install: >-
-          mingw-w64-x86_64-gcc
-          mingw-w64-x86_64-cmake
-          mingw-w64-x86_64-curl
-          mingw-w64-x86_64-jsoncpp
-          mingw-w64-x86_64-nsis
-          make
-          zip
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install dependencies (vcpkg)
+      run: |
+        vcpkg install jsoncpp:x64-windows curl:x64-windows
+        vcpkg integrate install
           
-    - name: Build Neutron
+    - name: Build Neutron Runtime
       run: |
-        cmake -B build -S . -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release
-        cmake --build build -j$(nproc)
-        
-    - name: Build nt-box
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+        cmake --build build --config Release
+      
+    - name: Build Box Package Manager
       run: |
-        cd nt-box
-        cmake -B build -S . -G "MSYS Makefiles" -DCMAKE_BUILD_TYPE=Release
-        cmake --build build
-        cd ..
-        
+        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
+        cmake --build nt-box/build --config Release
+        copy nt-box\build\Release\box.exe .
+      
     - name: Package
+      run: python package.py --output neutron-windows-x64
+      shell: pwsh
+      
+    - name: Get version
+      id: get_version
+      shell: bash
       run: |
-        mkdir -p neutron-windows-x64
-        cp build/neutron.exe neutron-windows-x64/
-        cp neutron_runtime.lib neutron-windows-x64/ 2>/dev/null || true
-        cp libneutron_runtime.a neutron-windows-x64/ 2>/dev/null || true
-        cp build/*.dll neutron-windows-x64/ 2>/dev/null || true
-        # Copy ALL runtime dependencies
-        cp /mingw64/bin/*.dll neutron-windows-x64/ 2>/dev/null || true
-        cp README.md LICENSE neutron-windows-x64/
-        cp -r docs neutron-windows-x64/
-        cp -r include neutron-windows-x64/
-        cp -r src neutron-windows-x64/
-        cp -r libs neutron-windows-x64/
-        cp scripts/install.sh neutron-windows-x64/
-        cp nt-box/build/box.exe neutron-windows-x64/ 2>/dev/null || true
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.tag }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "Version: ${VERSION}"
         
-        # Create Installer
-        makensis -DVERSION="${{ needs.create-release.outputs.version }}" installer.nsi
-        mv NeutronInstaller.exe neutron-${{ needs.create-release.outputs.version }}-installer.exe
-        
-        cd neutron-windows-x64
-        zip -r ../neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip .
-        cd ..
+    - name: Create Release Archive
+      run: |
+        $Version = "${{ steps.get_version.outputs.version }}"
+        Compress-Archive -Path neutron-windows-x64 -DestinationPath "neutron-${Version}-windows-x64.zip"
+      shell: pwsh
         
     - name: Upload Release Asset (Zip)
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: actions/upload-artifact@v4
       with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip
-        asset_name: neutron-${{ needs.create-release.outputs.version }}-windows-x64.zip
-        asset_content_type: application/zip
+        name: neutron-windows-x64-zip
+        path: neutron-${{ steps.get_version.outputs.version }}-windows-x64.zip
 
+  build-windows-installer:
+    name: Build Windows x64 Installer
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+      
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install NSIS
+      run: |
+        choco install nsis -y
+        # Refresh PATH to include NSIS
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        Write-Host "NSIS installed, checking version:"
+        & "C:\Program Files (x86)\NSIS\makensis.exe" /VERSION
+      shell: pwsh
+
+    - name: Install dependencies (vcpkg)
+      run: |
+        vcpkg install jsoncpp:x64-windows curl:x64-windows
+        vcpkg integrate install
+          
+    - name: Build Neutron Runtime
+      run: |
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+        cmake --build build --config Release
+      
+    - name: Build Box Package Manager
+      run: |
+        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
+        cmake --build nt-box/build --config Release
+        copy nt-box\build\Release\box.exe .
+      
+    - name: Get version
+      id: get_version
+      shell: bash
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.tag }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "Version: ${VERSION}"
+    
+    - name: List files before installer creation
+      run: |
+        Write-Host "=== Files in root directory ==="
+        Get-ChildItem | Format-Table Name, Length, LastWriteTime
+        Write-Host "`n=== Checking for required files ==="
+        if (Test-Path "neutron.exe") { Write-Host "✓ neutron.exe found" } else { Write-Host "✗ neutron.exe NOT found" }
+        if (Test-Path "box.exe") { Write-Host "✓ box.exe found" } else { Write-Host "✗ box.exe NOT found" }
+        if (Test-Path "installer.nsi") { Write-Host "✓ installer.nsi found" } else { Write-Host "✗ installer.nsi NOT found" }
+        if (Test-Path "LICENSE") { Write-Host "✓ LICENSE found" } else { Write-Host "✗ LICENSE NOT found" }
+        Write-Host "`n=== Build directory contents ==="
+        if (Test-Path "build/Release") {
+          Get-ChildItem build/Release | Format-Table Name, Length
+        }
+      shell: pwsh
+    
+    - name: Create Installer
+      run: |
+        Write-Host "=== Creating Windows Installer ==="
+        python package.py --installer
+        Write-Host "`n=== Checking if installer was created ==="
+        if (Test-Path "NeutronInstaller.exe") {
+          Write-Host "✓ NeutronInstaller.exe created successfully"
+          $size = (Get-Item NeutronInstaller.exe).Length
+          Write-Host "File size: $size bytes ($([math]::Round($size/1MB, 2)) MB)"
+        } else {
+          Write-Host "✗ NeutronInstaller.exe NOT created"
+          Write-Host "`nListing all .exe files in current directory:"
+          Get-ChildItem *.exe
+          exit 1
+        }
+      shell: pwsh
+        
     - name: Upload Release Asset (Installer)
-      uses: actions/upload-release-asset@v1
+      uses: actions/upload-artifact@v4
+      with:
+        name: neutron-windows-x64-installer
+        path: NeutronInstaller.exe
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-linux-x64, build-macos-universal, build-windows-zip, build-windows-installer]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Get version
+      id: get_version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.tag }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "Version: ${VERSION}"
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.get_version.outputs.version }}
+        draft: false
+        prerelease: ${{ contains(steps.get_version.outputs.version, 'alpha') || contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'rc') }}
+        files: |
+          artifacts/neutron-linux-x64/*
+          artifacts/neutron-macos-universal/*
+          artifacts/neutron-windows-x64-zip/*
+          artifacts/neutron-windows-x64-installer/*
+        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./neutron-${{ needs.create-release.outputs.version }}-installer.exe
-        asset_name: neutron-${{ needs.create-release.outputs.version }}-installer.exe
-        asset_content_type: application/vnd.microsoft.portable-executable
-
-  # NOTE: Windows ARM64 build is complex to cross-compile from x64 runner
-  # We'll focus on native Windows x64, and Linux multi-arch builds below

@@ -12,6 +12,25 @@ extern "C" {
 typedef struct NeutronVM NeutronVM;
 typedef struct NeutronValue NeutronValue;
 
+#ifdef _WIN32
+    #ifdef BUILDING_NEUTRON
+        #define NEUTRON_API __declspec(dllexport)
+    #else
+        #define NEUTRON_API __declspec(dllimport)
+    #endif
+    // For native module exports (always dllexport when building a module)
+    #define NEUTRON_MODULE_EXPORT __declspec(dllexport)
+#else
+    #define NEUTRON_API
+    // On Unix, use visibility attribute for shared library exports
+    #define NEUTRON_MODULE_EXPORT __attribute__((visibility("default")))
+    // Compatibility: define __declspec as no-op on non-Windows so modules
+    // that hardcode __declspec(dllexport) still compile on Linux/macOS
+    #ifndef __declspec
+        #define __declspec(x)
+    #endif
+#endif
+
 // --- Value Management ---
 
 // Value types
@@ -23,22 +42,23 @@ typedef enum {
 } NeutronType;
 
 // Type checking
-NeutronType neutron_get_type(NeutronValue* value);
-bool neutron_is_nil(NeutronValue* value);
-bool neutron_is_boolean(NeutronValue* value);
-bool neutron_is_number(NeutronValue* value);
-bool neutron_is_string(NeutronValue* value);
+// Type checking
+NEUTRON_API NeutronType neutron_get_type(NeutronValue* value);
+NEUTRON_API bool neutron_is_nil(NeutronValue* value);
+NEUTRON_API bool neutron_is_boolean(NeutronValue* value);
+NEUTRON_API bool neutron_is_number(NeutronValue* value);
+NEUTRON_API bool neutron_is_string(NeutronValue* value);
 
 // Value getters
-bool neutron_get_boolean(NeutronValue* value);
-double neutron_get_number(NeutronValue* value);
-const char* neutron_get_string(NeutronValue* value, size_t* length);
+NEUTRON_API bool neutron_get_boolean(NeutronValue* value);
+NEUTRON_API double neutron_get_number(NeutronValue* value);
+NEUTRON_API const char* neutron_get_string(NeutronValue* value, size_t* length);
 
 // Value creators
-NeutronValue* neutron_new_nil();
-NeutronValue* neutron_new_boolean(bool value);
-NeutronValue* neutron_new_number(double value);
-NeutronValue* neutron_new_string(NeutronVM* vm, const char* chars, size_t length);
+NEUTRON_API NeutronValue* neutron_new_nil();
+NEUTRON_API NeutronValue* neutron_new_boolean(bool value);
+NEUTRON_API NeutronValue* neutron_new_number(double value);
+NEUTRON_API NeutronValue* neutron_new_string(NeutronVM* vm, const char* chars, size_t length);
 
 // --- Native Functions ---
 
@@ -46,7 +66,7 @@ NeutronValue* neutron_new_string(NeutronVM* vm, const char* chars, size_t length
 typedef NeutronValue* (*NeutronNativeFn)(NeutronVM* vm, int arg_count, NeutronValue** args);
 
 // Function for registering a native function
-void neutron_define_native(NeutronVM* vm, const char* name, NeutronNativeFn function, int arity);
+NEUTRON_API void neutron_define_native(NeutronVM* vm, const char* name, NeutronNativeFn function, int arity);
 
 #ifdef __cplusplus
 }

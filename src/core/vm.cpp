@@ -179,9 +179,8 @@ VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>"), hasException(f
 }
 
 VM::~VM() {
-    for (Object* obj : heap) {
-        delete obj;
-    }
+    // Don't manually delete objects - they should be managed by GC
+    // Just clear the heap vector
     heap.clear();
 }
 
@@ -2191,13 +2190,29 @@ void VM::load_module(const std::string& name) {
         // Create a temporary VM with the module environment as globals
         globals.clear();
         
-        void (*init_func)(VM*) = (void (*)(VM*))dlsym(handle, "neutron_module_init");
+        // Try to find the init function with various possible names
+        void (*init_func)(NeutronVM*) = nullptr;
+        
+        // Try standard C name first
+        init_func = (void (*)(NeutronVM*))dlsym(handle, "neutron_module_init");
+        
+        // If not found, try with underscore prefix (some Windows compilers add this)
         if (!init_func) {
-            dlclose(handle);
-            runtimeError(this, "Module '" + name + "' is not a valid Neutron module: missing neutron_module_init function.",
-                        frames.empty() ? -1 : frames.back().currentLine);
+            init_func = (void (*)(NeutronVM*))dlsym(handle, "_neutron_module_init");
         }
-        init_func(this);
+        
+        if (!init_func) {
+            // Get the last error message for debugging
+            const char* error_msg = dlerror();
+            dlclose(handle);
+            std::string full_error = "Module '" + name + "' is not a valid Neutron module: missing neutron_module_init function.";
+            if (error_msg) {
+                full_error += " Error: " + std::string(error_msg);
+            }
+            runtimeError(this, full_error, frames.empty() ? -1 : frames.back().currentLine);
+        }
+        
+        init_func(reinterpret_cast<NeutronVM*>(this));
         
         // Copy the defined values from globals to the module environment
         for (const auto& pair : globals) {

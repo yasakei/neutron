@@ -25,17 +25,23 @@ tests/
 
 ### Linux / macOS
 ```bash
-./run_tests.sh
+python3 run_tests.py
 ```
 
-### Windows (MSYS2)
+### Windows (Visual Studio)
+
+```cmd
+# Build first
+cmake -B build -S .
+cmake --build build --config Release
+
+# Run tests
+python run_tests.py
+```
+
+### Windows (MSYS2 - Alternative)
 ```bash
-bash run_tests.sh
-```
-
-### Windows (PowerShell)
-```powershell
-.\run_tests.ps1
+python3 run_tests.py
 ```
 
 ### Output Format
@@ -522,7 +528,7 @@ Tests work with both build systems:
 All tests pass on:
 - ✅ Linux (Ubuntu, Debian, Fedora, Arch, Alpine)
 - ✅ macOS (Intel and Apple Silicon)
-- ✅ Windows (MSYS2, Visual Studio, MinGW)
+- ✅ Windows (Visual Studio, MSYS2, MinGW)
 - ✅ BSD variants (FreeBSD, OpenBSD, NetBSD)
 
 ### Test Runner Features
@@ -576,15 +582,14 @@ for file in tests/fixes/*.nt; do ./neutron "$file"; done
    say("=== All tests passed ===");
    ```
 
-4. Run the test suite to verify: `./run_tests.sh`
+4. Run the test suite to verify: `python3 run_tests.py`
 
 5. Tests are automatically discovered by the test runner
 
 ## Integration
 
 Tests are included in:
-- `run_tests.sh` - Main test runner with directory-based organization
-- `run_tests.ps1` - PowerShell version for Windows
+- `run_tests.py` - Main test runner with directory-based organization
 - `create_release.sh` - Tests directory included in releases
 - `README.md` - Testing instructions
 - `FIXES.md` - Bug tracking with test references

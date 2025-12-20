@@ -3,34 +3,30 @@
 #include "capi.h"
 #include "types/obj_string.h"
 #include <cstring>
+#include <vector>
+
+// Thread-local storage for return values to avoid cross-library memory issues
+// Each thread gets its own return value slot that persists between calls
+static thread_local neutron::Value tls_return_value;
 
 // A C++ class that wraps a C native function
 neutron::Value CNativeFn::call(neutron::VM& vm, std::vector<neutron::Value> args) {
 
-    // Create temporary argument copies on heap
-    std::vector<neutron::Value*> temp_arg_ptrs;
+    // Use stack allocation for arguments - simpler and avoids TLS cleanup issues
     std::vector<NeutronValue*> c_args;
+    c_args.reserve(args.size());
     
-    for (const auto& arg : args) {
-        neutron::Value* temp_arg = new neutron::Value(arg);
-        temp_arg_ptrs.push_back(temp_arg);
-        c_args.push_back(reinterpret_cast<NeutronValue*>(temp_arg));
+    for (auto& arg : args) {
+        c_args.push_back(reinterpret_cast<NeutronValue*>(&arg));
     }
 
     // Call the C function
     NeutronValue* result = function(reinterpret_cast<NeutronVM*>(&vm), args.size(), c_args.data());
 
-    // Copy the result value to avoid cross-library memory deallocation issues
+    // Copy the result value
     neutron::Value cpp_result = *reinterpret_cast<neutron::Value*>(result);
     
-    // Clean up our temporary argument allocations
-    for (auto ptr : temp_arg_ptrs) {
-        delete ptr;
-    }
-    
-    // Clean up the result pointer allocated by the C function
-    // The value has been copied, so it's safe to delete the pointer
-    delete reinterpret_cast<neutron::Value*>(result);
+    // result points to tls_return_value which persists
     
     return cpp_result;
 }
@@ -90,20 +86,24 @@ const char* neutron_get_string(NeutronValue* value, size_t* length) {
 }
 
 NeutronValue* neutron_new_nil() {
-    return to_c_value(new neutron::Value());
+    tls_return_value = neutron::Value();
+    return to_c_value(&tls_return_value);
 }
 
 NeutronValue* neutron_new_boolean(bool value) {
-    return to_c_value(new neutron::Value(value));
+    tls_return_value = neutron::Value(value);
+    return to_c_value(&tls_return_value);
 }
 
 NeutronValue* neutron_new_number(double value) {
-    return to_c_value(new neutron::Value(value));
+    tls_return_value = neutron::Value(value);
+    return to_c_value(&tls_return_value);
 }
 
 NeutronValue* neutron_new_string(NeutronVM* vm, const char* chars, size_t length) {
     neutron::VM* cpp_vm = reinterpret_cast<neutron::VM*>(vm);
-    return to_c_value(new neutron::Value(cpp_vm->allocate<neutron::ObjString>(std::string(chars, length))));
+    tls_return_value = neutron::Value(cpp_vm->allocate<neutron::ObjString>(std::string(chars, length)));
+    return to_c_value(&tls_return_value);
 }
 
 // --- Native Functions ---
