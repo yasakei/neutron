@@ -20,14 +20,14 @@ tests/
 
 ### Run all tests:
 ```bash
-./run_tests.sh
+python3 run_tests.py
 ```
 
 ### Run with verbose output:
 ```bash
-./run_tests.sh -v
+python3 run_tests.py -v
 # or
-./run_tests.sh --verbose
+python3 run_tests.py --verbose
 ```
 
 ## Test Naming Convention

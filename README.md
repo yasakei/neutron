@@ -241,8 +241,8 @@ cmake -B build -G "MSYS Makefiles" && cmake --build build
 ### Running Tests
 
 ```bash
-./run_tests.sh          # Linux/macOS
-.\run_tests.ps1         # Windows PowerShell
+python3 run_tests.py          # Linux/macOS
+python3 run_tests.py
 ```
 
 The test suite includes 21 comprehensive tests covering all language features. See [Test Suite Documentation](docs/guides/test-suite.md) for details.

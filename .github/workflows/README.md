@@ -10,7 +10,7 @@ This directory contains CI/CD workflows for the Neutron programming language.
 
 **What it does:**
 - ✅ Builds Neutron on **Linux (Ubuntu)**, **macOS**, and **Windows (Visual Studio)**
-- ✅ Runs the full test suite (`run_tests.sh`) on all platforms
+- ✅ Runs the full test suite (`python3 run_tests.py`) on all platforms
 - ✅ Uploads build artifacts for 7 days
 - ✅ Verifies binary with `--version` check
 - ✅ Fails if any platform fails

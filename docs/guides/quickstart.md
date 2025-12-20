@@ -106,11 +106,8 @@ Run it:
 Verify your installation:
 
 ```bash
-# Linux/macOS/MSYS2
-./run_tests.sh
-
-# Windows PowerShell
-.\run_tests.ps1
+# Linux/macOS/Windows
+python3 run_tests.py
 ```
 
 Expected output:
