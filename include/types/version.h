@@ -12,7 +12,7 @@ public:
     static constexpr int MAJOR = 3;
     static constexpr int MINOR = 0;
     static constexpr int PATCH = 0;
-    static constexpr const char* STAGE = "testing";
+    static constexpr const char* STAGE = "beta";
     
     // Full version string
     static std::string getVersion();
