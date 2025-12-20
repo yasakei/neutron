@@ -168,8 +168,6 @@ jobs:
         copy nt-box\build\Release\box.exe .
         copy build\Release\*.dll . 2>nul || echo "No DLLs to copy"
         copy build\Release\*.lib . 2>nul || echo "No LIBs to copy"
-        copy build\*.dll . 2>nul || echo "No DLLs to copy from build root"
-        copy build\*.lib . 2>nul || echo "No LIBs to copy from build root"
       shell: cmd
       
     - name: Package
@@ -243,8 +241,6 @@ jobs:
         copy nt-box\build\Release\box.exe .
         copy build\Release\*.dll . 2>nul || echo "No DLLs to copy from Release"
         copy build\Release\*.lib . 2>nul || echo "No LIBs to copy from Release"
-        copy build\*.dll . 2>nul || echo "No DLLs to copy from build root"
-        copy build\*.lib . 2>nul || echo "No LIBs to copy from build root"
         echo "Files copied to root for installer"
       shell: cmd
       
