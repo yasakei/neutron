@@ -179,9 +179,8 @@ VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>"), hasException(f
 }
 
 VM::~VM() {
-    for (Object* obj : heap) {
-        delete obj;
-    }
+    // Don't manually delete objects - they should be managed by GC
+    // Just clear the heap vector
     heap.clear();
 }
 
