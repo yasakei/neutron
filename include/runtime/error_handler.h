@@ -60,7 +60,7 @@ public:
 private:
     static bool useColor;
     static bool showStackTrace;
-    static std::string currentFileName;
+    static std::string* currentFileName;
     static std::vector<std::string>* sourceLines;  // Cache of source code lines (pointer to avoid destruction order issues)
     static bool cleanedUp;  // Flag to prevent double cleanup
 
@@ -120,6 +120,12 @@ public:
     
     // Cleanup static data (called before library unload on Linux)
     static void cleanup();
+    
+    // Check if cleanup has been called
+    static bool isCleanedUp() { return cleanedUp; }
+    
+    // Get current filename safely
+    static std::string getCurrentFileName() { return currentFileName ? *currentFileName : ""; }
 };
 
 // Exception class for recoverable errors (e.g., in REPL mode)

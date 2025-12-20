@@ -324,8 +324,12 @@ add_executable(neutron src/core/main.cpp)
 # Define BUILDING_NEUTRON for the main executable so functions are exported
 target_compile_definitions(neutron PRIVATE BUILDING_NEUTRON)
 
-# Link executable against static runtime only (avoid shared library conflicts)
-target_link_libraries(neutron neutron_runtime)
+# Link executable against both static runtime and shared library
+if(UNIX AND NOT APPLE)
+    target_link_libraries(neutron -Wl,--whole-archive neutron_runtime -Wl,--no-whole-archive neutron_shared)
+else()
+    target_link_libraries(neutron neutron_runtime neutron_shared)
+endif()
 
 # On macOS, also link jsoncpp to the main executable to ensure the library can be found at runtime
 if(APPLE)

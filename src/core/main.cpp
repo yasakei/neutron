@@ -282,6 +282,7 @@ int main(int argc, char* argv[]) {
 
     // Default behavior: run file or REPL
     neutron::VM vm;
+    
     if (argc >= 2) {
         std::string filePath = argv[1];
         

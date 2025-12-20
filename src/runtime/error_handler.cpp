@@ -19,7 +19,7 @@ namespace neutron {
 // Initialize static members
 bool ErrorHandler::useColor = true;
 bool ErrorHandler::showStackTrace = true;
-std::string ErrorHandler::currentFileName = "";
+std::string* ErrorHandler::currentFileName = new std::string("");
 std::vector<std::string>* ErrorHandler::sourceLines = new std::vector<std::string>();
 bool ErrorHandler::cleanedUp = false;
 
@@ -59,7 +59,9 @@ void ErrorHandler::setStackTraceEnabled(bool enabled) {
 }
 
 void ErrorHandler::setCurrentFile(const std::string& fileName) {
-    currentFileName = fileName;
+    if (currentFileName) {
+        *currentFileName = fileName;
+    }
 }
 
 void ErrorHandler::setSourceLines(const std::vector<std::string>& lines) {
@@ -304,7 +306,7 @@ void ErrorHandler::reportError(const ErrorInfo& error) {
 
 void ErrorHandler::reportSyntaxError(const std::string& message, const Token& token, 
                                      const std::string& suggestion) {
-    ErrorInfo error(ErrorType::SYNTAX_ERROR, message, currentFileName, token.line, 0);
+    ErrorInfo error(ErrorType::SYNTAX_ERROR, message, currentFileName ? *currentFileName : "", token.line, 0);
     
     // Try to get the source line
     if (sourceLines && token.line > 0 && token.line <= static_cast<int>(sourceLines->size())) {
@@ -325,7 +327,7 @@ void ErrorHandler::reportSyntaxError(const std::string& message, const Token& to
 
 void ErrorHandler::reportRuntimeError(const std::string& message, const std::string& fileName,
                                       int line, const std::vector<StackFrame>& trace) {
-    ErrorInfo error(ErrorType::RUNTIME_ERROR, message, fileName.empty() ? currentFileName : fileName, line);
+    ErrorInfo error(ErrorType::RUNTIME_ERROR, message, fileName.empty() ? (currentFileName ? *currentFileName : "") : fileName, line);
     error.stackTrace = trace;
     
     // Try to get the source line
@@ -340,7 +342,7 @@ void ErrorHandler::reportRuntimeError(const std::string& message, const std::str
 
 void ErrorHandler::reportLexicalError(const std::string& message, int line, int column,
                                       const std::string& fileName) {
-    ErrorInfo error(ErrorType::LEXICAL_ERROR, message, fileName.empty() ? currentFileName : fileName, 
+    ErrorInfo error(ErrorType::LEXICAL_ERROR, message, fileName.empty() ? (currentFileName ? *currentFileName : "") : fileName, 
                    line, column);
     
     // Try to get the source line
@@ -356,7 +358,7 @@ void ErrorHandler::reportLexicalError(const std::string& message, int line, int 
 void ErrorHandler::typeError(const std::string& expected, const std::string& got, 
                              const std::string& fileName, int line) {
     std::string message = "Expected " + expected + " but got " + got;
-    ErrorInfo error(ErrorType::TYPE_ERROR, message, fileName.empty() ? currentFileName : fileName, line);
+    ErrorInfo error(ErrorType::TYPE_ERROR, message, fileName.empty() ? ErrorHandler::getCurrentFileName() : fileName, line);
     error.suggestion = getSuggestion(ErrorType::TYPE_ERROR, message);
     reportError(error);
 }
@@ -364,13 +366,13 @@ void ErrorHandler::typeError(const std::string& expected, const std::string& got
 void ErrorHandler::referenceError(const std::string& name, const std::string& fileName, 
                                   int line, bool isFunction) {
     std::string message = "Undefined " + std::string(isFunction ? "function" : "variable") + " '" + name + "'";
-    ErrorInfo error(ErrorType::REFERENCE_ERROR, message, fileName.empty() ? currentFileName : fileName, line);
+    ErrorInfo error(ErrorType::REFERENCE_ERROR, message, fileName.empty() ? ErrorHandler::getCurrentFileName() : fileName, line);
     error.suggestion = getSuggestion(ErrorType::REFERENCE_ERROR, message);
     reportError(error);
 }
 
 void ErrorHandler::rangeError(const std::string& message, const std::string& fileName, int line) {
-    ErrorInfo error(ErrorType::RANGE_ERROR, message, fileName.empty() ? currentFileName : fileName, line);
+    ErrorInfo error(ErrorType::RANGE_ERROR, message, fileName.empty() ? ErrorHandler::getCurrentFileName() : fileName, line);
     error.suggestion = getSuggestion(ErrorType::RANGE_ERROR, message);
     reportError(error);
 }
@@ -379,21 +381,21 @@ void ErrorHandler::argumentError(int expected, int got, const std::string& funct
                                 const std::string& fileName, int line) {
     std::string message = "Function '" + functionName + "' expects " + std::to_string(expected) + 
                          " argument" + (expected != 1 ? "s" : "") + " but got " + std::to_string(got);
-    ErrorInfo error(ErrorType::ARGUMENT_ERROR, message, fileName.empty() ? currentFileName : fileName, line);
+    ErrorInfo error(ErrorType::ARGUMENT_ERROR, message, fileName.empty() ? ErrorHandler::getCurrentFileName() : fileName, line);
     error.suggestion = getSuggestion(ErrorType::ARGUMENT_ERROR, message);
     reportError(error);
 }
 
 void ErrorHandler::divisionError(const std::string& fileName, int line) {
     std::string message = "Division by zero is not allowed";
-    ErrorInfo error(ErrorType::DIVISION_ERROR, message, fileName.empty() ? currentFileName : fileName, line);
+    ErrorInfo error(ErrorType::DIVISION_ERROR, message, fileName.empty() ? ErrorHandler::getCurrentFileName() : fileName, line);
     error.suggestion = "Check that the divisor is not zero before performing division or modulo operations.";
     reportError(error);
 }
 
 void ErrorHandler::stackOverflowError(const std::string& fileName, int line) {
     std::string message = "Stack overflow - maximum call depth exceeded";
-    ErrorInfo error(ErrorType::STACK_ERROR, message, fileName.empty() ? currentFileName : fileName, line);
+    ErrorInfo error(ErrorType::STACK_ERROR, message, fileName.empty() ? ErrorHandler::getCurrentFileName() : fileName, line);
     error.suggestion = "This usually indicates infinite recursion. Check your recursive function calls.";
     reportError(error);
 }
@@ -401,7 +403,7 @@ void ErrorHandler::stackOverflowError(const std::string& fileName, int line) {
 void ErrorHandler::moduleError(const std::string& moduleName, const std::string& reason,
                                const std::string& fileName, int line) {
     std::string message = "Failed to load module '" + moduleName + "': " + reason;
-    ErrorInfo error(ErrorType::MODULE_ERROR, message, fileName.empty() ? currentFileName : fileName, line);
+    ErrorInfo error(ErrorType::MODULE_ERROR, message, fileName.empty() ? ErrorHandler::getCurrentFileName() : fileName, line);
     error.suggestion = getSuggestion(ErrorType::MODULE_ERROR, message);
     reportError(error);
 }
@@ -427,7 +429,7 @@ void ErrorHandler::printLine(const std::string& content, bool error) {
 }
 
 [[noreturn]] void ErrorHandler::fatal(const std::string& message, ErrorType type) {
-    ErrorInfo error(type, message, currentFileName);
+    ErrorInfo error(type, message, getCurrentFileName());
     fatal(error);
 }
 
@@ -463,20 +465,21 @@ const char* NeutronException::what() const noexcept {
 }
 
 void ErrorHandler::cleanup() {
-    if (cleanedUp || !sourceLines) return;  // Prevent double cleanup
+    if (cleanedUp) return;  // Prevent double cleanup
     cleanedUp = true;
-    delete sourceLines;
-    sourceLines = nullptr;
+    
+    if (sourceLines) {
+        delete sourceLines;
+        sourceLines = nullptr;
+    }
+    
+    if (currentFileName) {
+        delete currentFileName;
+        currentFileName = nullptr;
+    }
 }
 
 } // namespace neutron
 
-// Cleanup function to clear static data before library unload
-// This prevents crashes on Linux when the shared library destructor tries to free
-// memory that was allocated by a different allocator
-#ifndef _WIN32
-__attribute__((destructor))
-#endif
-static void cleanupErrorHandler() {
-    neutron::ErrorHandler::cleanup();
-}
+// Note: Destructor attribute disabled to prevent conflicts with manual cleanup
+// Manual cleanup in main() is sufficient for proper resource management
