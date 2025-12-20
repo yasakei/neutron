@@ -214,7 +214,7 @@ Write performance-critical code in C++ and call it from Neutron
 |----------|-------------|
 | **Linux** | GCC/Clang, CMake 3.15+, libcurl, libjsoncpp |
 | **macOS** | Xcode Command Line Tools, CMake, curl, jsoncpp |
-| **Windows** | MSYS2/MinGW-w64 or Visual Studio 2019+, CMake |
+| **Windows** | Visual Studio 2019+ or MSYS2/MinGW-w64, CMake |
 
 ### Build from Source
 
@@ -227,7 +227,10 @@ cmake -B build && cmake --build build -j$(nproc)
 brew install cmake curl jsoncpp
 cmake -B build && cmake --build build -j$(sysctl -n hw.ncpu)
 
-# Windows (MSYS2 MINGW64)
+# Windows (Visual Studio)
+cmake -B build && cmake --build build --config Release
+
+# Windows (MSYS2 MINGW64 - Alternative)
 pacman -S mingw-w64-x86_64-{gcc,cmake,curl,jsoncpp} make
 cmake -B build -G "MSYS Makefiles" && cmake --build build
 ```

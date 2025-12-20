@@ -151,7 +151,7 @@ benchmarks/
 
 - **Neutron**: Built binary in project root or `build/` directory
 - **Python**: Python 3.7+ with `bc` utility for calculations
-- **System**: Linux, macOS, or MSYS2 on Windows
+- **System**: Linux, macOS, or Windows (Visual Studio/MSYS2)
 
 ## Adding New Benchmarks
 

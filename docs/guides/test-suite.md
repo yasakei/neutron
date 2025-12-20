@@ -28,7 +28,18 @@ tests/
 ./run_tests.sh
 ```
 
-### Windows (MSYS2)
+### Windows (Visual Studio)
+
+```cmd
+# Build first
+cmake -B build -S .
+cmake --build build --config Release
+
+# Run tests
+python run_tests.py
+```
+
+### Windows (MSYS2 - Alternative)
 ```bash
 bash run_tests.sh
 ```
@@ -522,7 +533,7 @@ Tests work with both build systems:
 All tests pass on:
 - ✅ Linux (Ubuntu, Debian, Fedora, Arch, Alpine)
 - ✅ macOS (Intel and Apple Silicon)
-- ✅ Windows (MSYS2, Visual Studio, MinGW)
+- ✅ Windows (Visual Studio, MSYS2, MinGW)
 - ✅ BSD variants (FreeBSD, OpenBSD, NetBSD)
 
 ### Test Runner Features

@@ -68,7 +68,7 @@ box build native mymodule
 ```
 
 This will:
-- Detect your system's C++ compiler (GCC, Clang, MSVC, MinGW)
+- Detect your system's C++ compiler (MSVC, GCC, Clang, MinGW)
 - Compile `native.cpp` with the Neutron headers
 - Link against the Neutron runtime (using dynamic symbol resolution)
 - Install to `.box/modules/mymodule/`

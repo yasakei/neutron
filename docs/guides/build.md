@@ -222,7 +222,43 @@ open build/neutron.xcodeproj
 
 ## Windows
 
-### MSYS2 (Recommended)
+### Visual Studio 2019/2022 (Recommended)
+
+Visual Studio provides the most robust Windows development environment with excellent debugging and IntelliSense support.
+
+```cmd
+REM 1. Install Visual Studio with C++ Desktop Development workload
+REM    Download from: https://visualstudio.microsoft.com/
+
+REM 2. Clone Neutron repository
+git clone https://github.com/yasakei/neutron.git
+cd neutron
+
+REM 3. Install vcpkg (optional - for easier dependency management)
+git submodule add https://github.com/microsoft/vcpkg.git vcpkg
+./vcpkg/bootstrap-vcpkg.bat
+./vcpkg/vcpkg install curl:x64-windows jsoncpp:x64-windows
+
+REM 4. Build using package script (recommended)
+python package.py --output neutron-windows-x64
+
+REM Or build manually
+cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+
+REM Build Box package manager
+cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
+cmake --build nt-box/build --config Release
+
+REM 5. Verify
+.\neutron-windows-x64\neutron.exe --version
+.\neutron-windows-x64\box.exe --version
+
+REM 6. Run tests
+python run_tests.py
+```
+
+### MSYS2 (Alternative)
 
 MSYS2 provides a Unix-like environment on Windows with easy package management.
 
@@ -270,42 +306,7 @@ cmake --build nt-box/build -j$(nproc)
 python run_tests.py
 ```
 
-### Visual Studio 2019/2022 with vcpkg [powershell]
 
-```pwsh
-REM 1. Install Visual Studio with C++ Desktop Development workload
-REM    Download from: https://visualstudio.microsoft.com/
-
-REM 2. Clone Neutron repository
-git clone https://github.com/yasakei/neutron.git
-cd neutron
-
-REM 3. Install vcpkg
-git submodule add https://github.com/microsoft/vcpkg.git vcpkg
-./vcpkg/bootstrap-vcpkg.bat
-
-REM 4. Install dependencies
-./vcpkg/vcpkg install dlfcn-win32 curl:x64-windows jsoncpp:x64-windows                                
-
-
-REM 5. Build using package script (recommended)
-python package.py --output neutron-windows-x64
-
-REM Or build manually
-cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake
-cmake --build build --config Release
-
-REM Build Box package manager
-cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
-cmake --build nt-box/build --config Release
-
-REM 6. Verify
-.\neutron-windows-x64\neutron.exe --version
-.\neutron-windows-x64\box.exe --version
-
-REM 7. Run tests
-python run_tests.py
-```
 
 ### MinGW-w64 (Alternative)
 
