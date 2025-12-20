@@ -31,6 +31,80 @@ class Colors:
                 safe_text = text.encode(sys.stdout.encoding, errors='replace').decode(sys.stdout.encoding)
             print(safe_text, end=end)
 
+def run_box_test(neutron_bin, root_dir):
+    """Run box module installation and test"""
+    Colors.print("Testing: box module", Colors.BLUE)
+    
+    # Find box binary
+    is_windows = platform.system() == "Windows"
+    box_name = "box.exe" if is_windows else "box"
+    
+    box_paths = [
+        os.path.join(root_dir, "build", box_name),
+        os.path.join(root_dir, "build", "Release", box_name),
+        os.path.join(root_dir, "build", "Debug", box_name),
+        os.path.join(root_dir, "nt-box", "build", box_name),
+        os.path.join(root_dir, "nt-box", "build", "Release", box_name),
+        os.path.join(root_dir, "nt-box", "build", "Debug", box_name),
+    ]
+    
+    box_bin = None
+    for p in box_paths:
+        if os.path.exists(p):
+            box_bin = p
+            break
+    
+    # Check system PATH
+    if not box_bin:
+        try:
+            which_cmd = "where" if is_windows else "which"
+            result = subprocess.run([which_cmd, "box"], capture_output=True)
+            if result.returncode == 0:
+                box_bin = "box"
+        except:
+            pass
+    
+    if not box_bin:
+        print(f"  ", end="")
+        Colors.print("[SKIP]", Colors.YELLOW, end="")
+        print(f" box binary not found")
+        return 0, 0
+    
+    try:
+        # Install base64 module
+        result = subprocess.run([box_bin, "install", "base64"], capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"  ", end="")
+            Colors.print("[FAIL]", Colors.RED, end="")
+            print(f" box install base64")
+            print(f"    {result.stderr}")
+            return 0, 1
+        
+        # Run the test
+        test_file = os.path.join(root_dir, "tests", "box_base64_test.nt")
+        result = subprocess.run([neutron_bin, test_file], capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            print(f"  ", end="")
+            Colors.print("[PASS]", Colors.GREEN, end="")
+            print(f" box_base64_test")
+            return 1, 0
+        else:
+            print(f"  ", end="")
+            Colors.print("[FAIL]", Colors.RED, end="")
+            print(f" box_base64_test")
+            output = result.stdout + result.stderr
+            for line in output.splitlines():
+                print(f"    {line}")
+            return 0, 1
+            
+    except Exception as e:
+        print(f"  ", end="")
+        Colors.print("[FAIL]", Colors.RED, end="")
+        print(f" box_base64_test (Exception)")
+        print(f"    {str(e)}")
+        return 0, 1
+
 def main():
     root_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(root_dir)
@@ -140,6 +214,18 @@ def main():
         print(", ", end="")
         Colors.print(f"{dir_failed} failed", Colors.RED)
         print()
+
+    # Run box test
+    box_passed, box_failed = run_box_test(neutron_bin, root_dir)
+    total_passed += box_passed
+    total_failed += box_failed
+    if box_failed > 0:
+        failed_tests.append("tests/box_base64_test.nt")
+    print("  Summary: ", end="")
+    Colors.print(f"{box_passed} passed", Colors.GREEN, end="")
+    print(", ", end="")
+    Colors.print(f"{box_failed} failed", Colors.RED)
+    print()
 
     # Final summary
     Colors.print("==== FINAL SUMMARY ====", Colors.CYAN)

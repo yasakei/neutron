@@ -1,0 +1,3 @@
+use base64;
+var x = base64.encode("Hello World!");
+say(x);
