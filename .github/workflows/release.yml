@@ -42,7 +42,13 @@ jobs:
       run: |
         cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
         cmake --build nt-box/build
+      
+    - name: Copy binaries and libraries to root for packaging
+      run: |
+        cp build/neutron .
         cp nt-box/build/box .
+        cp build/*.so . 2>/dev/null || echo "No .so files to copy"
+        cp build/*.a . 2>/dev/null || echo "No .a files to copy"
       
     - name: Package
       run: python3 package.py --output neutron-linux-x64
@@ -96,7 +102,13 @@ jobs:
       run: |
         cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
         cmake --build nt-box/build
+      
+    - name: Copy binaries and libraries to root for packaging
+      run: |
+        cp build/neutron .
         cp nt-box/build/box .
+        cp build/*.dylib . 2>/dev/null || echo "No .dylib files to copy"
+        cp build/*.a . 2>/dev/null || echo "No .a files to copy"
       
     - name: Package
       run: python3 package.py --output neutron-macos-universal
@@ -149,7 +161,16 @@ jobs:
       run: |
         cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
         cmake --build nt-box/build --config Release
+      
+    - name: Copy binaries to root for packaging
+      run: |
+        copy build\Release\neutron.exe .
         copy nt-box\build\Release\box.exe .
+        copy build\Release\*.dll . 2>nul || echo "No DLLs to copy"
+        copy build\Release\*.lib . 2>nul || echo "No LIBs to copy"
+        copy build\*.dll . 2>nul || echo "No DLLs to copy from build root"
+        copy build\*.lib . 2>nul || echo "No LIBs to copy from build root"
+      shell: cmd
       
     - name: Package
       run: python package.py --output neutron-windows-x64
@@ -215,7 +236,17 @@ jobs:
       run: |
         cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
         cmake --build nt-box/build --config Release
+      
+    - name: Copy binaries and dependencies to root for installer
+      run: |
+        copy build\Release\neutron.exe .
         copy nt-box\build\Release\box.exe .
+        copy build\Release\*.dll . 2>nul || echo "No DLLs to copy from Release"
+        copy build\Release\*.lib . 2>nul || echo "No LIBs to copy from Release"
+        copy build\*.dll . 2>nul || echo "No DLLs to copy from build root"
+        copy build\*.lib . 2>nul || echo "No LIBs to copy from build root"
+        echo "Files copied to root for installer"
+      shell: cmd
       
     - name: Get version
       id: get_version
