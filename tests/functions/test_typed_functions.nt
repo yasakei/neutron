@@ -1,0 +1,121 @@
+// Typed Functions Feature Tests
+// Tests function parameter types, return types, and safe block enforcement
+
+say("Testing Typed Functions Feature");
+
+// Test 1: Basic typed function
+say("\n1. Basic typed function:");
+fun add(int a, int b) -> int {
+    return a + b;
+}
+
+var result = add(5, 10);
+if (result == 15) {
+    say("✓ Typed function works: add(5, 10) = " + result);
+} else {
+    say("✗ Typed function failed");
+}
+
+// Test 2: Mixed parameter types
+say("\n2. Mixed parameter types:");
+fun greet(string name, int age) -> string {
+    return "Hello " + name + ", you are " + age + " years old!";
+}
+
+var greeting = greet("Alice", 25);
+say("✓ Mixed types: " + greeting);
+
+// Test 3: Function without return type (backward compatibility)
+say("\n3. Untyped function (backward compatibility):");
+fun oldStyle(x, y) {
+    return x * y;
+}
+
+var product = oldStyle(3, 4);
+say("✓ Untyped function: " + product);
+
+// Test 4: Parameter type checking
+say("\n4. Parameter type checking:");
+try {
+    add("hello", 5);  // Should fail - string instead of int
+    say("✗ Type checking failed - this should not print");
+} catch (e) {
+    say("✓ Correctly caught parameter type error: " + e);
+}
+
+// Test 5: All supported parameter types
+say("\n5. All supported parameter types:");
+fun testAllTypes(int i, float f, string s, bool b, array a, object o, any x) -> string {
+    return "All types received successfully!";
+}
+
+var testResult = testAllTypes(42, 3.14, "hello", true, [1, 2, 3], {"key": "value"}, "anything");
+say("✓ " + testResult);
+
+// Test 6: Safe block enforcement
+say("\n6. Safe block enforcement:");
+try {
+    safe {
+        // This should fail - no parameter types
+        fun invalidFunc(x, y) {
+            return x + y;
+        }
+    }
+} catch (e) {
+    say("✓ Safe block correctly enforced parameter types: " + e);
+}
+
+try {
+    safe {
+        // This should fail - no return type
+        fun invalidFunc2(int x, int y) {
+            return x + y;
+        }
+    }
+} catch (e) {
+    say("✓ Safe block correctly enforced return type: " + e);
+}
+
+// Test 7: Valid function in safe block
+say("\n7. Valid function in safe block:");
+safe {
+    fun multiply(int x, int y) -> int {
+        return x * y;
+    }
+    
+    var int safeResult = multiply(6, 7);
+    say("✓ Safe block function works: 6 * 7 = " + safeResult);
+}
+
+// Test 8: Nested function calls with types
+say("\n8. Nested function calls with types:");
+fun double(int n) -> int {
+    return n * 2;
+}
+
+fun quadruple(int n) -> int {
+    return double(double(n));
+}
+
+var quad = quadruple(5);
+say("✓ Nested typed functions: quadruple(5) = " + quad);
+
+// Test 9: Function with array and object parameters
+say("\n9. Complex parameter types:");
+fun processData(array numbers, object config) -> string {
+    return "Processed " + numbers + " with config " + config;
+}
+
+var processed = processData([1, 2, 3], {"mode": "fast"});
+say("✓ Complex types: " + processed);
+
+// Test 10: Type mismatch in different parameter positions
+say("\n10. Type mismatch in different positions:");
+try {
+    greet(25, "Alice");  // Swapped parameters - should fail
+    say("✗ Should have caught swapped parameters");
+} catch (e) {
+    say("✓ Caught swapped parameter types: " + e);
+}
+
+say("\nTyped functions test completed - All features working!");

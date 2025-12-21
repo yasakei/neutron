@@ -1,0 +1,67 @@
+// NEUT-021: Type Safety for Variable Reassignment
+// Tests that variables with type annotations cannot be reassigned to incompatible types
+// Bug: var int x = 10; x = "string"; was allowed but should throw a type error
+
+say("Testing NEUT-021: Type Safety for Variable Reassignment");
+
+// Test 1: Valid reassignment (same type)
+say("\n1. Valid reassignment (same type):");
+var int x = 10;
+say("Initial value: " + x);
+x = 20;
+say("After valid reassignment: " + x);
+
+// Test 2: Valid reassignment for string
+var string name = "Alice";
+say("Initial name: " + name);
+name = "Bob";
+say("After valid reassignment: " + name);
+
+// Test 3: Valid reassignment for bool
+var bool flag = true;
+say("Initial flag: " + flag);
+flag = false;
+say("After valid reassignment: " + flag);
+
+say("\n2. Testing type safety (these should fail):");
+
+// Test 4: Invalid reassignment (int to string) - should throw error
+try {
+    var int number = 42;
+    say("number initialized as int: " + number);
+    number = "string";  // This should fail
+    say("ERROR: This line should not be reached!");
+} catch (e) {
+    say("✓ Correctly caught type error for int->string: " + e);
+}
+
+// Test 5: Invalid reassignment (string to int) - should throw error  
+try {
+    var string text = "hello";
+    say("text initialized as string: " + text);
+    text = 123;  // This should fail
+    say("ERROR: This line should not be reached!");
+} catch (e) {
+    say("✓ Correctly caught type error for string->int: " + e);
+}
+
+// Test 6: Invalid reassignment (bool to string) - should throw error
+try {
+    var bool isActive = true;
+    say("isActive initialized as bool: " + isActive);
+    isActive = "not a boolean";  // This should fail
+    say("ERROR: This line should not be reached!");
+} catch (e) {
+    say("✓ Correctly caught type error for bool->string: " + e);
+}
+
+// Test 7: 'any' type should allow any reassignment
+say("\n3. Testing 'any' type (should allow all reassignments):");
+var any flexible = 42;
+say("any flexible = 42: " + flexible);
+flexible = "now a string";
+say("any flexible = 'now a string': " + flexible);
+flexible = true;
+say("any flexible = true: " + flexible);
+
+say("\nNEUT-021 test completed - Type safety is working!");

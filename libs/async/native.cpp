@@ -119,11 +119,9 @@ static Value async_await(VM& vm, const std::vector<Value>& args) {
     if (args[0].type == ValueType::ARRAY) {
         Array* arr = std::get<Array*>(args[0].as);
         futureObj = dynamic_cast<FutureObject*>(arr);
-        std::cout << "async_await: got FutureObject from ARRAY, id=" << (futureObj ? futureObj->id : -1) << std::endl;
     } else if (args[0].type == ValueType::OBJECT) {
         Object* obj = std::get<Object*>(args[0].as);
         futureObj = dynamic_cast<FutureObject*>(obj);
-        std::cout << "async_await: got FutureObject from OBJECT, id=" << (futureObj ? futureObj->id : -1) << std::endl;
     }
     
     if (!futureObj) {
@@ -132,17 +130,14 @@ static Value async_await(VM& vm, const std::vector<Value>& args) {
     
     // Wait for the thread to finish if it's still running
     if (futureObj->handle->thread.joinable()) {
-        std::cout << "async_await: joining thread for id=" << futureObj->id << std::endl;
         // Release lock to allow async thread to run
         int count = vm.unlock_fully();
         futureObj->handle->thread.join();
         vm.relock(count);
-        std::cout << "async_await: thread joined for id=" << futureObj->id << ", result=" << futureObj->handle->result.toString() << std::endl;
     }
     
     // Return the stored result
     if (futureObj->handle->completed) {
-        std::cout << "async_await: returning result for id=" << futureObj->id << ": " << futureObj->handle->result.toString() << std::endl;
         return futureObj->handle->result;
     }
     

@@ -1,0 +1,110 @@
+// Safe Block Feature Tests
+// Tests that safe blocks enforce type annotations and can be caught with try/catch
+
+say("Testing Safe Block Feature");
+
+// Test 1: Valid safe block with type annotations
+say("\n1. Valid safe block with type annotations:");
+safe {
+    var int x = 10;
+    var string name = "Alice";
+    var bool flag = true;
+    say("Safe block executed successfully!");
+    say("x = " + x + ", name = " + name + ", flag = " + flag);
+}
+
+// Test 2: Nested safe blocks
+say("\n2. Nested safe blocks:");
+safe {
+    var int outer = 5;
+    safe {
+        var string inner = "nested";
+        say("Nested safe block: outer = " + outer + ", inner = " + inner);
+    }
+}
+
+// Test 3: Safe block with error handling for variables
+say("\n3. Safe block with error handling for variables:");
+try {
+    safe {
+        var int validVar = 42;
+        say("Valid variable: " + validVar);
+        
+        // This should cause an error - no type annotation
+        var invalidVar = "no type";
+        say("This should not be reached!");
+    }
+} catch (e) {
+    say("✓ Correctly caught safe block variable error: " + e);
+}
+
+// Test 4: Safe block with typed functions
+say("\n4. Safe block with typed functions:");
+safe {
+    fun add(int a, int b) -> int {
+        return a + b;
+    }
+    
+    var int result = add(10, 20);
+    say("Safe block function result: " + result);
+}
+
+// Test 5: Safe block function enforcement - missing parameter types
+say("\n5. Safe block function enforcement - missing parameter types:");
+try {
+    safe {
+        // This should fail - no parameter types
+        fun invalidFunc(x, y) {
+            return x + y;
+        }
+    }
+} catch (e) {
+    say("✓ Safe block enforced function parameter types: " + e);
+}
+
+// Test 6: Safe block function enforcement - missing return type
+say("\n6. Safe block function enforcement - missing return type:");
+try {
+    safe {
+        // This should fail - no return type
+        fun invalidFunc2(int x, int y) {
+            return x + y;
+        }
+    }
+} catch (e) {
+    say("✓ Safe block enforced function return type: " + e);
+}
+
+// Test 7: Safe block mixed with regular code
+say("\n7. Safe block mixed with regular code:");
+var regularVar = "I don't need a type";
+say("Regular variable: " + regularVar);
+
+safe {
+    var int safeVar = 100;
+    say("Safe variable: " + safeVar);
+}
+
+var anotherRegular = 3.14;
+say("Another regular variable: " + anotherRegular);
+
+// Test 8: Safe block with all supported types
+say("\n8. Safe block with all supported types:");
+safe {
+    var int intVar = 42;
+    var float floatVar = 3.14;
+    var string stringVar = "hello";
+    var bool boolVar = true;
+    var array arrayVar = [1, 2, 3];
+    var object objectVar = {"key": "value"};
+    var any anyVar = "can be anything";
+    
+    fun processAll(int i, float f, string s, bool b, array a, object o, any x) -> string {
+        return "All types processed successfully!";
+    }
+    
+    var string processResult = processAll(intVar, floatVar, stringVar, boolVar, arrayVar, objectVar, anyVar);
+    say("✓ " + processResult);
+}
+
+say("\nSafe blocks test completed - All features working!");

@@ -1,0 +1,7 @@
+// var age = 12;
+// var status = age >= 18 ? "Adult" : "Minor";
+// say(status); // "Adult"
+
+var sal = 130;
+var sal_out = sal <= 120 ? "Less":"Moderate";
+say(sal_out);
