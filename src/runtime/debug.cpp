@@ -167,6 +167,10 @@ size_t disassembleInstruction(const Chunk* chunk, size_t offset) {
             return simpleInstruction("OP_VALIDATE_SAFE_FUNCTION", offset);
         case OpCode::OP_VALIDATE_SAFE_VARIABLE:
             return constantInstruction("OP_VALIDATE_SAFE_VARIABLE", chunk, offset);
+        case OpCode::OP_VALIDATE_SAFE_FILE_FUNCTION:
+            return simpleInstruction("OP_VALIDATE_SAFE_FILE_FUNCTION", offset);
+        case OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE:
+            return constantInstruction("OP_VALIDATE_SAFE_FILE_VARIABLE", chunk, offset);
         case OpCode::OP_LOGICAL_OR:
             return simpleInstruction("OP_LOGICAL_OR", offset);
         case OpCode::OP_CLOSURE:

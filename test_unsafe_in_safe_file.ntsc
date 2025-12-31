@@ -1,0 +1,6 @@
+// This should fail because it has untyped variables in a .ntsc file
+
+var int x = 10;  // This is fine
+var y = 20;      // This should fail - no type annotation
+
+say("This should not run!");

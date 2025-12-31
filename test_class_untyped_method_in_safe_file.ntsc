@@ -1,0 +1,9 @@
+// Test class with untyped method - should fail in .ntsc file
+
+class BadClass {
+    fun badMethod(x, y) {  // Missing parameter types - should fail
+        return x + y;
+    }
+}
+
+say("This should not run!");

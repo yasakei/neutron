@@ -1,6 +1,6 @@
 /*
  * Neutron Programming Language - Project Builder
- * Copyright (c) 2025 yasakei
+ * Copyright (c) 2026 yasakei
  */
 
 #ifndef NEUTRON_PROJECT_BUILDER_H

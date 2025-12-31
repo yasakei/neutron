@@ -17,7 +17,7 @@ struct Local {
 
 class Compiler {
 public:
-    Compiler(VM& vm);
+    Compiler(VM& vm, bool isSafeFile = false);
     Compiler(Compiler* enclosing);
     Function* compile(const std::vector<std::unique_ptr<Stmt>>& statements);
     Function* compile(const FunctionStmt* stmt, const std::vector<std::unique_ptr<Stmt>>& body);
@@ -95,6 +95,9 @@ public:
     
     // Track if we're currently in a safe block (enforces type annotations)
     bool inSafeBlock;
+    
+    // Track if we're compiling a safe file (.ntsc)
+    bool isSafeFile;
 };
 } // namespace neutron
 
