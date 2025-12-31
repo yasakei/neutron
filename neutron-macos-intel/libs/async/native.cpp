@@ -1,6 +1,6 @@
 /*
  * Neutron Programming Language
- * Copyright (c) 2025 yasakei
+ * Copyright (c) 2026 yasakei
  * 
  * This software is distributed under the Neutron Public License 1.0.
  * For full license text, see LICENSE file in the root directory.
@@ -109,7 +109,20 @@ static Value async_run(VM& vm, const std::vector<Value>& args) {
     return Value(futureObj);
 }
 
-// Function to await the result of an async operation
+/**
+ * @brief Await completion of an asynchronous handle and return its result.
+ *
+ * Waits for the provided async handle to finish. While blocking for the worker
+ * to complete, the function releases the VM lock so the worker may run and
+ * then restores the lock before returning. Throws if the call-site does not
+ * supply exactly one argument or if that argument is not an async handle.
+ *
+ * @param vm VM instance used for locking while waiting.
+ * @param args A single argument: an async handle (a FutureObject supplied as an Array or Object).
+ * @return Value The result produced by the asynchronous operation, or a default Value if no result is available.
+ *
+ * @throws std::runtime_error If the argument count is not 1 or the argument is not an async handle.
+ */
 static Value async_await(VM& vm, const std::vector<Value>& args) {
     if (args.size() != 1) {
         throw std::runtime_error("async.await() expects 1 argument (async handle)");
@@ -119,11 +132,9 @@ static Value async_await(VM& vm, const std::vector<Value>& args) {
     if (args[0].type == ValueType::ARRAY) {
         Array* arr = std::get<Array*>(args[0].as);
         futureObj = dynamic_cast<FutureObject*>(arr);
-        std::cout << "async_await: got FutureObject from ARRAY, id=" << (futureObj ? futureObj->id : -1) << std::endl;
     } else if (args[0].type == ValueType::OBJECT) {
         Object* obj = std::get<Object*>(args[0].as);
         futureObj = dynamic_cast<FutureObject*>(obj);
-        std::cout << "async_await: got FutureObject from OBJECT, id=" << (futureObj ? futureObj->id : -1) << std::endl;
     }
     
     if (!futureObj) {
@@ -132,17 +143,14 @@ static Value async_await(VM& vm, const std::vector<Value>& args) {
     
     // Wait for the thread to finish if it's still running
     if (futureObj->handle->thread.joinable()) {
-        std::cout << "async_await: joining thread for id=" << futureObj->id << std::endl;
         // Release lock to allow async thread to run
         int count = vm.unlock_fully();
         futureObj->handle->thread.join();
         vm.relock(count);
-        std::cout << "async_await: thread joined for id=" << futureObj->id << ", result=" << futureObj->handle->result.toString() << std::endl;
     }
     
     // Return the stored result
     if (futureObj->handle->completed) {
-        std::cout << "async_await: returning result for id=" << futureObj->id << ": " << futureObj->handle->result.toString() << std::endl;
         return futureObj->handle->result;
     }
     

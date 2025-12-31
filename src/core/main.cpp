@@ -1,6 +1,6 @@
 /*
  * Neutron Programming Language
- * Copyright (c) 2025 yasakei
+ * Copyright (c) 2026 yasakei
  * 
  * This software is distributed under the Neutron Public License 1.0.
  * For full license text, see LICENSE file in the root directory.
@@ -36,12 +36,19 @@
 #include "project/project_config.h"
 #include "project/project_builder.h"
 #include "platform/platform.h"
-
-void run(const std::string& source, neutron::VM& vm);
 void runFile(const std::string& path, neutron::VM& vm);
 void runPrompt(neutron::VM& vm);
 
-void run(const std::string& source, neutron::VM& vm) {
+/**
+ * @brief Compiles and executes Neutron source code in the given virtual machine.
+ *
+ * Sets up source-aware error reporting (source lines, colored output, and stack traces),
+ * compiles the provided source into a function, and runs it on the supplied VM.
+ *
+ * @param source The Neutron source code to compile and execute.
+ * @param isSafeFile If `true`, enables "safe" compilation mode that restricts unsafe operations.
+ */
+void run(const std::string& source, neutron::VM& vm, bool isSafeFile = false) {
     // Split source into lines for error reporting
     std::vector<std::string> lines;
     std::istringstream iss(source);
@@ -62,20 +69,40 @@ void run(const std::string& source, neutron::VM& vm) {
         neutron::Parser parser(tokens);
         std::vector<std::unique_ptr<neutron::Stmt>> statements = parser.parse();
         
-        neutron::Compiler compiler(vm);
+        neutron::Compiler compiler(vm, isSafeFile);
         neutron::Function* function = compiler.compile(statements);
         
         vm.interpret(function);
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        neutron::ErrorHandler::reportRuntimeError(e.what(), vm.currentFileName);
         exit(1);
     }
 }
 
+/**
+ * @brief Loads a Neutron source file, configures the VM for that file, and executes its contents.
+ *
+ * This sets the current file used for error reporting and assigns the path to the VM's
+ * currentFileName. If the file has a ".ntsc" extension, the VM is marked as running in
+ * safe-file mode. The file's directory is added to the VM's module search path, the
+ * file is read entirely into a source string, and the source is executed via run(...).
+ *
+ * @param path Filesystem path to the Neutron source file to run.
+ * @param vm   Virtual machine instance whose state will be updated and used to execute the file.
+ *
+ * @note If the file cannot be opened, an I/O fatal error is reported via ErrorHandler::fatal.
+ */
 void runFile(const std::string& path, neutron::VM& vm) {
     // Set current file for error reporting
     neutron::ErrorHandler::setCurrentFile(path);
     vm.currentFileName = path;
+    
+    // Check if this is a .ntsc file (Neutron Safe Code)
+    bool isSafeFile = false;
+    if (path.length() >= 5 && path.substr(path.length() - 5) == ".ntsc") {
+        isSafeFile = true;
+        vm.isSafeFile = true;
+    }
     
     // Add the script's directory to the module search path
     std::string directory;
@@ -99,9 +126,19 @@ void runFile(const std::string& path, neutron::VM& vm) {
     
     file.close();
     
-    run(source, vm);
+    run(source, vm, isSafeFile);
 }
 
+/**
+ * @brief Starts an interactive Neutron REPL using the given virtual machine.
+ *
+ * Prints a header with version and platform information, then reads lines
+ * from standard input in a loop, executing each line in the provided VM.
+ * On EOF the prompt exits; runtime exceptions raised during execution are
+ * caught and reported to standard error.
+ *
+ * @param vm The virtual machine instance used to compile and execute REPL input.
+ */
 void runPrompt(neutron::VM& vm) {
     std::string line;
     std::cout << "Neutron " << neutron::Version::getVersion() << " REPL" << std::endl;

@@ -1,6 +1,6 @@
 /*
  * Neutron Programming Language
- * Copyright (c) 2025 yasakei
+ * Copyright (c) 2026 yasakei
  * 
  * This software is distributed under the Neutron Public License 1.0.
  * For full license text, see LICENSE file in the root directory.
@@ -78,7 +78,21 @@ bool isTruthy(const Value& value) {
     }
 }
 
-// Helper function for error reporting with stack trace
+/**
+ * @brief Report a runtime error, generate a stack trace, and terminate execution.
+ *
+ * Finds a matching active exception handler; if one is found, unwinds VM frames
+ * and raises a VMException to transfer control to the VM's exception-handling
+ * loop. If no handler is found, builds a stack trace, reports the error via
+ * ErrorHandler, and terminates the process.
+ *
+ * @param vm Pointer to the VM instance where the error occurred.
+ * @param message Human-readable error message to report.
+ * @param line Source line number associated with the error, or -1 if unknown.
+ *
+ * @throws VMException If an enclosing exception handler is found; control is
+ *                     transferred to VM::run's exception handling.
+ */
 [[noreturn]] void runtimeError(VM* vm, const std::string& message, int line = -1) {
     // Check if there is an active exception handler that covers the current instruction
     // We need to search up the call stack
@@ -157,7 +171,16 @@ bool isTruthy(const Value& value) {
     exit(1);
 }
 
-VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>"), hasException(false), pendingException(Value()) {  // Start GC at 1024 bytes
+/**
+ * @brief Initialize VM runtime state and built-in registrations.
+ *
+ * Sets up core VM fields (instruction pointer, GC threshold starting at 1024 bytes,
+ * current file name, exception flags, and disables safe-file mode), enables
+ * error-handler color output and stack traces, registers the built-in `say`
+ * native function, runs external module initializers (registration only; not
+ * executed until imported), and configures the default module search paths.
+ */
+VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>"), hasException(false), pendingException(Value()), isSafeFile(false) {  // Start GC at 1024 bytes
     // Initialize error handler
     ErrorHandler::setColorEnabled(true);
     ErrorHandler::setStackTraceEnabled(true);
@@ -883,6 +906,18 @@ bool VM::callStringMethod(BoundStringMethod* method, int argCount) {
     }
 }
 
+/**
+ * @brief Execute the VM's current call frames until completion or until a target frame depth is reached.
+ *
+ * Runs the bytecode interpreter loop for the active CallFrame stack, dispatching opcodes, manipulating
+ * the value stack, performing function calls/returns, property/index operations, control-flow and
+ * exception handling, and performing runtime validations (including safe-file (.ntsc) checks).
+ * Execution stops when the call frame stack becomes empty or its size is less than or equal to
+ * the provided minimum frame depth; the final return value (if any) is left on the VM stack.
+ *
+ * @param minFrameDepth Stop and return control to the caller when the number of active call frames
+ *                      is less than or equal to this value.
+ */
 void VM::run(size_t minFrameDepth) {
     CallFrame* frame = &frames.back();
 
@@ -1050,7 +1085,11 @@ void VM::run(size_t minFrameDepth) {
                         // Check that all parameters have type annotations
                         for (const auto& param : function->declaration->params) {
                             if (!param.typeAnnotation.has_value()) {
-                                throw VMException(Value("Function parameter '" + param.name.lexeme + "' must have a type annotation inside a safe block."));
+                                if (this->isSafeFile) {
+                                    throw VMException(Value("Function parameter '" + param.name.lexeme + "' must have a type annotation in .ntsc files (Neutron Safe Code)."));
+                                } else {
+                                    throw VMException(Value("Function parameter '" + param.name.lexeme + "' must have a type annotation inside a safe block."));
+                                }
                             }
                         }
                         
@@ -1065,7 +1104,38 @@ void VM::run(size_t minFrameDepth) {
             case (uint8_t)OpCode::OP_VALIDATE_SAFE_VARIABLE: {
                 // Validate that a variable has a type annotation in safe block
                 std::string varName = READ_STRING();
-                throw VMException(Value("Variable '" + varName + "' must have a type annotation inside a safe block."));
+                if (this->isSafeFile) {
+                    throw VMException(Value("Variable '" + varName + "' must have a type annotation in .ntsc files (Neutron Safe Code)."));
+                } else {
+                    throw VMException(Value("Variable '" + varName + "' must have a type annotation inside a safe block."));
+                }
+                break;
+            }
+            case (uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_FUNCTION: {
+                // Validate that the function on top of stack has proper type annotations for safe file
+                Value functionValue = stack.back();
+                if (functionValue.type == ValueType::CALLABLE) {
+                    Function* function = dynamic_cast<Function*>(std::get<Callable*>(functionValue.as));
+                    if (function && function->declaration) {
+                        // Check that all parameters have type annotations
+                        for (const auto& param : function->declaration->params) {
+                            if (!param.typeAnnotation.has_value()) {
+                                throw VMException(Value("Function parameter '" + param.name.lexeme + "' must have a type annotation in safe file (.ntsc)."));
+                            }
+                        }
+                        
+                        // Check that function has a return type annotation
+                        if (!function->declaration->returnType.has_value()) {
+                            throw VMException(Value("Function '" + function->declaration->name.lexeme + "' must have a return type annotation in safe file (.ntsc)."));
+                        }
+                    }
+                }
+                break;
+            }
+            case (uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE: {
+                // Validate that a variable has a type annotation in safe file
+                std::string varName = READ_STRING();
+                throw VMException(Value("Variable '" + varName + "' must have a type annotation in safe file (.ntsc)."));
                 break;
             }
             case (uint8_t)OpCode::OP_SET_GLOBAL: {

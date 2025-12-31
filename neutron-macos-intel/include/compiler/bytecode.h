@@ -9,6 +9,17 @@ namespace neutron {
 // Forward declarations
 struct Value;
 
+/**
+ * Append a single byte to the chunk's bytecode and record its source line.
+ * @param byte The bytecode value to append.
+ * @param line The source line number associated with this byte.
+ */
+
+/**
+ * Add a value to the chunk's constant pool and return its index.
+ * @param value The constant value to store.
+ * @returns The index of the added constant within the `constants` vector.
+ */
 enum class OpCode : uint8_t {
     OP_RETURN,
     OP_CONSTANT,
@@ -60,6 +71,8 @@ enum class OpCode : uint8_t {
     OP_LOGICAL_AND,
     OP_VALIDATE_SAFE_FUNCTION,  // Validate function in safe block at runtime
     OP_VALIDATE_SAFE_VARIABLE,  // Validate variable in safe block at runtime
+    OP_VALIDATE_SAFE_FILE_FUNCTION,  // Validate function in safe file at runtime
+    OP_VALIDATE_SAFE_FILE_VARIABLE,  // Validate variable in safe file at runtime
     OP_LOGICAL_OR,
     OP_BITWISE_AND,
     OP_BITWISE_OR,

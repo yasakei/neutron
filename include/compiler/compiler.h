@@ -7,6 +7,25 @@
 #include <optional>
 #include <set>
 
+/**
+ * Represents a local variable declared in the current compilation scope.
+ *
+ * Holds the token identifying the local, the scope depth where it was declared,
+ * and an optional type annotation token when one was provided.
+ */
+
+/**
+ * Initialize a top-level Compiler for emitting bytecode into the given VM.
+ *
+ * @param vm Reference to the VM instance that will own emitted functions and constants.
+ * @param isSafeFile When true, enable safe-file semantics (enforce/track type annotations).
+ */
+
+/**
+ * Create a nested Compiler that shares context with an enclosing compiler.
+ *
+ * @param enclosing Pointer to the enclosing Compiler representing the outer scope.
+ */
 namespace neutron {
 
 struct Local {
@@ -17,7 +36,7 @@ struct Local {
 
 class Compiler {
 public:
-    Compiler(VM& vm);
+    Compiler(VM& vm, bool isSafeFile = false);
     Compiler(Compiler* enclosing);
     Function* compile(const std::vector<std::unique_ptr<Stmt>>& statements);
     Function* compile(const FunctionStmt* stmt, const std::vector<std::unique_ptr<Stmt>>& body);
@@ -95,6 +114,9 @@ public:
     
     // Track if we're currently in a safe block (enforces type annotations)
     bool inSafeBlock;
+    
+    // Track if we're compiling a safe file (.ntsc)
+    bool isSafeFile;
 };
 } // namespace neutron
 

@@ -69,7 +69,17 @@ static int constantInstruction(const char* name, const Chunk* chunk, int offset)
 //     uint8_t slot = chunk->code[offset + 1];
 //     printf("%-16s %4d\n", name, slot);
 //     return offset + 2;
-// }
+/**
+ * @brief Disassembles and prints the instruction at the given bytecode offset.
+ *
+ * Reads the opcode stored in chunk->code[offset], prints a formatted line
+ * showing the offset, source line number, and a human-readable representation
+ * of the instruction (including referenced constant information when applicable).
+ *
+ * @param chunk The bytecode chunk containing instructions, constants, and line mappings.
+ * @param offset The byte offset within the chunk at which to disassemble an instruction.
+ * @return size_t The offset immediately following the disassembled instruction.
+ */
 
 size_t disassembleInstruction(const Chunk* chunk, size_t offset) {
     std::cout << offset << " ";
@@ -167,6 +177,10 @@ size_t disassembleInstruction(const Chunk* chunk, size_t offset) {
             return simpleInstruction("OP_VALIDATE_SAFE_FUNCTION", offset);
         case OpCode::OP_VALIDATE_SAFE_VARIABLE:
             return constantInstruction("OP_VALIDATE_SAFE_VARIABLE", chunk, offset);
+        case OpCode::OP_VALIDATE_SAFE_FILE_FUNCTION:
+            return simpleInstruction("OP_VALIDATE_SAFE_FILE_FUNCTION", offset);
+        case OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE:
+            return constantInstruction("OP_VALIDATE_SAFE_FILE_VARIABLE", chunk, offset);
         case OpCode::OP_LOGICAL_OR:
             return simpleInstruction("OP_LOGICAL_OR", offset);
         case OpCode::OP_CLOSURE:
