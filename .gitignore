@@ -109,6 +109,7 @@ nt-box
 neutron-linux-x64/
 neutron-windows-x64/
 neutron-macos-x64/
+neutron-macos-intel/
 neutron-macos-arm64/
 neutron-*.zip
 neutron-*.tar.gz
