@@ -1,0 +1,131 @@
+// Neutron Safe Code (.ntsc) File Tests
+// This file requires all variables, functions, and classes to have type annotations
+
+say("Testing .ntsc (Neutron Safe Code) File");
+
+// Test 1: Variables with type annotations
+say("\n1. Variables with type annotations:");
+var int x = 10;
+var string name = "Alice";
+var bool flag = true;
+var float pi = 3.14;
+var array numbers = [1, 2, 3];
+var object config = {"key": "value"};
+say("x = " + x);
+say("name = " + name);
+say("flag = " + flag);
+say("pi = " + pi);
+say("✓ All typed variables work!");
+
+// Test 2: Functions with typed parameters and return types
+say("\n2. Functions with typed parameters and return types:");
+fun add(int a, int b) -> int {
+    return a + b;
+}
+
+fun greet(string person) -> string {
+    return "Hello, " + person + "!";
+}
+
+fun isPositive(int num) -> bool {
+    return num > 0;
+}
+
+var int sum = add(5, 10);
+var string greeting = greet("Bob");
+var bool positive = isPositive(42);
+say("add(5, 10) = " + sum);
+say("greet('Bob') = " + greeting);
+say("isPositive(42) = " + positive);
+say("✓ All typed functions work!");
+
+// Test 3: Classes with typed methods and properties
+say("\n3. Classes with typed methods and properties:");
+class Person {
+    var string name;
+    var int age;
+    
+    fun init(string n, int a) -> int {
+        this.name = n;
+        this.age = a;
+        return a;
+    }
+    
+    fun getName() -> string {
+        return this.name;
+    }
+    
+    fun getAge() -> int {
+        return this.age;
+    }
+    
+    fun describe() -> string {
+        return this.name + " is " + this.age + " years old.";
+    }
+}
+
+var any person = Person();
+person.init("Charlie", 25);
+say("Person name: " + person.getName());
+say("Person age: " + person.getAge());
+say("Description: " + person.describe());
+say("✓ Typed class works!");
+
+// Test 4: Class with calculations
+say("\n4. Class with calculations:");
+class Calculator {
+    var int result;
+    
+    fun init() -> int {
+        this.result = 0;
+        return 0;
+    }
+    
+    fun add(int x) -> int {
+        this.result = this.result + x;
+        return this.result;
+    }
+    
+    fun subtract(int x) -> int {
+        this.result = this.result - x;
+        return this.result;
+    }
+    
+    fun multiply(int x) -> int {
+        this.result = this.result * x;
+        return this.result;
+    }
+    
+    fun getResult() -> int {
+        return this.result;
+    }
+    
+    fun reset() -> int {
+        this.result = 0;
+        return 0;
+    }
+}
+
+var any calc = Calculator();
+calc.init();
+calc.add(10);
+calc.multiply(5);
+calc.subtract(20);
+say("Calculator result: " + calc.getResult());
+say("✓ Calculator class works!");
+
+// Test 5: Function with multiple parameter types
+say("\n5. Function with multiple parameter types:");
+fun processData(string label, int count, bool active, array items) -> string {
+    var string status = "inactive";
+    if (active) {
+        status = "active";
+    }
+    return label + ": " + count + " items (" + status + ")";
+}
+
+var string result = processData("Inventory", 42, true, [1, 2, 3]);
+say(result);
+say("✓ Multi-type function works!");
+
+say("\n.ntsc file test completed - All type safety features working!");

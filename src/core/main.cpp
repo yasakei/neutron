@@ -65,7 +65,7 @@ void run(const std::string& source, neutron::VM& vm, bool isSafeFile = false) {
         
         vm.interpret(function);
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        neutron::ErrorHandler::reportRuntimeError(e.what(), vm.currentFileName);
         exit(1);
     }
 }
@@ -79,8 +79,7 @@ void runFile(const std::string& path, neutron::VM& vm) {
     bool isSafeFile = false;
     if (path.length() >= 5 && path.substr(path.length() - 5) == ".ntsc") {
         isSafeFile = true;
-        std::cout << "Loading Neutron Safe Code file: " << path << std::endl;
-        std::cout << "Type safety enforcement: ENABLED" << std::endl;
+        vm.isSafeFile = true;
     }
     
     // Add the script's directory to the module search path

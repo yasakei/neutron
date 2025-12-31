@@ -593,15 +593,29 @@ void Compiler::visitClassStmt(const ClassStmt* stmt) {
                 // Check that all parameters have type annotations
                 for (const auto& param : funcStmt->params) {
                     if (!param.typeAnnotation.has_value()) {
-                        throw std::runtime_error("Class method parameter '" + param.name.lexeme + 
-                                                "' must have a type annotation in safe blocks and .ntsc files.");
+                        std::string errorMsg = "Class method parameter '" + param.name.lexeme + 
+                                              "' must have a type annotation";
+                        if (vm.isSafeFile) {
+                            errorMsg += " in .ntsc files.";
+                        } else {
+                            errorMsg += " inside a safe block.";
+                        }
+                        ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, param.name.line);
+                        exit(1);
                     }
                 }
                 
                 // Check that the method has a return type annotation
                 if (!funcStmt->returnType.has_value()) {
-                    throw std::runtime_error("Class method '" + funcStmt->name.lexeme + 
-                                            "' must have a return type annotation in safe blocks and .ntsc files.");
+                    std::string errorMsg = "Class method '" + funcStmt->name.lexeme + 
+                                          "' must have a return type annotation";
+                    if (vm.isSafeFile) {
+                        errorMsg += " in .ntsc files.";
+                    } else {
+                        errorMsg += " inside a safe block.";
+                    }
+                    ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, funcStmt->name.line);
+                    exit(1);
                 }
             }
             
@@ -630,8 +644,15 @@ void Compiler::visitClassStmt(const ClassStmt* stmt) {
         } else if (auto varStmt = dynamic_cast<const VarStmt*>(method.get())) {
             // In safe blocks or .ntsc files, enforce type annotations on class properties
             if (inSafeBlock && !varStmt->typeAnnotation.has_value()) {
-                throw std::runtime_error("Class property '" + varStmt->name.lexeme + 
-                                        "' must have a type annotation in safe blocks and .ntsc files.");
+                std::string errorMsg = "Class property '" + varStmt->name.lexeme + 
+                                      "' must have a type annotation";
+                if (vm.isSafeFile) {
+                    errorMsg += " in .ntsc files.";
+                } else {
+                    errorMsg += " inside a safe block.";
+                }
+                ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, varStmt->name.line);
+                exit(1);
             }
             // For now, we only support function declarations in classes
             // Properties will be handled by the VM at runtime

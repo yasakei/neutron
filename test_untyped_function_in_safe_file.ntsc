@@ -1,9 +1,0 @@
-// This should fail because it has untyped functions in a .ntsc file
-
-var int x = 10;  // This is fine
-
-fun badFunction(a, b) {  // This should fail - no parameter types
-    return a + b;
-}
-
-say("This should not run!");

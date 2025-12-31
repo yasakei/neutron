@@ -107,4 +107,31 @@ safe {
     say("✓ " + processResult);
 }
 
+// Test 9: Safe block with properly typed class
+say("\n9. Safe block with properly typed class:");
+safe {
+    class Calculator {
+        var int value;
+        
+        fun init(int v) -> int {
+            this.value = v;
+            return v;
+        }
+        
+        fun add(int x) -> int {
+            this.value = this.value + x;
+            return this.value;
+        }
+        
+        fun getValue() -> int {
+            return this.value;
+        }
+    }
+    
+    var any calc = Calculator();
+    calc.init(10);
+    var int result = calc.add(5);
+    say("✓ Safe block class works: Calculator value = " + result);
+}
+
 say("\nSafe blocks test completed - All features working!");

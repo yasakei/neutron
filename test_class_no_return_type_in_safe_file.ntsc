@@ -1,9 +1,0 @@
-// Test class with method missing return type - should fail in .ntsc file
-
-class BadClass {
-    fun badMethod(int x, int y) {  // Missing return type - should fail
-        return x + y;
-    }
-}
-
-say("This should not run!");

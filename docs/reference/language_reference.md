@@ -638,7 +638,7 @@ say(result);  // 6
 
 ## Safe Blocks
 
-**Safe blocks** enforce type annotations on all variables and functions within their scope, providing stricter type safety for critical code sections.
+**Safe blocks** enforce type annotations on all variables, functions, and classes within their scope, providing stricter type safety for critical code sections.
 
 ### Basic Safe Block Syntax
 
@@ -651,6 +651,16 @@ safe {
     // All functions must have parameter and return types
     fun add(int a, int b) -> int {
         return a + b;
+    }
+    
+    // All class methods and properties must have type annotations
+    class Calculator {
+        var int value;
+        
+        fun add(int x) -> int {
+            this.value = this.value + x;
+            return this.value;
+        }
     }
 }
 ```
@@ -693,6 +703,24 @@ safe {
 }
 ```
 
+4. **Class method and property types**:
+```js
+safe {
+    class Person {
+        var string name;           // ✅ Valid - typed property
+        var age;                   // ❌ Error: missing type annotation
+        
+        fun getName() -> string {  // ✅ Valid - typed method
+            return this.name;
+        }
+        
+        fun setName(n) {           // ❌ Error: missing parameter type
+            this.name = n;
+        }
+    }
+}
+```
+
 ### Error Handling with Safe Blocks
 
 Safe block violations throw runtime exceptions that can be caught:
@@ -726,6 +754,86 @@ safe {
 // Back to regular code
 var anotherRegular = 3.14;
 ```
+
+---
+
+## Neutron Safe Code Files (.ntsc)
+
+Neutron supports **safe code files** with the `.ntsc` extension. These files enforce type annotations throughout the entire file, similar to having the whole file wrapped in a `safe {}` block.
+
+### File Extension
+
+- `.nt` - Standard Neutron files (dynamic typing, optional type annotations)
+- `.ntsc` - Neutron Safe Code files (mandatory type annotations)
+
+### Usage
+
+```bash
+# Run a standard Neutron file
+./neutron myprogram.nt
+
+# Run a Neutron Safe Code file (type safety enforced)
+./neutron myprogram.ntsc
+```
+
+### Requirements in .ntsc Files
+
+All variables, functions, and classes must have complete type annotations:
+
+```js
+// myprogram.ntsc
+
+// Variables must have types
+var int count = 0;
+var string name = "Alice";
+
+// Functions must have parameter and return types
+fun add(int a, int b) -> int {
+    return a + b;
+}
+
+// Classes must have typed properties and methods
+class Person {
+    var string name;
+    var int age;
+    
+    fun init(string n, int a) -> int {
+        this.name = n;
+        this.age = a;
+        return a;
+    }
+    
+    fun getName() -> string {
+        return this.name;
+    }
+}
+
+var any person = Person();
+person.init("Bob", 30);
+say(person.getName());
+```
+
+### Error Messages
+
+Errors in `.ntsc` files have specific messages:
+
+```
+// Missing variable type
+Variable 'x' must have a type annotation in .ntsc files.
+
+// Missing function parameter type
+Class method parameter 'x' must have a type annotation in .ntsc files.
+
+// Missing function return type
+Class method 'getName' must have a return type annotation in .ntsc files.
+```
+
+### When to Use .ntsc Files
+
+- **Critical code**: Financial calculations, security-sensitive operations
+- **Team projects**: Enforce consistent typing across the codebase
+- **Library code**: Ensure clear API contracts
+- **Gradual migration**: Convert files one at a time to strict typing
 
 ---
 
