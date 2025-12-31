@@ -1,6 +1,6 @@
 /*
  * Neutron Programming Language - Project Manager Implementation
- * Copyright (c) 2025 yasakei
+ * Copyright (c) 2026 yasakei
  */
 
 #include "project/project_manager.h"

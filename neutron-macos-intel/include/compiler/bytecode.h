@@ -60,6 +60,8 @@ enum class OpCode : uint8_t {
     OP_LOGICAL_AND,
     OP_VALIDATE_SAFE_FUNCTION,  // Validate function in safe block at runtime
     OP_VALIDATE_SAFE_VARIABLE,  // Validate variable in safe block at runtime
+    OP_VALIDATE_SAFE_FILE_FUNCTION,  // Validate function in safe file at runtime
+    OP_VALIDATE_SAFE_FILE_VARIABLE,  // Validate variable in safe file at runtime
     OP_LOGICAL_OR,
     OP_BITWISE_AND,
     OP_BITWISE_OR,

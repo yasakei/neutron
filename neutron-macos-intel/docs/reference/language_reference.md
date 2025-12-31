@@ -531,6 +531,69 @@ say(add(5, 3));       // 8
 say(multiply(4, 7));  // 28
 ```
 
+### Typed Functions
+
+Neutron supports **typed function parameters** and **return types** with runtime validation.
+
+#### Function Parameter Types
+
+```js
+fun add(int a, int b) {
+    return a + b;
+}
+
+fun greet(string name, int age) {
+    return "Hello " + name + ", you are " + age + " years old!";
+}
+
+fun processData(array items, object config) {
+    return "Processed " + items.length + " items";
+}
+```
+
+#### Function Return Types
+
+```js
+fun add(int a, int b) -> int {
+    return a + b;
+}
+
+fun getName() -> string {
+    return "Alice";
+}
+
+fun isValid(any value) -> bool {
+    return value != nil;
+}
+```
+
+#### Runtime Parameter Validation
+
+Function calls are validated at runtime:
+
+```js
+fun multiply(int x, int y) -> int {
+    return x * y;
+}
+
+multiply(5, 10);        // ✅ Valid
+multiply("hello", 5);   // ❌ Runtime error: parameter type mismatch
+```
+
+#### Mixed Typed and Untyped Functions
+
+```js
+// Typed function
+fun add(int a, int b) -> int {
+    return a + b;
+}
+
+// Untyped function (backward compatibility)
+fun oldFunction(x, y) {
+    return x + y;  // Works with any types
+}
+```
+
 ### Lambda Functions
 
 Anonymous functions can be created inline and assigned to variables or passed as arguments.
@@ -569,6 +632,99 @@ say(applyTwice(double, 3));  // 12
 ```js
 var result = fun(x) { return x + 1; }(5);
 say(result);  // 6
+```
+
+---
+
+## Safe Blocks
+
+**Safe blocks** enforce type annotations on all variables and functions within their scope, providing stricter type safety for critical code sections.
+
+### Basic Safe Block Syntax
+
+```js
+safe {
+    // All variables must have type annotations
+    var int x = 10;
+    var string name = "Alice";
+    
+    // All functions must have parameter and return types
+    fun add(int a, int b) -> int {
+        return a + b;
+    }
+}
+```
+
+### Safe Block Enforcement
+
+Inside a safe block, the following are **required**:
+
+1. **Variable type annotations**:
+```js
+safe {
+    var int x = 10;        // ✅ Valid
+    var y = 20;            // ❌ Error: missing type annotation
+}
+```
+
+2. **Function parameter types**:
+```js
+safe {
+    fun add(int a, int b) -> int {  // ✅ Valid
+        return a + b;
+    }
+    
+    fun invalid(x, y) {             // ❌ Error: missing parameter types
+        return x + y;
+    }
+}
+```
+
+3. **Function return types**:
+```js
+safe {
+    fun add(int a, int b) -> int {  // ✅ Valid
+        return a + b;
+    }
+    
+    fun invalid(int a, int b) {     // ❌ Error: missing return type
+        return a + b;
+    }
+}
+```
+
+### Error Handling with Safe Blocks
+
+Safe block violations throw runtime exceptions that can be caught:
+
+```js
+try {
+    safe {
+        var x = 10;  // Missing type annotation
+    }
+} catch (e) {
+    say("Caught error: " + e);
+    // Output: "Variable 'x' must have a type annotation inside a safe block."
+}
+```
+
+### Mixed Safe and Regular Code
+
+```js
+// Regular code - no type requirements
+var regularVar = "no type needed";
+
+safe {
+    // Strict typing required here
+    var int safeVar = 100;
+    
+    fun multiply(int x, int y) -> int {
+        return x * y;
+    }
+}
+
+// Back to regular code
+var anotherRegular = 3.14;
 ```
 
 ---

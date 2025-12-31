@@ -1,6 +1,6 @@
 /*
  * Neutron Programming Language - Project Manager
- * Copyright (c) 2025 yasakei
+ * Copyright (c) 2026 yasakei
  */
 
 #ifndef NEUTRON_PROJECT_MANAGER_H

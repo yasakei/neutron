@@ -8,7 +8,7 @@
 
 namespace neutron {
 
-Compiler::Compiler(VM& vm) : enclosing(nullptr), function(nullptr), vm(vm), chunk(nullptr), scopeDepth(0), currentLine(1), inSafeBlock(false) {
+Compiler::Compiler(VM& vm, bool isSafeFile) : enclosing(nullptr), function(nullptr), vm(vm), chunk(nullptr), scopeDepth(0), currentLine(1), inSafeBlock(isSafeFile), isSafeFile(isSafeFile) {
     function = vm.allocate<Function>(nullptr, std::make_shared<Environment>());
     function->name = "<script>";
     // function->chunk is already allocated in constructor
@@ -18,7 +18,7 @@ Compiler::Compiler(VM& vm) : enclosing(nullptr), function(nullptr), vm(vm), chun
     declaredGlobals = vm.declaredGlobals;
 }
 
-Compiler::Compiler(Compiler* enclosing) : enclosing(enclosing), function(nullptr), vm(enclosing->vm), chunk(nullptr), scopeDepth(0), currentLine(1), inSafeBlock(false) {
+Compiler::Compiler(Compiler* enclosing) : enclosing(enclosing), function(nullptr), vm(enclosing->vm), chunk(nullptr), scopeDepth(0), currentLine(1), inSafeBlock(false), isSafeFile(enclosing->isSafeFile) {
     function = vm.allocate<Function>(nullptr, std::make_shared<Environment>());
     // function->chunk is already allocated in constructor
     chunk = function->chunk;
@@ -321,7 +321,11 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
         // Check if we're in a safe block and emit validation instruction
         if (inSafeBlock && !stmt->typeAnnotation.has_value()) {
             // Emit validation instruction that will be executed at runtime
-            emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_VARIABLE, makeConstant(Value(stmt->name.lexeme)));
+            if (isSafeFile) {
+                emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE, makeConstant(Value(stmt->name.lexeme)));
+            } else {
+                emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_VARIABLE, makeConstant(Value(stmt->name.lexeme)));
+            }
         }
 
         // Perform compile-time type checking if type annotation exists
@@ -371,7 +375,11 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
     // Check if we're in a safe block and emit validation instruction
     if (inSafeBlock && !stmt->typeAnnotation.has_value()) {
         // Emit validation instruction that will be executed at runtime
-        emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_VARIABLE, makeConstant(Value(stmt->name.lexeme)));
+        if (isSafeFile) {
+            emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE, makeConstant(Value(stmt->name.lexeme)));
+        } else {
+            emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_VARIABLE, makeConstant(Value(stmt->name.lexeme)));
+        }
     }
     
     // Track static variables in VM (persistence across REPL statements)
@@ -580,6 +588,37 @@ void Compiler::visitClassStmt(const ClassStmt* stmt) {
     // Compile the methods
     for (const auto& method : stmt->body) {
         if (auto funcStmt = dynamic_cast<const FunctionStmt*>(method.get())) {
+            // In safe blocks or .ntsc files, enforce type annotations on class methods
+            if (inSafeBlock) {
+                // Check that all parameters have type annotations
+                for (const auto& param : funcStmt->params) {
+                    if (!param.typeAnnotation.has_value()) {
+                        std::string errorMsg = "Class method parameter '" + param.name.lexeme + 
+                                              "' must have a type annotation";
+                        if (vm.isSafeFile) {
+                            errorMsg += " in .ntsc files.";
+                        } else {
+                            errorMsg += " inside a safe block.";
+                        }
+                        ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, param.name.line);
+                        exit(1);
+                    }
+                }
+                
+                // Check that the method has a return type annotation
+                if (!funcStmt->returnType.has_value()) {
+                    std::string errorMsg = "Class method '" + funcStmt->name.lexeme + 
+                                          "' must have a return type annotation";
+                    if (vm.isSafeFile) {
+                        errorMsg += " in .ntsc files.";
+                    } else {
+                        errorMsg += " inside a safe block.";
+                    }
+                    ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, funcStmt->name.line);
+                    exit(1);
+                }
+            }
+            
             Compiler compiler(this);
             compiler.function->name = funcStmt->name.lexeme;
             compiler.function->arity_val = funcStmt->params.size();
@@ -602,7 +641,19 @@ void Compiler::visitClassStmt(const ClassStmt* stmt) {
             compiler.emitReturn();
 
             klass->methods[funcStmt->name.lexeme] = compiler.function;
-        } else if (dynamic_cast<const VarStmt*>(method.get())) {
+        } else if (auto varStmt = dynamic_cast<const VarStmt*>(method.get())) {
+            // In safe blocks or .ntsc files, enforce type annotations on class properties
+            if (inSafeBlock && !varStmt->typeAnnotation.has_value()) {
+                std::string errorMsg = "Class property '" + varStmt->name.lexeme + 
+                                      "' must have a type annotation";
+                if (vm.isSafeFile) {
+                    errorMsg += " in .ntsc files.";
+                } else {
+                    errorMsg += " inside a safe block.";
+                }
+                ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, varStmt->name.line);
+                exit(1);
+            }
             // For now, we only support function declarations in classes
             // Properties will be handled by the VM at runtime
         }
@@ -737,7 +788,11 @@ void Compiler::visitFunctionStmt(const FunctionStmt* stmt) {
     
     // If we're in a safe block, emit validation instruction
     if (inSafeBlock) {
-        emitByte((uint8_t)OpCode::OP_VALIDATE_SAFE_FUNCTION);
+        if (isSafeFile) {
+            emitByte((uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_FUNCTION);
+        } else {
+            emitByte((uint8_t)OpCode::OP_VALIDATE_SAFE_FUNCTION);
+        }
     }
     
     // Define the function as a global variable in the current scope

@@ -1,6 +1,6 @@
 /*
  * Neutron Programming Language
- * Copyright (c) 2025 yasakei
+ * Copyright (c) 2026 yasakei
  * 
  * This software is distributed under the Neutron Public License 1.0.
  * For full license text, see LICENSE file in the root directory.
@@ -157,7 +157,7 @@ bool isTruthy(const Value& value) {
     exit(1);
 }
 
-VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>"), hasException(false), pendingException(Value()) {  // Start GC at 1024 bytes
+VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>"), hasException(false), pendingException(Value()), isSafeFile(false) {  // Start GC at 1024 bytes
     // Initialize error handler
     ErrorHandler::setColorEnabled(true);
     ErrorHandler::setStackTraceEnabled(true);
@@ -1050,7 +1050,11 @@ void VM::run(size_t minFrameDepth) {
                         // Check that all parameters have type annotations
                         for (const auto& param : function->declaration->params) {
                             if (!param.typeAnnotation.has_value()) {
-                                throw VMException(Value("Function parameter '" + param.name.lexeme + "' must have a type annotation inside a safe block."));
+                                if (this->isSafeFile) {
+                                    throw VMException(Value("Function parameter '" + param.name.lexeme + "' must have a type annotation in .ntsc files (Neutron Safe Code)."));
+                                } else {
+                                    throw VMException(Value("Function parameter '" + param.name.lexeme + "' must have a type annotation inside a safe block."));
+                                }
                             }
                         }
                         
@@ -1065,7 +1069,38 @@ void VM::run(size_t minFrameDepth) {
             case (uint8_t)OpCode::OP_VALIDATE_SAFE_VARIABLE: {
                 // Validate that a variable has a type annotation in safe block
                 std::string varName = READ_STRING();
-                throw VMException(Value("Variable '" + varName + "' must have a type annotation inside a safe block."));
+                if (this->isSafeFile) {
+                    throw VMException(Value("Variable '" + varName + "' must have a type annotation in .ntsc files (Neutron Safe Code)."));
+                } else {
+                    throw VMException(Value("Variable '" + varName + "' must have a type annotation inside a safe block."));
+                }
+                break;
+            }
+            case (uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_FUNCTION: {
+                // Validate that the function on top of stack has proper type annotations for safe file
+                Value functionValue = stack.back();
+                if (functionValue.type == ValueType::CALLABLE) {
+                    Function* function = dynamic_cast<Function*>(std::get<Callable*>(functionValue.as));
+                    if (function && function->declaration) {
+                        // Check that all parameters have type annotations
+                        for (const auto& param : function->declaration->params) {
+                            if (!param.typeAnnotation.has_value()) {
+                                throw VMException(Value("Function parameter '" + param.name.lexeme + "' must have a type annotation in safe file (.ntsc)."));
+                            }
+                        }
+                        
+                        // Check that function has a return type annotation
+                        if (!function->declaration->returnType.has_value()) {
+                            throw VMException(Value("Function '" + function->declaration->name.lexeme + "' must have a return type annotation in safe file (.ntsc)."));
+                        }
+                    }
+                }
+                break;
+            }
+            case (uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE: {
+                // Validate that a variable has a type annotation in safe file
+                std::string varName = READ_STRING();
+                throw VMException(Value("Variable '" + varName + "' must have a type annotation in safe file (.ntsc)."));
                 break;
             }
             case (uint8_t)OpCode::OP_SET_GLOBAL: {
