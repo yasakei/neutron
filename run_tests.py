@@ -157,6 +157,7 @@ def main():
             continue
             
         test_files = glob.glob(os.path.join(full_dir, "*.nt"))
+        test_files += glob.glob(os.path.join(full_dir, "*.ntsc"))
         if not test_files:
             continue
             
