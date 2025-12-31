@@ -4,3 +4,6 @@
 [submodule "nt-box"]
 	path = nt-box
 	url = https://github.com/yasakei/nt-box.git
+[submodule "docs"]
+	path = docs
+	url = https://github.com/yasakei/docs
