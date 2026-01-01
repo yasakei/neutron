@@ -155,7 +155,17 @@ bool isTruthy(const Value& value) {
             }
         }
         
-        int frameLine = it->currentLine > 0 ? it->currentLine : line;
+        int frameLine = -1;
+        if (it->function && it->function->chunk && it->ip) {
+            size_t offset = it->ip - it->function->chunk->code.data();
+            if (offset > 0) offset--;
+            if (offset < it->function->chunk->lines.size()) {
+                frameLine = it->function->chunk->lines[offset];
+            }
+        }
+        
+        if (frameLine == -1) frameLine = it->currentLine > 0 ? it->currentLine : line;
+        
         stackTrace.emplace_back(funcName, it->fileName.empty() ? vm->currentFileName : it->fileName, frameLine);
     }
     
@@ -164,6 +174,9 @@ bool isTruthy(const Value& value) {
 }
 
 VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>"), hasException(false), pendingException(Value()), isSafeFile(false) {  // Start GC at 1024 bytes
+    // Reserve a large stack to prevent reallocation and enable pointer optimizations
+    stack.reserve(1024 * 1024);
+    
     // Initialize error handler
     ErrorHandler::setColorEnabled(true);
     ErrorHandler::setStackTraceEnabled(true);
@@ -891,35 +904,126 @@ bool VM::callStringMethod(BoundStringMethod* method, int argCount) {
 }
 
 void VM::run(size_t minFrameDepth) {
+    // Use local pointer for stack top for performance
+    // We assume stack has enough capacity (reserved in constructor)
+    Value* stackTop = stack.data() + stack.size();
+    Value* stackStart = stack.data();
+    
+    auto syncStack = [&]() {
+        size_t currentSize = stackTop - stackStart;
+        stack.resize(currentSize);
+        stackStart = stack.data();
+        stackTop = stackStart + currentSize;
+    };
+    
+    auto reloadStack = [&]() {
+        stackStart = stack.data();
+        stackTop = stackStart + stack.size();
+    };
+
+    // Fast push/pop to avoid method call overhead and stack checks in the loop
+    auto push = [&](const Value& value) {
+        *stackTop++ = value;
+    };
+    
+    auto pop = [&]() -> Value {
+        return *--stackTop;
+    };
+
+    auto peek = [&](int distance) -> Value& {
+        return *(stackTop - 1 - distance);
+    };
+
     CallFrame* frame = &frames.back();
 
 #define READ_BYTE() (*frame->ip++)
 #define READ_SHORT() \
     (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
-#define READ_CONSTANT() \
-    ([&]() -> Value& { \
-        uint8_t index = READ_BYTE(); \
-        if (index >= frame->function->chunk->constants.size()) { \
-            runtimeError(this, "Constant index out of bounds: " + std::to_string(index) + \
-                        " (max: " + std::to_string(frame->function->chunk->constants.size() - 1) + ")", \
-                        frame->currentLine); \
-        } \
-        return frame->function->chunk->constants[index]; \
-    }())
+#define READ_CONSTANT() (frame->function->chunk->constants[READ_BYTE()])
 #define READ_STRING() (std::get<ObjString*>(READ_CONSTANT().as)->chars)
+
+// Computed goto optimization (disabled by default due to C++ scope rules)
+//#define COMPUTED_GOTO 1
+
+#ifdef COMPUTED_GOTO
+    static void* dispatch_table[] = {
+        &&CASE_OP_RETURN,
+        &&CASE_OP_CONSTANT,
+        &&CASE_OP_NIL,
+        &&CASE_OP_TRUE,
+        &&CASE_OP_FALSE,
+        &&CASE_OP_POP,
+        &&CASE_OP_DUP,
+        &&CASE_OP_GET_LOCAL,
+        &&CASE_OP_SET_LOCAL,
+        &&CASE_OP_GET_GLOBAL,
+        &&CASE_OP_DEFINE_GLOBAL,
+        &&CASE_OP_SET_GLOBAL,
+        &&CASE_OP_SET_GLOBAL_TYPED,
+        &&CASE_OP_SET_LOCAL_TYPED,
+        &&CASE_OP_DEFINE_TYPED_GLOBAL,
+        &&CASE_OP_GET_PROPERTY,
+        &&CASE_OP_SET_PROPERTY,
+        &&CASE_OP_EQUAL,
+        &&CASE_OP_GREATER,
+        &&CASE_OP_LESS,
+        &&CASE_OP_ADD,
+        &&CASE_OP_SUBTRACT,
+        &&CASE_OP_MULTIPLY,
+        &&CASE_OP_DIVIDE,
+        &&CASE_OP_MODULO,
+        &&CASE_OP_NOT,
+        &&CASE_OP_NEGATE,
+        &&CASE_OP_SAY,
+        &&CASE_OP_JUMP,
+        &&CASE_OP_JUMP_IF_FALSE,
+        &&CASE_OP_LOOP,
+        &&CASE_OP_CALL,
+        &&CASE_OP_CLOSURE,
+        &&CASE_OP_GET_UPVALUE,
+        &&CASE_OP_SET_UPVALUE,
+        &&CASE_OP_CLOSE_UPVALUE,
+        &&CASE_OP_ARRAY,
+        &&CASE_OP_OBJECT,
+        &&CASE_OP_INDEX_GET,
+        &&CASE_OP_INDEX_SET,
+        &&CASE_OP_THIS,
+        &&CASE_OP_BREAK,
+        &&CASE_OP_CONTINUE,
+        &&CASE_OP_TRY,
+        &&CASE_OP_END_TRY,
+        &&CASE_OP_THROW,
+        &&CASE_OP_NOT_EQUAL,
+        &&CASE_OP_LOGICAL_AND,
+        &&CASE_OP_VALIDATE_SAFE_FUNCTION,
+        &&CASE_OP_VALIDATE_SAFE_VARIABLE,
+        &&CASE_OP_VALIDATE_SAFE_FILE_FUNCTION,
+        &&CASE_OP_VALIDATE_SAFE_FILE_VARIABLE,
+        &&CASE_OP_LOGICAL_OR,
+        &&CASE_OP_BITWISE_AND,
+        &&CASE_OP_BITWISE_OR,
+        &&CASE_OP_BITWISE_XOR,
+        &&CASE_OP_BITWISE_NOT,
+        &&CASE_OP_LEFT_SHIFT,
+        &&CASE_OP_RIGHT_SHIFT
+    };
+    #define DISPATCH() goto *dispatch_table[READ_BYTE()]
+    #define CASE(op) CASE_##op:
+#else
+    #define DISPATCH() break
+    #define CASE(op) case (uint8_t)OpCode::op:
+#endif
 
     while (true) {
     try {
+#ifdef COMPUTED_GOTO
+        DISPATCH();
+#else
         for (;;) {
-            // Update currentLine from bytecode before processing instruction
-        size_t offset = frame->ip - frame->function->chunk->code.data();
-        if (offset < frame->function->chunk->lines.size()) {
-            frame->currentLine = frame->function->chunk->lines[offset];
-        }
-        
-        uint8_t instruction;
-        switch (instruction = READ_BYTE()) {
-            case (uint8_t)OpCode::OP_RETURN: {
+        uint8_t instruction = READ_BYTE();
+        switch (instruction) {
+#endif
+            CASE(OP_RETURN) {
                 Value result = pop();
                 size_t return_slot_offset = frame->slot_offset;  // Points to first argument
                 bool was_bound_method = frame->isBoundMethod;
@@ -928,8 +1032,8 @@ void VM::run(size_t minFrameDepth) {
                 Value returnValue = result;
                 if (was_initializer) {
                     // For initializers, return 'this' instead of the function result
-                    if (return_slot_offset < stack.size()) {
-                        returnValue = stack[return_slot_offset];
+                    if (return_slot_offset < (size_t)(stackTop - stackStart)) {
+                        returnValue = *(stackStart + return_slot_offset);
                     }
                 }
 
@@ -940,19 +1044,20 @@ void VM::run(size_t minFrameDepth) {
                     
                     // Clean up stack frame (arguments and callee)
                     if (was_bound_method) {
-                        stack.resize(return_slot_offset);  // Keep everything before receiver
+                        stackTop = stackStart + return_slot_offset;
                     } else if (return_slot_offset > 0) {
                         // If it was a function call, clean up stack
                         // Ensure we don't underflow if stack is somehow smaller (shouldn't happen)
-                        if (stack.size() >= return_slot_offset - 1) {
-                            stack.resize(return_slot_offset - 1);  // Remove callee too
+                        if ((size_t)(stackTop - stackStart) >= return_slot_offset - 1) {
+                            stackTop = stackStart + return_slot_offset - 1;
                         }
                     } else {
                         // Top level script or no arguments/callee on stack
-                        stack.clear();
+                        stackTop = stackStart;
                     }
                     
                     push(returnValue);
+                    syncStack();
                     return;
                 }
 
@@ -960,22 +1065,22 @@ void VM::run(size_t minFrameDepth) {
                 // For bound methods, receiver is at slot_offset, so resize to slot_offset
                 // For regular functions, callee is at slot_offset-1, so resize to slot_offset-1
                 if (was_bound_method) {
-                    stack.resize(return_slot_offset);  // Keep everything before receiver
+                    stackTop = stackStart + return_slot_offset;
                 } else if (return_slot_offset > 0) {
-                    stack.resize(return_slot_offset - 1);  // Remove callee + arguments (NEUT-020 fix)
+                    stackTop = stackStart + return_slot_offset - 1;
                 } else {
                     // Edge case: top-level script or no arguments
-                    stack.clear();
+                    stackTop = stackStart;
                 }
                 push(returnValue);
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_CONSTANT: {
+            CASE(OP_CONSTANT) {
                 Value constant = READ_CONSTANT();
                 push(constant);
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_CLOSURE: {
+            CASE(OP_CLOSURE) {
                 Value constant = READ_CONSTANT();
                 // The constant should be a Function
                 if (constant.type == ValueType::CALLABLE) {
@@ -983,41 +1088,41 @@ void VM::run(size_t minFrameDepth) {
                 } else {
                     runtimeError(this, "OP_CLOSURE constant must be a function.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_NIL: {
+            CASE(OP_NIL) {
                 push(Value());
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_TRUE: {
+            CASE(OP_TRUE) {
                 push(Value(true));
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_FALSE: {
+            CASE(OP_FALSE) {
                 push(Value(false));
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_POP: {
+            CASE(OP_POP) {
                 pop();
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_DUP: {
+            CASE(OP_DUP) {
                 // Duplicate the value on top of the stack
-                push(stack.back());
-                break;
+                push(peek(0));
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_GET_LOCAL: {
+            CASE(OP_GET_LOCAL) {
                 uint8_t slot = READ_BYTE();
-                push(stack[frame->slot_offset + slot]);
-                break;
+                push(stackStart[frame->slot_offset + slot]);
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_SET_LOCAL: {
+            CASE(OP_SET_LOCAL) {
                 uint8_t slot = READ_BYTE();
-                stack[frame->slot_offset + slot] = stack.back();
-                break;
+                stackStart[frame->slot_offset + slot] = peek(0);
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_GET_GLOBAL: {
-                std::string name = READ_STRING();
+            CASE(OP_GET_GLOBAL) {
+                const std::string& name = READ_STRING();
                 auto it = globals.find(name);
                 if (it == globals.end()) {
                     // Check if it looks like a module name (common module names)
@@ -1031,26 +1136,26 @@ void VM::run(size_t minFrameDepth) {
                     }
                 }
                 push(globals[name]);
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_DEFINE_GLOBAL: {
-                std::string name = READ_STRING();
-                globals[name] = stack.back();
+            CASE(OP_DEFINE_GLOBAL) {
+                const std::string& name = READ_STRING();
+                globals[name] = peek(0);
                 pop();
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_DEFINE_TYPED_GLOBAL: {
-                std::string name = READ_STRING();
+            CASE(OP_DEFINE_TYPED_GLOBAL) {
+                const std::string& name = READ_STRING();
                 TokenType type = static_cast<TokenType>(READ_BYTE());
                 
-                globals[name] = stack.back();
+                globals[name] = peek(0);
                 globalTypes[name] = type;  // Store the type information
                 pop();
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_VALIDATE_SAFE_FUNCTION: {
+            CASE(OP_VALIDATE_SAFE_FUNCTION) {
                 // Validate that the function on top of stack has proper type annotations for safe block
-                Value functionValue = stack.back();
+                Value functionValue = peek(0);
                 if (functionValue.type == ValueType::CALLABLE) {
                     Function* function = dynamic_cast<Function*>(std::get<Callable*>(functionValue.as));
                     if (function && function->declaration) {
@@ -1071,9 +1176,9 @@ void VM::run(size_t minFrameDepth) {
                         }
                     }
                 }
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_VALIDATE_SAFE_VARIABLE: {
+            CASE(OP_VALIDATE_SAFE_VARIABLE) {
                 // Validate that a variable has a type annotation in safe block
                 std::string varName = READ_STRING();
                 if (this->isSafeFile) {
@@ -1081,11 +1186,11 @@ void VM::run(size_t minFrameDepth) {
                 } else {
                     throw VMException(Value("Variable '" + varName + "' must have a type annotation inside a safe block."));
                 }
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_FUNCTION: {
+            CASE(OP_VALIDATE_SAFE_FILE_FUNCTION) {
                 // Validate that the function on top of stack has proper type annotations for safe file
-                Value functionValue = stack.back();
+                Value functionValue = peek(0);
                 if (functionValue.type == ValueType::CALLABLE) {
                     Function* function = dynamic_cast<Function*>(std::get<Callable*>(functionValue.as));
                     if (function && function->declaration) {
@@ -1102,26 +1207,26 @@ void VM::run(size_t minFrameDepth) {
                         }
                     }
                 }
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE: {
+            CASE(OP_VALIDATE_SAFE_FILE_VARIABLE) {
                 // Validate that a variable has a type annotation in safe file
-                std::string varName = READ_STRING();
+                const std::string& varName = READ_STRING();
                 throw VMException(Value("Variable '" + varName + "' must have a type annotation in safe file (.ntsc)."));
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_SET_GLOBAL: {
-                std::string name = READ_STRING();
+            CASE(OP_SET_GLOBAL) {
+                const std::string& name = READ_STRING();
                 auto it = globals.find(name);
                 if (it == globals.end()) {
                     runtimeError(this, "Undefined variable '" + name + "'.", 
                                 frames.empty() ? -1 : frames.back().currentLine);
                 }
-                globals[name] = stack.back();
-                break;
+                globals[name] = peek(0);
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_SET_GLOBAL_TYPED: {
-                std::string name = READ_STRING();
+            CASE(OP_SET_GLOBAL_TYPED) {
+                const std::string& name = READ_STRING();
                 
                 auto it = globals.find(name);
                 if (it == globals.end()) {
@@ -1133,12 +1238,12 @@ void VM::run(size_t minFrameDepth) {
                 auto typeIt = globalTypes.find(name);
                 if (typeIt == globalTypes.end()) {
                     // If no type is stored, fall back to regular assignment
-                    globals[name] = stack.back();
-                    break;
+                    globals[name] = peek(0);
+                    DISPATCH();
                 }
                 
                 TokenType expectedType = typeIt->second;
-                Value value = stack.back();
+                Value value = peek(0);
                 
                 // Check type compatibility
                 bool isValid = false;
@@ -1208,13 +1313,13 @@ void VM::run(size_t minFrameDepth) {
                 }
                 
                 globals[name] = value;
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_SET_LOCAL_TYPED: {
+            CASE(OP_SET_LOCAL_TYPED) {
                 uint8_t slot = READ_BYTE();
                 TokenType expectedType = static_cast<TokenType>(READ_BYTE());
                 
-                Value value = stack.back();
+                Value value = peek(0);
                 
                 // Check type compatibility
                 bool isValid = false;
@@ -1283,12 +1388,12 @@ void VM::run(size_t minFrameDepth) {
                                 frames.empty() ? -1 : frames.back().currentLine);
                 }
                 
-                stack[frame->slot_offset + slot] = value;
-                break;
+                stackStart[frame->slot_offset + slot] = value;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_GET_PROPERTY: {
-                std::string propertyName = READ_STRING();
-                Value object = stack.back();
+            CASE(OP_GET_PROPERTY) {
+                const std::string& propertyName = READ_STRING();
+                Value object = peek(0);
                 
                 if (object.type == ValueType::MODULE) {
                     Module* module = std::get<Module*>(object.as);
@@ -1394,10 +1499,10 @@ void VM::run(size_t minFrameDepth) {
                 } else {
                     runtimeError(this, "Only modules, arrays, strings, and objects have properties. Cannot use dot notation on this value type.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_SET_PROPERTY: {
-                std::string propertyName = READ_STRING();
+            CASE(OP_SET_PROPERTY) {
+                const std::string& propertyName = READ_STRING();
                 Value value = pop();  // The value to set
                 Value object = pop();  // The object/instance
                 
@@ -1417,17 +1522,17 @@ void VM::run(size_t minFrameDepth) {
                 } else {
                     runtimeError(this, "Only instances and objects support property assignment.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_THIS: {
+            CASE(OP_THIS) {
                 // 'this' is stored as the first local variable (slot 0) in method calls
                 CallFrame* frame = &frames[frames.size() - 1];
                 push(stack[frame->slot_offset]);
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_EQUAL: {
-                Value b = pop();
-                Value a = pop();
+            CASE(OP_EQUAL) {
+                Value& b = peek(0);
+                Value& a = peek(1);
                 
                 bool result = false;
                 if (a.type != b.type) {
@@ -1444,12 +1549,15 @@ void VM::run(size_t minFrameDepth) {
                     // For complex types (OBJECT, ARRAY, etc.), fall back to string comparison
                     result = (a.toString() == b.toString());
                 }
-                push(Value(result));
-                break;
+                
+                // Reuse 'a' slot for result
+                a = Value(result);
+                stackTop--;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_NOT_EQUAL: {
-                Value b = pop();
-                Value a = pop();
+            CASE(OP_NOT_EQUAL) {
+                Value& b = peek(0);
+                Value& a = peek(1);
                 
                 bool result = false;
                 if (a.type != b.type) {
@@ -1466,198 +1574,225 @@ void VM::run(size_t minFrameDepth) {
                     // For complex types (OBJECT, ARRAY, etc.), fall back to string comparison
                     result = (a.toString() != b.toString());
                 }
-                push(Value(result));
-                break;
+                
+                // Reuse 'a' slot for result
+                a = Value(result);
+                stackTop--;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_GREATER: {
-                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+            CASE(OP_GREATER) {
+                Value& b = peek(0);
+                Value& a = peek(1);
+                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double b = std::get<double>(pop().as);
-                double a = std::get<double>(pop().as);
-                push(Value(a > b));
-                break;
+                // Reuse 'a' slot for result
+                a = Value(std::get<double>(a.as) > std::get<double>(b.as));
+                stackTop--;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_LESS: {
-                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+            CASE(OP_LESS) {
+                Value& b = peek(0);
+                Value& a = peek(1);
+                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double b = std::get<double>(pop().as);
-                double a = std::get<double>(pop().as);
-                push(Value(a < b));
-                break;
+                // Reuse 'a' slot for result
+                a = Value(std::get<double>(a.as) < std::get<double>(b.as));
+                stackTop--;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_ADD: {
-                Value b = pop();
-                Value a = pop();
+            CASE(OP_ADD) {
+                Value& b = peek(0);
+                Value& a = peek(1);
                 
                 if (a.type == ValueType::NUMBER && b.type == ValueType::NUMBER) {
-                    double num_a = std::get<double>(a.as);
-                    double num_b = std::get<double>(b.as);
-                    push(Value(num_a + num_b));
+                    a.as = std::get<double>(a.as) + std::get<double>(b.as);
+                    stackTop--;
                 } else {
-                    std::string str_a = a.toString();
-                    std::string str_b = b.toString();
-                    push(Value(str_a + str_b));
+                    Value val_b = pop();
+                    Value val_a = pop();
+                    std::string str_a = val_a.toString();
+                    std::string str_b = val_b.toString();
+                    syncStack();
+                    push(Value(allocate<ObjString>(str_a + str_b)));
                 }
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_SUBTRACT: {
-                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+            CASE(OP_SUBTRACT) {
+                Value& b = peek(0);
+                Value& a = peek(1);
+                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double b = std::get<double>(pop().as);
-                double a = std::get<double>(pop().as);
-                push(Value(a - b));
-                break;
+                a.as = std::get<double>(a.as) - std::get<double>(b.as);
+                stackTop--;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_MULTIPLY: {
-                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+            CASE(OP_MULTIPLY) {
+                Value& b = peek(0);
+                Value& a = peek(1);
+                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double b = std::get<double>(pop().as);
-                double a = std::get<double>(pop().as);
-                push(Value(a * b));
-                break;
+                a.as = std::get<double>(a.as) * std::get<double>(b.as);
+                stackTop--;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_DIVIDE: {
-                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+            CASE(OP_DIVIDE) {
+                Value& b = peek(0);
+                Value& a = peek(1);
+                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double b = std::get<double>(pop().as);
-                double a = std::get<double>(pop().as);
-                if (b == 0) {
+                double val_b = std::get<double>(b.as);
+                if (val_b == 0) {
                     runtimeError(this, "Division by zero.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                push(Value(a / b));
-                break;
+                a.as = std::get<double>(a.as) / val_b;
+                stackTop--;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_MODULO: {
-                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+            CASE(OP_MODULO) {
+                Value& b = peek(0);
+                Value& a = peek(1);
+                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double b = std::get<double>(pop().as);
-                double a = std::get<double>(pop().as);
-                if (b == 0) {
+                double val_b = std::get<double>(b.as);
+                if (val_b == 0) {
                     runtimeError(this, "Modulo by zero.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                push(Value(fmod(a, b)));
-                break;
+                a.as = fmod(std::get<double>(a.as), val_b);
+                stackTop--;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_NOT: {
-                Value value = pop();
-                push(Value(!isTruthy(value)));
-                break;
+            CASE(OP_NOT) {
+                Value& value = peek(0);
+                value = Value(!isTruthy(value));
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_NEGATE: {
-                if (stack.back().type != ValueType::NUMBER) {
+            CASE(OP_NEGATE) {
+                Value& value = peek(0);
+                if (value.type != ValueType::NUMBER) {
                     runtimeError(this, "Operand must be a number.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double value = std::get<double>(pop().as);
-                push(Value(-value));
-                break;
+                value.as = -std::get<double>(value.as);
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_BITWISE_AND: {
-                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+            CASE(OP_BITWISE_AND) {
+                Value& b = peek(0);
+                Value& a = peek(1);
+                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double b = std::get<double>(pop().as);
-                double a = std::get<double>(pop().as);
-                push(Value((double)((long long)a & (long long)b)));
-                break;
+                a.as = (double)((long long)std::get<double>(a.as) & (long long)std::get<double>(b.as));
+                stackTop--;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_BITWISE_OR: {
-                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+            CASE(OP_BITWISE_OR) {
+                Value& b = peek(0);
+                Value& a = peek(1);
+                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double b = std::get<double>(pop().as);
-                double a = std::get<double>(pop().as);
-                push(Value((double)((long long)a | (long long)b)));
-                break;
+                a.as = (double)((long long)std::get<double>(a.as) | (long long)std::get<double>(b.as));
+                stackTop--;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_BITWISE_XOR: {
-                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+            CASE(OP_BITWISE_XOR) {
+                Value& b = peek(0);
+                Value& a = peek(1);
+                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double b = std::get<double>(pop().as);
-                double a = std::get<double>(pop().as);
-                push(Value((double)((long long)a ^ (long long)b)));
-                break;
+                a.as = (double)((long long)std::get<double>(a.as) ^ (long long)std::get<double>(b.as));
+                stackTop--;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_BITWISE_NOT: {
-                if (stack.back().type != ValueType::NUMBER) {
+            CASE(OP_BITWISE_NOT) {
+                Value& value = peek(0);
+                if (value.type != ValueType::NUMBER) {
                     runtimeError(this, "Operand must be a number.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double value = std::get<double>(pop().as);
-                push(Value((double)(~(long long)value)));
-                break;
+                value.as = (double)(~(long long)std::get<double>(value.as));
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_LEFT_SHIFT: {
-                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+            CASE(OP_LEFT_SHIFT) {
+                Value& b = peek(0);
+                Value& a = peek(1);
+                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double b = std::get<double>(pop().as);
-                double a = std::get<double>(pop().as);
-                push(Value((double)((long long)a << (long long)b)));
-                break;
+                a.as = (double)((long long)std::get<double>(a.as) << (long long)std::get<double>(b.as));
+                stackTop--;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_RIGHT_SHIFT: {
-                if (stack.back().type != ValueType::NUMBER || stack[stack.size() - 2].type != ValueType::NUMBER) {
+            CASE(OP_RIGHT_SHIFT) {
+                Value& b = peek(0);
+                Value& a = peek(1);
+                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double b = std::get<double>(pop().as);
-                double a = std::get<double>(pop().as);
-                push(Value((double)((long long)a >> (long long)b)));
-                break;
+                a.as = (double)((long long)std::get<double>(a.as) >> (long long)std::get<double>(b.as));
+                stackTop--;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_SAY: {
+            CASE(OP_SAY) {
                 std::cout << pop().toString() << std::endl;
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_JUMP: {
+            CASE(OP_JUMP) {
                 uint16_t offset = READ_SHORT();
                 frame->ip += offset;
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_JUMP_IF_FALSE: {
+            CASE(OP_JUMP_IF_FALSE) {
                 uint16_t offset = READ_SHORT();
                 Value condition = pop();  // Pop the condition value
                 if (!isTruthy(condition)) {
                     frame->ip += offset;
                 }
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_LOOP: {
+            CASE(OP_LOOP) {
                 uint16_t offset = READ_SHORT();
                 frame->ip -= offset;
-                break;
+                DISPATCH();
             }
-                        case (uint8_t)OpCode::OP_CALL: {
+                        CASE(OP_CALL) {
                                 uint8_t argCount = READ_BYTE();
-                                // The function object should be at position [stack.size() - argCount - 1]
-                                // Arguments are at positions [stack.size() - argCount] to [stack.size() - 1]
-                                Value callee = stack[stack.size() - argCount - 1];
+                                syncStack();
+                                Value callee = peek(argCount);
                                 if (!callValue(callee, argCount)) {
                                         return;
-                }
+                                }
+                                reloadStack();
                                 frame = &frames.back();
-                                break;
+                                DISPATCH();
             }
-                        case (uint8_t)OpCode::OP_ARRAY: {
+                        CASE(OP_ARRAY) {
                                 uint8_t count = READ_BYTE();
                                 std::vector<Value> elements;
                                 elements.reserve(count);
-                
-                // Pop 'count' elements from the stack in reverse order
-                for (int i = 0; i < count; i++) {
-                    elements.insert(elements.begin(), pop());
-                }
-                
-                                push(Value(allocate<Array>(std::move(elements))));
-                                break;
+                                
+                                // Read elements without popping to keep them reachable for GC
+                                for (int i = 0; i < count; i++) {
+                                    elements.push_back(peek(count - 1 - i));
+                                }
+                                
+                                syncStack();
+                                Array* array = allocate<Array>(std::move(elements));
+                                
+                                // Pop elements
+                                stackTop -= count;
+                                
+                                push(Value(array));
+                                DISPATCH();
             }
-                        case (uint8_t)OpCode::OP_OBJECT: {
+                        CASE(OP_OBJECT) {
                 uint8_t count = READ_BYTE();
+                syncStack();
                 auto obj = allocate<JsonObject>();
                 
                 // Pop 'count' pairs from the stack
@@ -1676,9 +1811,9 @@ void VM::run(size_t minFrameDepth) {
                 }
                 
                 push(Value(obj));
-                break;
+                DISPATCH();
             }
-                        case (uint8_t)OpCode::OP_INDEX_GET: {
+                        CASE(OP_INDEX_GET) {
                                 Value index = pop();
                                 Value object = pop();
                 
@@ -1759,9 +1894,9 @@ void VM::run(size_t minFrameDepth) {
                     runtimeError(this, "Only arrays, strings, buffers, and objects support index access.", frames.empty() ? -1 : frames.back().currentLine);
                     return;
                 }
-                                break;
+                                DISPATCH();
             }
-                        case (uint8_t)OpCode::OP_INDEX_SET: {
+                        CASE(OP_INDEX_SET) {
                 Value value = pop();
                                 Value index = pop();
                                 Value object = pop();
@@ -1833,9 +1968,9 @@ void VM::run(size_t minFrameDepth) {
                     runtimeError(this, "Only arrays, buffers, and objects support index assignment.", frames.empty() ? -1 : frames.back().currentLine);
                                         return;
                 }
-                                break;
+                                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_TRY: {
+            CASE(OP_TRY) {
                 // Set up an exception handler frame
                 // Read handler information from bytecode
                 uint16_t tryEnd = READ_SHORT(); // End of try block
@@ -1854,9 +1989,9 @@ void VM::run(size_t minFrameDepth) {
                     frame->fileName,
                     frame->currentLine
                 );
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_END_TRY: {
+            CASE(OP_END_TRY) {
                 // End of try block - remove the exception handler frame
                 if (!exceptionFrames.empty()) {
                     exceptionFrames.pop_back();
@@ -1873,9 +2008,9 @@ void VM::run(size_t minFrameDepth) {
                     hasException = false;
                 }
                 
-                break;
+                DISPATCH();
             }
-            case (uint8_t)OpCode::OP_THROW: {
+            CASE(OP_THROW) {
                 // A value has been pushed to the stack - this is the exception
                 Value exception = pop();
                 
@@ -1912,7 +2047,7 @@ void VM::run(size_t minFrameDepth) {
                     // Jump to the finally block
                     frame->ip = frame->function->chunk->code.data() + handler->finallyStart;
                     // Don't pop the exception frame yet - we'll need it when finally block completes
-                    break; // Exit OP_THROW processing
+                    DISPATCH(); // Exit OP_THROW processing
                 }
                 
                 // Adjust the stack to the frame base when the exception frame was created
@@ -1946,10 +2081,14 @@ void VM::run(size_t minFrameDepth) {
                     runtimeError(this, "Exception occurred but no handler available", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 
-                break;
+                DISPATCH();
             }
+#ifndef COMPUTED_GOTO
         }
-        }
+#endif
+#ifndef COMPUTED_GOTO
+        } // End of for(;;)
+#endif
     } catch (const VMException& e) {
         // Handle caught runtime exception
         push(e.value); // Push exception value
@@ -1965,7 +2104,7 @@ void VM::run(size_t minFrameDepth) {
             ExceptionFrame& frame_handler = exceptionFrames[i];
             if (current_pos >= frame_handler.tryStart && current_pos <= frame_handler.tryEnd) {
                 handler = &frame_handler;
-                break;
+                DISPATCH();
             }
         }
         

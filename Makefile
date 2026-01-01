@@ -185,6 +185,19 @@ neutron_runtime/fast:
 .PHONY : neutron_runtime/fast
 
 #=============================================================================
+# Target rules for targets named neutron_shared
+
+# Build rule for target.
+neutron_shared: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 neutron_shared
+.PHONY : neutron_shared
+
+# fast build rule for target.
+neutron_shared/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_shared.dir/build.make CMakeFiles/neutron_shared.dir/build
+.PHONY : neutron_shared/fast
+
+#=============================================================================
 # Target rules for targets named neutron
 
 # Build rule for target.
@@ -413,30 +426,6 @@ libs/time/native.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/libs/time/native.cpp.s
 .PHONY : libs/time/native.cpp.s
 
-src/capi.o: src/capi.cpp.o
-.PHONY : src/capi.o
-
-# target to build an object file
-src/capi.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/capi.cpp.o
-.PHONY : src/capi.cpp.o
-
-src/capi.i: src/capi.cpp.i
-.PHONY : src/capi.i
-
-# target to preprocess a source file
-src/capi.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/capi.cpp.i
-.PHONY : src/capi.cpp.i
-
-src/capi.s: src/capi.cpp.s
-.PHONY : src/capi.s
-
-# target to generate assembly for a file
-src/capi.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/capi.cpp.s
-.PHONY : src/capi.cpp.s
-
 src/compiler/bytecode.o: src/compiler/bytecode.cpp.o
 .PHONY : src/compiler/bytecode.o
 
@@ -533,29 +522,104 @@ src/compiler/scanner.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/compiler/scanner.cpp.s
 .PHONY : src/compiler/scanner.cpp.s
 
-src/main.o: src/main.cpp.o
-.PHONY : src/main.o
+src/core/capi.o: src/core/capi.cpp.o
+.PHONY : src/core/capi.o
 
 # target to build an object file
-src/main.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron.dir/build.make CMakeFiles/neutron.dir/src/main.cpp.o
-.PHONY : src/main.cpp.o
+src/core/capi.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/core/capi.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_shared.dir/build.make CMakeFiles/neutron_shared.dir/src/core/capi.cpp.o
+.PHONY : src/core/capi.cpp.o
 
-src/main.i: src/main.cpp.i
-.PHONY : src/main.i
+src/core/capi.i: src/core/capi.cpp.i
+.PHONY : src/core/capi.i
 
 # target to preprocess a source file
-src/main.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron.dir/build.make CMakeFiles/neutron.dir/src/main.cpp.i
-.PHONY : src/main.cpp.i
+src/core/capi.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/core/capi.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_shared.dir/build.make CMakeFiles/neutron_shared.dir/src/core/capi.cpp.i
+.PHONY : src/core/capi.cpp.i
 
-src/main.s: src/main.cpp.s
-.PHONY : src/main.s
+src/core/capi.s: src/core/capi.cpp.s
+.PHONY : src/core/capi.s
 
 # target to generate assembly for a file
-src/main.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron.dir/build.make CMakeFiles/neutron.dir/src/main.cpp.s
-.PHONY : src/main.cpp.s
+src/core/capi.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/core/capi.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_shared.dir/build.make CMakeFiles/neutron_shared.dir/src/core/capi.cpp.s
+.PHONY : src/core/capi.cpp.s
+
+src/core/checkpoint.o: src/core/checkpoint.cpp.o
+.PHONY : src/core/checkpoint.o
+
+# target to build an object file
+src/core/checkpoint.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/core/checkpoint.cpp.o
+.PHONY : src/core/checkpoint.cpp.o
+
+src/core/checkpoint.i: src/core/checkpoint.cpp.i
+.PHONY : src/core/checkpoint.i
+
+# target to preprocess a source file
+src/core/checkpoint.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/core/checkpoint.cpp.i
+.PHONY : src/core/checkpoint.cpp.i
+
+src/core/checkpoint.s: src/core/checkpoint.cpp.s
+.PHONY : src/core/checkpoint.s
+
+# target to generate assembly for a file
+src/core/checkpoint.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/core/checkpoint.cpp.s
+.PHONY : src/core/checkpoint.cpp.s
+
+src/core/main.o: src/core/main.cpp.o
+.PHONY : src/core/main.o
+
+# target to build an object file
+src/core/main.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron.dir/build.make CMakeFiles/neutron.dir/src/core/main.cpp.o
+.PHONY : src/core/main.cpp.o
+
+src/core/main.i: src/core/main.cpp.i
+.PHONY : src/core/main.i
+
+# target to preprocess a source file
+src/core/main.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron.dir/build.make CMakeFiles/neutron.dir/src/core/main.cpp.i
+.PHONY : src/core/main.cpp.i
+
+src/core/main.s: src/core/main.cpp.s
+.PHONY : src/core/main.s
+
+# target to generate assembly for a file
+src/core/main.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron.dir/build.make CMakeFiles/neutron.dir/src/core/main.cpp.s
+.PHONY : src/core/main.cpp.s
+
+src/core/vm.o: src/core/vm.cpp.o
+.PHONY : src/core/vm.o
+
+# target to build an object file
+src/core/vm.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/core/vm.cpp.o
+.PHONY : src/core/vm.cpp.o
+
+src/core/vm.i: src/core/vm.cpp.i
+.PHONY : src/core/vm.i
+
+# target to preprocess a source file
+src/core/vm.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/core/vm.cpp.i
+.PHONY : src/core/vm.cpp.i
+
+src/core/vm.s: src/core/vm.cpp.s
+.PHONY : src/core/vm.s
+
+# target to generate assembly for a file
+src/core/vm.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/core/vm.cpp.s
+.PHONY : src/core/vm.cpp.s
 
 src/modules/module.o: src/modules/module.cpp.o
 .PHONY : src/modules/module.o
@@ -971,6 +1035,7 @@ src/types/obj_string.o: src/types/obj_string.cpp.o
 # target to build an object file
 src/types/obj_string.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/types/obj_string.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_shared.dir/build.make CMakeFiles/neutron_shared.dir/src/types/obj_string.cpp.o
 .PHONY : src/types/obj_string.cpp.o
 
 src/types/obj_string.i: src/types/obj_string.cpp.i
@@ -979,6 +1044,7 @@ src/types/obj_string.i: src/types/obj_string.cpp.i
 # target to preprocess a source file
 src/types/obj_string.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/types/obj_string.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_shared.dir/build.make CMakeFiles/neutron_shared.dir/src/types/obj_string.cpp.i
 .PHONY : src/types/obj_string.cpp.i
 
 src/types/obj_string.s: src/types/obj_string.cpp.s
@@ -987,6 +1053,7 @@ src/types/obj_string.s: src/types/obj_string.cpp.s
 # target to generate assembly for a file
 src/types/obj_string.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/types/obj_string.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_shared.dir/build.make CMakeFiles/neutron_shared.dir/src/types/obj_string.cpp.s
 .PHONY : src/types/obj_string.cpp.s
 
 src/types/return.o: src/types/return.cpp.o
@@ -1019,6 +1086,7 @@ src/types/value.o: src/types/value.cpp.o
 # target to build an object file
 src/types/value.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/types/value.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_shared.dir/build.make CMakeFiles/neutron_shared.dir/src/types/value.cpp.o
 .PHONY : src/types/value.cpp.o
 
 src/types/value.i: src/types/value.cpp.i
@@ -1027,6 +1095,7 @@ src/types/value.i: src/types/value.cpp.i
 # target to preprocess a source file
 src/types/value.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/types/value.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_shared.dir/build.make CMakeFiles/neutron_shared.dir/src/types/value.cpp.i
 .PHONY : src/types/value.cpp.i
 
 src/types/value.s: src/types/value.cpp.s
@@ -1035,6 +1104,7 @@ src/types/value.s: src/types/value.cpp.s
 # target to generate assembly for a file
 src/types/value.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/types/value.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_shared.dir/build.make CMakeFiles/neutron_shared.dir/src/types/value.cpp.s
 .PHONY : src/types/value.cpp.s
 
 src/types/version.o: src/types/version.cpp.o
@@ -1085,30 +1155,6 @@ src/utils/component_interface.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/utils/component_interface.cpp.s
 .PHONY : src/utils/component_interface.cpp.s
 
-src/vm.o: src/vm.cpp.o
-.PHONY : src/vm.o
-
-# target to build an object file
-src/vm.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/vm.cpp.o
-.PHONY : src/vm.cpp.o
-
-src/vm.i: src/vm.cpp.i
-.PHONY : src/vm.i
-
-# target to preprocess a source file
-src/vm.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/vm.cpp.i
-.PHONY : src/vm.cpp.i
-
-src/vm.s: src/vm.cpp.s
-.PHONY : src/vm.s
-
-# target to generate assembly for a file
-src/vm.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/neutron_runtime.dir/build.make CMakeFiles/neutron_runtime.dir/src/vm.cpp.s
-.PHONY : src/vm.cpp.s
-
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -1124,6 +1170,7 @@ help:
 	@echo "... test"
 	@echo "... neutron"
 	@echo "... neutron_runtime"
+	@echo "... neutron_shared"
 	@echo "... libs/arrays/native.o"
 	@echo "... libs/arrays/native.i"
 	@echo "... libs/arrays/native.s"
@@ -1151,9 +1198,6 @@ help:
 	@echo "... libs/time/native.o"
 	@echo "... libs/time/native.i"
 	@echo "... libs/time/native.s"
-	@echo "... src/capi.o"
-	@echo "... src/capi.i"
-	@echo "... src/capi.s"
 	@echo "... src/compiler/bytecode.o"
 	@echo "... src/compiler/bytecode.i"
 	@echo "... src/compiler/bytecode.s"
@@ -1166,9 +1210,18 @@ help:
 	@echo "... src/compiler/scanner.o"
 	@echo "... src/compiler/scanner.i"
 	@echo "... src/compiler/scanner.s"
-	@echo "... src/main.o"
-	@echo "... src/main.i"
-	@echo "... src/main.s"
+	@echo "... src/core/capi.o"
+	@echo "... src/core/capi.i"
+	@echo "... src/core/capi.s"
+	@echo "... src/core/checkpoint.o"
+	@echo "... src/core/checkpoint.i"
+	@echo "... src/core/checkpoint.s"
+	@echo "... src/core/main.o"
+	@echo "... src/core/main.i"
+	@echo "... src/core/main.s"
+	@echo "... src/core/vm.o"
+	@echo "... src/core/vm.i"
+	@echo "... src/core/vm.s"
 	@echo "... src/modules/module.o"
 	@echo "... src/modules/module.i"
 	@echo "... src/modules/module.s"
@@ -1235,9 +1288,6 @@ help:
 	@echo "... src/utils/component_interface.o"
 	@echo "... src/utils/component_interface.i"
 	@echo "... src/utils/component_interface.s"
-	@echo "... src/vm.o"
-	@echo "... src/vm.i"
-	@echo "... src/vm.s"
 .PHONY : help
 
 

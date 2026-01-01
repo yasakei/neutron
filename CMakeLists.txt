@@ -18,9 +18,9 @@ endif()
 
 # Compiler options
 if(MSVC)
-    add_compile_options(/W4 /utf-8 /EHsc)
+    add_compile_options(/W4 /utf-8 /EHsc /O2)
 else()
-    add_compile_options(-Wall -Wextra -O2)
+    add_compile_options(-Wall -Wextra -O3 -march=native -flto)
 endif()
 
 # Include directories
