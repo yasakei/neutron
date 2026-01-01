@@ -22,6 +22,7 @@ bool ErrorHandler::showStackTrace = true;
 std::string* ErrorHandler::currentFileName = new std::string("");
 std::vector<std::string>* ErrorHandler::sourceLines = new std::vector<std::string>();
 bool ErrorHandler::cleanedUp = false;
+bool ErrorHandler::hasError = false;
 
 // ANSI color codes
 const std::string ErrorHandler::RESET = "\033[0m";
@@ -233,6 +234,7 @@ std::string ErrorHandler::getSuggestion(ErrorType type, const std::string& messa
 }
 
 void ErrorHandler::reportError(const ErrorInfo& error) {
+    hasError = true;
     std::ostringstream oss;
     
     // Error type and location

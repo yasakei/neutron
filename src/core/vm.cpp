@@ -145,8 +145,14 @@ bool isTruthy(const Value& value) {
     
     for (auto it = vm->frames.rbegin(); it != vm->frames.rend(); ++it) {
         std::string funcName = "<script>";
-        if (it->function && it->function->declaration) {
-            funcName = it->function->declaration->name.lexeme;
+        if (it->function) {
+            if (it->function->declaration) {
+                funcName = it->function->declaration->name.lexeme;
+            } else if (!it->function->name.empty()) {
+                funcName = it->function->name;
+            } else {
+                funcName = "<anonymous>";
+            }
         }
         
         int frameLine = it->currentLine > 0 ? it->currentLine : line;
@@ -257,9 +263,10 @@ std::string Function::toString() const {
     if (declaration) {
         return "<fn " + declaration->name.lexeme + ">";
     } else if (!name.empty()) {
+        if (name == "<script>") return "<script>";
         return "<fn " + name + ">";
     }
-    return "<script>";
+    return "<fn <anonymous>>";
 }
 
 int Function::arity() { return arity_val; }

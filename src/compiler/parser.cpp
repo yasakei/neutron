@@ -64,11 +64,18 @@ ValueType literalValueTypeToValueType(LiteralValueType type) {
 Parser::Parser(const std::vector<Token>& tokens)
     : tokens(tokens), current(0) {}
 
+// Internal exception for parser panic mode
+class ParserException : public std::exception {};
+
 std::vector<std::unique_ptr<Stmt>> Parser::parse() {
     std::vector<std::unique_ptr<Stmt>> statements;
     
     while (!isAtEnd()) {
-        statements.push_back(statement());
+        try {
+            statements.push_back(statement());
+        } catch (const ParserException&) {
+            synchronize();
+        }
     }
     
     return statements;
@@ -305,7 +312,7 @@ std::unique_ptr<Stmt> Parser::forStatement() {
     }
 
     if (condition == nullptr) {
-        condition = std::make_unique<LiteralExpr>(true);
+        condition = std::make_unique<LiteralExpr>(true, previous().line);
     }
 
     body = std::make_unique<WhileStmt>(std::move(condition), std::move(body));
@@ -596,7 +603,7 @@ std::unique_ptr<Expr> Parser::unary() {
                                op.type == TokenType::PLUS_PLUS ? "+" : "-", op.line);
         
         // Create: operand + 1 or operand - 1
-        auto one = std::make_unique<LiteralExpr>(1.0);
+        auto one = std::make_unique<LiteralExpr>(1.0, op.line);
         
         // Clone the operand for the binary expression (need a copy)
         std::unique_ptr<Expr> operandCopy;
@@ -637,7 +644,7 @@ std::unique_ptr<Expr> Parser::call() {
             }
             
             Token paren = consume(TokenType::RIGHT_PAREN, "Expect ')' after arguments.");
-            expr = std::make_unique<CallExpr>(std::move(expr), std::move(arguments));
+            expr = std::make_unique<CallExpr>(std::move(expr), paren, std::move(arguments));
         } else if (match({TokenType::DOT})) {
             Token name = consume(TokenType::IDENTIFIER, "Expect property name after '.'.");
             expr = std::make_unique<MemberExpr>(std::move(expr), name);
@@ -661,7 +668,7 @@ std::unique_ptr<Expr> Parser::call() {
                                    op.type == TokenType::PLUS_PLUS ? "+" : "-", op.line);
             
             // Create: operand + 1 or operand - 1
-            auto one = std::make_unique<LiteralExpr>(1.0);
+            auto one = std::make_unique<LiteralExpr>(1.0, op.line);
             
             // Clone the operand for the binary expression
             std::unique_ptr<Expr> operandCopy;
@@ -692,27 +699,29 @@ std::unique_ptr<Expr> Parser::call() {
 
 std::unique_ptr<Expr> Parser::primary() {
     if (match({TokenType::FALSE})) {
-        return std::make_unique<LiteralExpr>(false);
+        return std::make_unique<LiteralExpr>(false, previous().line);
     }
     
     if (match({TokenType::TRUE})) {
-        return std::make_unique<LiteralExpr>(true);
+        return std::make_unique<LiteralExpr>(true, previous().line);
     }
     
     if (match({TokenType::NIL})) {
-        return std::make_unique<LiteralExpr>();
+        auto expr = std::make_unique<LiteralExpr>();
+        expr->line = previous().line;
+        return expr;
     }
     
     if (match({TokenType::NUMBER})) {
         // Parse the number from the lexeme
         double num = std::stod(previous().lexeme);
-        return std::make_unique<LiteralExpr>(num);
+        return std::make_unique<LiteralExpr>(num, previous().line);
     }
     
     if (match({TokenType::STRING})) {
         // Create a string value from the lexeme
         std::string str = previous().lexeme;
-        auto expr = std::make_unique<LiteralExpr>(str);
+        auto expr = std::make_unique<LiteralExpr>(str, previous().line);
         return expr;
     }
     
@@ -869,9 +878,9 @@ Token Parser::consume(TokenType type, const std::string& message) {
     return peek();
 }
 
-[[noreturn]] void Parser::error(Token token, const std::string& message) {
+void Parser::error(Token token, const std::string& message) {
     ErrorHandler::reportSyntaxError(message, token);
-    exit(1);
+    throw ParserException();
 }
 
 void Parser::synchronize() {

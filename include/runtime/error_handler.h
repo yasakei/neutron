@@ -63,6 +63,7 @@ private:
     static std::string* currentFileName;
     static std::vector<std::string>* sourceLines;  // Cache of source code lines (pointer to avoid destruction order issues)
     static bool cleanedUp;  // Flag to prevent double cleanup
+    static bool hasError;   // Flag to track if any error occurred
 
     // ANSI color codes (cross-platform compatible)
     static const std::string RESET;
@@ -123,6 +124,10 @@ public:
     
     // Check if cleanup has been called
     static bool isCleanedUp() { return cleanedUp; }
+    
+    // Check if any error occurred
+    static bool hadError() { return hasError; }
+    static void resetError() { hasError = false; }
     
     // Get current filename safely
     static std::string getCurrentFileName() { return currentFileName ? *currentFileName : ""; }

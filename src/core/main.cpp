@@ -60,6 +60,11 @@ void run(const std::string& source, neutron::VM& vm, bool isSafeFile = false) {
         neutron::Parser parser(tokens);
         std::vector<std::unique_ptr<neutron::Stmt>> statements = parser.parse();
         
+        // Stop if there were any syntax errors
+        if (neutron::ErrorHandler::hadError()) {
+            return;
+        }
+
         neutron::Compiler compiler(vm, isSafeFile);
         neutron::Function* function = compiler.compile(statements);
         

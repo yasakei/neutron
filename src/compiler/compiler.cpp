@@ -130,6 +130,9 @@ int Compiler::resolveLocal(const Token& name) {
 }
 
 void Compiler::visitLiteralExpr(const LiteralExpr* expr) {
+    if (expr->line > 0) {
+        currentLine = expr->line;
+    }
     switch (expr->valueType) {
         case LiteralValueType::NIL:
             emitByte((uint8_t)OpCode::OP_NIL);
@@ -824,6 +827,9 @@ void Compiler::visitCallExpr(const CallExpr* expr) {
     for (const auto& argument : expr->arguments) {
         compileExpression(argument.get());
     }
+    
+    // Update current line to the closing parenthesis
+    currentLine = expr->paren.line;
     
     // Emit the call instruction with the number of arguments
     emitBytes((uint8_t)OpCode::OP_CALL, expr->arguments.size());

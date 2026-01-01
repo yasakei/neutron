@@ -149,7 +149,7 @@ void Scanner::scanToken() {
                 msg += c;
                 msg += "'";
                 ErrorHandler::reportLexicalError(msg, line, current - start);
-                exit(1);
+                // Don't exit, just continue scanning
             }
             break;
     }

@@ -22,7 +22,7 @@ private:
     Token consume(TokenType type, const std::string& message);
     
     // Error handling
-    [[noreturn]] void error(Token token, const std::string& message);
+    void error(Token token, const std::string& message);
     
     // Parsing methods
     std::unique_ptr<Expr> expression();

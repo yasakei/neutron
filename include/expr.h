@@ -60,21 +60,22 @@ public:
     // Store values directly instead of using a union
     std::shared_ptr<void> value; // Could be string, double, bool, or nullptr
     LiteralValueType valueType;
+    int line = 0;
     
     LiteralExpr() : Expr(ExprType::LITERAL), value(nullptr), valueType(LiteralValueType::NIL) {
     }
     
-    LiteralExpr(bool val) : Expr(ExprType::LITERAL), valueType(LiteralValueType::BOOLEAN) {
+    LiteralExpr(bool val, int line = 0) : Expr(ExprType::LITERAL), valueType(LiteralValueType::BOOLEAN), line(line) {
         auto ptr = std::make_shared<bool>(val);
         value = std::static_pointer_cast<void>(ptr);
     }
     
-    LiteralExpr(double val) : Expr(ExprType::LITERAL), valueType(LiteralValueType::NUMBER) {
+    LiteralExpr(double val, int line = 0) : Expr(ExprType::LITERAL), valueType(LiteralValueType::NUMBER), line(line) {
         auto ptr = std::make_shared<double>(val);
         value = std::static_pointer_cast<void>(ptr);
     }
     
-    LiteralExpr(const std::string& val) : Expr(ExprType::LITERAL), valueType(LiteralValueType::STRING) {
+    LiteralExpr(const std::string& val, int line = 0) : Expr(ExprType::LITERAL), valueType(LiteralValueType::STRING), line(line) {
         auto ptr = std::make_shared<std::string>(val);
         value = std::static_pointer_cast<void>(ptr);
     }
@@ -147,10 +148,11 @@ public:
 class CallExpr : public Expr {
 public:
     std::unique_ptr<Expr> callee;
+    Token paren;
     std::vector<std::unique_ptr<Expr>> arguments;
     
-    CallExpr(std::unique_ptr<Expr> callee, std::vector<std::unique_ptr<Expr>> arguments)
-        : Expr(ExprType::CALL), callee(std::move(callee)), arguments(std::move(arguments)) {}
+    CallExpr(std::unique_ptr<Expr> callee, Token paren, std::vector<std::unique_ptr<Expr>> arguments)
+        : Expr(ExprType::CALL), callee(std::move(callee)), paren(paren), arguments(std::move(arguments)) {}
         
     void accept(Compiler* compiler) const override;
 };
