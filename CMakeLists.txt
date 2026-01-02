@@ -20,7 +20,11 @@ endif()
 if(MSVC)
     add_compile_options(/W4 /utf-8 /EHsc /O2)
 else()
-    add_compile_options(-Wall -Wextra -O3 -march=native -flto)
+    add_compile_options(-Wall -Wextra -O3 -flto)
+    # Only use -march=native for single-architecture builds (not universal binaries)
+    if(NOT CMAKE_OSX_ARCHITECTURES OR CMAKE_OSX_ARCHITECTURES STREQUAL "")
+        add_compile_options(-march=native)
+    endif()
 endif()
 
 # Include directories

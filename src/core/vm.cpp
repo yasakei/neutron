@@ -934,9 +934,14 @@ void VM::run(size_t minFrameDepth) {
 #define READ_STRING() (READ_CONSTANT().as.obj_string->chars)
 
 // Computed goto optimization (disabled by default due to C++ scope rules)
-#define COMPUTED_GOTO 1
+// Only enable on GCC/Clang - MSVC doesn't support computed goto
+#if defined(__GNUC__) || defined(__clang__)
+    #define COMPUTED_GOTO 1
+#else
+    #define COMPUTED_GOTO 0
+#endif
 
-#ifdef COMPUTED_GOTO
+#if COMPUTED_GOTO
     static void* dispatch_table[] = {
         &&CASE_OP_RETURN,
         &&CASE_OP_CONSTANT,
@@ -1007,7 +1012,7 @@ void VM::run(size_t minFrameDepth) {
 
     while (true) {
     try {
-#ifdef COMPUTED_GOTO
+#if COMPUTED_GOTO
         DISPATCH();
 #else
         for (;;) {
@@ -2101,10 +2106,10 @@ void VM::run(size_t minFrameDepth) {
                 // DISPATCH();
                 continue;
             }
-#ifndef COMPUTED_GOTO
+#if !COMPUTED_GOTO
         }
 #endif
-#ifndef COMPUTED_GOTO
+#if !COMPUTED_GOTO
         } // End of for(;;)
 #endif
     } catch (const VMException& e) {

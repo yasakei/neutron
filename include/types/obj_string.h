@@ -2,6 +2,7 @@
 
 #include "object.h"
 #include <string>
+#include <cstdint>
 
 namespace neutron {
 

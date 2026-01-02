@@ -1,0 +1,66 @@
+// Parallel Fibonacci - Demonstrates Erlang-style process parallelism
+// This example computes fibonacci numbers in parallel across multiple CPU cores
+use process;
+use time;
+
+// Sequential fibonacci function
+fun fib(n) {
+    if (n < 2) return n;
+    return fib(n - 1) + fib(n - 2);
+}
+
+// Worker process - must be self-contained with its own fib function
+fun fib_worker() {
+    // Define fib inside the worker (processes are isolated)
+    fun fib_local(n) {
+        if (n < 2) return n;
+        return fib_local(n - 1) + fib_local(n - 2);
+    }
+    
+    var n = process.receive();
+    var result = fib_local(n);
+    say("  Worker " + process.self() + " computed fib(" + n + ") = " + result);
+    return result;
+}
+
+say("=== Parallel Fibonacci Example ===");
+say("");
+
+// Sequential version - one after another
+say("Running sequential (4x fib(30))...");
+var start = time.now();
+var r1 = fib(30);
+var r2 = fib(30);
+var r3 = fib(30);
+var r4 = fib(30);
+var sequential_time = time.now() - start;
+say("Sequential time: " + sequential_time + "ms");
+say("");
+
+// Parallel version - all 4 at once on separate cores
+say("Running parallel (4x fib(30) on 4 workers)...");
+start = time.now();
+
+// Spawn 4 worker processes
+var w1 = process.spawn(fib_worker);
+var w2 = process.spawn(fib_worker);
+var w3 = process.spawn(fib_worker);
+var w4 = process.spawn(fib_worker);
+
+// Send work to each worker
+process.send(w1, 30);
+process.send(w2, 30);
+process.send(w3, 30);
+process.send(w4, 30);
+
+// Wait for all workers to complete
+while (process.process_count() > 0) {
+    process.process_sleep(5);
+}
+var parallel_time = time.now() - start;
+
+say("");
+say("=== Results ===");
+say("Sequential: " + sequential_time + "ms");
+say("Parallel:   " + parallel_time + "ms");
+say("Speedup:    " + (sequential_time / parallel_time) + "x");
