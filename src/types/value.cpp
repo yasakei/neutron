@@ -11,71 +11,68 @@
 
 namespace neutron {
 
-Value::Value() : type(ValueType::NIL), as(nullptr) {}
+Value::Value() : type(ValueType::NIL) { as.object = nullptr; }
 
-Value::Value(std::nullptr_t) : type(ValueType::NIL), as(nullptr) {}
+Value::Value(std::nullptr_t) : type(ValueType::NIL) { as.object = nullptr; }
 
-Value::Value(bool value) : type(ValueType::BOOLEAN), as(value) {}
+Value::Value(bool value) : type(ValueType::BOOLEAN) { as.boolean = value; }
 
-Value::Value(double value) : type(ValueType::NUMBER), as(value) {}
+Value::Value(double value) : type(ValueType::NUMBER) { as.number = value; }
 
-Value::Value(ObjString* string) : type(ValueType::OBJ_STRING), as(string) {}
+Value::Value(ObjString* string) : type(ValueType::OBJ_STRING) { as.obj_string = string; }
 
-Value::Value(const std::string& value) : type(ValueType::OBJ_STRING), as(new ObjString(value)) {}
+Value::Value(const std::string& value) : type(ValueType::OBJ_STRING) { as.obj_string = new ObjString(value); }
 
-Value::Value(Array* array) : type(ValueType::ARRAY), as(array) {}
+Value::Value(Array* array) : type(ValueType::ARRAY) { as.array = array; }
 
-Value::Value(Object* object) : type(ValueType::OBJECT), as(object) {}
+Value::Value(Object* object) : type(ValueType::OBJECT) { as.object = object; }
 
-Value::Value(Callable* callable) : type(ValueType::CALLABLE), as(callable) {}
+Value::Value(Callable* callable) : type(ValueType::CALLABLE) { as.callable = callable; }
 
-Value::Value(Module* module) : type(ValueType::MODULE), as(module) {}
+Value::Value(Module* module) : type(ValueType::MODULE) { as.module = module; }
 
-Value::Value(Class* klass) : type(ValueType::CLASS), as(klass) {}
+Value::Value(Class* klass) : type(ValueType::CLASS) { as.klass = klass; }
 
-Value::Value(Instance* instance) : type(ValueType::INSTANCE), as(instance) {}
+Value::Value(Instance* instance) : type(ValueType::INSTANCE) { as.instance = instance; }
 
-Value::Value(Buffer* buffer) : type(ValueType::BUFFER), as(buffer) {}
+Value::Value(Buffer* buffer) : type(ValueType::BUFFER) { as.buffer = buffer; }
 
 std::string Value::toString() const {
     switch (type) {
         case ValueType::NIL:
             return "nil";
         case ValueType::BOOLEAN:
-            return std::get<bool>(as) ? "true" : "false";
+            return as.boolean ? "true" : "false";
         case ValueType::NUMBER: {
             // Convert double to string, removing trailing zeros
             char buffer[32];
-            snprintf(buffer, sizeof(buffer), "%.15g", std::get<double>(as));
+            snprintf(buffer, sizeof(buffer), "%.15g", as.number);
             return std::string(buffer);
         }
         case ValueType::OBJ_STRING:
-            return std::get<ObjString*>(as)->toString();
+            return as.obj_string->toString();
         case ValueType::ARRAY: {
-            Array* arr = std::get<Array*>(as);
-            if (!arr) return "<null array>";
-            return arr->toString();
+            if (!as.array) return "<null array>";
+            return as.array->toString();
         }
         case ValueType::OBJECT: {
-            Object* obj = std::get<Object*>(as);
-            if (!obj) return "<null object>";
-            return obj->toString();
+            if (!as.object) return "<null object>";
+            return as.object->toString();
         }
         case ValueType::CALLABLE: {
-            Callable* callable = std::get<Callable*>(as);
-            if (callable == nullptr) {
+            if (as.callable == nullptr) {
                 return "<null callable>";
             }
-            return callable->toString();
+            return as.callable->toString();
         }
         case ValueType::MODULE:
             return "<module>";
         case ValueType::CLASS:
-            return std::get<Class*>(as)->toString();
+            return as.klass->toString();
         case ValueType::INSTANCE:
-            return std::get<Instance*>(as)->toString();
+            return as.instance->toString();
         case ValueType::BUFFER:
-            return std::get<Buffer*>(as)->toString();
+            return as.buffer->toString();
     }
     return "";
 }
@@ -86,7 +83,7 @@ bool Value::isModule() const {
 
 Module* Value::asModule() const {
     if (isModule()) {
-        return std::get<Module*>(as);
+        return as.module;
     }
     return nullptr;
 }
@@ -97,7 +94,7 @@ bool Value::isString() const {
 
 ObjString* Value::asString() const {
     if (isString()) {
-        return std::get<ObjString*>(as);
+        return as.obj_string;
     }
     return nullptr;
 }
@@ -108,7 +105,7 @@ bool Value::isBuffer() const {
 
 Buffer* Value::asBuffer() const {
     if (isBuffer()) {
-        return std::get<Buffer*>(as);
+        return as.buffer;
     }
     return nullptr;
 }

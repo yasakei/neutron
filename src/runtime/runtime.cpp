@@ -76,7 +76,65 @@ std::string Class::toString() const {
 }
 
 Instance::Instance(Class* klass)
-    : klass(klass) {}
+    : klass(klass), inlineCount(0), overflowFields(nullptr) {
+    // Inline fields are already zero-initialized
+}
+
+Instance::~Instance() {
+    delete overflowFields;
+}
+
+Value* Instance::getField(ObjString* key) {
+    // Fast path: check inline fields first
+    for (uint8_t i = 0; i < inlineCount; ++i) {
+        if (inlineFields[i].key == key) {
+            return &inlineFields[i].value;
+        }
+    }
+    
+    // Slow path: check overflow map
+    if (overflowFields) {
+        auto it = overflowFields->find(key);
+        if (it != overflowFields->end()) {
+            return &it->second;
+        }
+    }
+    
+    return nullptr;
+}
+
+void Instance::setField(ObjString* key, const Value& value) {
+    // Fast path: check if key already exists in inline fields
+    for (uint8_t i = 0; i < inlineCount; ++i) {
+        if (inlineFields[i].key == key) {
+            inlineFields[i].value = value;
+            return;
+        }
+    }
+    
+    // Check overflow map if it exists
+    if (overflowFields) {
+        auto it = overflowFields->find(key);
+        if (it != overflowFields->end()) {
+            it->second = value;
+            return;
+        }
+    }
+    
+    // New field - try inline first
+    if (inlineCount < INLINE_FIELD_COUNT) {
+        inlineFields[inlineCount].key = key;
+        inlineFields[inlineCount].value = value;
+        ++inlineCount;
+        return;
+    }
+    
+    // Overflow to hash map
+    if (!overflowFields) {
+        overflowFields = new std::unordered_map<ObjString*, Value, ObjStringHash, ObjStringPtrEqual>();
+    }
+    (*overflowFields)[key] = value;
+}
 
 std::string Instance::toString() const {
     return "<" + klass->name + " instance>";

@@ -92,6 +92,7 @@ set(NEUTRON_BUILTIN_MODULE_SOURCES
     libs/arrays/native.cpp
     libs/async/native.cpp
     libs/regex/native.cpp
+    libs/process/native.cpp
 )
 
 # All module-related sources (internal and built-in)
@@ -125,6 +126,7 @@ set(NEUTRON_RUNTIME_SOURCES
     src/runtime/error_handler.cpp
     src/runtime/runtime.cpp
     src/runtime/debug.cpp
+    src/runtime/process.cpp
 )
 
 # Module system source files

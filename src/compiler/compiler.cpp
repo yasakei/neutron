@@ -144,7 +144,7 @@ void Compiler::visitLiteralExpr(const LiteralExpr* expr) {
             emitConstant(Value(*static_cast<double*>(expr->value.get())));
             break;
         case LiteralValueType::STRING:
-            emitConstant(Value(*static_cast<std::string*>(expr->value.get())));
+            emitConstant(Value(vm.internString(*static_cast<std::string*>(expr->value.get()))));
             break;
     }
 }
@@ -253,7 +253,7 @@ void Compiler::visitVariableExpr(const VariableExpr* expr) {
     if (arg != -1) {
         emitBytes((uint8_t)OpCode::OP_GET_LOCAL, arg);
     } else {
-        emitBytes((uint8_t)OpCode::OP_GET_GLOBAL, makeConstant(Value(expr->name.lexeme)));
+        emitBytes((uint8_t)OpCode::OP_GET_GLOBAL, makeConstant(Value(vm.internString(expr->name.lexeme))));
     }
 }
 
@@ -288,7 +288,7 @@ void Compiler::visitAssignExpr(const AssignExpr* expr) {
         
         // Always use the type-safe assignment for globals, which will check against
         // stored type information at runtime (if any exists)
-        emitBytes((uint8_t)OpCode::OP_SET_GLOBAL_TYPED, makeConstant(Value(expr->name.lexeme)));
+        emitBytes((uint8_t)OpCode::OP_SET_GLOBAL_TYPED, makeConstant(Value(vm.internString(expr->name.lexeme))));
     }
 }
 
@@ -325,9 +325,9 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
         if (inSafeBlock && !stmt->typeAnnotation.has_value()) {
             // Emit validation instruction that will be executed at runtime
             if (isSafeFile) {
-                emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE, makeConstant(Value(stmt->name.lexeme)));
+                emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE, makeConstant(Value(vm.internString(stmt->name.lexeme))));
             } else {
-                emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_VARIABLE, makeConstant(Value(stmt->name.lexeme)));
+                emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_VARIABLE, makeConstant(Value(vm.internString(stmt->name.lexeme))));
             }
         }
 
@@ -379,9 +379,9 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
     if (inSafeBlock && !stmt->typeAnnotation.has_value()) {
         // Emit validation instruction that will be executed at runtime
         if (isSafeFile) {
-            emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE, makeConstant(Value(stmt->name.lexeme)));
+            emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE, makeConstant(Value(vm.internString(stmt->name.lexeme))));
         } else {
-            emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_VARIABLE, makeConstant(Value(stmt->name.lexeme)));
+            emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_VARIABLE, makeConstant(Value(vm.internString(stmt->name.lexeme))));
         }
     }
     
@@ -398,11 +398,11 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
     
     // If there's a type annotation, use the typed define instruction
     if (stmt->typeAnnotation.has_value()) {
-        emitBytes((uint8_t)OpCode::OP_DEFINE_TYPED_GLOBAL, makeConstant(Value(stmt->name.lexeme)));
+        emitBytes((uint8_t)OpCode::OP_DEFINE_TYPED_GLOBAL, makeConstant(Value(vm.internString(stmt->name.lexeme))));
         emitByte((uint8_t)stmt->typeAnnotation.value().type);
     } else {
         // Use regular define for variables without type annotations
-        emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(stmt->name.lexeme)));
+        emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(vm.internString(stmt->name.lexeme))));
     }
 }
 
@@ -643,7 +643,10 @@ void Compiler::visitClassStmt(const ClassStmt* stmt) {
 
             compiler.emitReturn();
 
-            klass->methods[funcStmt->name.lexeme] = compiler.function;
+            klass->methods[vm.internString(funcStmt->name.lexeme)] = compiler.function;
+            if (funcStmt->name.lexeme == "initialize") {
+                klass->initializer = compiler.function;
+            }
         } else if (auto varStmt = dynamic_cast<const VarStmt*>(method.get())) {
             // In safe blocks or .ntsc files, enforce type annotations on class properties
             if (inSafeBlock && !varStmt->typeAnnotation.has_value()) {
@@ -664,7 +667,7 @@ void Compiler::visitClassStmt(const ClassStmt* stmt) {
 
     // Define the class as a global variable
     emitBytes((uint8_t)OpCode::OP_CONSTANT, makeConstant(Value(klass)));
-    emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(stmt->name.lexeme)));
+    emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(vm.internString(stmt->name.lexeme))));
 }
 
 void Compiler::visitUseStmt(const UseStmt* stmt) {
@@ -703,10 +706,10 @@ void Compiler::visitUseStmt(const UseStmt* stmt) {
                 if (val.type != ValueType::NIL) {
                     // Define in current global scope
                     emitBytes((uint8_t)OpCode::OP_CONSTANT, makeConstant(val));
-                    emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(name)));
+                    emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(vm.internString(name))));
                 } else {
                      emitBytes((uint8_t)OpCode::OP_CONSTANT, makeConstant(val));
-                     emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(name)));
+                     emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(vm.internString(name))));
                 }
             }
             
@@ -799,7 +802,7 @@ void Compiler::visitFunctionStmt(const FunctionStmt* stmt) {
     }
     
     // Define the function as a global variable in the current scope
-    emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(stmt->name.lexeme)));
+    emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(vm.internString(stmt->name.lexeme))));
 }
 
 void Compiler::visitReturnStmt(const ReturnStmt* stmt) {
@@ -816,7 +819,7 @@ void Compiler::visitMemberExpr(const MemberExpr* expr) {
     compileExpression(expr->object.get());
     
     // Emit a GET_PROPERTY instruction with the property name
-    emitBytes((uint8_t)OpCode::OP_GET_PROPERTY, makeConstant(Value(expr->property.lexeme)));
+    emitBytes((uint8_t)OpCode::OP_GET_PROPERTY, makeConstant(Value(vm.internString(expr->property.lexeme))));
 }
 
 void Compiler::visitCallExpr(const CallExpr* expr) {
@@ -870,14 +873,14 @@ void Compiler::visitMemberSetExpr(const MemberSetExpr* expr) {
     compileExpression(expr->value.get());
     
     // Emit the property name as a constant
-    emitBytes((uint8_t)OpCode::OP_SET_PROPERTY, makeConstant(Value(expr->property.lexeme)));
+    emitBytes((uint8_t)OpCode::OP_SET_PROPERTY, makeConstant(Value(vm.internString(expr->property.lexeme))));
 }
 
 void Compiler::visitObjectExpr(const ObjectExpr* expr) {
     // Compile properties
     for (const auto& property : expr->properties) {
         // Push key
-        emitConstant(Value(property.first));
+        emitConstant(Value(vm.internString(property.first)));
         
         // Push value
         compileExpression(property.second.get());

@@ -33,7 +33,7 @@ Value time_format(VM& vm, std::vector<Value> arguments) {
     }
     
     // Get the timestamp
-    double timestamp = std::get<double>(arguments[0].as);
+    double timestamp = arguments[0].as.number;
     
     // Default format or custom format
     std::string format = "%Y-%m-%d %H:%M:%S";
@@ -51,7 +51,7 @@ Value time_format(VM& vm, std::vector<Value> arguments) {
     std::ostringstream oss;
     oss << std::put_time(std::localtime(&t), format.c_str());
     
-    return Value(vm.allocate<ObjString>(oss.str()));
+    return Value(vm.internString(oss.str()));
 }
 
 // Sleep for specified milliseconds
@@ -65,7 +65,7 @@ Value time_sleep(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Argument for time.sleep() must be a number (milliseconds).");
     }
     
-    int milliseconds = static_cast<int>(std::get<double>(arguments[0].as));
+    int milliseconds = static_cast<int>(arguments[0].as.number);
     std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
     
     return Value(nullptr);

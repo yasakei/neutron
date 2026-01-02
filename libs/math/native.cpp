@@ -28,8 +28,8 @@ Value add(VM& vm, std::vector<Value> args) {
     if (args[0].type != ValueType::NUMBER || args[1].type != ValueType::NUMBER) {
         throw std::runtime_error("add() expects two numbers.");
     }
-    double a = std::get<double>(args[0].as);
-    double b = std::get<double>(args[1].as);
+    double a = args[0].as.number;
+    double b = args[1].as.number;
     return Value(a + b);
 }
 
@@ -42,8 +42,8 @@ Value subtract(VM& vm, std::vector<Value> args) {
     if (args[0].type != ValueType::NUMBER || args[1].type != ValueType::NUMBER) {
         throw std::runtime_error("subtract() expects two numbers.");
     }
-    double a = std::get<double>(args[0].as);
-    double b = std::get<double>(args[1].as);
+    double a = args[0].as.number;
+    double b = args[1].as.number;
     return Value(a - b);
 }
 
@@ -56,8 +56,8 @@ Value multiply(VM& vm, std::vector<Value> args) {
     if (args[0].type != ValueType::NUMBER || args[1].type != ValueType::NUMBER) {
         throw std::runtime_error("multiply() expects two numbers.");
     }
-    double a = std::get<double>(args[0].as);
-    double b = std::get<double>(args[1].as);
+    double a = args[0].as.number;
+    double b = args[1].as.number;
     return Value(a * b);
 }
 
@@ -70,8 +70,8 @@ Value divide(VM& vm, std::vector<Value> args) {
     if (args[0].type != ValueType::NUMBER || args[1].type != ValueType::NUMBER) {
         throw std::runtime_error("divide() expects two numbers.");
     }
-    double a = std::get<double>(args[0].as);
-    double b = std::get<double>(args[1].as);
+    double a = args[0].as.number;
+    double b = args[1].as.number;
     if (b == 0) {
         throw std::runtime_error("Division by zero.");
     }
@@ -87,7 +87,7 @@ Value sqrt_fn(VM& vm, std::vector<Value> args) {
     if (args[0].type != ValueType::NUMBER) {
         throw std::runtime_error("sqrt() expects a number.");
     }
-    double num = std::get<double>(args[0].as);
+    double num = args[0].as.number;
     return Value(std::sqrt(num));
 }
 
@@ -99,8 +99,8 @@ Value pow_fn(VM& vm, std::vector<Value> args) {
     if (args[0].type != ValueType::NUMBER || args[1].type != ValueType::NUMBER) {
         throw std::runtime_error("pow() expects two numbers.");
     }
-    double base = std::get<double>(args[0].as);
-    double exp = std::get<double>(args[1].as);
+    double base = args[0].as.number;
+    double exp = args[1].as.number;
     return Value(std::pow(base, exp));
 }
 
@@ -112,7 +112,7 @@ Value abs_fn(VM& vm, std::vector<Value> args) {
     if (args[0].type != ValueType::NUMBER) {
         throw std::runtime_error("abs() expects a number.");
     }
-    double num = std::get<double>(args[0].as);
+    double num = args[0].as.number;
     return Value(std::abs(num));
 }
 
@@ -124,7 +124,7 @@ Value ceil_fn(VM& vm, std::vector<Value> args) {
     if (args[0].type != ValueType::NUMBER) {
         throw std::runtime_error("ceil() expects a number.");
     }
-    double num = std::get<double>(args[0].as);
+    double num = args[0].as.number;
     return Value(std::ceil(num));
 }
 
@@ -136,7 +136,7 @@ Value floor_fn(VM& vm, std::vector<Value> args) {
     if (args[0].type != ValueType::NUMBER) {
         throw std::runtime_error("floor() expects a number.");
     }
-    double num = std::get<double>(args[0].as);
+    double num = args[0].as.number;
     return Value(std::floor(num));
 }
 
@@ -148,7 +148,7 @@ Value round_fn(VM& vm, std::vector<Value> args) {
     if (args[0].type != ValueType::NUMBER) {
         throw std::runtime_error("round() expects a number.");
     }
-    double num = std::get<double>(args[0].as);
+    double num = args[0].as.number;
     return Value(std::round(num));
 }
 
@@ -160,7 +160,7 @@ Value sin_fn(VM& vm, std::vector<Value> args) {
     if (args[0].type != ValueType::NUMBER) {
         throw std::runtime_error("sin() expects a number.");
     }
-    double num = std::get<double>(args[0].as);
+    double num = args[0].as.number;
     return Value(std::sin(num));
 }
 
@@ -172,7 +172,7 @@ Value cos_fn(VM& vm, std::vector<Value> args) {
     if (args[0].type != ValueType::NUMBER) {
         throw std::runtime_error("cos() expects a number.");
     }
-    double num = std::get<double>(args[0].as);
+    double num = args[0].as.number;
     return Value(std::cos(num));
 }
 
@@ -184,7 +184,7 @@ Value tan_fn(VM& vm, std::vector<Value> args) {
     if (args[0].type != ValueType::NUMBER) {
         throw std::runtime_error("tan() expects a number.");
     }
-    double num = std::get<double>(args[0].as);
+    double num = args[0].as.number;
     return Value(std::tan(num));
 }
 

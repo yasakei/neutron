@@ -105,19 +105,15 @@ public:
     template<typename T, typename... Args>
     T* allocate(Args&&... args) {
         T* obj = new T(std::forward<Args>(args)...);
-        
-        // Protect the new object from GC until it's returned and used
-        tempRoots.push_back(obj);
         heap.push_back(obj);
         
-        // Check if we need to run garbage collection
+        // Only check GC periodically to reduce overhead
         if (heap.size() >= nextGC) {
+            tempRoots.push_back(obj);  // Protect during GC
             collectGarbage();
-        }
-        
-        // Unprotect
-        if (!tempRoots.empty() && tempRoots.back() == obj) {
-            tempRoots.pop_back();
+            if (!tempRoots.empty() && tempRoots.back() == obj) {
+                tempRoots.pop_back();
+            }
         }
         
         return obj;
@@ -139,6 +135,14 @@ public:
     std::vector<std::string> sourceLines;  // Source code lines for error reporting
     std::vector<std::shared_ptr<ComponentInterface>> loadedComponents;  // Loaded components
     
+    // String interning
+    std::unordered_map<std::string, ObjString*> internedStrings;
+    ObjString* internString(const std::string& str);
+    
+    // Fast string allocation (no interning - for data strings like concatenation results)
+    ObjString* makeString(const std::string& str);
+    ObjString* makeString(std::string&& str);
+
     // Temporary roots for garbage collection protection during allocation
     std::vector<Object*> tempRoots;
 

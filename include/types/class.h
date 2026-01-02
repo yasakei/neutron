@@ -5,6 +5,7 @@
 #include <memory>
 #include "types/callable.h"
 #include "runtime/environment.h"
+#include "types/obj_string.h"
 
 namespace neutron {
 
@@ -18,7 +19,8 @@ public:
     
     std::string name;
     std::shared_ptr<Environment> class_env;  // Store the environment for this class
-    std::unordered_map<std::string, Value> methods;  // Store method definitions
+    std::unordered_map<ObjString*, Value> methods;  // Store method definitions
+    class Function* initializer = nullptr; // Cached initializer
 };
 
 }

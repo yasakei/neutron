@@ -72,15 +72,15 @@ bool neutron_is_string(NeutronValue* value) {
 }
 
 bool neutron_get_boolean(NeutronValue* value) {
-    return std::get<bool>(to_cpp_value(value)->as);
+    return to_cpp_value(value)->as.boolean;
 }
 
 double neutron_get_number(NeutronValue* value) {
-    return std::get<double>(to_cpp_value(value)->as);
+    return to_cpp_value(value)->as.number;
 }
 
 const char* neutron_get_string(NeutronValue* value, size_t* length) {
-    const std::string& str = std::get<neutron::ObjString*>(to_cpp_value(value)->as)->chars;
+    const std::string& str = to_cpp_value(value)->as.obj_string->chars;
     *length = str.length();
     return str.c_str();
 }
@@ -102,7 +102,7 @@ NeutronValue* neutron_new_number(double value) {
 
 NeutronValue* neutron_new_string(NeutronVM* vm, const char* chars, size_t length) {
     neutron::VM* cpp_vm = reinterpret_cast<neutron::VM*>(vm);
-    tls_return_value = neutron::Value(cpp_vm->allocate<neutron::ObjString>(std::string(chars, length)));
+    tls_return_value = neutron::Value(cpp_vm->internString(std::string(chars, length)));
     return to_c_value(&tls_return_value);
 }
 

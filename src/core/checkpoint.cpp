@@ -66,14 +66,14 @@ public:
         writeByte((uint8_t)val.type);
         switch (val.type) {
             case ValueType::NIL: break;
-            case ValueType::BOOLEAN: writeByte(std::get<bool>(val.as)); break;
-            case ValueType::NUMBER: writeDouble(std::get<double>(val.as)); break;
-            case ValueType::OBJ_STRING: writeLong(getObjectId(std::get<ObjString*>(val.as))); break;
-            case ValueType::ARRAY: writeLong(getObjectId(std::get<Array*>(val.as))); break;
-            case ValueType::OBJECT: writeLong(getObjectId(std::get<Object*>(val.as))); break;
-            case ValueType::CALLABLE: writeLong(getObjectId(std::get<Callable*>(val.as))); break;
-            case ValueType::CLASS: writeLong(getObjectId(std::get<Class*>(val.as))); break;
-            case ValueType::INSTANCE: writeLong(getObjectId(std::get<Instance*>(val.as))); break;
+            case ValueType::BOOLEAN: writeByte(val.as.boolean); break;
+            case ValueType::NUMBER: writeDouble(val.as.number); break;
+            case ValueType::OBJ_STRING: writeLong(getObjectId(val.as.obj_string)); break;
+            case ValueType::ARRAY: writeLong(getObjectId(val.as.array)); break;
+            case ValueType::OBJECT: writeLong(getObjectId(val.as.object)); break;
+            case ValueType::CALLABLE: writeLong(getObjectId(val.as.callable)); break;
+            case ValueType::CLASS: writeLong(getObjectId(val.as.klass)); break;
+            case ValueType::INSTANCE: writeLong(getObjectId(val.as.instance)); break;
             default: break;
         }
     }
@@ -123,12 +123,12 @@ void CheckpointManager::saveCheckpoint(VM& vm, const std::string& path, Value re
 
     auto getObjPtr = [](const Value& v) -> Object* {
         switch (v.type) {
-            case ValueType::OBJ_STRING: return std::get<ObjString*>(v.as);
-            case ValueType::ARRAY: return std::get<Array*>(v.as);
-            case ValueType::OBJECT: return std::get<Object*>(v.as);
-            case ValueType::CALLABLE: return std::get<Callable*>(v.as);
-            case ValueType::CLASS: return std::get<Class*>(v.as);
-            case ValueType::INSTANCE: return std::get<Instance*>(v.as);
+            case ValueType::OBJ_STRING: return v.as.obj_string;
+            case ValueType::ARRAY: return v.as.array;
+            case ValueType::OBJECT: return v.as.object;
+            case ValueType::CALLABLE: return v.as.callable;
+            case ValueType::CLASS: return v.as.klass;
+            case ValueType::INSTANCE: return v.as.instance;
             default: return nullptr;
         }
     };
@@ -190,7 +190,7 @@ void CheckpointManager::saveCheckpoint(VM& vm, const std::string& path, Value re
         } else if (auto map = dynamic_cast<JsonObject*>(obj)) {
             ser.writeLong(map->properties.size());
             for (const auto& p : map->properties) {
-                ser.writeString(p.first);
+                ser.writeString(p.first->chars);
                 ser.writeValue(p.second);
             }
         } else if (auto fn = dynamic_cast<Function*>(obj)) {
@@ -277,7 +277,7 @@ void CheckpointManager::loadCheckpoint(VM& vm, const std::string& path) {
         Object* obj = nullptr;
         
         if (type == (uint8_t)ValueType::OBJ_STRING) {
-            obj = vm.allocate<ObjString>(readString());
+            obj = vm.internString(readString());
         } else if (type == (uint8_t)ValueType::ARRAY) {
             obj = vm.allocate<Array>();
         } else if (type == (uint8_t)ValueType::OBJECT) {
@@ -337,7 +337,7 @@ void CheckpointManager::loadCheckpoint(VM& vm, const std::string& path) {
             uint64_t count = readLong();
             for (uint64_t j = 0; j < count; j++) {
                 std::string k = readString();
-                map->properties[k] = readValue();
+                map->properties[vm.internString(k)] = readValue();
             }
         } else if (auto fn = dynamic_cast<Function*>(obj)) {
             uint64_t codeSize = readLong();

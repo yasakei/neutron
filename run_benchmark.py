@@ -182,11 +182,16 @@ def main():
             ("Object/Dictionary Operations", "neutron/dict_ops.nt", "python/dict_ops.py")
         ]),
         ("Math Operations", [
-            ("Mathematical Functions", "neutron/math.nt", "python/math.py")
+            ("Mathematical Functions", "neutron/math.nt", "python/math.py"),
+            ("Bitwise Operations", "neutron/bitwise.nt", "python/bitwise.py")
         ]),
         ("String Operations", [
              ("String Manipulation", "neutron/strings.nt", "python/strings.py"),
-             ("Advanced String Operations", "neutron/string_ops.nt", "python/string_ops.py")
+             ("Advanced String Operations", "neutron/string_ops.nt", "python/string_ops.py"),
+             ("String Concatenation", "neutron/string_concat.nt", "python/string_concat.py")
+        ]),
+        ("Object Operations", [
+            ("Object Instantiation", "neutron/objects.nt", "python/objects.py")
         ]),
         ("Loop Performance", [
             ("Loop Operations", "neutron/loops.nt", "python/loops.py"),

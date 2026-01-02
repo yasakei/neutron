@@ -1,0 +1,51 @@
+// Worker Pool Example - Distributing work across multiple processes
+// Demonstrates a common pattern for parallel task processing
+use process;
+
+// Worker that processes numbers
+fun number_cruncher() {
+    // Compute sum of squares from 1 to n
+    fun sum_squares(n) {
+        var sum = 0;
+        for (var i = 1; i <= n; i = i + 1) {
+            sum = sum + (i * i);
+        }
+        return sum;
+    }
+    
+    var n = process.receive();
+    var result = sum_squares(n);
+    say("  Process " + process.self() + ": sum_squares(" + n + ") = " + result);
+    return result;
+}
+
+say("=== Worker Pool Example ===");
+say("");
+
+// Create a pool of 4 workers
+say("Creating worker pool...");
+var workers = [];
+var w1 = process.spawn(number_cruncher);
+var w2 = process.spawn(number_cruncher);
+var w3 = process.spawn(number_cruncher);
+var w4 = process.spawn(number_cruncher);
+
+say("Spawned 4 workers: " + w1 + ", " + w2 + ", " + w3 + ", " + w4);
+say("");
+
+// Distribute different workloads
+say("Distributing work...");
+process.send(w1, 10000);
+process.send(w2, 20000);
+process.send(w3, 30000);
+process.send(w4, 40000);
+
+// Wait for all workers to complete
+say("");
+say("Waiting for workers...");
+while (process.process_count() > 0) {
+    process.process_sleep(10);
+}
+
+say("");
+say("All workers completed!");

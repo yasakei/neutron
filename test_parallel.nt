@@ -1,0 +1,46 @@
+// Parallel computation benchmark using Erlang-style processes
+use process;
+
+// Worker that computes sum of range  
+fun sum_worker() {
+    var start = process.receive();
+    var end = start + 10000;
+    
+    // Sum all numbers in range
+    var sum = 0;
+    for (var i = start; i < end; i = i + 1) {
+        sum = sum + i;
+    }
+    
+    say("Worker computed sum(" + start + ".." + end + ") = " + sum);
+    return sum;
+}
+
+say("=== Parallel Process Benchmark ===");
+say("");
+
+// Spawn 4 workers
+say("Spawning 4 worker processes...");
+var w1 = process.spawn(sum_worker);
+var w2 = process.spawn(sum_worker);
+var w3 = process.spawn(sum_worker);
+var w4 = process.spawn(sum_worker);
+
+say("  Workers spawned: " + w1 + ", " + w2 + ", " + w3 + ", " + w4);
+
+// Send work to each worker
+say("");
+say("Sending work to workers...");
+process.send(w1, 0);
+process.send(w2, 10000);
+process.send(w3, 20000);
+process.send(w4, 30000);
+
+// Wait for workers to complete
+say("");
+say("Waiting for workers to complete...");
+process.process_sleep(500);
+
+say("");
+say("Active processes: " + process.process_count());
+say("Parallel processing complete!");

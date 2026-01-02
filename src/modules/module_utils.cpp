@@ -15,7 +15,7 @@ namespace neutron {
         double execute_neutron_code_number(VM* vm, const std::string& code) {
             Value result = vm->execute_string(code);
             if (result.type == ValueType::NUMBER) {
-                return std::get<double>(result.as);
+                return result.as.number;
             }
             throw std::runtime_error("Expected number result from Neutron code execution");
         }
@@ -23,7 +23,7 @@ namespace neutron {
         bool execute_neutron_code_boolean(VM* vm, const std::string& code) {
             Value result = vm->execute_string(code);
             if (result.type == ValueType::BOOLEAN) {
-                return std::get<bool>(result.as);
+                return result.as.boolean;
             }
             throw std::runtime_error("Expected boolean result from Neutron code execution");
         }

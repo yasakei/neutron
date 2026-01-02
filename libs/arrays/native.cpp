@@ -12,7 +12,7 @@ Array* getArrayFromArgs(const std::vector<Value>& arguments, int index = 0) {
     if (static_cast<int>(arguments.size()) <= index || arguments[index].type != ValueType::ARRAY) {
         throw std::runtime_error("Expected array argument at position " + std::to_string(index + 1));
     }
-    return std::get<Array*>(arguments[index].as);
+    return arguments[index].as.array;
 }
 
 // Helper function to check if two values are equal
@@ -23,11 +23,11 @@ bool valuesEqual(const Value& a, const Value& b) {
         case ValueType::NIL:
             return true;
         case ValueType::BOOLEAN:
-            return std::get<bool>(a.as) == std::get<bool>(b.as);
+            return a.as.boolean == b.as.boolean;
         case ValueType::NUMBER:
-            return std::get<double>(a.as) == std::get<double>(b.as);
+            return a.as.number == b.as.number;
         case ValueType::OBJ_STRING:
-            return std::get<ObjString*>(a.as)->chars == std::get<ObjString*>(b.as)->chars;
+            return a.as.obj_string->chars == b.as.obj_string->chars;
         default:
             return false; // For complex types, we'll do shallow comparison
     }
@@ -44,7 +44,7 @@ Value native_arrays_length(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Expected array argument for length function");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
+    Array* arr = arguments[0].as.array;
     return Value(static_cast<double>(arr->size()));
 }
 
@@ -58,7 +58,7 @@ Value native_arrays_push(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("First argument must be an array");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
+    Array* arr = arguments[0].as.array;
     arr->push(arguments[1]);
     return Value(); // Return nil
 }
@@ -69,7 +69,7 @@ Value native_arrays_pop(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Expected array argument for pop function");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
+    Array* arr = arguments[0].as.array;
     if (arr->size() == 0) {
         throw std::runtime_error("Cannot pop from empty array");
     }
@@ -84,8 +84,8 @@ Value native_arrays_at(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Expected array and index arguments for at function");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
-    int index = static_cast<int>(std::get<double>(arguments[1].as));
+    Array* arr = arguments[0].as.array;
+    int index = static_cast<int>(arguments[1].as.number);
     
     if (index < 0 || index >= static_cast<int>(arr->size())) {
         std::string range = arr->size() == 0 ? "[]" : "[0, " + std::to_string(arr->size()-1) + "]";
@@ -103,8 +103,8 @@ Value native_arrays_set(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Expected array, index, and value arguments for set function");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
-    int index = static_cast<int>(std::get<double>(arguments[1].as));
+    Array* arr = arguments[0].as.array;
+    int index = static_cast<int>(arguments[1].as.number);
     
     if (index < 0 || index >= static_cast<int>(arr->size())) {
         std::string range = arr->size() == 0 ? "[]" : "[0, " + std::to_string(arr->size()-1) + "]";
@@ -122,10 +122,10 @@ Value native_arrays_slice(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Expected array, start index, and optional end index for slice function");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
-    int start = static_cast<int>(std::get<double>(arguments[1].as));
+    Array* arr = arguments[0].as.array;
+    int start = static_cast<int>(arguments[1].as.number);
     int end = (arguments.size() > 2 && arguments[2].type == ValueType::NUMBER) ? 
-              static_cast<int>(std::get<double>(arguments[2].as)) : static_cast<int>(arr->size());
+              static_cast<int>(arguments[2].as.number) : static_cast<int>(arr->size());
     
     if (start < 0) start = 0;
     if (end > static_cast<int>(arr->size())) end = arr->size();
@@ -145,7 +145,7 @@ Value native_arrays_join(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Expected array argument for join function");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
+    Array* arr = arguments[0].as.array;
     std::string separator = (arguments.size() > 1) ? arguments[1].toString() : ",";
     
     std::string result;
@@ -154,7 +154,7 @@ Value native_arrays_join(VM& vm, std::vector<Value> arguments) {
         result += arr->at(i).toString();
     }
     
-    return Value(vm.allocate<ObjString>(result));
+    return Value(vm.internString(result));
 }
 
 Value native_arrays_reverse(VM& vm, std::vector<Value> arguments) {
@@ -163,7 +163,7 @@ Value native_arrays_reverse(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Expected array argument for reverse function");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
+    Array* arr = arguments[0].as.array;
     std::reverse(arr->elements.begin(), arr->elements.end());
     return arguments[0]; 
 }
@@ -174,13 +174,13 @@ Value native_arrays_sort(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Expected array argument for sort function");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
+    Array* arr = arguments[0].as.array;
     
     std::sort(arr->elements.begin(), arr->elements.end(), [](const Value& a, const Value& b) {
         if (a.type == ValueType::NUMBER && b.type == ValueType::NUMBER) {
-            return std::get<double>(a.as) < std::get<double>(b.as);
+            return a.as.number < b.as.number;
         } else if (a.type == ValueType::OBJ_STRING && b.type == ValueType::OBJ_STRING) {
-            return std::get<ObjString*>(a.as)->chars < std::get<ObjString*>(b.as)->chars;
+            return a.as.obj_string->chars < b.as.obj_string->chars;
         } else if (a.type == ValueType::NUMBER) {
             return true; 
         } else if (b.type == ValueType::NUMBER) {
@@ -202,7 +202,7 @@ Value native_arrays_index_of(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("First argument must be an array");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
+    Array* arr = arguments[0].as.array;
     Value target = arguments[1];
     
     for (size_t i = 0; i < arr->size(); i++) {
@@ -224,7 +224,7 @@ Value native_arrays_contains(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("First argument must be an array");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
+    Array* arr = arguments[0].as.array;
     Value target = arguments[1];
     
     for (size_t i = 0; i < arr->size(); i++) {
@@ -246,7 +246,7 @@ Value native_arrays_remove(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("First argument must be an array");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
+    Array* arr = arguments[0].as.array;
     Value target = arguments[1];
     
     for (auto it = arr->elements.begin(); it != arr->elements.end(); ++it) {
@@ -266,8 +266,8 @@ Value native_arrays_remove_at(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Expected array and index arguments for remove_at function");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
-    int index = static_cast<int>(std::get<double>(arguments[1].as));
+    Array* arr = arguments[0].as.array;
+    int index = static_cast<int>(arguments[1].as.number);
     
     if (index < 0 || index >= static_cast<int>(arr->size())) {
         std::string range = arr->size() == 0 ? "[]" : "[0, " + std::to_string(arr->size()-1) + "]";
@@ -286,7 +286,7 @@ Value native_arrays_clear(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Expected array argument for clear function");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
+    Array* arr = arguments[0].as.array;
     arr->elements.clear();
     return arguments[0]; 
 }
@@ -296,7 +296,7 @@ Value native_arrays_clone(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Expected array argument for clone function");
     }
     
-    Array* original = std::get<Array*>(arguments[0].as);
+    Array* original = arguments[0].as.array;
     return Value(vm.allocate<Array>(original->elements)); 
 }
 
@@ -305,7 +305,7 @@ Value native_arrays_to_string(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Expected array argument for to_string function");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
+    Array* arr = arguments[0].as.array;
     std::string result = "[";
     
     for (size_t i = 0; i < arr->size(); i++) {
@@ -314,7 +314,7 @@ Value native_arrays_to_string(VM& vm, std::vector<Value> arguments) {
     }
     
     result += "]";
-    return Value(vm.allocate<ObjString>(result));
+    return Value(vm.internString(result));
 }
 
 Value native_arrays_flat(VM& vm, std::vector<Value> arguments) {
@@ -322,13 +322,13 @@ Value native_arrays_flat(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Expected array argument for flat function");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
+    Array* arr = arguments[0].as.array;
     std::vector<Value> result;
     
     for (size_t i = 0; i < arr->size(); i++) {
         Value current = arr->at(i);
         if (current.type == ValueType::ARRAY) {
-            Array* nested = std::get<Array*>(current.as);
+            Array* nested = current.as.array;
             result.insert(result.end(), nested->elements.begin(), nested->elements.end());
         } else {
             result.push_back(current);
@@ -344,10 +344,10 @@ Value native_arrays_fill(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Expected array and value arguments for fill function");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
+    Array* arr = arguments[0].as.array;
     Value value = arguments[1];
-    int start = (arguments.size() > 2) ? static_cast<int>(std::get<double>(arguments[2].as)) : 0;
-    int end = (arguments.size() > 3) ? static_cast<int>(std::get<double>(arguments[3].as)) : static_cast<int>(arr->size());
+    int start = (arguments.size() > 2) ? static_cast<int>(arguments[2].as.number) : 0;
+    int end = (arguments.size() > 3) ? static_cast<int>(arguments[3].as.number) : static_cast<int>(arr->size());
     
     if (start < 0) start = 0;
     if (end > static_cast<int>(arr->size())) end = arr->size();
@@ -364,9 +364,9 @@ Value native_arrays_range(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Expected start and optional end arguments for range function");
     }
     
-    int start = static_cast<int>(std::get<double>(arguments[0].as));
-    int end = (arguments.size() > 1) ? static_cast<int>(std::get<double>(arguments[1].as)) : start + 10; 
-    int step = (arguments.size() > 2) ? static_cast<int>(std::get<double>(arguments[2].as)) : 1;
+    int start = static_cast<int>(arguments[0].as.number);
+    int end = (arguments.size() > 1) ? static_cast<int>(arguments[1].as.number) : start + 10; 
+    int step = (arguments.size() > 2) ? static_cast<int>(arguments[2].as.number) : 1;
     
     if (step == 0) step = 1; 
     
@@ -390,7 +390,7 @@ Value native_arrays_shuffle(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Expected array argument for shuffle function");
     }
     
-    Array* arr = std::get<Array*>(arguments[0].as);
+    Array* arr = arguments[0].as.array;
     
     std::random_device rd;
     std::mt19937 gen(rd());

@@ -50,6 +50,7 @@
 #include "http/native.h"
 #include "async/native.h"
 #include "regex/native.h"
+#include "process/native.h"
 #include "modules/module_registry.h"
 #include "utils/component_interface.h"
 
@@ -72,7 +73,7 @@ bool isTruthy(const Value& value) {
         case ValueType::NIL:
             return false;
         case ValueType::BOOLEAN:
-            return std::get<bool>(value.as);
+            return value.as.boolean;
         default:
             return true;
     }
@@ -173,9 +174,10 @@ bool isTruthy(const Value& value) {
     exit(1);
 }
 
-VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>"), hasException(false), pendingException(Value()), isSafeFile(false) {  // Start GC at 1024 bytes
+VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>"), hasException(false), pendingException(Value()), isSafeFile(false) {  // Start GC at 1024 objects
     // Reserve a large stack to prevent reallocation and enable pointer optimizations
     stack.reserve(1024 * 1024);
+    frames.reserve(256); // Reserve frames to avoid reallocation
     
     // Initialize error handler
     ErrorHandler::setColorEnabled(true);
@@ -415,7 +417,7 @@ bool VM::call(Function* function, int argCount) {
 bool VM::callValue(Value callee, int argCount) {
     // Handle BoundArrayMethod and BoundStringMethod
     if (callee.type == ValueType::OBJECT) {
-        Object* obj = std::get<Object*>(callee.as);
+        Object* obj = callee.as.object;
         if (BoundArrayMethod* arrayMethod = dynamic_cast<BoundArrayMethod*>(obj)) {
             return callArrayMethod(arrayMethod, argCount);
         } else if (BoundStringMethod* stringMethod = dynamic_cast<BoundStringMethod*>(obj)) {
@@ -424,7 +426,7 @@ bool VM::callValue(Value callee, int argCount) {
     }
     
     if (callee.type == ValueType::CALLABLE) {
-        Callable* callable = std::get<Callable*>(callee.as);
+        Callable* callable = callee.as.callable;
         
         // Check for BoundMethod first
         if (BoundMethod* boundMethod = dynamic_cast<BoundMethod*>(callable)) {
@@ -501,48 +503,43 @@ bool VM::callValue(Value callee, int argCount) {
 
     // Handle CLASS type
     if (callee.type == ValueType::CLASS) {
-        Class* klass = std::get<Class*>(callee.as);
+        Class* klass = callee.as.klass;
         
         // Create instance
         Instance* instance = allocate<Instance>(klass);
         Value instanceVal(instance);
         
         // Check for initializer
-        auto it = klass->methods.find("initialize");
-        if (it != klass->methods.end()) {
-             if (it->second.type == ValueType::CALLABLE && std::holds_alternative<Callable*>(it->second.as)) {
-                Callable* callable = std::get<Callable*>(it->second.as);
-                if (Function* initializer = dynamic_cast<Function*>(callable)) {
-                
-                if (initializer->arity_val != argCount) {
-                     runtimeError(this, "Expected " + std::to_string(initializer->arity_val) + " arguments but got " + std::to_string(argCount) + " for constructor.", frames.empty() ? -1 : frames.back().currentLine);
-                     return false;
-                }
-                
-                // Replace the class on the stack with the instance (this)
-                stack[stack.size() - argCount - 1] = instanceVal;
-                
-                // Manually set up the call frame
-                if (frames.size() == 256) {
-                    runtimeError(this, "Stack overflow.", frames.empty() ? -1 : frames.back().currentLine);
+        if (klass->initializer) {
+            Function* initializer = klass->initializer;
+            
+            if (initializer->arity_val != argCount) {
+                    runtimeError(this, "Expected " + std::to_string(initializer->arity_val) + " arguments but got " + std::to_string(argCount) + " for constructor.", frames.empty() ? -1 : frames.back().currentLine);
                     return false;
-                }
+            }
+            
+            // Replace the class on the stack with the instance (this)
+            stack[stack.size() - argCount - 1] = instanceVal;
+            
+            // Manually set up the call frame
+            if (frames.size() == 256) {
+                runtimeError(this, "Stack overflow.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
+            }
 
-                CallFrame* frame = &frames.emplace_back();
-                frame->function = initializer;
-                if (initializer->chunk->code.empty()) {
-                    frame->ip = nullptr;
-                } else {
-                    frame->ip = initializer->chunk->code.data();
-                }
-                frame->slot_offset = stack.size() - argCount - 1; // Include receiver
-                frame->fileName = currentFileName;
-                frame->currentLine = -1;
-                frame->isBoundMethod = true;
-                frame->isInitializer = true;
-                return true;
-                }
-             }
+            CallFrame* frame = &frames.emplace_back();
+            frame->function = initializer;
+            if (initializer->chunk->code.empty()) {
+                frame->ip = nullptr;
+            } else {
+                frame->ip = initializer->chunk->code.data();
+            }
+            frame->slot_offset = stack.size() - argCount - 1; // Include receiver
+            frame->fileName = currentFileName;
+            frame->currentLine = -1;
+            frame->isBoundMethod = true;
+            frame->isInitializer = true;
+            return true;
         } 
         
         // No initializer or not a function
@@ -551,8 +548,8 @@ bool VM::callValue(Value callee, int argCount) {
             return false;
         }
         
-        stack.resize(stack.size() - argCount - 1);
-        push(instanceVal);
+        stack[stack.size() - argCount - 1] = instanceVal;
+        stack.resize(stack.size() - argCount);
         return true;
     }
 
@@ -608,8 +605,8 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
                 runtimeError(this, "Array.slice expects number arguments.", frames.empty() ? -1 : frames.back().currentLine);
                 return false;
             }
-            int start = static_cast<int>(std::get<double>(args[0].as));
-            int end = static_cast<int>(std::get<double>(args[1].as));
+            int start = static_cast<int>(args[0].as.number);
+            int end = static_cast<int>(args[1].as.number);
             
             if (start < 0) start = 0;
             if (end > static_cast<int>(arr->size())) end = arr->size();
@@ -664,7 +661,7 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
             std::sort(arr->elements.begin(), arr->elements.end(), [](const Value& a, const Value& b) {
                 // Numbers come before strings
                 if (a.type == ValueType::NUMBER && b.type == ValueType::NUMBER) {
-                    return std::get<double>(a.as) < std::get<double>(b.as);
+                    return a.as.number < b.as.number;
                 } else if (a.type == ValueType::OBJ_STRING && b.type == ValueType::OBJ_STRING) {
                     return a.toString() < b.toString();
                 } else if (a.type == ValueType::NUMBER) {
@@ -861,7 +858,7 @@ bool VM::callStringMethod(BoundStringMethod* method, int argCount) {
                 runtimeError(this, "substring() expects first argument to be a number.", frames.empty() ? -1 : frames.back().currentLine);
                 return false;
             }
-            int start = static_cast<int>(std::get<double>(args[0].as));
+            int start = static_cast<int>(args[0].as.number);
             int len = static_cast<int>(str.length());
             
             if (start < 0) start = 0;
@@ -873,7 +870,7 @@ bool VM::callStringMethod(BoundStringMethod* method, int argCount) {
                     runtimeError(this, "substring() expects second argument to be a number.", frames.empty() ? -1 : frames.back().currentLine);
                     return false;
                 }
-                end = static_cast<int>(std::get<double>(args[1].as));
+                end = static_cast<int>(args[1].as.number);
                 if (end < 0) end = 0;
                 if (end > len) end = len;
             }
@@ -904,34 +901,28 @@ bool VM::callStringMethod(BoundStringMethod* method, int argCount) {
 }
 
 void VM::run(size_t minFrameDepth) {
-    // Use local pointer for stack top for performance
-    // We assume stack has enough capacity (reserved in constructor)
-    Value* stackTop = stack.data() + stack.size();
-    Value* stackStart = stack.data();
+    // Removed raw pointer optimization to fix vector resize bug
     
     auto syncStack = [&]() {
-        size_t currentSize = stackTop - stackStart;
-        stack.resize(currentSize);
-        stackStart = stack.data();
-        stackTop = stackStart + currentSize;
+        // No-op
     };
     
     auto reloadStack = [&]() {
-        stackStart = stack.data();
-        stackTop = stackStart + stack.size();
+        // No-op
     };
 
-    // Fast push/pop to avoid method call overhead and stack checks in the loop
     auto push = [&](const Value& value) {
-        *stackTop++ = value;
+        stack.push_back(value);
     };
     
     auto pop = [&]() -> Value {
-        return *--stackTop;
+        Value v = stack.back();
+        stack.pop_back();
+        return v;
     };
 
     auto peek = [&](int distance) -> Value& {
-        return *(stackTop - 1 - distance);
+        return stack[stack.size() - 1 - distance];
     };
 
     CallFrame* frame = &frames.back();
@@ -940,10 +931,10 @@ void VM::run(size_t minFrameDepth) {
 #define READ_SHORT() \
     (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
 #define READ_CONSTANT() (frame->function->chunk->constants[READ_BYTE()])
-#define READ_STRING() (std::get<ObjString*>(READ_CONSTANT().as)->chars)
+#define READ_STRING() (READ_CONSTANT().as.obj_string->chars)
 
 // Computed goto optimization (disabled by default due to C++ scope rules)
-//#define COMPUTED_GOTO 1
+#define COMPUTED_GOTO 1
 
 #ifdef COMPUTED_GOTO
     static void* dispatch_table[] = {
@@ -980,26 +971,26 @@ void VM::run(size_t minFrameDepth) {
         &&CASE_OP_LOOP,
         &&CASE_OP_CALL,
         &&CASE_OP_CLOSURE,
-        &&CASE_OP_GET_UPVALUE,
-        &&CASE_OP_SET_UPVALUE,
-        &&CASE_OP_CLOSE_UPVALUE,
+        &&CASE_DEFAULT, // OP_GET_UPVALUE
+        &&CASE_DEFAULT, // OP_SET_UPVALUE
+        &&CASE_DEFAULT, // OP_CLOSE_UPVALUE
         &&CASE_OP_ARRAY,
         &&CASE_OP_OBJECT,
         &&CASE_OP_INDEX_GET,
         &&CASE_OP_INDEX_SET,
         &&CASE_OP_THIS,
-        &&CASE_OP_BREAK,
-        &&CASE_OP_CONTINUE,
+        &&CASE_DEFAULT, // OP_BREAK
+        &&CASE_DEFAULT, // OP_CONTINUE
         &&CASE_OP_TRY,
         &&CASE_OP_END_TRY,
         &&CASE_OP_THROW,
         &&CASE_OP_NOT_EQUAL,
-        &&CASE_OP_LOGICAL_AND,
+        &&CASE_DEFAULT, // OP_LOGICAL_AND
         &&CASE_OP_VALIDATE_SAFE_FUNCTION,
         &&CASE_OP_VALIDATE_SAFE_VARIABLE,
         &&CASE_OP_VALIDATE_SAFE_FILE_FUNCTION,
         &&CASE_OP_VALIDATE_SAFE_FILE_VARIABLE,
-        &&CASE_OP_LOGICAL_OR,
+        &&CASE_DEFAULT, // OP_LOGICAL_OR
         &&CASE_OP_BITWISE_AND,
         &&CASE_OP_BITWISE_OR,
         &&CASE_OP_BITWISE_XOR,
@@ -1032,8 +1023,8 @@ void VM::run(size_t minFrameDepth) {
                 Value returnValue = result;
                 if (was_initializer) {
                     // For initializers, return 'this' instead of the function result
-                    if (return_slot_offset < (size_t)(stackTop - stackStart)) {
-                        returnValue = *(stackStart + return_slot_offset);
+                    if (return_slot_offset < (size_t)(stack.size())) {
+                        returnValue = *(stack.data() + return_slot_offset);
                     }
                 }
 
@@ -1044,16 +1035,16 @@ void VM::run(size_t minFrameDepth) {
                     
                     // Clean up stack frame (arguments and callee)
                     if (was_bound_method) {
-                        stackTop = stackStart + return_slot_offset;
+                        stack.resize(return_slot_offset);
                     } else if (return_slot_offset > 0) {
                         // If it was a function call, clean up stack
                         // Ensure we don't underflow if stack is somehow smaller (shouldn't happen)
-                        if ((size_t)(stackTop - stackStart) >= return_slot_offset - 1) {
-                            stackTop = stackStart + return_slot_offset - 1;
+                        if ((size_t)(stack.size()) >= return_slot_offset - 1) {
+                            stack.resize(return_slot_offset - 1);
                         }
                     } else {
                         // Top level script or no arguments/callee on stack
-                        stackTop = stackStart;
+                        stack.clear();
                     }
                     
                     push(returnValue);
@@ -1065,12 +1056,12 @@ void VM::run(size_t minFrameDepth) {
                 // For bound methods, receiver is at slot_offset, so resize to slot_offset
                 // For regular functions, callee is at slot_offset-1, so resize to slot_offset-1
                 if (was_bound_method) {
-                    stackTop = stackStart + return_slot_offset;
+                    stack.resize(return_slot_offset);
                 } else if (return_slot_offset > 0) {
-                    stackTop = stackStart + return_slot_offset - 1;
+                    stack.resize(return_slot_offset - 1);
                 } else {
                     // Edge case: top-level script or no arguments
-                    stackTop = stackStart;
+                    stack.clear();
                 }
                 push(returnValue);
                 DISPATCH();
@@ -1113,12 +1104,12 @@ void VM::run(size_t minFrameDepth) {
             }
             CASE(OP_GET_LOCAL) {
                 uint8_t slot = READ_BYTE();
-                push(stackStart[frame->slot_offset + slot]);
+                push(stack[frame->slot_offset + slot]);
                 DISPATCH();
             }
             CASE(OP_SET_LOCAL) {
                 uint8_t slot = READ_BYTE();
-                stackStart[frame->slot_offset + slot] = peek(0);
+                stack[frame->slot_offset + slot] = peek(0);
                 DISPATCH();
             }
             CASE(OP_GET_GLOBAL) {
@@ -1157,7 +1148,7 @@ void VM::run(size_t minFrameDepth) {
                 // Validate that the function on top of stack has proper type annotations for safe block
                 Value functionValue = peek(0);
                 if (functionValue.type == ValueType::CALLABLE) {
-                    Function* function = dynamic_cast<Function*>(std::get<Callable*>(functionValue.as));
+                    Function* function = dynamic_cast<Function*>(functionValue.as.callable);
                     if (function && function->declaration) {
                         // Check that all parameters have type annotations
                         for (const auto& param : function->declaration->params) {
@@ -1179,6 +1170,7 @@ void VM::run(size_t minFrameDepth) {
                 DISPATCH();
             }
             CASE(OP_VALIDATE_SAFE_VARIABLE) {
+                {
                 // Validate that a variable has a type annotation in safe block
                 std::string varName = READ_STRING();
                 if (this->isSafeFile) {
@@ -1186,13 +1178,14 @@ void VM::run(size_t minFrameDepth) {
                 } else {
                     throw VMException(Value("Variable '" + varName + "' must have a type annotation inside a safe block."));
                 }
+                }
                 DISPATCH();
             }
             CASE(OP_VALIDATE_SAFE_FILE_FUNCTION) {
                 // Validate that the function on top of stack has proper type annotations for safe file
                 Value functionValue = peek(0);
                 if (functionValue.type == ValueType::CALLABLE) {
-                    Function* function = dynamic_cast<Function*>(std::get<Callable*>(functionValue.as));
+                    Function* function = dynamic_cast<Function*>(functionValue.as.callable);
                     if (function && function->declaration) {
                         // Check that all parameters have type annotations
                         for (const auto& param : function->declaration->params) {
@@ -1388,15 +1381,16 @@ void VM::run(size_t minFrameDepth) {
                                 frames.empty() ? -1 : frames.back().currentLine);
                 }
                 
-                stackStart[frame->slot_offset + slot] = value;
+                stack[frame->slot_offset + slot] = value;
                 DISPATCH();
             }
             CASE(OP_GET_PROPERTY) {
-                const std::string& propertyName = READ_STRING();
+                ObjString* propertyNameObj = READ_CONSTANT().as.obj_string;
+                const std::string& propertyName = propertyNameObj->chars;
                 Value object = peek(0);
                 
                 if (object.type == ValueType::MODULE) {
-                    Module* module = std::get<Module*>(object.as);
+                    Module* module = object.as.module;
                     try {
                         Value property = module->get(propertyName);
                         stack.pop_back();
@@ -1406,7 +1400,7 @@ void VM::run(size_t minFrameDepth) {
                                     frames.empty() ? -1 : frames.back().currentLine);
                     }
                 } else if (object.type == ValueType::ARRAY) {
-                    Array* arr = std::get<Array*>(object.as);
+                    Array* arr = object.as.array;
                     
                     if (propertyName == "length") {
                         stack.pop_back();
@@ -1434,7 +1428,7 @@ void VM::run(size_t minFrameDepth) {
                         // Return an array of individual characters
                         Array* charArray = allocate<Array>();
                         for (char c : str) {
-                            charArray->push(Value(std::string(1, c)));
+                            charArray->push(Value(internString(std::string(1, c))));
                         }
                         stack.pop_back();
                         push(Value(charArray));
@@ -1448,32 +1442,28 @@ void VM::run(size_t minFrameDepth) {
                     }
                 } else if (object.type == ValueType::INSTANCE) {
                     // Handle instance properties and methods
-                    Instance* inst = std::get<Instance*>(object.as);
+                    Instance* inst = object.as.instance;
                     
-                    // Check fields first
-                    auto it = inst->fields.find(propertyName);
-                    if (it != inst->fields.end()) {
-                        stack.pop_back();
-                        push(it->second);
+                    // Check fields first using inline/overflow lookup
+                    Value* fieldVal = inst->getField(propertyNameObj);
+                    if (fieldVal != nullptr) {
+                        stack.back() = *fieldVal;
                     } else {
                         // Check methods in the class
-                        auto methIt = inst->klass->methods.find(propertyName);
+                        auto methIt = inst->klass->methods.find(propertyNameObj);
                         if (methIt != inst->klass->methods.end()) {
                             // Create a bound method that captures the instance
                             Value methodValue = methIt->second;
                             if (methodValue.type == ValueType::CALLABLE) {
-                                Function* func = dynamic_cast<Function*>(std::get<Callable*>(methodValue.as));
+                                Function* func = dynamic_cast<Function*>(methodValue.as.callable);
                                 if (func != nullptr) {
-                                    stack.pop_back();
-                                    push(Value(allocate<BoundMethod>(object, func)));
+                                    stack.back() = Value(allocate<BoundMethod>(object, func));
                                 } else {
                                     // Not a Function, but still a callable - use as-is
-                                    stack.pop_back();
-                                    push(methodValue);
+                                    stack.back() = methodValue;
                                 }
                             } else {
-                                stack.pop_back();
-                                push(methodValue);
+                                stack.back() = methodValue;
                             }
                         } else {
                             runtimeError(this, "Property '" + propertyName + "' not found on instance.",
@@ -1481,12 +1471,12 @@ void VM::run(size_t minFrameDepth) {
                         }
                     }
                 } else if (object.type == ValueType::OBJECT) {
-                    Object* objPtr = std::get<Object*>(object.as);
+                    Object* objPtr = object.as.object;
                     
                     // Check if it's a JsonObject
                     JsonObject* obj = dynamic_cast<JsonObject*>(objPtr);
                     if (obj != nullptr) {
-                        auto it = obj->properties.find(propertyName);
+                        auto it = obj->properties.find(propertyNameObj);
                         if (it != obj->properties.end()) {
                             stack.pop_back();
                             push(it->second);
@@ -1502,20 +1492,22 @@ void VM::run(size_t minFrameDepth) {
                 DISPATCH();
             }
             CASE(OP_SET_PROPERTY) {
-                const std::string& propertyName = READ_STRING();
-                Value value = pop();  // The value to set
-                Value object = pop();  // The object/instance
+                ObjString* propertyNameObj = READ_CONSTANT().as.obj_string;
+                Value& value = stack.back();
+                Value& object = stack[stack.size() - 2];
                 
                 if (object.type == ValueType::INSTANCE) {
-                    Instance* inst = std::get<Instance*>(object.as);
-                    inst->fields[propertyName] = value;
-                    push(value);  // Assignment expression returns the value
+                    Instance* inst = object.as.instance;
+                    inst->setField(propertyNameObj, value);
+                    stack[stack.size() - 2] = value;
+                    stack.pop_back();
                 } else if (object.type == ValueType::OBJECT) {
-                    Object* objPtr = std::get<Object*>(object.as);
+                    Object* objPtr = object.as.object;
                     JsonObject* jsonObj = dynamic_cast<JsonObject*>(objPtr);
                     if (jsonObj != nullptr) {
-                        jsonObj->properties[propertyName] = value;
-                        push(value);
+                        jsonObj->properties[propertyNameObj] = value;
+                        stack[stack.size() - 2] = value;
+                        stack.pop_back();
                     } else {
                         runtimeError(this, "Cannot set property on this object type.", frames.empty() ? -1 : frames.back().currentLine);
                     }
@@ -1540,9 +1532,9 @@ void VM::run(size_t minFrameDepth) {
                 } else if (a.type == ValueType::NIL) {
                     result = true;  // All nil values are equal
                 } else if (a.type == ValueType::BOOLEAN) {
-                    result = (std::get<bool>(a.as) == std::get<bool>(b.as));
+                    result = (a.as.boolean == b.as.boolean);
                 } else if (a.type == ValueType::NUMBER) {
-                    result = (std::get<double>(a.as) == std::get<double>(b.as));
+                    result = (a.as.number == b.as.number);
                 } else if (a.type == ValueType::OBJ_STRING) {
                     result = (a.asString()->chars == b.asString()->chars);
                 } else {
@@ -1552,7 +1544,7 @@ void VM::run(size_t minFrameDepth) {
                 
                 // Reuse 'a' slot for result
                 a = Value(result);
-                stackTop--;
+                stack.pop_back();
                 DISPATCH();
             }
             CASE(OP_NOT_EQUAL) {
@@ -1565,9 +1557,9 @@ void VM::run(size_t minFrameDepth) {
                 } else if (a.type == ValueType::NIL) {
                     result = false;  // All nil values are equal
                 } else if (a.type == ValueType::BOOLEAN) {
-                    result = (std::get<bool>(a.as) != std::get<bool>(b.as));
+                    result = (a.as.boolean != b.as.boolean);
                 } else if (a.type == ValueType::NUMBER) {
-                    result = (std::get<double>(a.as) != std::get<double>(b.as));
+                    result = (a.as.number != b.as.number);
                 } else if (a.type == ValueType::OBJ_STRING) {
                     result = (a.asString()->chars != b.asString()->chars);
                 } else {
@@ -1577,7 +1569,7 @@ void VM::run(size_t minFrameDepth) {
                 
                 // Reuse 'a' slot for result
                 a = Value(result);
-                stackTop--;
+                stack.pop_back();
                 DISPATCH();
             }
             CASE(OP_GREATER) {
@@ -1587,8 +1579,8 @@ void VM::run(size_t minFrameDepth) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 // Reuse 'a' slot for result
-                a = Value(std::get<double>(a.as) > std::get<double>(b.as));
-                stackTop--;
+                a = Value(a.as.number > b.as.number);
+                stack.pop_back();
                 DISPATCH();
             }
             CASE(OP_LESS) {
@@ -1598,8 +1590,8 @@ void VM::run(size_t minFrameDepth) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 // Reuse 'a' slot for result
-                a = Value(std::get<double>(a.as) < std::get<double>(b.as));
-                stackTop--;
+                a = Value(a.as.number < b.as.number);
+                stack.pop_back();
                 DISPATCH();
             }
             CASE(OP_ADD) {
@@ -1607,15 +1599,25 @@ void VM::run(size_t minFrameDepth) {
                 Value& a = peek(1);
                 
                 if (a.type == ValueType::NUMBER && b.type == ValueType::NUMBER) {
-                    a.as = std::get<double>(a.as) + std::get<double>(b.as);
-                    stackTop--;
+                    a.as.number = a.as.number + b.as.number;
+                    stack.pop_back();
+                } else if (a.type == ValueType::OBJ_STRING && b.type == ValueType::OBJ_STRING) {
+                    ObjString* strA = a.as.obj_string;
+                    ObjString* strB = b.as.obj_string;
+                    
+                    std::string result;
+                    result.reserve(strA->chars.length() + strB->chars.length());
+                    result.append(strA->chars);
+                    result.append(strB->chars);
+                    
+                    a = Value(makeString(std::move(result)));
+                    stack.pop_back();
                 } else {
                     Value val_b = pop();
                     Value val_a = pop();
                     std::string str_a = val_a.toString();
                     std::string str_b = val_b.toString();
-                    syncStack();
-                    push(Value(allocate<ObjString>(str_a + str_b)));
+                    push(Value(makeString(str_a + str_b)));
                 }
                 DISPATCH();
             }
@@ -1625,8 +1627,8 @@ void VM::run(size_t minFrameDepth) {
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as = std::get<double>(a.as) - std::get<double>(b.as);
-                stackTop--;
+                a.as.number = a.as.number - b.as.number;
+                stack.pop_back();
                 DISPATCH();
             }
             CASE(OP_MULTIPLY) {
@@ -1635,8 +1637,8 @@ void VM::run(size_t minFrameDepth) {
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as = std::get<double>(a.as) * std::get<double>(b.as);
-                stackTop--;
+                a.as.number = a.as.number * b.as.number;
+                stack.pop_back();
                 DISPATCH();
             }
             CASE(OP_DIVIDE) {
@@ -1645,12 +1647,12 @@ void VM::run(size_t minFrameDepth) {
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double val_b = std::get<double>(b.as);
+                double val_b = b.as.number;
                 if (val_b == 0) {
                     runtimeError(this, "Division by zero.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as = std::get<double>(a.as) / val_b;
-                stackTop--;
+                a.as.number = a.as.number / val_b;
+                stack.pop_back();
                 DISPATCH();
             }
             CASE(OP_MODULO) {
@@ -1659,12 +1661,12 @@ void VM::run(size_t minFrameDepth) {
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double val_b = std::get<double>(b.as);
+                double val_b = b.as.number;
                 if (val_b == 0) {
                     runtimeError(this, "Modulo by zero.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as = fmod(std::get<double>(a.as), val_b);
-                stackTop--;
+                a.as.number = fmod(a.as.number, val_b);
+                stack.pop_back();
                 DISPATCH();
             }
             CASE(OP_NOT) {
@@ -1677,7 +1679,7 @@ void VM::run(size_t minFrameDepth) {
                 if (value.type != ValueType::NUMBER) {
                     runtimeError(this, "Operand must be a number.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                value.as = -std::get<double>(value.as);
+                value.as.number = -value.as.number;
                 DISPATCH();
             }
             CASE(OP_BITWISE_AND) {
@@ -1686,8 +1688,10 @@ void VM::run(size_t minFrameDepth) {
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as = (double)((long long)std::get<double>(a.as) & (long long)std::get<double>(b.as));
-                stackTop--;
+                int64_t ia = static_cast<int64_t>(a.as.number);
+                int64_t ib = static_cast<int64_t>(b.as.number);
+                a.as.number = static_cast<double>(ia & ib);
+                stack.pop_back();
                 DISPATCH();
             }
             CASE(OP_BITWISE_OR) {
@@ -1696,8 +1700,10 @@ void VM::run(size_t minFrameDepth) {
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as = (double)((long long)std::get<double>(a.as) | (long long)std::get<double>(b.as));
-                stackTop--;
+                int64_t ia = static_cast<int64_t>(a.as.number);
+                int64_t ib = static_cast<int64_t>(b.as.number);
+                a.as.number = static_cast<double>(ia | ib);
+                stack.pop_back();
                 DISPATCH();
             }
             CASE(OP_BITWISE_XOR) {
@@ -1706,8 +1712,10 @@ void VM::run(size_t minFrameDepth) {
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as = (double)((long long)std::get<double>(a.as) ^ (long long)std::get<double>(b.as));
-                stackTop--;
+                int64_t ia = static_cast<int64_t>(a.as.number);
+                int64_t ib = static_cast<int64_t>(b.as.number);
+                a.as.number = static_cast<double>(ia ^ ib);
+                stack.pop_back();
                 DISPATCH();
             }
             CASE(OP_BITWISE_NOT) {
@@ -1715,7 +1723,7 @@ void VM::run(size_t minFrameDepth) {
                 if (value.type != ValueType::NUMBER) {
                     runtimeError(this, "Operand must be a number.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                value.as = (double)(~(long long)std::get<double>(value.as));
+                value.as.number = static_cast<double>(~static_cast<int64_t>(value.as.number));
                 DISPATCH();
             }
             CASE(OP_LEFT_SHIFT) {
@@ -1724,8 +1732,10 @@ void VM::run(size_t minFrameDepth) {
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as = (double)((long long)std::get<double>(a.as) << (long long)std::get<double>(b.as));
-                stackTop--;
+                int64_t ia = static_cast<int64_t>(a.as.number);
+                int64_t ib = static_cast<int64_t>(b.as.number);
+                a.as.number = static_cast<double>(ia << ib);
+                stack.pop_back();
                 DISPATCH();
             }
             CASE(OP_RIGHT_SHIFT) {
@@ -1734,10 +1744,14 @@ void VM::run(size_t minFrameDepth) {
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as = (double)((long long)std::get<double>(a.as) >> (long long)std::get<double>(b.as));
-                stackTop--;
+                int64_t ia = static_cast<int64_t>(a.as.number);
+                int64_t ib = static_cast<int64_t>(b.as.number);
+                a.as.number = static_cast<double>(ia >> ib);
+                stack.pop_back();
                 DISPATCH();
             }
+            CASE_DEFAULT:
+                runtimeError(this, "Unknown opcode.", frames.empty() ? -1 : frames.back().currentLine);
             CASE(OP_SAY) {
                 std::cout << pop().toString() << std::endl;
                 DISPATCH();
@@ -1772,6 +1786,7 @@ void VM::run(size_t minFrameDepth) {
                                 DISPATCH();
             }
                         CASE(OP_ARRAY) {
+                {
                                 uint8_t count = READ_BYTE();
                                 std::vector<Value> elements;
                                 elements.reserve(count);
@@ -1785,9 +1800,10 @@ void VM::run(size_t minFrameDepth) {
                                 Array* array = allocate<Array>(std::move(elements));
                                 
                                 // Pop elements
-                                stackTop -= count;
+                                stack.resize(stack.size() - count);
                                 
                                 push(Value(array));
+                }
                                 DISPATCH();
             }
                         CASE(OP_OBJECT) {
@@ -1807,7 +1823,7 @@ void VM::run(size_t minFrameDepth) {
                         runtimeError(this, "Object keys must be strings.", frames.empty() ? -1 : frames.back().currentLine);
                     }
                     
-                    obj->properties[key.asString()->chars] = val;
+                    obj->properties[key.asString()] = val;
                 }
                 
                 push(Value(obj));
@@ -1823,8 +1839,8 @@ void VM::run(size_t minFrameDepth) {
                                             return;
                     }
                     
-                                        int idx = static_cast<int>(std::get<double>(index.as));
-                    Array* array = std::get<Array*>(object.as);
+                                        int idx = static_cast<int>(index.as.number);
+                    Array* array = object.as.array;
                     
                                         if (idx < 0 || idx >= static_cast<int>(array->size())) {
                         std::string range = array->size() == 0 ? "[]" : "[0, " + std::to_string(array->size()-1) + "]";
@@ -1842,7 +1858,7 @@ void VM::run(size_t minFrameDepth) {
                         return;
                     }
                     
-                    int idx = static_cast<int>(std::get<double>(index.as));
+                    int idx = static_cast<int>(index.as.number);
                     std::string str = object.asString()->chars;
                     
                     if (idx < 0 || idx >= static_cast<int>(str.length())) {
@@ -1862,7 +1878,7 @@ void VM::run(size_t minFrameDepth) {
                         return;
                     }
                     
-                    int idx = static_cast<int>(std::get<double>(index.as));
+                    int idx = static_cast<int>(index.as.number);
                     Buffer* buffer = object.asBuffer();
                     
                     if (idx < 0 || idx >= static_cast<int>(buffer->size())) {
@@ -1872,7 +1888,7 @@ void VM::run(size_t minFrameDepth) {
                     
                     push(Value(static_cast<double>(buffer->get(idx))));
                 } else if (object.type == ValueType::OBJECT) {
-                    Object* objPtr = std::get<Object*>(object.as);
+                    Object* objPtr = object.as.object;
                     JsonObject* jsonObj = dynamic_cast<JsonObject*>(objPtr);
                     
                     if (jsonObj) {
@@ -1880,9 +1896,10 @@ void VM::run(size_t minFrameDepth) {
                             runtimeError(this, "Object key must be a string.", frames.empty() ? -1 : frames.back().currentLine);
                             return;
                         }
-                        std::string key = index.asString()->chars;
-                        if (jsonObj->properties.count(key)) {
-                            push(jsonObj->properties[key]);
+                        ObjString* key = index.asString();
+                        auto it = jsonObj->properties.find(key);
+                        if (it != jsonObj->properties.end()) {
+                            push(it->second);
                         } else {
                             push(Value()); // Return nil if key not found
                         }
@@ -1907,8 +1924,8 @@ void VM::run(size_t minFrameDepth) {
                                             return;
                     }
                     
-                                        int idx = static_cast<int>(std::get<double>(index.as));
-                    Array* array = std::get<Array*>(object.as);
+                                        int idx = static_cast<int>(index.as.number);
+                    Array* array = object.as.array;
                     
                                         if (idx < 0 || idx >= static_cast<int>(array->size())) {
                         std::string range = array->size() == 0 ? "[]" : "[0, " + std::to_string(array->size()-1) + "]";
@@ -1932,8 +1949,8 @@ void VM::run(size_t minFrameDepth) {
                         return;
                     }
                     
-                    int idx = static_cast<int>(std::get<double>(index.as));
-                    int val = static_cast<int>(std::get<double>(value.as));
+                    int idx = static_cast<int>(index.as.number);
+                    int val = static_cast<int>(value.as.number);
                     Buffer* buffer = object.asBuffer();
                     
                     if (idx < 0 || idx >= static_cast<int>(buffer->size())) {
@@ -1949,7 +1966,7 @@ void VM::run(size_t minFrameDepth) {
                     buffer->set(idx, static_cast<uint8_t>(val));
                     push(value);
                 } else if (object.type == ValueType::OBJECT) {
-                    Object* objPtr = std::get<Object*>(object.as);
+                    Object* objPtr = object.as.object;
                     JsonObject* jsonObj = dynamic_cast<JsonObject*>(objPtr);
                     
                     if (jsonObj) {
@@ -1957,8 +1974,7 @@ void VM::run(size_t minFrameDepth) {
                             runtimeError(this, "Object key must be a string.", frames.empty() ? -1 : frames.back().currentLine);
                             return;
                         }
-                        std::string key = index.asString()->chars;
-                        jsonObj->properties[key] = value;
+                        jsonObj->properties[index.asString()] = value;
                         push(value);
                     } else {
                          runtimeError(this, "This object type does not support index assignment.", frames.empty() ? -1 : frames.back().currentLine);
@@ -2047,7 +2063,8 @@ void VM::run(size_t minFrameDepth) {
                     // Jump to the finally block
                     frame->ip = frame->function->chunk->code.data() + handler->finallyStart;
                     // Don't pop the exception frame yet - we'll need it when finally block completes
-                    DISPATCH(); // Exit OP_THROW processing
+                    // DISPATCH(); // Exit OP_THROW processing - handled by outer loop continue
+                    continue;
                 }
                 
                 // Adjust the stack to the frame base when the exception frame was created
@@ -2081,7 +2098,8 @@ void VM::run(size_t minFrameDepth) {
                     runtimeError(this, "Exception occurred but no handler available", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 
-                DISPATCH();
+                // DISPATCH();
+                continue;
             }
 #ifndef COMPUTED_GOTO
         }
@@ -2104,7 +2122,8 @@ void VM::run(size_t minFrameDepth) {
             ExceptionFrame& frame_handler = exceptionFrames[i];
             if (current_pos >= frame_handler.tryStart && current_pos <= frame_handler.tryEnd) {
                 handler = &frame_handler;
-                DISPATCH();
+                // Found handler, break to execute it
+                break;
             }
         }
         
@@ -2171,7 +2190,7 @@ Value VM::call(const Value& callee, const std::vector<Value>& arguments) {
             throw std::runtime_error("Can only call functions.");
         }
         
-        Callable* function = std::get<Callable*>(callee.as);
+        Callable* function = callee.as.callable;
         
         // Save current stack state
         size_t stack_size = stack.size();
@@ -2358,6 +2377,10 @@ void VM::load_module(const std::string& name) {
         return;
     } else if (name == "regex") {
         neutron_init_regex_module(this);
+        loadedModuleCache[name] = true;
+        return;
+    } else if (name == "process") {
+        neutron_init_process_module(this);
         loadedModuleCache[name] = true;
         return;
     }
@@ -2693,6 +2716,26 @@ std::shared_ptr<ComponentInterface> VM::getComponent(const std::string& name) co
     return nullptr;
 }
 
+ObjString* VM::internString(const std::string& str) {
+    auto it = internedStrings.find(str);
+    if (it != internedStrings.end()) {
+        return it->second;
+    }
+    
+    ObjString* newString = allocate<ObjString>(str);
+    internedStrings[str] = newString;
+    return newString;
+}
+
+// Fast string allocation without interning - for data strings (skip hash computation)
+ObjString* VM::makeString(const std::string& str) {
+    return allocate<ObjString>(str, false);  // Don't compute hash
+}
+
+ObjString* VM::makeString(std::string&& str) {
+    return allocate<ObjString>(std::move(str), false);  // Don't compute hash
+}
+
 void VM::collectGarbage() {
     // Mark all reachable objects
     markRoots();
@@ -2730,6 +2773,11 @@ void VM::markRoots() {
     for (Object* obj : tempRoots) {
         markObject(obj);
     }
+
+    // Mark interned strings
+    for (const auto& pair : internedStrings) {
+        markObject(pair.second);
+    }
 }
 
 void VM::markObject(Object* obj) {
@@ -2752,11 +2800,25 @@ void VM::blackenObject(Object* obj) {
     } else if (auto* bam = dynamic_cast<BoundArrayMethod*>(obj)) {
         markObject(bam->array);
     } else if (auto* json_obj = dynamic_cast<JsonObject*>(obj)) {
-        for (const auto& prop : json_obj->properties) markValue(prop.second);
+        for (const auto& prop : json_obj->properties) {
+            markObject(prop.first);
+            markValue(prop.second);
+        }
     } else if (auto* json_arr = dynamic_cast<JsonArray*>(obj)) {
         for (const auto& element : json_arr->elements) markValue(element);
     } else if (auto* inst = dynamic_cast<Instance*>(obj)) {
-        for (const auto& field : inst->fields) markValue(field.second);
+        // Mark inline fields
+        for (uint8_t i = 0; i < inst->inlineCount; ++i) {
+            markObject(inst->inlineFields[i].key);
+            markValue(inst->inlineFields[i].value);
+        }
+        // Mark overflow fields if present
+        if (inst->overflowFields) {
+            for (const auto& entry : *inst->overflowFields) {
+                markObject(entry.first);
+                markValue(entry.second);
+            }
+        }
         markObject(inst->klass);
     } else if (dynamic_cast<Buffer*>(obj)) {
         // Buffer has no references to other objects
@@ -2784,6 +2846,7 @@ void VM::blackenObject(Object* obj) {
             for (const auto& pair : klass->class_env->values) markValue(pair.second);
         }
         for (const auto& pair : klass->methods) {
+            markObject(pair.first);
             markValue(pair.second);
         }
     }
@@ -2792,13 +2855,13 @@ void VM::blackenObject(Object* obj) {
 void VM::markValue(const Value& value) {
     Object* obj = nullptr;
     switch (value.type) {
-        case ValueType::OBJ_STRING: obj = std::get<ObjString*>(value.as); break;
-        case ValueType::ARRAY: obj = std::get<Array*>(value.as); break;
-        case ValueType::OBJECT: obj = std::get<Object*>(value.as); break;
-        case ValueType::CALLABLE: obj = std::get<Callable*>(value.as); break;
-        case ValueType::MODULE: obj = std::get<Module*>(value.as); break;
-        case ValueType::CLASS: obj = std::get<Class*>(value.as); break;
-        case ValueType::INSTANCE: obj = std::get<Instance*>(value.as); break;
+        case ValueType::OBJ_STRING: obj = value.as.obj_string; break;
+        case ValueType::ARRAY: obj = value.as.array; break;
+        case ValueType::OBJECT: obj = value.as.object; break;
+        case ValueType::CALLABLE: obj = value.as.callable; break;
+        case ValueType::MODULE: obj = value.as.module; break;
+        case ValueType::CLASS: obj = value.as.klass; break;
+        case ValueType::INSTANCE: obj = value.as.instance; break;
         default: return;
     }
     markObject(obj);

@@ -117,10 +117,10 @@ static Value async_await(VM& vm, const std::vector<Value>& args) {
     
     FutureObject* futureObj = nullptr;
     if (args[0].type == ValueType::ARRAY) {
-        Array* arr = std::get<Array*>(args[0].as);
+        Array* arr = args[0].as.array;
         futureObj = dynamic_cast<FutureObject*>(arr);
     } else if (args[0].type == ValueType::OBJECT) {
-        Object* obj = std::get<Object*>(args[0].as);
+        Object* obj = args[0].as.object;
         futureObj = dynamic_cast<FutureObject*>(obj);
     }
     
@@ -155,7 +155,7 @@ static Value async_sleep(VM& vm, const std::vector<Value>& args) {
         throw std::runtime_error("async.sleep() expects a number argument (milliseconds)");
     }
     
-    double ms = std::get<double>(args[0].as);
+    double ms = args[0].as.number;
     
     // We cannot unlock here because the VM stack is not thread-safe.
     // If we unlock, another thread might execute bytecode and corrupt the stack.
@@ -180,7 +180,7 @@ static Value async_timer(VM& vm, const std::vector<Value>& args) {
     }
     
     Value callable = args[0];
-    double ms = std::get<double>(args[1].as);
+    double ms = args[1].as.number;
     
     auto futureObj = vm.allocate<FutureObject>(callable);
     auto handle = futureObj->handle;

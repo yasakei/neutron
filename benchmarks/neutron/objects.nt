@@ -1,0 +1,21 @@
+
+// Object instantiation benchmark
+class Point {
+    fun initialize(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+    
+    fun dist() {
+        return this.x * this.x + this.y * this.y;
+    }
+}
+
+var sum = 0;
+
+for (var i = 0; i < 100000; i = i + 1) {
+    var p = Point(i, i + 1);
+    sum = sum + p.dist();
+}
+
+say("Object result: " + sum);

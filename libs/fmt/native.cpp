@@ -47,7 +47,7 @@ Value native_fmt_to_int(VM& vm, std::vector<Value> arguments) {
     switch (val.type) {
         case ValueType::NUMBER:
             // Already a number, just return as integer (truncate decimal part)
-            return Value(static_cast<double>(static_cast<int>(std::get<double>(val.as))));
+            return Value(static_cast<double>(static_cast<int>(val.as.number)));
         
         case ValueType::OBJ_STRING: {
             // Convert string to number
@@ -70,7 +70,7 @@ Value native_fmt_to_int(VM& vm, std::vector<Value> arguments) {
         
         case ValueType::BOOLEAN:
             // Convert bool to int (true = 1, false = 0)
-            return Value(std::get<bool>(val.as) ? 1.0 : 0.0);
+            return Value(val.as.boolean ? 1.0 : 0.0);
             
         case ValueType::NIL:
             // nil converts to 0
@@ -97,9 +97,9 @@ Value native_fmt_to_str(VM& vm, std::vector<Value> arguments) {
         case ValueType::NUMBER: {
             // Convert number to string
             char buffer[32];
-            double num = std::get<double>(val.as);
+            double num = val.as.number;
             snprintf(buffer, sizeof(buffer), "%.15g", num);
-            return Value(vm.allocate<ObjString>(std::string(buffer)));
+            return Value(vm.internString(std::string(buffer)));
         }
         
         case ValueType::OBJ_STRING:
@@ -108,11 +108,11 @@ Value native_fmt_to_str(VM& vm, std::vector<Value> arguments) {
             
         case ValueType::BOOLEAN:
             // Convert bool to string
-            return Value(vm.allocate<ObjString>(std::get<bool>(val.as) ? "true" : "false"));
+            return Value(vm.internString(val.as.boolean ? "true" : "false"));
             
         case ValueType::NIL:
             // nil converts to "nil" string
-            return Value(vm.allocate<ObjString>("nil"));
+            return Value(vm.internString("nil"));
             
         case ValueType::ARRAY:
         case ValueType::OBJECT:
@@ -135,15 +135,15 @@ Value native_fmt_to_bin(VM& vm, std::vector<Value> arguments) {
     switch (val.type) {
         case ValueType::NUMBER: {
             // Convert number to binary string
-            int num = static_cast<int>(std::get<double>(val.as));
+            int num = static_cast<int>(val.as.number);
             // Remove leading zeros from the binary representation
             std::string bin = std::bitset<32>(num).to_string();
             // Find first '1' and return substring from there, or return "0" if all zeros
             size_t firstOne = bin.find('1');
             if (firstOne == std::string::npos) {
-                return Value(vm.allocate<ObjString>("0"));
+                return Value(vm.internString("0"));
             }
-            return Value(vm.allocate<ObjString>(bin.substr(firstOne)));
+            return Value(vm.internString(bin.substr(firstOne)));
         }
         
         case ValueType::OBJ_STRING: {
@@ -172,7 +172,7 @@ Value native_fmt_to_bin(VM& vm, std::vector<Value> arguments) {
         
         case ValueType::BOOLEAN:
             // Convert boolean to binary (true = 1, false = 0)
-            return Value(vm.allocate<ObjString>(std::get<bool>(val.as) ? "1" : "0"));
+            return Value(vm.allocate<ObjString>(val.as.boolean ? "1" : "0"));
             
         case ValueType::NIL:
             // nil converts to "0" binary
@@ -263,7 +263,7 @@ Value native_fmt_to_float(VM& vm, std::vector<Value> arguments) {
         
         case ValueType::BOOLEAN:
             // Convert bool to float (true = 1.0, false = 0.0)
-            return Value(std::get<bool>(val.as) ? 1.0 : 0.0);
+            return Value(val.as.boolean ? 1.0 : 0.0);
             
         case ValueType::NIL:
             // nil converts to 0.0

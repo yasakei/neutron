@@ -43,11 +43,11 @@ Value json_stringify(VM& vm, std::vector<Value> arguments) {
         if (arguments[1].type != ValueType::BOOLEAN) {
             throw std::runtime_error("Second argument for json.stringify() must be a boolean.");
         }
-        pretty = std::get<bool>(arguments[1].as);
+        pretty = arguments[1].as.boolean;
     }
     
     std::string result = valueToJsonString(arguments[0], pretty);
-    return Value(vm.allocate<ObjString>(result));
+    return Value(vm.internString(result));
 }
 
 // JSON parse function
@@ -72,10 +72,10 @@ std::string valueToJsonString(const Value& value, bool pretty, int indent) {
         case ValueType::NIL:
             return "null";
         case ValueType::BOOLEAN:
-            return std::get<bool>(value.as) ? "true" : "false";
+            return value.as.boolean ? "true" : "false";
         case ValueType::NUMBER: {
             std::ostringstream oss;
-            oss << std::setprecision(15) << std::get<double>(value.as);
+            oss << std::setprecision(15) << value.as.number;
             return oss.str();
         }
         case ValueType::OBJ_STRING: {
@@ -106,7 +106,7 @@ std::string valueToJsonString(const Value& value, bool pretty, int indent) {
         case ValueType::BUFFER:
             return "\"<buffer>\""; // Buffers are not serializable to JSON directly
         case ValueType::OBJECT: {
-            JsonObject* obj = dynamic_cast<JsonObject*>(std::get<Object*>(value.as));
+            JsonObject* obj = dynamic_cast<JsonObject*>(value.as.object);
             if (obj) {
                 std::ostringstream oss;
                 oss << "{";
@@ -117,7 +117,7 @@ std::string valueToJsonString(const Value& value, bool pretty, int indent) {
                     } else if (pretty) {
                         oss << "\n" + nextIndentStr;
                     }
-                    oss << "\"" << pair.first << "\":" << (pretty ? " " : "");
+                    oss << "\"" << pair.first->chars << "\":" << (pretty ? " " : "");
                     oss << valueToJsonString(pair.second, pretty, indent + 1);
                     first = false;
                 }
@@ -130,7 +130,7 @@ std::string valueToJsonString(const Value& value, bool pretty, int indent) {
             return "null";
         }
         case ValueType::ARRAY: {
-            Array* arr = std::get<Array*>(value.as);
+            Array* arr = value.as.array;
             if (arr) {
                 std::ostringstream oss;
                 oss << "[";
@@ -288,7 +288,7 @@ Value parseJsonObject(VM& vm, const std::string& json, size_t& pos) {
         pos++; // skip :
         skipWhitespace(json, pos);
         
-        obj->properties[key] = parseJsonValue(vm, json, pos);
+        obj->properties[vm.internString(key)] = parseJsonValue(vm, json, pos);
         
         skipWhitespace(json, pos);
         if (pos < json.length() && json[pos] == '}') {
@@ -312,7 +312,7 @@ Value parseJsonValue(VM& vm, const std::string& json, size_t& pos) {
     char c = json[pos];
     if (c == '{') return parseJsonObject(vm, json, pos);
     if (c == '[') return parseJsonArray(vm, json, pos);
-    if (c == '"') return Value(vm.allocate<ObjString>(parseJsonStringInternal(json, pos)));
+    if (c == '"') return Value(vm.internString(parseJsonStringInternal(json, pos)));
     if (c == 't' || c == 'f') return parseJsonBoolean(json, pos);
     if (c == 'n') return parseJsonNull(json, pos);
     if (isdigit(c) || c == '-') return parseJsonNumber(json, pos);
@@ -340,13 +340,12 @@ Value json_get(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Second argument for json.get() must be a string.");
     }
     
-    JsonObject* obj = dynamic_cast<JsonObject*>(std::get<Object*>(arguments[0].as));
+    JsonObject* obj = dynamic_cast<JsonObject*>(arguments[0].as.object);
     if (!obj) {
         throw std::runtime_error("Invalid object type.");
     }
     
-    std::string key = arguments[1].asString()->chars;
-    auto it = obj->properties.find(key);
+    auto it = obj->properties.find(arguments[1].asString());
     if (it != obj->properties.end()) {
         return it->second;
     }
@@ -369,13 +368,12 @@ Value json_set(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Second argument for json.set() must be a string key.");
     }
     
-    JsonObject* obj = dynamic_cast<JsonObject*>(std::get<Object*>(arguments[0].as));
+    JsonObject* obj = dynamic_cast<JsonObject*>(arguments[0].as.object);
     if (!obj) {
         throw std::runtime_error("Invalid object type.");
     }
     
-    std::string key = arguments[1].asString()->chars;
-    obj->properties[key] = arguments[2];
+    obj->properties[arguments[1].asString()] = arguments[2];
     
     return arguments[0]; // Return the modified object
 }
@@ -395,13 +393,12 @@ Value json_has(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Second argument for json.has() must be a string key.");
     }
     
-    JsonObject* obj = dynamic_cast<JsonObject*>(std::get<Object*>(arguments[0].as));
+    JsonObject* obj = dynamic_cast<JsonObject*>(arguments[0].as.object);
     if (!obj) {
         throw std::runtime_error("Invalid object type.");
     }
     
-    std::string key = arguments[1].asString()->chars;
-    return Value(obj->properties.find(key) != obj->properties.end());
+    return Value(obj->properties.find(arguments[1].asString()) != obj->properties.end());
 }
 
 // JSON keys - get all keys from an object
@@ -414,14 +411,14 @@ Value json_keys(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Argument for json.keys() must be an object.");
     }
     
-    JsonObject* obj = dynamic_cast<JsonObject*>(std::get<Object*>(arguments[0].as));
+    JsonObject* obj = dynamic_cast<JsonObject*>(arguments[0].as.object);
     if (!obj) {
         throw std::runtime_error("Invalid object type.");
     }
     
     auto keysArray = vm.allocate<Array>();
     for (const auto& pair : obj->properties) {
-        keysArray->elements.push_back(Value(vm.allocate<ObjString>(pair.first)));
+        keysArray->elements.push_back(Value(pair.first));
     }
     
     return Value(keysArray);
@@ -437,7 +434,7 @@ Value json_values(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Argument for json.values() must be an object.");
     }
     
-    JsonObject* obj = dynamic_cast<JsonObject*>(std::get<Object*>(arguments[0].as));
+    JsonObject* obj = dynamic_cast<JsonObject*>(arguments[0].as.object);
     if (!obj) {
         throw std::runtime_error("Invalid object type.");
     }
@@ -460,8 +457,8 @@ Value json_merge(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Both arguments for json.merge() must be objects.");
     }
     
-    JsonObject* obj1 = dynamic_cast<JsonObject*>(std::get<Object*>(arguments[0].as));
-    JsonObject* obj2 = dynamic_cast<JsonObject*>(std::get<Object*>(arguments[1].as));
+    JsonObject* obj1 = dynamic_cast<JsonObject*>(arguments[0].as.object);
+    JsonObject* obj2 = dynamic_cast<JsonObject*>(arguments[1].as.object);
     
     if (!obj1 || !obj2) {
         throw std::runtime_error("Invalid object type.");
@@ -497,12 +494,12 @@ Value json_delete(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Second argument for json.delete() must be a string key.");
     }
     
-    JsonObject* obj = dynamic_cast<JsonObject*>(std::get<Object*>(arguments[0].as));
+    JsonObject* obj = dynamic_cast<JsonObject*>(arguments[0].as.object);
     if (!obj) {
         throw std::runtime_error("Invalid object type.");
     }
     
-    std::string key = arguments[1].asString()->chars;
+    ObjString* key = arguments[1].asString();
     obj->properties.erase(key);
     
     return arguments[0]; // Return the modified object
@@ -557,7 +554,7 @@ Value json_writeFile(VM& vm, std::vector<Value> arguments) {
     
     bool pretty = false;
     if (arguments.size() == 3 && arguments[2].type == ValueType::BOOLEAN) {
-        pretty = std::get<bool>(arguments[2].as);
+        pretty = arguments[2].as.boolean;
     }
     
     std::string filepath = arguments[0].asString()->chars;

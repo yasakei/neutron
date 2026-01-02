@@ -78,15 +78,15 @@ static size_t curlHeaderCallback(char* buffer, size_t size, size_t nitems, void*
 // Helper function to create a response object
 Value createResponse(VM& vm, double status, const std::string& body, const std::unordered_map<std::string, std::string>& headers = {}) {
     auto responseObject = vm.allocate<JsonObject>();
-    responseObject->properties["status"] = Value(status);
-    responseObject->properties["body"] = Value(vm.allocate<ObjString>(body));
+    responseObject->properties[vm.internString("status")] = Value(status);
+    responseObject->properties[vm.internString("body")] = Value(vm.internString(body));
     
     // Create headers object
     auto headersObject = vm.allocate<JsonObject>();
     for (const auto& header : headers) {
-        headersObject->properties[header.first] = Value(vm.allocate<ObjString>(header.second));
+        headersObject->properties[vm.internString(header.first)] = Value(vm.internString(header.second));
     }
-    responseObject->properties["headers"] = Value(headersObject);
+    responseObject->properties[vm.internString("headers")] = Value(headersObject);
     
     return Value(responseObject);
 }
@@ -101,7 +101,7 @@ Value http_get(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("First argument for http.get() must be a string URL.");
     }
     
-    std::string url = std::get<ObjString*>(arguments[0].as)->chars;
+    std::string url = arguments[0].as.obj_string->chars;
     
     CURL* curl = curl_easy_init();
     if (!curl) {
@@ -145,11 +145,11 @@ Value http_post(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("First argument for http.post() must be a string URL.");
     }
     
-    std::string url = std::get<ObjString*>(arguments[0].as)->chars;
+    std::string url = arguments[0].as.obj_string->chars;
     std::string data = "";
     
     if (arguments.size() >= 2 && arguments[1].type == ValueType::OBJ_STRING) {
-        data = std::get<ObjString*>(arguments[1].as)->chars;
+        data = arguments[1].as.obj_string->chars;
     }
     
     CURL* curl = curl_easy_init();
@@ -195,7 +195,7 @@ Value http_put(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("First argument for http.put() must be a string URL.");
     }
     
-    std::string url = std::get<ObjString*>(arguments[0].as)->chars;
+    std::string url = arguments[0].as.obj_string->chars;
     std::string data = "";
     
     // Handle data if provided
@@ -203,7 +203,7 @@ Value http_put(VM& vm, std::vector<Value> arguments) {
         if (arguments[1].type != ValueType::OBJ_STRING) {
             throw std::runtime_error("Second argument for http.put() must be a string data.");
         }
-        data = std::get<ObjString*>(arguments[1].as)->chars;
+        data = arguments[1].as.obj_string->chars;
     }
     
     CURL* curl = curl_easy_init();
@@ -249,7 +249,7 @@ Value http_delete(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("First argument for http.delete() must be a string URL.");
     }
     
-    std::string url = std::get<ObjString*>(arguments[0].as)->chars;
+    std::string url = arguments[0].as.obj_string->chars;
     
     CURL* curl = curl_easy_init();
     if (!curl) {
@@ -293,7 +293,7 @@ Value http_head(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("First argument for http.head() must be a string URL.");
     }
     
-    std::string url = std::get<ObjString*>(arguments[0].as)->chars;
+    std::string url = arguments[0].as.obj_string->chars;
     
     CURL* curl = curl_easy_init();
     if (!curl) {
@@ -335,11 +335,11 @@ Value http_patch(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("First argument for http.patch() must be a string URL.");
     }
     
-    std::string url = std::get<ObjString*>(arguments[0].as)->chars;
+    std::string url = arguments[0].as.obj_string->chars;
     std::string data = "";
     
     if (arguments.size() >= 2 && arguments[1].type == ValueType::OBJ_STRING) {
-        data = std::get<ObjString*>(arguments[1].as)->chars;
+        data = arguments[1].as.obj_string->chars;
     }
     
     CURL* curl = curl_easy_init();
@@ -388,13 +388,13 @@ Value http_request(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Second argument for http.request() must be a string URL.");
     }
     
-    std::string method = std::get<ObjString*>(arguments[0].as)->chars;
-    std::string url = std::get<ObjString*>(arguments[1].as)->chars;
+    std::string method = arguments[0].as.obj_string->chars;
+    std::string url = arguments[1].as.obj_string->chars;
     std::string data = "";
     std::unordered_map<std::string, std::string> headers;
     
     if (arguments.size() >= 3 && arguments[2].type == ValueType::OBJ_STRING) {
-        data = std::get<ObjString*>(arguments[2].as)->chars;
+        data = arguments[2].as.obj_string->chars;
     }
     
     std::string responseBody = "Mock " + method + " request to " + url;
@@ -489,9 +489,9 @@ Value http_createServer(VM& vm, std::vector<Value> arguments) {
     }
     
     auto serverObj = vm.allocate<JsonObject>();
-    serverObj->properties["port"] = Value(0.0);
-    serverObj->properties["running"] = Value(false);
-    serverObj->properties["handler"] = arguments[0];
+    serverObj->properties[vm.internString("port")] = Value(0.0);
+    serverObj->properties[vm.internString("running")] = Value(false);
+    serverObj->properties[vm.internString("handler")] = arguments[0];
     
     return Value(serverObj);
 }
@@ -509,21 +509,21 @@ Value http_listen(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Second argument for http.listen() must be a port number.");
     }
     
-    JsonObject* server = dynamic_cast<JsonObject*>(std::get<Object*>(arguments[0].as));
+    JsonObject* server = dynamic_cast<JsonObject*>(arguments[0].as.object);
     if (!server) {
         throw std::runtime_error("Invalid server object.");
     }
     
-    int port = static_cast<int>(std::get<double>(arguments[1].as));
-    Value handler = server->properties["handler"];
+    int port = static_cast<int>(arguments[1].as.number);
+    Value handler = server->properties[vm.internString("handler")];
     
     if (serverRunning) {
         throw std::runtime_error("Server is already running");
     }
     
     serverRunning = true;
-    server->properties["port"] = Value(static_cast<double>(port));
-    server->properties["running"] = Value(true);
+    server->properties[vm.internString("port")] = Value(static_cast<double>(port));
+    server->properties[vm.internString("running")] = Value(true);
     
     initSockets();
     
@@ -589,9 +589,9 @@ Value http_listen(VM& vm, std::vector<Value> arguments) {
         
         // Create request object
         auto reqObj = vm.allocate<JsonObject>();
-        reqObj->properties["raw"] = Value(vm.allocate<ObjString>(rawRequest));
-        reqObj->properties["method"] = Value(vm.allocate<ObjString>(method));
-        reqObj->properties["path"] = Value(vm.allocate<ObjString>(path));
+        reqObj->properties[vm.internString("raw")] = Value(vm.internString(rawRequest));
+        reqObj->properties[vm.internString("method")] = Value(vm.internString(method));
+        reqObj->properties[vm.internString("path")] = Value(vm.internString(path));
         
         // Call handler
         vm.push(handler);
@@ -618,15 +618,15 @@ Value http_listen(VM& vm, std::vector<Value> arguments) {
             Value responseVal = vm.pop();
             
             if (responseVal.type == ValueType::OBJ_STRING) {
-                responseBody = std::get<ObjString*>(responseVal.as)->chars;
+                responseBody = responseVal.as.obj_string->chars;
             } else if (responseVal.type == ValueType::OBJECT) {
-                JsonObject* resObj = dynamic_cast<JsonObject*>(std::get<Object*>(responseVal.as));
+                JsonObject* resObj = dynamic_cast<JsonObject*>(responseVal.as.object);
                 if (resObj) {
-                    if (resObj->properties.count("body") && resObj->properties["body"].type == ValueType::OBJ_STRING) {
-                        responseBody = std::get<ObjString*>(resObj->properties["body"].as)->chars;
+                    if (resObj->properties.count(vm.internString("body")) && resObj->properties[vm.internString("body")].type == ValueType::OBJ_STRING) {
+                        responseBody = resObj->properties[vm.internString("body")].as.obj_string->chars;
                     }
-                    if (resObj->properties.count("status") && resObj->properties["status"].type == ValueType::NUMBER) {
-                        status = static_cast<int>(std::get<double>(resObj->properties["status"].as));
+                    if (resObj->properties.count(vm.internString("status")) && resObj->properties[vm.internString("status")].type == ValueType::NUMBER) {
+                        status = static_cast<int>(resObj->properties[vm.internString("status")].as.number);
                     }
                     // TODO: Handle headers
                 }
@@ -657,7 +657,7 @@ Value http_startServer(VM& /*vm*/, std::vector<Value> arguments) {
         throw std::runtime_error("Argument for http.startServer() must be a port number.");
     }
     
-    int port = static_cast<int>(std::get<double>(arguments[0].as));
+    int port = static_cast<int>(arguments[0].as.number);
     
     if (serverRunning) {
         throw std::runtime_error("Server is already running");
@@ -694,7 +694,7 @@ Value http_urlEncode(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Argument for http.urlEncode() must be a string.");
     }
     
-    std::string str = std::get<ObjString*>(arguments[0].as)->chars;
+    std::string str = arguments[0].as.obj_string->chars;
     std::string encoded;
     
     for (char c : str) {
@@ -709,7 +709,7 @@ Value http_urlEncode(VM& vm, std::vector<Value> arguments) {
         }
     }
     
-    return Value(vm.allocate<ObjString>(encoded));
+    return Value(vm.internString(encoded));
 }
 
 // URL decode
@@ -722,7 +722,7 @@ Value http_urlDecode(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Argument for http.urlDecode() must be a string.");
     }
     
-    std::string str = std::get<ObjString*>(arguments[0].as)->chars;
+    std::string str = arguments[0].as.obj_string->chars;
     std::string decoded;
     
     for (size_t i = 0; i < str.length(); i++) {
@@ -738,7 +738,7 @@ Value http_urlDecode(VM& vm, std::vector<Value> arguments) {
         }
     }
     
-    return Value(vm.allocate<ObjString>(decoded));
+    return Value(vm.internString(decoded));
 }
 
 // Parse query string
@@ -751,7 +751,7 @@ Value http_parseQuery(VM& vm, std::vector<Value> arguments) {
         throw std::runtime_error("Argument for http.parseQuery() must be a string.");
     }
     
-    std::string query = std::get<ObjString*>(arguments[0].as)->chars;
+    std::string query = arguments[0].as.obj_string->chars;
     auto params = vm.allocate<JsonObject>();
     
     size_t pos = 0;
@@ -765,7 +765,7 @@ Value http_parseQuery(VM& vm, std::vector<Value> arguments) {
         std::string key = query.substr(pos, eq - pos);
         std::string value = query.substr(eq + 1, amp - eq - 1);
         
-        params->properties[key] = Value(vm.allocate<ObjString>(value));
+        params->properties[vm.internString(key)] = Value(vm.internString(value));
         pos = amp + 1;
     }
     
@@ -785,8 +785,8 @@ Value http_serveHTML(VM& /*vm*/, std::vector<Value> arguments) {
         throw std::runtime_error("Second argument for http.serveHTML() must be a string HTML content.");
     }
     
-    int port = static_cast<int>(std::get<double>(arguments[0].as));
-    std::string html_content = std::get<ObjString*>(arguments[1].as)->chars;
+    int port = static_cast<int>(arguments[0].as.number);
+    std::string html_content = arguments[1].as.obj_string->chars;
     
     if (serverRunning) {
         throw std::runtime_error("Server is already running");

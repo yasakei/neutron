@@ -1,0 +1,31 @@
+// Simple Process Example - Basic message passing
+// Demonstrates spawning a process and sending/receiving messages
+use process;
+
+// A simple worker that receives a message and responds
+fun greeter() {
+    var name = process.receive();
+    say("Hello, " + name + "! (from process " + process.self() + ")");
+    return "greeted " + name;
+}
+
+say("=== Simple Process Example ===");
+say("");
+
+// Get our own PID
+say("Main process PID: " + process.self());
+
+// Spawn a worker process
+var worker_pid = process.spawn(greeter);
+say("Spawned worker with PID: " + worker_pid);
+
+// Send a message to the worker
+process.send(worker_pid, "Neutron");
+say("Sent message to worker");
+
+// Wait for worker to finish
+process.process_sleep(100);
+
+say("");
+say("Active processes: " + process.process_count());
+say("Done!");

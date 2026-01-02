@@ -74,7 +74,7 @@ Value sys_read(VM& vm, std::vector<Value> args) {
     
     std::stringstream buffer;
     buffer << file.rdbuf();
-    return Value(vm.allocate<ObjString>(buffer.str()));
+    return Value(vm.internString(buffer.str()));
 }
 
 Value sys_write(VM& vm, std::vector<Value> args) {
@@ -236,7 +236,7 @@ Value sys_rmdir(VM& vm, std::vector<Value> args) {
         if (args[1].type != ValueType::BOOLEAN) {
             throw std::runtime_error("sys.rmdir() recursive flag must be a boolean");
         }
-        recursive = std::get<bool>(args[1].as);
+        recursive = args[1].as.boolean;
     }
     
     fs::path path(pathStr);
@@ -290,7 +290,7 @@ Value sys_listdir(VM& vm, std::vector<Value> args) {
     
     auto array = vm.allocate<Array>();
     for (const auto& file : files) {
-        array->elements.push_back(Value(vm.allocate<ObjString>(file)));
+        array->elements.push_back(Value(vm.internString(file)));
     }
     return Value(array);
 }
@@ -311,7 +311,7 @@ Value sys_stat(VM& vm, std::vector<Value> args) {
     }
     
     auto info = vm.allocate<JsonObject>();
-    info->properties["size"] = Value(static_cast<double>(fs::file_size(path)));
+    info->properties[vm.internString("size")] = Value(static_cast<double>(fs::file_size(path)));
     
     // Handle time conversion safely
     auto ftime = fs::last_write_time(path);
@@ -322,10 +322,10 @@ Value sys_stat(VM& vm, std::vector<Value> args) {
     
     std::stringstream ss;
     ss << std::put_time(std::localtime(&cftime), "%Y-%m-%d %H:%M:%S");
-    info->properties["mtime"] = Value(vm.allocate<ObjString>(ss.str()));
+    info->properties[vm.internString("mtime")] = Value(vm.internString(ss.str()));
     
-    info->properties["is_directory"] = Value(fs::is_directory(path));
-    info->properties["is_file"] = Value(fs::is_regular_file(path));
+    info->properties[vm.internString("is_directory")] = Value(fs::is_directory(path));
+    info->properties[vm.internString("is_file")] = Value(fs::is_regular_file(path));
     
     return Value(info);
 }
@@ -343,7 +343,7 @@ Value sys_chmod(VM& vm, std::vector<Value> args) {
     }
     
     std::string pathStr = args[0].asString()->chars;
-    int mode = static_cast<int>(std::get<double>(args[1].as));
+    int mode = static_cast<int>(args[1].as.number);
     
     // Cast integer mode to permissions
     fs::permissions(pathStr, static_cast<fs::perms>(mode), fs::perm_options::replace);
@@ -364,7 +364,7 @@ Value sys_tmpfile(VM& vm, std::vector<Value> args) {
     std::string filename = "neutron_tmp_" + std::to_string(now) + "_" + std::to_string(rand_val);
     fs::path tmp_path = tmp_dir / filename;
     
-    return Value(vm.allocate<ObjString>(tmp_path.string()));
+    return Value(vm.internString(tmp_path.string()));
 }
 
 // System Information
@@ -379,7 +379,7 @@ Value sys_cwd(VM& vm, std::vector<Value> args) {
         throw std::runtime_error("Failed to get current working directory");
     }
     
-    return Value(vm.allocate<ObjString>(cwd));
+    return Value(vm.internString(cwd));
 }
 
 Value sys_chdir(VM& vm, std::vector<Value> args) {
@@ -415,7 +415,7 @@ Value sys_env(VM& vm, std::vector<Value> args) {
         return Value(); // Return nil
     }
     
-    return Value(vm.allocate<ObjString>(value));
+    return Value(vm.internString(value));
 }
 
 Value sys_args(VM& vm, std::vector<Value> args) {
@@ -426,7 +426,7 @@ Value sys_args(VM& vm, std::vector<Value> args) {
     // Return command line arguments from VM
     auto array = vm.allocate<Array>();
     for (const auto& arg : vm.commandLineArgs) {
-        array->elements.push_back(Value(vm.allocate<ObjString>(arg)));
+        array->elements.push_back(Value(vm.internString(arg)));
     }
     return Value(array);
 }
@@ -439,11 +439,11 @@ Value sys_info(VM& vm, std::vector<Value> args) {
     auto info = vm.allocate<JsonObject>();
     
     // Use platform abstraction for system info
-    info->properties["platform"] = Value(vm.allocate<ObjString>(platform::getPlatform()));
-    info->properties["arch"] = Value(vm.allocate<ObjString>(platform::getArch()));
-    info->properties["user"] = Value(vm.allocate<ObjString>(platform::getUsername()));
-    info->properties["hostname"] = Value(vm.allocate<ObjString>(platform::getHostname()));
-    info->properties["cwd"] = Value(vm.allocate<ObjString>(platform::getCwd()));
+    info->properties[vm.internString("platform")] = Value(vm.internString(platform::getPlatform()));
+    info->properties[vm.internString("arch")] = Value(vm.internString(platform::getArch()));
+    info->properties[vm.internString("user")] = Value(vm.internString(platform::getUsername()));
+    info->properties[vm.internString("hostname")] = Value(vm.internString(platform::getHostname()));
+    info->properties[vm.internString("cwd")] = Value(vm.internString(platform::getCwd()));
     
     return Value(info);
 }
@@ -464,7 +464,7 @@ Value sys_input(VM& vm, std::vector<Value> args) {
     
     std::string line;
     std::getline(std::cin, line);
-    return Value(vm.allocate<ObjString>(line));
+    return Value(vm.internString(line));
 }
 
 Value sys_sleep(VM& vm, std::vector<Value> args) {
@@ -476,7 +476,7 @@ Value sys_sleep(VM& vm, std::vector<Value> args) {
         throw std::runtime_error("sys.sleep() expects a number (milliseconds)");
     }
     
-    int ms = static_cast<int>(std::get<double>(args[0].as));
+    int ms = static_cast<int>(args[0].as.number);
     std::this_thread::sleep_for(std::chrono::milliseconds(ms));
     
     return Value(true);
@@ -495,7 +495,7 @@ Value sys_exit(VM& vm, std::vector<Value> args) {
         if (args[0].type != ValueType::NUMBER) {
             throw std::runtime_error("sys.exit() exit code must be a number");
         }
-        exit_code = static_cast<int>(std::get<double>(args[0].as));
+        exit_code = static_cast<int>(args[0].as.number);
     }
     
     platform::exitProcess(exit_code);
@@ -525,7 +525,7 @@ Value sys_alloc(VM& vm, std::vector<Value> args) {
         throw std::runtime_error("sys.alloc() expects a number size");
     }
     
-    size_t size = static_cast<size_t>(std::get<double>(args[0].as));
+    size_t size = static_cast<size_t>(args[0].as.number);
     return Value(vm.allocate<Buffer>(size));
 }
 

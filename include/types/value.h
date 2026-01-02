@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <variant>
 #include <vector>
 
 namespace neutron {
@@ -29,11 +28,22 @@ enum class ValueType {
     BUFFER
 };
 
-using Literal = std::variant<std::nullptr_t, bool, double, ObjString*, Array*, Object*, Callable*, Module*, class Class*, class Instance*, class Buffer*>;
+union ValueUnion {
+    bool boolean;
+    double number;
+    ObjString* obj_string;
+    Array* array;
+    Object* object;
+    Callable* callable;
+    Module* module;
+    Class* klass;
+    Instance* instance;
+    Buffer* buffer;
+};
 
 struct Value {
     ValueType type;
-    Literal as;
+    ValueUnion as;
 
     Value();
     Value(std::nullptr_t);
