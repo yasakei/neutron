@@ -235,6 +235,18 @@ pacman -S mingw-w64-x86_64-{gcc,cmake,curl,jsoncpp} make
 cmake -B build -G "MSYS Makefiles" && cmake --build build
 ```
 
+### Build Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `NEUTRON_UNSAFE_OPTIMIZATIONS` | `OFF` | Enable aggressive performance optimizations that may reduce security. Disables MSVC stack buffer security checks (`/GS-`). Only use for benchmarking or when the security trade-off is acceptable. |
+
+```bash
+# Example: Enable unsafe optimizations for benchmarking
+cmake -B build -DNEUTRON_UNSAFE_OPTIMIZATIONS=ON
+cmake --build build --config Release
+```
+
 > [!WARNING]
 > For detailed platform-specific instructions and troubleshooting, see the [Build Guide](docs/guides/build.md).
 

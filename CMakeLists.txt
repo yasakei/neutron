@@ -16,6 +16,15 @@ elseif(UNIX)
     add_definitions(-DNEUTRON_LINUX)
 endif()
 
+# =============================================================================
+# Build Options
+# =============================================================================
+# NEUTRON_UNSAFE_OPTIMIZATIONS: Enable aggressive performance optimizations that
+# may reduce security. Currently this disables MSVC stack buffer security checks
+# (/GS-). Only enable for benchmarking or performance-critical builds where the
+# security trade-off is acceptable. Default: OFF
+option(NEUTRON_UNSAFE_OPTIMIZATIONS "Enable unsafe performance optimizations (disables /GS- security checks)" OFF)
+
 # Compiler options
 if(MSVC)
     # /O2: Maximize speed
@@ -23,10 +32,16 @@ if(MSVC)
     # /Ot: Favor fast code over small code
     # /fp:fast: Fast floating-point model
     # /GL: Whole program optimization (works with LTO)
-    # /GS-: Disable security checks (small speedup)
     # /Gy: Enable function-level linking
     # /Ob3: Aggressive inlining (VS2019+)
-    add_compile_options(/W4 /utf-8 /EHsc /O2 /Oi /Ot /fp:fast /GL /GS- /Gy)
+    add_compile_options(/W4 /utf-8 /EHsc /O2 /Oi /Ot /fp:fast /GL /Gy)
+    
+    # /GS-: Disable stack buffer security checks (small speedup, security trade-off)
+    # Only enabled when NEUTRON_UNSAFE_OPTIMIZATIONS is ON
+    if(NEUTRON_UNSAFE_OPTIMIZATIONS)
+        message(STATUS "NEUTRON_UNSAFE_OPTIMIZATIONS enabled: Adding /GS- (disabling stack security checks)")
+        add_compile_options(/GS-)
+    endif()
     # Check if MSVC supports /Ob3 (VS2019 16.3+)
     include(CheckCXXCompilerFlag)
     check_cxx_compiler_flag(/Ob3 HAS_OB3)
