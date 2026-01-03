@@ -52,6 +52,22 @@ jobs:
     - name: Run tests
       run: python3 run_tests.py
       
+    - name: Run Performance Benchmarks
+      run: |
+        echo "═══════════════════════════════════════════════════════════"
+        echo "  🐧 LINUX (Ubuntu) PERFORMANCE BENCHMARKS"
+        echo "═══════════════════════════════════════════════════════════"
+        python3 run_benchmark.py | tee benchmark-linux.txt
+        echo ""
+        echo "═══════════════════════════════════════════════════════════"
+      
+    - name: Upload Benchmark Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-linux
+        path: benchmark-linux.txt
+        retention-days: 30
+      
     - name: Create Archive
       run: tar -czf neutron-linux-x64.tar.gz neutron-linux-x64
       
@@ -107,6 +123,22 @@ jobs:
     - name: Run tests
       run: python3 run_tests.py
 
+    - name: Run Performance Benchmarks
+      run: |
+        echo "═══════════════════════════════════════════════════════════"
+        echo "  🍎 macOS (Apple Silicon M1/M2) PERFORMANCE BENCHMARKS"
+        echo "═══════════════════════════════════════════════════════════"
+        python3 run_benchmark.py | tee benchmark-macos.txt
+        echo ""
+        echo "═══════════════════════════════════════════════════════════"
+      
+    - name: Upload Benchmark Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-macos
+        path: benchmark-macos.txt
+        retention-days: 30
+
     - name: Create Archive
       run: tar -czf neutron-macos-universal.tar.gz neutron-macos-universal
       
@@ -158,6 +190,22 @@ jobs:
         
     - name: Run tests
       run: python run_tests.py
+
+    - name: Run Performance Benchmarks
+      run: |
+        Write-Host "═══════════════════════════════════════════════════════════"
+        Write-Host "  🪟 WINDOWS (x64) PERFORMANCE BENCHMARKS"
+        Write-Host "═══════════════════════════════════════════════════════════"
+        python run_benchmark.py | Tee-Object -FilePath benchmark-windows.txt
+        Write-Host ""
+        Write-Host "═══════════════════════════════════════════════════════════"
+      
+    - name: Upload Benchmark Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-windows
+        path: benchmark-windows.txt
+        retention-days: 30
         
     - name: Create Archive
       run: |
@@ -169,6 +217,58 @@ jobs:
         name: neutron-windows-x64
         path: neutron-windows-x64.zip
         retention-days: 7
+
+  benchmark-summary:
+    name: Performance Summary
+    runs-on: ubuntu-latest
+    needs: [build-linux, build-macos-universal, build-windows-msvc]
+    if: always()
+    
+    steps:
+    - name: Download all benchmark results
+      uses: actions/download-artifact@v4
+      with:
+        pattern: benchmark-*
+        merge-multiple: true
+        
+    - name: Generate Performance Summary
+      run: |
+        echo ""
+        echo "╔══════════════════════════════════════════════════════════════════╗"
+        echo "║           📊 NEUTRON PERFORMANCE SUMMARY (ALL PLATFORMS)          ║"
+        echo "╚══════════════════════════════════════════════════════════════════╝"
+        echo ""
+        
+        echo "┌─────────────────────────────────────────────────────────────────┐"
+        echo "│ 🐧 LINUX RESULTS                                                │"
+        echo "└─────────────────────────────────────────────────────────────────┘"
+        if [ -f benchmark-linux.txt ]; then
+          cat benchmark-linux.txt | grep -E "(Win Rate|Neutron Faster|Python Faster|SUMMARY)" || cat benchmark-linux.txt | tail -20
+        else
+          echo "  ❌ Linux benchmark results not available"
+        fi
+        echo ""
+        
+        echo "┌─────────────────────────────────────────────────────────────────┐"
+        echo "│ 🍎 macOS RESULTS                                                │"
+        echo "└─────────────────────────────────────────────────────────────────┘"
+        if [ -f benchmark-macos.txt ]; then
+          cat benchmark-macos.txt | grep -E "(Win Rate|Neutron Faster|Python Faster|SUMMARY)" || cat benchmark-macos.txt | tail -20
+        else
+          echo "  ❌ macOS benchmark results not available"
+        fi
+        echo ""
+        
+        echo "┌─────────────────────────────────────────────────────────────────┐"
+        echo "│ 🪟 WINDOWS RESULTS                                              │"
+        echo "└─────────────────────────────────────────────────────────────────┘"
+        if [ -f benchmark-windows.txt ]; then
+          cat benchmark-windows.txt | grep -E "(Win Rate|Neutron Faster|Python Faster|SUMMARY)" || cat benchmark-windows.txt | tail -20
+        else
+          echo "  ❌ Windows benchmark results not available"
+        fi
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════════"
 
   test-summary:
     name: Test Summary
