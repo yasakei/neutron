@@ -874,8 +874,12 @@ Token Parser::consume(TokenType type, const std::string& message) {
     if (check(type)) return advance();
     
     error(peek(), message);
-    // This is just to satisfy the compiler, error() will throw
-    return peek();
+    // error() throws, this is unreachable but satisfies compiler
+#if defined(_MSC_VER)
+    __assume(false);
+#elif defined(__GNUC__) || defined(__clang__)
+    __builtin_unreachable();
+#endif
 }
 
 void Parser::error(Token token, const std::string& message) {

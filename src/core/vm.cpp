@@ -68,15 +68,15 @@ struct VMException {
     VMException(Value v) : value(v) {}
 };
 
+#ifdef _MSC_VER
+__forceinline
+#else
+inline __attribute__((always_inline))
+#endif
 bool isTruthy(const Value& value) {
-    switch (value.type) {
-        case ValueType::NIL:
-            return false;
-        case ValueType::BOOLEAN:
-            return value.as.boolean;
-        default:
-            return true;
-    }
+    // Fast path for common cases
+    if (value.type == ValueType::BOOLEAN) return value.as.boolean;
+    return value.type != ValueType::NIL;
 }
 
 // Helper function for error reporting with stack trace
@@ -85,25 +85,29 @@ bool isTruthy(const Value& value) {
     // We need to search up the call stack
     
     // Iterate exception frames backwards (most recent first)
-    for (int i = vm->exceptionFrames.size() - 1; i >= 0; i--) {
+    for (size_t idx = vm->exceptionFrames.size(); idx > 0; idx--) {
+        size_t i = idx - 1;
         VM::ExceptionFrame& handler = vm->exceptionFrames[i];
         
         // Find the call frame that owns this handler
         // The handler belongs to the frame where frame->slot_offset == handler.frameBase
         CallFrame* frame = nullptr;
-        int frameIndex = -1;
+        size_t frameIndex = 0;
+        bool foundFrame = false;
         
-        for (int j = vm->frames.size() - 1; j >= 0; j--) {
+        for (size_t jdx = vm->frames.size(); jdx > 0; jdx--) {
+            size_t j = jdx - 1;
             if (vm->frames[j].slot_offset == handler.frameBase) {
                 frame = &vm->frames[j];
                 frameIndex = j;
+                foundFrame = true;
                 break;
             }
         }
         
-        if (frame) {
+        if (foundFrame && frame) {
             // Calculate current position in that frame
-            int current_pos;
+            ptrdiff_t current_pos;
             if (frame == &vm->frames.back()) {
                 // Current frame: use current IP
                 if (frame->function && frame->function->chunk) {
@@ -174,10 +178,11 @@ bool isTruthy(const Value& value) {
     exit(1);
 }
 
-VM::VM() : ip(nullptr), nextGC(1024), currentFileName("<stdin>"), hasException(false), pendingException(Value()), isSafeFile(false) {  // Start GC at 1024 objects
+VM::VM() : ip(nullptr), nextGC(8192), currentFileName("<stdin>"), hasException(false), pendingException(Value()), isSafeFile(false) {  // Start GC at 8192 objects
     // Reserve a large stack to prevent reallocation and enable pointer optimizations
     stack.reserve(1024 * 1024);
     frames.reserve(256); // Reserve frames to avoid reallocation
+    heap.reserve(16384); // Pre-allocate heap space
     
     // Initialize error handler
     ErrorHandler::setColorEnabled(true);
@@ -609,7 +614,7 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
             int end = static_cast<int>(args[1].as.number);
             
             if (start < 0) start = 0;
-            if (end > static_cast<int>(arr->size())) end = arr->size();
+            if (end > static_cast<int>(arr->size())) end = static_cast<int>(arr->size());
             if (start > end) start = end;
             
             std::vector<Value> sliced;
@@ -781,7 +786,7 @@ bool VM::callArrayMethod(BoundArrayMethod* method, int argCount) {
         push(result);
         return true;
         
-    } catch (const VMException& e) {
+    } catch (const VMException&) {
         throw;
     } catch (const std::runtime_error& e) {
         runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
@@ -892,7 +897,7 @@ bool VM::callStringMethod(BoundStringMethod* method, int argCount) {
         push(result);
         return true;
         
-    } catch (const VMException& e) {
+    } catch (const VMException&) {
         throw;
     } catch (const std::runtime_error& e) {
         runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
@@ -901,28 +906,30 @@ bool VM::callStringMethod(BoundStringMethod* method, int argCount) {
 }
 
 void VM::run(size_t minFrameDepth) {
-    // Removed raw pointer optimization to fix vector resize bug
+    // Stack operations - use direct vector access for speed
+    std::vector<Value>& stk = stack;  // Local reference to avoid this-> indirection
     
-    auto syncStack = [&]() {
-        // No-op
-    };
-    
-    auto reloadStack = [&]() {
-        // No-op
-    };
+    auto syncStack = [&]() {};
+    auto reloadStack = [&]() {};
 
+    // Inline push for hot path
+    #define FAST_PUSH(val) stk.push_back(val)
+    #define FAST_POP() (stk.pop_back())
+    #define FAST_PEEK(d) (stk[stk.size() - 1 - (d)])
+    #define FAST_TOP() (stk.back())
+    
     auto push = [&](const Value& value) {
-        stack.push_back(value);
+        stk.push_back(value);
     };
     
     auto pop = [&]() -> Value {
-        Value v = stack.back();
-        stack.pop_back();
+        Value v = stk.back();
+        stk.pop_back();
         return v;
     };
 
     auto peek = [&](int distance) -> Value& {
-        return stack[stack.size() - 1 - distance];
+        return stk[stk.size() - 1 - distance];
     };
 
     CallFrame* frame = &frames.back();
@@ -1087,41 +1094,39 @@ void VM::run(size_t minFrameDepth) {
                 DISPATCH();
             }
             CASE(OP_NIL) {
-                push(Value());
+                FAST_PUSH(Value());
                 DISPATCH();
             }
             CASE(OP_TRUE) {
-                push(Value(true));
+                FAST_PUSH(Value(true));
                 DISPATCH();
             }
             CASE(OP_FALSE) {
-                push(Value(false));
+                FAST_PUSH(Value(false));
                 DISPATCH();
             }
             CASE(OP_POP) {
-                pop();
+                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_DUP) {
-                // Duplicate the value on top of the stack
-                push(peek(0));
+                FAST_PUSH(stk.back());
                 DISPATCH();
             }
             CASE(OP_GET_LOCAL) {
                 uint8_t slot = READ_BYTE();
-                push(stack[frame->slot_offset + slot]);
+                FAST_PUSH(stk[frame->slot_offset + slot]);
                 DISPATCH();
             }
             CASE(OP_SET_LOCAL) {
                 uint8_t slot = READ_BYTE();
-                stack[frame->slot_offset + slot] = peek(0);
+                stk[frame->slot_offset + slot] = stk.back();
                 DISPATCH();
             }
             CASE(OP_GET_GLOBAL) {
                 const std::string& name = READ_STRING();
                 auto it = globals.find(name);
                 if (it == globals.end()) {
-                    // Check if it looks like a module name (common module names)
                     if (name == "json" || name == "math" || name == "sys" || name == "http" || 
                         name == "time" || name == "fmt" || name == "arrays") {
                         runtimeError(this, "Undefined variable '" + name + "'. Did you forget to import it? Use 'use " + name + ";' at the top of your file.", 
@@ -1131,7 +1136,7 @@ void VM::run(size_t minFrameDepth) {
                                     frames.empty() ? -1 : frames.back().currentLine);
                     }
                 }
-                push(globals[name]);
+                FAST_PUSH(it->second);  // Use iterator directly instead of second lookup
                 DISPATCH();
             }
             CASE(OP_DEFINE_GLOBAL) {
@@ -1498,21 +1503,21 @@ void VM::run(size_t minFrameDepth) {
             }
             CASE(OP_SET_PROPERTY) {
                 ObjString* propertyNameObj = READ_CONSTANT().as.obj_string;
-                Value& value = stack.back();
-                Value& object = stack[stack.size() - 2];
+                Value& value = stk.back();
+                Value& object = stk[stk.size() - 2];
                 
                 if (object.type == ValueType::INSTANCE) {
                     Instance* inst = object.as.instance;
                     inst->setField(propertyNameObj, value);
-                    stack[stack.size() - 2] = value;
-                    stack.pop_back();
+                    stk[stk.size() - 2] = value;
+                    stk.pop_back();
                 } else if (object.type == ValueType::OBJECT) {
                     Object* objPtr = object.as.object;
                     JsonObject* jsonObj = dynamic_cast<JsonObject*>(objPtr);
                     if (jsonObj != nullptr) {
                         jsonObj->properties[propertyNameObj] = value;
-                        stack[stack.size() - 2] = value;
-                        stack.pop_back();
+                        stk[stk.size() - 2] = value;
+                        stk.pop_back();
                     } else {
                         runtimeError(this, "Cannot set property on this object type.", frames.empty() ? -1 : frames.back().currentLine);
                     }
@@ -1523,8 +1528,7 @@ void VM::run(size_t minFrameDepth) {
             }
             CASE(OP_THIS) {
                 // 'this' is stored as the first local variable (slot 0) in method calls
-                CallFrame* frame = &frames[frames.size() - 1];
-                push(stack[frame->slot_offset]);
+                FAST_PUSH(stk[frame->slot_offset]);
                 DISPATCH();
             }
             CASE(OP_EQUAL) {
@@ -1578,34 +1582,35 @@ void VM::run(size_t minFrameDepth) {
                 DISPATCH();
             }
             CASE(OP_GREATER) {
-                Value& b = peek(0);
-                Value& a = peek(1);
+                size_t sz = stk.size();
+                Value& b = stk[sz - 1];
+                Value& a = stk[sz - 2];
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                // Reuse 'a' slot for result
                 a = Value(a.as.number > b.as.number);
-                stack.pop_back();
+                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_LESS) {
-                Value& b = peek(0);
-                Value& a = peek(1);
+                size_t sz = stk.size();
+                Value& b = stk[sz - 1];
+                Value& a = stk[sz - 2];
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                // Reuse 'a' slot for result
                 a = Value(a.as.number < b.as.number);
-                stack.pop_back();
+                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_ADD) {
-                Value& b = peek(0);
-                Value& a = peek(1);
+                size_t sz = stk.size();
+                Value& b = stk[sz - 1];
+                Value& a = stk[sz - 2];
                 
                 if (a.type == ValueType::NUMBER && b.type == ValueType::NUMBER) {
-                    a.as.number = a.as.number + b.as.number;
-                    stack.pop_back();
+                    a.as.number += b.as.number;
+                    stk.pop_back();
                 } else if (a.type == ValueType::OBJ_STRING && b.type == ValueType::OBJ_STRING) {
                     ObjString* strA = a.as.obj_string;
                     ObjString* strB = b.as.obj_string;
@@ -1616,7 +1621,7 @@ void VM::run(size_t minFrameDepth) {
                     result.append(strB->chars);
                     
                     a = Value(makeString(std::move(result)));
-                    stack.pop_back();
+                    stk.pop_back();
                 } else {
                     Value val_b = pop();
                     Value val_a = pop();
@@ -1627,28 +1632,31 @@ void VM::run(size_t minFrameDepth) {
                 DISPATCH();
             }
             CASE(OP_SUBTRACT) {
-                Value& b = peek(0);
-                Value& a = peek(1);
+                size_t sz = stk.size();
+                Value& b = stk[sz - 1];
+                Value& a = stk[sz - 2];
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as.number = a.as.number - b.as.number;
-                stack.pop_back();
+                a.as.number -= b.as.number;
+                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_MULTIPLY) {
-                Value& b = peek(0);
-                Value& a = peek(1);
+                size_t sz = stk.size();
+                Value& b = stk[sz - 1];
+                Value& a = stk[sz - 2];
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as.number = a.as.number * b.as.number;
-                stack.pop_back();
+                a.as.number *= b.as.number;
+                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_DIVIDE) {
-                Value& b = peek(0);
-                Value& a = peek(1);
+                size_t sz = stk.size();
+                Value& b = stk[sz - 1];
+                Value& a = stk[sz - 2];
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
@@ -1656,13 +1664,14 @@ void VM::run(size_t minFrameDepth) {
                 if (val_b == 0) {
                     runtimeError(this, "Division by zero.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as.number = a.as.number / val_b;
-                stack.pop_back();
+                a.as.number /= val_b;
+                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_MODULO) {
-                Value& b = peek(0);
-                Value& a = peek(1);
+                size_t sz = stk.size();
+                Value& b = stk[sz - 1];
+                Value& a = stk[sz - 2];
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
@@ -1671,7 +1680,7 @@ void VM::run(size_t minFrameDepth) {
                     runtimeError(this, "Modulo by zero.", frames.empty() ? -1 : frames.back().currentLine);
                 }
                 a.as.number = fmod(a.as.number, val_b);
-                stack.pop_back();
+                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_NOT) {
@@ -1688,43 +1697,40 @@ void VM::run(size_t minFrameDepth) {
                 DISPATCH();
             }
             CASE(OP_BITWISE_AND) {
-                Value& b = peek(0);
-                Value& a = peek(1);
+                size_t sz = stk.size();
+                Value& b = stk[sz - 1];
+                Value& a = stk[sz - 2];
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                int64_t ia = static_cast<int64_t>(a.as.number);
-                int64_t ib = static_cast<int64_t>(b.as.number);
-                a.as.number = static_cast<double>(ia & ib);
-                stack.pop_back();
+                a.as.number = static_cast<double>(static_cast<int64_t>(a.as.number) & static_cast<int64_t>(b.as.number));
+                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_BITWISE_OR) {
-                Value& b = peek(0);
-                Value& a = peek(1);
+                size_t sz = stk.size();
+                Value& b = stk[sz - 1];
+                Value& a = stk[sz - 2];
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                int64_t ia = static_cast<int64_t>(a.as.number);
-                int64_t ib = static_cast<int64_t>(b.as.number);
-                a.as.number = static_cast<double>(ia | ib);
-                stack.pop_back();
+                a.as.number = static_cast<double>(static_cast<int64_t>(a.as.number) | static_cast<int64_t>(b.as.number));
+                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_BITWISE_XOR) {
-                Value& b = peek(0);
-                Value& a = peek(1);
+                size_t sz = stk.size();
+                Value& b = stk[sz - 1];
+                Value& a = stk[sz - 2];
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                int64_t ia = static_cast<int64_t>(a.as.number);
-                int64_t ib = static_cast<int64_t>(b.as.number);
-                a.as.number = static_cast<double>(ia ^ ib);
-                stack.pop_back();
+                a.as.number = static_cast<double>(static_cast<int64_t>(a.as.number) ^ static_cast<int64_t>(b.as.number));
+                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_BITWISE_NOT) {
-                Value& value = peek(0);
+                Value& value = stk.back();
                 if (value.type != ValueType::NUMBER) {
                     runtimeError(this, "Operand must be a number.", frames.empty() ? -1 : frames.back().currentLine);
                 }
@@ -1732,31 +1738,34 @@ void VM::run(size_t minFrameDepth) {
                 DISPATCH();
             }
             CASE(OP_LEFT_SHIFT) {
-                Value& b = peek(0);
-                Value& a = peek(1);
+                size_t sz = stk.size();
+                Value& b = stk[sz - 1];
+                Value& a = stk[sz - 2];
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                int64_t ia = static_cast<int64_t>(a.as.number);
-                int64_t ib = static_cast<int64_t>(b.as.number);
-                a.as.number = static_cast<double>(ia << ib);
-                stack.pop_back();
+                a.as.number = static_cast<double>(static_cast<int64_t>(a.as.number) << static_cast<int64_t>(b.as.number));
+                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_RIGHT_SHIFT) {
-                Value& b = peek(0);
-                Value& a = peek(1);
+                size_t sz = stk.size();
+                Value& b = stk[sz - 1];
+                Value& a = stk[sz - 2];
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                int64_t ia = static_cast<int64_t>(a.as.number);
-                int64_t ib = static_cast<int64_t>(b.as.number);
-                a.as.number = static_cast<double>(ia >> ib);
-                stack.pop_back();
+                a.as.number = static_cast<double>(static_cast<int64_t>(a.as.number) >> static_cast<int64_t>(b.as.number));
+                stk.pop_back();
                 DISPATCH();
             }
+#if !COMPUTED_GOTO
+            default:
+                runtimeError(this, "Unknown opcode.", frames.empty() ? -1 : frames.back().currentLine);
+#else
             CASE_DEFAULT:
                 runtimeError(this, "Unknown opcode.", frames.empty() ? -1 : frames.back().currentLine);
+#endif
             CASE(OP_SAY) {
                 std::cout << pop().toString() << std::endl;
                 DISPATCH();
@@ -1768,8 +1777,11 @@ void VM::run(size_t minFrameDepth) {
             }
             CASE(OP_JUMP_IF_FALSE) {
                 uint16_t offset = READ_SHORT();
-                Value condition = pop();  // Pop the condition value
-                if (!isTruthy(condition)) {
+                Value& condition = stk.back();
+                bool jump = (condition.type == ValueType::NIL) || 
+                           (condition.type == ValueType::BOOLEAN && !condition.as.boolean);
+                stk.pop_back();
+                if (jump) {
                     frame->ip += offset;
                 }
                 DISPATCH();
@@ -1998,14 +2010,14 @@ void VM::run(size_t minFrameDepth) {
                 uint16_t catchStart = READ_SHORT(); // Start of catch block (-1 if none)
                 uint16_t finallyStart = READ_SHORT(); // Start of finally block (-1 if none)
                 
-                int currentIP = (frame->ip - 1) - frame->function->chunk->code.data(); // Position before reading shorts
+                ptrdiff_t currentIP = (frame->ip - 1) - frame->function->chunk->code.data(); // Position before reading shorts
                 size_t currentFrameBase = stack.size();
                 
                 exceptionFrames.emplace_back(
-                    currentIP, 
-                    tryEnd, 
-                    catchStart == 0xFFFF ? -1 : catchStart,  // 0xFFFF represents -1 (no handler)
-                    finallyStart == 0xFFFF ? -1 : finallyStart, // 0xFFFF represents -1 (no handler)
+                    static_cast<int>(currentIP), 
+                    static_cast<int>(tryEnd), 
+                    catchStart == 0xFFFF ? -1 : static_cast<int>(catchStart),  // 0xFFFF represents -1 (no handler)
+                    finallyStart == 0xFFFF ? -1 : static_cast<int>(finallyStart), // 0xFFFF represents -1 (no handler)
                     currentFrameBase,
                     frame->fileName,
                     frame->currentLine
@@ -2037,9 +2049,10 @@ void VM::run(size_t minFrameDepth) {
                 
                 // Find the closest exception handler in the current call frame
                 ExceptionFrame* handler = nullptr;
-                for (int i = exceptionFrames.size() - 1; i >= 0; i--) {
+                for (size_t idx = exceptionFrames.size(); idx > 0; idx--) {
+                    size_t i = idx - 1;
                     ExceptionFrame& frame_handler = exceptionFrames[i];
-                    int current_pos = frame->ip - frame->function->chunk->code.data() - 1; // -1 to account for the read byte
+                    ptrdiff_t current_pos = frame->ip - frame->function->chunk->code.data() - 1; // -1 to account for the read byte
                     if (current_pos >= frame_handler.tryStart && current_pos <= frame_handler.tryEnd) {
                         handler = &frame_handler;
                         break;
@@ -2119,11 +2132,12 @@ void VM::run(size_t minFrameDepth) {
         // We need to find the handler again because we unwound the C++ stack
         // but the VM state (frames, exceptionFrames) is preserved.
         
-        CallFrame* frame = &frames.back();
-        int current_pos = frame->ip - frame->function->chunk->code.data() - 1;
+        CallFrame* currentFrame = &frames.back();
+        ptrdiff_t current_pos = currentFrame->ip - currentFrame->function->chunk->code.data() - 1;
         
         ExceptionFrame* handler = nullptr;
-        for (int i = exceptionFrames.size() - 1; i >= 0; i--) {
+        for (size_t idx = exceptionFrames.size(); idx > 0; idx--) {
+            size_t i = idx - 1;
             ExceptionFrame& frame_handler = exceptionFrames[i];
             if (current_pos >= frame_handler.tryStart && current_pos <= frame_handler.tryEnd) {
                 handler = &frame_handler;
@@ -2145,10 +2159,11 @@ void VM::run(size_t minFrameDepth) {
             push(e.value); // Push exception again after resize
             
             // Jump to catch block
-            frame->ip = frame->function->chunk->code.data() + handler->catchStart;
+            currentFrame->ip = currentFrame->function->chunk->code.data() + handler->catchStart;
             
             // Refresh frame pointer
-            frame = &frames.back();
+            currentFrame = &frames.back();
+            (void)currentFrame; // Mark as used
             
             // Continue outer loop
             continue;
@@ -2249,7 +2264,7 @@ Value VM::call(const Value& callee, const std::vector<Value>& arguments) {
                  push(arg);
              }
              
-             call(func, arguments.size());
+             call(func, static_cast<int>(arguments.size()));
              
              run(frames.size() - 1);
              
@@ -2889,11 +2904,13 @@ void VM::sweep() {
 }
 
 bool VM::handleException(const Value& exception) {
+    (void)exception; // May be unused in some paths
     // Find the most recent handler that covers the current IP position
-    for (int i = exceptionFrames.size() - 1; i >= 0; i--) {
+    for (size_t idx = exceptionFrames.size(); idx > 0; idx--) {
+        size_t i = idx - 1;
         ExceptionFrame& handler = exceptionFrames[i];
         CallFrame* frame = &frames.back();
-        int current_pos = frame->ip - frame->function->chunk->code.data() - 1; // -1 to account for the read byte
+        ptrdiff_t current_pos = frame->ip - frame->function->chunk->code.data() - 1; // -1 to account for the read byte
         
         if (current_pos >= handler.tryStart && current_pos <= handler.tryEnd) {
             // Found a matching handler

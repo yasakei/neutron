@@ -17,6 +17,19 @@
 #ifndef NEUTRON_VM_H
 #define NEUTRON_VM_H
 
+// Performance hints for MSVC
+#ifdef _MSC_VER
+#define NEUTRON_FORCEINLINE __forceinline
+#define NEUTRON_NOINLINE __declspec(noinline)
+#define NEUTRON_LIKELY(x) (x)
+#define NEUTRON_UNLIKELY(x) (x)
+#else
+#define NEUTRON_FORCEINLINE inline __attribute__((always_inline))
+#define NEUTRON_NOINLINE __attribute__((noinline))
+#define NEUTRON_LIKELY(x) __builtin_expect(!!(x), 1)
+#define NEUTRON_UNLIKELY(x) __builtin_expect(!!(x), 0)
+#endif
+
 // Include all necessary type headers
 #include "types/value.h"
 #include "types/object.h"
