@@ -875,7 +875,11 @@ Token Parser::consume(TokenType type, const std::string& message) {
     
     error(peek(), message);
     // error() throws, this is unreachable but satisfies compiler
-    __assume(false); // MSVC: tell compiler this is unreachable
+#if defined(_MSC_VER)
+    __assume(false);
+#elif defined(__GNUC__) || defined(__clang__)
+    __builtin_unreachable();
+#endif
 }
 
 void Parser::error(Token token, const std::string& message) {
