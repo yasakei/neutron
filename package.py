@@ -37,6 +37,12 @@ class Colors:
             # Fallback for Windows console encoding issues
             print(text.encode('ascii', 'replace').decode('ascii'))
 
+def remove_readonly(func, path, excinfo):
+    import stat
+    # Clear the readonly bit and reattempt the removal
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
 def sanitize_path_for_msvc(os_type):
     # On Windows, sanitize PATH to avoid MinGW/MSYS conflicts when using MSVC
     if os_type == "windows":
@@ -682,98 +688,93 @@ def main():
             real_box_path = p
             break
 
-    if real_neutron_path and real_box_path:
-        # Prompt logic could go here, but for now we auto-build if missing or just rebuild to be safe?
-        # The bash script checks if files strictly don't exist.
-        Colors.print("Binaries found, but rebuilding to ensure latest version...", Colors.YELLOW)
-    else:
-        # Build both neutron and box if any are missing
-        Colors.print("Building Neutron and Box executables...", Colors.YELLOW)
+    # Always build to ensure latest version
+    Colors.print("Building Neutron and Box executables...", Colors.YELLOW)
 
-        # Preflight checks on Windows to catch common vcpkg/tooling problems before we start
-        if os_type == 'windows' and not args.skip_vcpkg:
-            ok = preflight_check_windows()
-            if not ok:
-                Colors.print("Preflight checks failed. Either install the listed prerequisites or re-run with --skip-vcpkg to proceed (may still fail).", Colors.RED)
-                sys.exit(1)
+    # Preflight checks on Windows to catch common vcpkg/tooling problems before we start
+    if os_type == 'windows' and not args.skip_vcpkg:
+        ok = preflight_check_windows()
+        if not ok:
+            Colors.print("Preflight checks failed. Either install the listed prerequisites or re-run with --skip-vcpkg to proceed (may still fail).", Colors.RED)
+            sys.exit(1)
 
-        # Build both executables
-        neutron_success = build_neutron(os_type, arch_type, build_dir, args.skip_vcpkg, args.debug)
-        box_success = build_box(os_type, arch_type, box_build_dir, args.skip_vcpkg, args.debug)
+    # Build both executables
+    neutron_success = build_neutron(os_type, arch_type, build_dir, args.skip_vcpkg, args.debug)
+    box_success = build_box(os_type, arch_type, box_build_dir, args.skip_vcpkg, args.debug)
 
-        # Ensure we have found both binaries after building
-        # Wait a bit in case build process is still copying files
-        time.sleep(2)
+    # Ensure we have found both binaries after building
+    # Wait a bit in case build process is still copying files
+    time.sleep(2)
 
-        # Find binaries after build
-        real_neutron_path = None
-        real_box_path = None
+    # Find binaries after build
+    real_neutron_path = None
+    real_box_path = None
 
-        # Try neutron paths first
-        for p in neutron_bin_paths:
+    # Try neutron paths first
+    for p in neutron_bin_paths:
+        if os.path.exists(p):
+            real_neutron_path = p
+            break
+
+    # If not found in standard locations, search in build directory more broadly
+    if not real_neutron_path:
+        neutron_search_paths = [
+            os.path.join(build_dir, "Release", neutron_exe),
+            os.path.join(build_dir, "Debug", neutron_exe),
+            os.path.join(build_dir, "MinSizeRel", neutron_exe),
+            os.path.join(build_dir, "RelWithDebInfo", neutron_exe),
+            os.path.join(root_dir, neutron_exe),  # In case build copied to root
+        ]
+        for p in neutron_search_paths:
             if os.path.exists(p):
                 real_neutron_path = p
                 break
 
-        # If not found in standard locations, search in build directory more broadly
-        if not real_neutron_path:
-            neutron_search_paths = [
-                os.path.join(build_dir, "Release", neutron_exe),
-                os.path.join(build_dir, "Debug", neutron_exe),
-                os.path.join(build_dir, "MinSizeRel", neutron_exe),
-                os.path.join(build_dir, "RelWithDebInfo", neutron_exe),
-                os.path.join(root_dir, neutron_exe),  # In case build copied to root
-            ]
-            for p in neutron_search_paths:
-                if os.path.exists(p):
-                    real_neutron_path = p
-                    break
+    # Try box paths
+    for p in box_bin_paths:
+        if os.path.exists(p):
+            real_box_path = p
+            break
 
-        # Try box paths
-        for p in box_bin_paths:
+    # If not found in standard locations, search in box build directory more broadly
+    if not real_box_path:
+        box_search_paths = [
+            os.path.join(box_build_dir, "Release", box_exe),
+            os.path.join(box_build_dir, "Debug", box_exe),
+            os.path.join(box_build_dir, "MinSizeRel", box_exe),
+            os.path.join(box_build_dir, "RelWithDebInfo", box_exe),
+            os.path.join(root_dir, box_exe),  # In case build copied to root
+        ]
+        for p in box_search_paths:
             if os.path.exists(p):
                 real_box_path = p
                 break
 
-        # If not found in standard locations, search in box build directory more broadly
-        if not real_box_path:
-            box_search_paths = [
-                os.path.join(box_build_dir, "Release", box_exe),
-                os.path.join(box_build_dir, "Debug", box_exe),
-                os.path.join(box_build_dir, "MinSizeRel", box_exe),
-                os.path.join(box_build_dir, "RelWithDebInfo", box_exe),
-                os.path.join(root_dir, box_exe),  # In case build copied to root
-            ]
-            for p in box_search_paths:
-                if os.path.exists(p):
-                    real_box_path = p
-                    break
+    # Check if both builds were successful and binaries exist
+    if not real_neutron_path and not real_box_path:
+        Colors.print("Build seemed successful but could not locate any binaries!", Colors.RED)
+        sys.exit(1)
 
-        # Check if both builds were successful and binaries exist
-        if not real_neutron_path and not real_box_path:
-            Colors.print("Build seemed successful but could not locate any binaries!", Colors.RED)
-            sys.exit(1)
+    # Warn if one of them is missing but continue (best-effort packaging)
+    if not real_neutron_path:
+        Colors.print("Warning: neutron executable not found; installer may not include runtime files.", Colors.YELLOW)
+    if not real_box_path:
+        Colors.print("Warning: box executable not found; some packaging actions may be skipped.", Colors.YELLOW)
 
-        # Warn if one of them is missing but continue (best-effort packaging)
-        if not real_neutron_path:
-            Colors.print("Warning: neutron executable not found; installer may not include runtime files.", Colors.YELLOW)
-        if not real_box_path:
-            Colors.print("Warning: box executable not found; some packaging actions may be skipped.", Colors.YELLOW)
+    # Verify executables work (optional test)
+    if real_neutron_path and os.path.exists(real_neutron_path):
+        try:
+            subprocess.check_output([real_neutron_path, "--version"], timeout=10)
+            Colors.print("Neutron executable verified successfully.", Colors.GREEN)
+        except Exception as e:
+            Colors.print(f"Neutron executable failed verification: {e}", Colors.YELLOW)
 
-        # Verify executables work (optional test)
-        if real_neutron_path and os.path.exists(real_neutron_path):
-            try:
-                subprocess.check_output([real_neutron_path, "--version"], timeout=10)
-                Colors.print("Neutron executable verified successfully.", Colors.GREEN)
-            except Exception as e:
-                Colors.print(f"Neutron executable failed verification: {e}", Colors.YELLOW)
-
-        if real_box_path and os.path.exists(real_box_path):
-            try:
-                subprocess.check_output([real_box_path, "--help"], timeout=10)
-                Colors.print("Box executable verified successfully.", Colors.GREEN)
-            except Exception as e:
-                Colors.print(f"Box executable failed verification: {e}", Colors.YELLOW)
+    if real_box_path and os.path.exists(real_box_path):
+        try:
+            subprocess.check_output([real_box_path, "--help"], timeout=10)
+            Colors.print("Box executable verified successfully.", Colors.GREEN)
+        except Exception as e:
+            Colors.print(f"Box executable failed verification: {e}", Colors.YELLOW)
 
     # Packaging
     if args.output:
@@ -784,7 +785,7 @@ def main():
     Colors.print(f"Creating package: {target_name}", Colors.BLUE)
     
     if os.path.exists(target_name):
-        shutil.rmtree(target_name)
+        shutil.rmtree(target_name, onerror=remove_readonly)
     os.makedirs(target_name)
     
     # Copy binaries (only if present)
