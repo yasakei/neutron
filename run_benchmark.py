@@ -4,6 +4,12 @@ import sys
 import platform
 import subprocess
 import time
+import io
+
+# Force UTF-8 output on Windows
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # Colors
 class Colors:
@@ -18,10 +24,16 @@ class Colors:
 
     @staticmethod
     def print(text, color=NC, end='\n'):
-        if sys.stdout.isatty() and platform.system() != "Windows":
-             print(f"{color}{text}{Colors.NC}", end=end)
-        else:
-             print(text, end=end)
+        # Use ASCII-safe output for CI environments
+        try:
+            if sys.stdout.isatty() and platform.system() != "Windows":
+                print(f"{color}{text}{Colors.NC}", end=end)
+            else:
+                print(text, end=end)
+        except UnicodeEncodeError:
+            # Fallback to ASCII representation
+            ascii_text = text.encode('ascii', 'replace').decode('ascii')
+            print(ascii_text, end=end)
 
 def run_benchmark(name, neutron_bin, neutron_file, python_file):
     # Run Python version
@@ -158,9 +170,9 @@ def main():
         Colors.print(f"Neutron binary not found. Please build the project first.", Colors.RED)
         sys.exit(1)
 
-    Colors.print("╔════════════════════════════════╗", Colors.CYAN)
-    Colors.print("║  Neutron Benchmark Suite v2.0 ║", Colors.CYAN)
-    Colors.print("╚════════════════════════════════╝", Colors.CYAN)
+    Colors.print("+================================+", Colors.CYAN)
+    Colors.print("|  Neutron Benchmark Suite v2.0  |", Colors.CYAN)
+    Colors.print("+================================+", Colors.CYAN)
     print()
     Colors.print(f"Neutron: {neutron_bin}", Colors.BLUE)
     Colors.print(f"Python: {sys.version.split()[0]}", Colors.BLUE)
@@ -214,7 +226,7 @@ def main():
         print()
 
     # Summary
-    Colors.print("════ BENCHMARK SUMMARY ═══", Colors.CYAN)
+    Colors.print("==== BENCHMARK SUMMARY ====", Colors.CYAN)
     print(f"Total Benchmarks: {total_benchmarks}")
     print("Neutron Faster:   ", end="")
     Colors.print(f"{neutron_faster}", Colors.GREEN)
