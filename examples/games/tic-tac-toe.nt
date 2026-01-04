@@ -1,0 +1,270 @@
+
+ // Tic Tac Toe with AI
+ // A console-based game featuring minimax algorithm
+ // 
+ // Author: yasakei
+ // Language: Neutron (https://neutron.ct.ws)
+
+use sys;
+
+var board = [
+    ["1", "2", "3"],
+    ["4", "5", "6"],
+    ["7", "8", "9"]
+];
+
+var humanPlayer = "X";
+var aiPlayer = "O";
+var currentPlayer = "X";
+var gameOver = false;
+var randomSeed = 12345;
+
+var sysInfo = sys.info();
+var isWindows = sysInfo.platform == "Windows";
+
+fun clearScreen() {
+    if (isWindows) {
+        sys.exec("cls");
+    } else {
+        sys.exec("clear");
+    }
+}
+
+fun displayBoard() {
+    clearScreen();
+    say("=== TIC TAC TOE vs AI ===");
+    say("You are X, AI is O");
+    say("");
+    say("  ${board[0][0]} | ${board[0][1]} | ${board[0][2]}");
+    say(" ---+---+---");
+    say("  ${board[1][0]} | ${board[1][1]} | ${board[1][2]}");
+    say(" ---+---+---");
+    say("  ${board[2][0]} | ${board[2][1]} | ${board[2][2]}");
+    say("");
+}
+
+fun checkWinner() {
+    for (var i = 0; i < 3; i = i + 1) {
+        if (board[i][0] == board[i][1] and board[i][1] == board[i][2]) {
+            return board[i][0];
+        }
+    }
+    
+    for (var j = 0; j < 3; j = j + 1) {
+        if (board[0][j] == board[1][j] and board[1][j] == board[2][j]) {
+            return board[0][j];
+        }
+    }
+    
+    if (board[0][0] == board[1][1] and board[1][1] == board[2][2]) {
+        return board[0][0];
+    }
+    if (board[0][2] == board[1][1] and board[1][1] == board[2][0]) {
+        return board[0][2];
+    }
+    
+    return "";
+}
+
+fun isBoardFull() {
+    for (var i = 0; i < 3; i = i + 1) {
+        for (var j = 0; j < 3; j = j + 1) {
+            if (board[i][j] != "X" and board[i][j] != "O") {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+fun random() {
+    randomSeed = (randomSeed * 1103515245 + 12345) % 2147483648;
+    return randomSeed;
+}
+
+fun getAvailableMoves() {
+    var available = [];
+    for (var i = 0; i < 3; i = i + 1) {
+        for (var j = 0; j < 3; j = j + 1) {
+            if (board[i][j] != "X" and board[i][j] != "O") {
+                available.push([i, j]);
+            }
+        }
+    }
+    return available;
+}
+
+fun randomMove() {
+    var available = getAvailableMoves();
+    if (available.length > 0) {
+        var idx = random() % available.length;
+        var move = available[idx];
+        board[move[0]][move[1]] = aiPlayer;
+        return true;
+    }
+    return false;
+}
+
+// Minimax algorithm - evaluates all possible game states
+fun minimax(isMaximizing) {
+    var winner = checkWinner();
+    
+    if (winner == aiPlayer) { return 10; }
+    if (winner == humanPlayer) { return -10; }
+    if (isBoardFull()) { return 0; }
+    
+    if (isMaximizing) {
+        var bestScore = -1000;
+        for (var i = 0; i < 3; i = i + 1) {
+            for (var j = 0; j < 3; j = j + 1) {
+                if (board[i][j] != "X" and board[i][j] != "O") {
+                    var temp = board[i][j];
+                    board[i][j] = aiPlayer;
+                    var score = minimax(false);
+                    board[i][j] = temp;
+                    if (score > bestScore) { bestScore = score; }
+                }
+            }
+        }
+        return bestScore;
+    } else {
+        var bestScore = 1000;
+        for (var i = 0; i < 3; i = i + 1) {
+            for (var j = 0; j < 3; j = j + 1) {
+                if (board[i][j] != "X" and board[i][j] != "O") {
+                    var temp = board[i][j];
+                    board[i][j] = humanPlayer;
+                    var score = minimax(true);
+                    board[i][j] = temp;
+                    if (score < bestScore) { bestScore = score; }
+                }
+            }
+        }
+        return bestScore;
+    }
+}
+
+fun bestMove() {
+    var bestScore = -1000;
+    var bestRow = -1;
+    var bestCol = -1;
+    
+    for (var i = 0; i < 3; i = i + 1) {
+        for (var j = 0; j < 3; j = j + 1) {
+            if (board[i][j] != "X" and board[i][j] != "O") {
+                var temp = board[i][j];
+                board[i][j] = aiPlayer;
+                var score = minimax(false);
+                board[i][j] = temp;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestRow = i;
+                    bestCol = j;
+                }
+            }
+        }
+    }
+    
+    if (bestRow != -1) {
+        board[bestRow][bestCol] = aiPlayer;
+        return true;
+    }
+    return false;
+}
+
+fun aiMove() {
+    var smartChance = 50 + (random() % 36);
+    
+    if (random() % 100 < smartChance) {
+        return bestMove();
+    } else {
+        return randomMove();
+    }
+}
+
+fun makeMove(pos) {
+    var row = -1;
+    var col = -1;
+    
+    if (pos == "1") { row = 0; col = 0; }
+    if (pos == "2") { row = 0; col = 1; }
+    if (pos == "3") { row = 0; col = 2; }
+    if (pos == "4") { row = 1; col = 0; }
+    if (pos == "5") { row = 1; col = 1; }
+    if (pos == "6") { row = 1; col = 2; }
+    if (pos == "7") { row = 2; col = 0; }
+    if (pos == "8") { row = 2; col = 1; }
+    if (pos == "9") { row = 2; col = 2; }
+    
+    if (row == -1) {
+        say("Invalid position! Use 1-9.");
+        return false;
+    }
+    
+    if (board[row][col] == "X" or board[row][col] == "O") {
+        say("Position already taken!");
+        return false;
+    }
+    
+    board[row][col] = humanPlayer;
+    return true;
+}
+
+fun checkGameEnd() {
+    var winner = checkWinner();
+    if (winner == humanPlayer) {
+        displayBoard();
+        say("You win! Great job!");
+        return true;
+    }
+    if (winner == aiPlayer) {
+        displayBoard();
+        say("AI wins! Better luck next time.");
+        return true;
+    }
+    if (isBoardFull()) {
+        displayBoard();
+        say("It's a draw!");
+        return true;
+    }
+    return false;
+}
+
+fun showIntro() {
+    clearScreen();
+    say("=== TIC TAC TOE vs AI ===");
+    say("        by yasakei");
+    say("");
+    say("AI plays like a human:");
+    say("  - Random mistakes each move");
+    say("  - 50-85% smart (unpredictable)");
+    say("  - Can mess up anytime!");
+    say("");
+    sys.input("Press Enter to start...");
+}
+
+randomSeed = 42;
+showIntro();
+
+while (!gameOver) {
+    displayBoard();
+    
+    if (currentPlayer == humanPlayer) {
+        say("Your turn (X)");
+        var input = sys.input("Enter position: ");
+        
+        if (makeMove(input)) {
+            if (checkGameEnd()) { gameOver = true; }
+            else { currentPlayer = aiPlayer; }
+        }
+    } else {
+        displayBoard();
+        say("AI is thinking...");
+        aiMove();
+        if (checkGameEnd()) { gameOver = true; }
+        else { currentPlayer = humanPlayer; }
+    }
+}
+
+say("");
+say("Thanks for playing!");
