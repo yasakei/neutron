@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <iostream>
+#include <unordered_map>
 #include "token.h"
 
 namespace neutron {
@@ -62,8 +63,11 @@ private:
     static bool showStackTrace;
     static std::string* currentFileName;
     static std::vector<std::string>* sourceLines;  // Cache of source code lines (pointer to avoid destruction order issues)
+    static std::unordered_map<std::string, std::vector<std::string>>* fileSources; // Cache of source code lines for all files
     static bool cleanedUp;  // Flag to prevent double cleanup
     static bool hasError;   // Flag to track if any error occurred
+    static int errorCount;  // Total number of errors reported
+    static const int MAX_DETAILED_ERRORS = 4; // Maximum number of errors to show with full details
 
     // ANSI color codes (cross-platform compatible)
     static const std::string RESET;
@@ -87,6 +91,9 @@ public:
     static void setStackTraceEnabled(bool enabled);
     static void setCurrentFile(const std::string& fileName);
     static void setSourceLines(const std::vector<std::string>& lines);
+    static void addFileSource(const std::string& fileName, const std::string& source);
+    static void printSummary();
+    static void reset();
 
     // Error reporting methods
     static void reportError(const ErrorInfo& error);

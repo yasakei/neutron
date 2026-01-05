@@ -62,6 +62,7 @@ void run(const std::string& source, neutron::VM& vm, bool isSafeFile = false) {
         
         // Stop if there were any syntax errors
         if (neutron::ErrorHandler::hadError()) {
+            neutron::ErrorHandler::printSummary();
             return;
         }
 
@@ -71,6 +72,7 @@ void run(const std::string& source, neutron::VM& vm, bool isSafeFile = false) {
         vm.interpret(function);
     } catch (const std::exception& e) {
         neutron::ErrorHandler::reportRuntimeError(e.what(), vm.currentFileName);
+        neutron::ErrorHandler::printSummary();
         exit(1);
     }
 }
