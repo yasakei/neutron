@@ -21,8 +21,10 @@ bool ErrorHandler::useColor = true;
 bool ErrorHandler::showStackTrace = true;
 std::string* ErrorHandler::currentFileName = new std::string("");
 std::vector<std::string>* ErrorHandler::sourceLines = new std::vector<std::string>();
+std::unordered_map<std::string, std::vector<std::string>>* ErrorHandler::fileSources = new std::unordered_map<std::string, std::vector<std::string>>();
 bool ErrorHandler::cleanedUp = false;
 bool ErrorHandler::hasError = false;
+int ErrorHandler::errorCount = 0;
 
 // ANSI color codes
 const std::string ErrorHandler::RESET = "\033[0m";
@@ -69,6 +71,38 @@ void ErrorHandler::setSourceLines(const std::vector<std::string>& lines) {
     if (sourceLines) {
         *sourceLines = lines;
     }
+    if (currentFileName && !currentFileName->empty() && fileSources) {
+        (*fileSources)[*currentFileName] = lines;
+    }
+}
+
+void ErrorHandler::addFileSource(const std::string& fileName, const std::string& source) {
+    if (!fileSources) {
+        fileSources = new std::unordered_map<std::string, std::vector<std::string>>();
+    }
+    
+    std::vector<std::string> lines;
+    std::stringstream ss(source);
+    std::string line;
+    while (std::getline(ss, line)) {
+        lines.push_back(line);
+    }
+    
+    (*fileSources)[fileName] = lines;
+}
+
+void ErrorHandler::printSummary() {
+    if (errorCount > 0) {
+        std::cerr << "\nFound " << errorCount << " error" << (errorCount == 1 ? "" : "s") << "." << std::endl;
+    }
+}
+
+void ErrorHandler::reset() {
+    hasError = false;
+    errorCount = 0;
+    if (currentFileName) *currentFileName = "";
+    if (sourceLines) sourceLines->clear();
+    if (fileSources) fileSources->clear();
 }
 
 std::string ErrorHandler::getErrorTypeName(ErrorType type) {
@@ -235,6 +269,25 @@ std::string ErrorHandler::getSuggestion(ErrorType type, const std::string& messa
 
 void ErrorHandler::reportError(const ErrorInfo& error) {
     hasError = true;
+    errorCount++;
+    
+    // If we've exceeded the detailed error limit, just print a compact message
+    if (errorCount > MAX_DETAILED_ERRORS) {
+        std::ostringstream oss;
+        
+        if (!error.fileName.empty()) {
+            oss << "[" << error.fileName;
+            if (error.line > 0) {
+                oss << ":" << error.line;
+            }
+            oss << "] ";
+        }
+        
+        oss << getErrorTypeName(error.type) << ": " << error.message;
+        std::cerr << oss.str() << std::endl;
+        return;
+    }
+
     std::ostringstream oss;
     
     // Error type and location
@@ -329,11 +382,17 @@ void ErrorHandler::reportSyntaxError(const std::string& message, const Token& to
 
 void ErrorHandler::reportRuntimeError(const std::string& message, const std::string& fileName,
                                       int line, const std::vector<StackFrame>& trace) {
-    ErrorInfo error(ErrorType::RUNTIME_ERROR, message, fileName.empty() ? (currentFileName ? *currentFileName : "") : fileName, line);
+    std::string actualFileName = fileName.empty() ? (currentFileName ? *currentFileName : "") : fileName;
+    ErrorInfo error(ErrorType::RUNTIME_ERROR, message, actualFileName, line);
     error.stackTrace = trace;
     
     // Try to get the source line
-    if (sourceLines && line > 0 && line <= static_cast<int>(sourceLines->size())) {
+    if (fileSources && fileSources->count(actualFileName)) {
+        const auto& lines = (*fileSources)[actualFileName];
+        if (line > 0 && line <= static_cast<int>(lines.size())) {
+            error.sourceLine = lines[line - 1];
+        }
+    } else if (sourceLines && line > 0 && line <= static_cast<int>(sourceLines->size())) {
         error.sourceLine = (*sourceLines)[line - 1];
     }
     
@@ -344,11 +403,17 @@ void ErrorHandler::reportRuntimeError(const std::string& message, const std::str
 
 void ErrorHandler::reportLexicalError(const std::string& message, int line, int column,
                                       const std::string& fileName) {
-    ErrorInfo error(ErrorType::LEXICAL_ERROR, message, fileName.empty() ? (currentFileName ? *currentFileName : "") : fileName, 
+    std::string actualFileName = fileName.empty() ? (currentFileName ? *currentFileName : "") : fileName;
+    ErrorInfo error(ErrorType::LEXICAL_ERROR, message, actualFileName, 
                    line, column);
     
     // Try to get the source line
-    if (sourceLines && line > 0 && line <= static_cast<int>(sourceLines->size())) {
+    if (fileSources && fileSources->count(actualFileName)) {
+        const auto& lines = (*fileSources)[actualFileName];
+        if (line > 0 && line <= static_cast<int>(lines.size())) {
+            error.sourceLine = lines[line - 1];
+        }
+    } else if (sourceLines && line > 0 && line <= static_cast<int>(sourceLines->size())) {
         error.sourceLine = (*sourceLines)[line - 1];
     }
     

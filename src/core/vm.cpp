@@ -174,7 +174,13 @@ bool isTruthy(const Value& value) {
         stackTrace.emplace_back(funcName, it->fileName.empty() ? vm->currentFileName : it->fileName, frameLine);
     }
     
-    ErrorHandler::reportRuntimeError(message, vm->currentFileName, line, stackTrace);
+    int errorLine = line;
+    if (errorLine == -1 && !stackTrace.empty()) {
+        errorLine = stackTrace[0].line;
+    }
+    
+    ErrorHandler::reportRuntimeError(message, vm->currentFileName, errorLine, stackTrace);
+    ErrorHandler::printSummary();
     exit(1);
 }
 
@@ -2443,6 +2449,9 @@ void VM::load_module(const std::string& name) {
                             std::istreambuf_iterator<char>());
         module_nt_file.close();
         
+        // Register source code with error handler
+        ErrorHandler::addFileSource(found_nt_path, source);
+        
         // Parse the module
         Scanner scanner(source);
         std::vector<Token> tokens = scanner.scanTokens();
@@ -2464,7 +2473,10 @@ void VM::load_module(const std::string& name) {
         Function* module_function = compiler.compile(statements);
         if (module_function) {
             // Execute the module to populate its functions/variables in the module environment
+            std::string previousFileName = currentFileName;
+            currentFileName = found_nt_path;
             interpret(module_function);
+            currentFileName = previousFileName;
             delete module_function;  // Clean up the allocated function
         }
         
@@ -2629,6 +2641,9 @@ void VM::load_file(const std::string& filepath) {
         return;
     }
     
+    // Register source code with error handler
+    ErrorHandler::addFileSource(filepath, source);
+    
     // Parse the file
     Scanner scanner(source);
     std::vector<Token> tokens = scanner.scanTokens();
@@ -2640,7 +2655,10 @@ void VM::load_file(const std::string& filepath) {
     Function* file_function = compiler.compile(statements);
     if (file_function) {
         // Execute the file to populate globals
+        std::string previousFileName = currentFileName;
+        currentFileName = filepath;
         interpret(file_function);
+        currentFileName = previousFileName;
         delete file_function;
     }
 }
@@ -2691,6 +2709,9 @@ Module* VM::load_file_as_module(const std::string& filepath) {
         return nullptr;
     }
     
+    // Register source code with error handler
+    ErrorHandler::addFileSource(filepath, source);
+    
     // Parse the file
     Scanner scanner(source);
     std::vector<Token> tokens = scanner.scanTokens();
@@ -2707,7 +2728,10 @@ Module* VM::load_file_as_module(const std::string& filepath) {
     // Note: We can't easily swap globals map with Environment, so we'll 
     // use a different approach: interpret_module helper
     
+    std::string previousFileName = currentFileName;
+    currentFileName = filepath;
     interpret_module(statements, module_env);
+    currentFileName = previousFileName;
     
     // Create the module
     return allocate<Module>(filepath, module_env);
