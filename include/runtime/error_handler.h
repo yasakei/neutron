@@ -8,6 +8,131 @@
 #include <unordered_map>
 #include "token.h"
 
+/**
+ * Return the human-readable name for the given ErrorType.
+ * @param type The error type to translate.
+ * @returns The name of the error type (e.g., "SYNTAX_ERROR").
+ */
+/**
+ * Enable or disable colored output in error messages.
+ * @param enabled True to enable colored output, false to disable it.
+ */
+/**
+ * Enable or disable printing of stack traces with errors.
+ * @param enabled True to print stack traces, false to omit them.
+ */
+/**
+ * Set the current source file name used for contextual error reporting.
+ * @param fileName The path or name of the current file.
+ */
+/**
+ * Provide source lines for the current file to enable inline context display.
+ * @param lines Vector of source lines for the current file.
+ */
+/**
+ * Cache the source contents for a named file for later context lookup.
+ * @param fileName The file name to associate with the provided source.
+ * @param source The full source text for the file (will be split into lines internally).
+ */
+/**
+ * Print a brief summary of all errors reported so far, including totals and any suppressed details.
+ */
+/**
+ * Reset internal error-handler state, including caches and counters, to initial defaults.
+ */
+/**
+ * Report a fully populated ErrorInfo to the handler for formatted output and tracking.
+ * @param error The detailed error information to report.
+ */
+/**
+ * Report a syntax error associated with a token and optional suggestion.
+ * @param message Human-readable error message describing the syntax problem.
+ * @param token The token where the syntax error was detected.
+ * @param suggestion Optional suggestion text to help fix the error.
+ */
+/**
+ * Report a runtime error with optional file, line, and stack trace context.
+ * @param message Human-readable error message describing the runtime failure.
+ * @param fileName Optional file name where the error occurred.
+ * @param line Optional line number where the error occurred, or -1 if unknown.
+ * @param trace Optional stack trace frames to include with the error.
+ */
+/**
+ * Report a lexical/tokenization error at a specific location.
+ * @param message Human-readable error message describing the lexical issue.
+ * @param line Line number where the lexical error occurred.
+ * @param column Column index where the lexical error occurred.
+ * @param fileName Optional file name where the error occurred.
+ */
+/**
+ * Report a type error describing an expected and actual type mismatch.
+ * @param expected Description of the expected type.
+ * @param got Description of the actual type encountered.
+ * @param fileName Optional file name where the error occurred.
+ * @param line Optional line number where the error occurred, or -1 if unknown.
+ */
+/**
+ * Report an undefined reference to a variable or function.
+ * @param name The identifier that was referenced but not found.
+ * @param fileName Optional file name where the reference occurred.
+ * @param line Optional line number where the reference occurred, or -1 if unknown.
+ * @param isFunction True if the missing reference was expected to be a function.
+ */
+/**
+ * Report a range-related error such as index out of bounds.
+ * @param message Human-readable message describing the range error.
+ * @param fileName Optional file name where the error occurred.
+ * @param line Optional line number where the error occurred, or -1 if unknown.
+ */
+/**
+ * Report an argument count mismatch for a function call.
+ * @param expected Number of arguments expected.
+ * @param got Number of arguments actually provided.
+ * @param functionName Name of the function that received the wrong argument count.
+ * @param fileName Optional file name where the error occurred.
+ * @param line Optional line number where the error occurred, or -1 if unknown.
+ */
+/**
+ * Report a division or modulo by zero error.
+ * @param fileName Optional file name where the error occurred.
+ * @param line Optional line number where the error occurred, or -1 if unknown.
+ */
+/**
+ * Report a stack overflow or related stack error.
+ * @param fileName Optional file name where the error occurred.
+ * @param line Optional line number where the error occurred, or -1 if unknown.
+ */
+/**
+ * Report a module loading or resolution error with a reason.
+ * @param moduleName Name of the module that failed to load or resolve.
+ * @param reason Human-readable reason for the module error.
+ * @param fileName Optional file name where the error occurred.
+ * @param line Optional line number where the error occurred, or -1 if unknown.
+ */
+/**
+ * Format an error message for consistent presentation (may add prefixes or normalization).
+ * @param message The raw error message to format.
+ * @returns The formatted error message string.
+ */
+/**
+ * Print a single line to the error output, optionally marking it as an error line.
+ * @param content The line content to print.
+ * @param error If true, the line will be printed with error highlighting.
+ */
+/**
+ * Terminate the process with the provided detailed error information.
+ * This function does not return.
+ * @param error The ErrorInfo describing the fatal condition.
+ */
+/**
+ * Terminate the process with a simple message and error type.
+ * This function does not return.
+ * @param message Human-readable message describing the fatal condition.
+ * @param type The ErrorType to classify the fatal error.
+ */
+/**
+ * Release or reset all internal static resources and caches used by the error handler.
+ */
 namespace neutron {
 
 // Error types for categorization
