@@ -39,6 +39,24 @@
 void runFile(const std::string& path, neutron::VM& vm);
 void runPrompt(neutron::VM& vm);
 
+/**
+ * @brief Compile and execute a Neutron source string in the given VM.
+ *
+ * Configures the global error handler for source-aware diagnostics, compiles
+ * the provided source into a function, and invokes the VM to interpret it.
+ * If syntax errors are detected, a summary is printed and execution stops.
+ * If a runtime exception occurs during compilation or interpretation, the
+ * runtime error is reported, a summary is printed, and the process exits with
+ * status 1.
+ *
+ * @param source The Neutron source code to compile and run.
+ * @param vm The virtual machine instance used for compilation and execution.
+ *           The VM's current file/name and module search paths may be used
+ *           for diagnostics and module resolution.
+ * @param isSafeFile When true, compile the source with safety restrictions
+ *                   appropriate for "safe" files (e.g., sandboxing or reduced
+ *                   permissions). Default is false.
+ */
 void run(const std::string& source, neutron::VM& vm, bool isSafeFile = false) {
     // Split source into lines for error reporting
     std::vector<std::string> lines;

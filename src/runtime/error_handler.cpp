@@ -67,6 +67,14 @@ void ErrorHandler::setCurrentFile(const std::string& fileName) {
     }
 }
 
+/**
+ * @brief Store the provided source lines as the current active source and, when a current file is set, associate them with that file.
+ *
+ * Copies `lines` into the internal buffer used for error reporting; if a current file name has been set, the same lines
+ * are also stored in the per-file source map so future errors for that file can retrieve the source.
+ *
+ * @param lines The file's source text split into individual lines.
+ */
 void ErrorHandler::setSourceLines(const std::vector<std::string>& lines) {
     if (sourceLines) {
         *sourceLines = lines;
@@ -76,6 +84,17 @@ void ErrorHandler::setSourceLines(const std::vector<std::string>& lines) {
     }
 }
 
+/**
+ * @brief Store a file's source text as a vector of lines for later error reporting.
+ *
+ * Splits the provided `source` text into lines (by newline characters) and associates
+ * the resulting line vector with `fileName` in the internal per-file source map.
+ * If the internal map does not yet exist it will be created. Any existing entry for
+ * `fileName` will be replaced.
+ *
+ * @param fileName Name or path of the source file to register.
+ * @param source Full contents of the file; will be split into lines and stored.
+ */
 void ErrorHandler::addFileSource(const std::string& fileName, const std::string& source) {
     if (!fileSources) {
         fileSources = new std::unordered_map<std::string, std::vector<std::string>>();
@@ -91,12 +110,24 @@ void ErrorHandler::addFileSource(const std::string& fileName, const std::string&
     (*fileSources)[fileName] = lines;
 }
 
+/**
+ * @brief Prints a compact summary of accumulated errors.
+ *
+ * If any errors have been recorded, emits a single-line summary to standard error
+ * indicating the total number of errors (e.g., "Found 3 errors.").
+ */
 void ErrorHandler::printSummary() {
     if (errorCount > 0) {
         std::cerr << "\nFound " << errorCount << " error" << (errorCount == 1 ? "" : "s") << "." << std::endl;
     }
 }
 
+/**
+ * @brief Clears all tracked error state and stored source data.
+ *
+ * Resets the error flag and error counter, clears the current file name,
+ * and removes all cached source lines and per-file source mappings.
+ */
 void ErrorHandler::reset() {
     hasError = false;
     errorCount = 0;
@@ -105,6 +136,12 @@ void ErrorHandler::reset() {
     if (fileSources) fileSources->clear();
 }
 
+/**
+ * @brief Map an ErrorType enum value to its canonical error type name.
+ *
+ * @return std::string The human-readable error type name (for example "SyntaxError",
+ * "RuntimeError", "TypeError"). Returns "Error" for unknown or default cases.
+ */
 std::string ErrorHandler::getErrorTypeName(ErrorType type) {
     switch (type) {
         case ErrorType::SYNTAX_ERROR:     return "SyntaxError";
@@ -267,6 +304,17 @@ std::string ErrorHandler::getSuggestion(ErrorType type, const std::string& messa
     return "";
 }
 
+/**
+ * @brief Report an error by formatting and emitting either a detailed diagnostic or a compact summary.
+ *
+ * Increments the global error state and, if the number of reported errors exceeds the detailed limit,
+ * emits a compact file/line-prefixed summary. Otherwise produces a multi-line diagnostic that includes
+ * the error type, optional file and location, the message, an optional source line with a column
+ * highlight, an optional suggestion, and an optional stack trace. Output uses ANSI colors when enabled.
+ *
+ * @param error Structure containing error details. Observed fields: `type`, `message`, `fileName`,
+ *              `line`, `column`, `sourceLine`, `suggestion`, and `stackTrace`.
+ */
 void ErrorHandler::reportError(const ErrorInfo& error) {
     hasError = true;
     errorCount++;
@@ -380,6 +428,19 @@ void ErrorHandler::reportSyntaxError(const std::string& message, const Token& to
     reportError(error);
 }
 
+/**
+ * @brief Report a runtime error with contextual source and stack information.
+ *
+ * Constructs an ErrorInfo for a runtime error using the provided message, file, and line;
+ * attaches the provided stack trace, attempts to populate the corresponding source line
+ * (preferring per-file sources if available; line numbers are 1-based), derives a suggested
+ * fix, and forwards the error to the central reporting routine.
+ *
+ * @param message Error message describing the runtime failure.
+ * @param fileName File name where the error occurred; if empty, the current file name is used.
+ * @param line 1-based line number within the file where the error occurred.
+ * @param trace Stack trace frames to associate with the runtime error.
+ */
 void ErrorHandler::reportRuntimeError(const std::string& message, const std::string& fileName,
                                       int line, const std::vector<StackFrame>& trace) {
     std::string actualFileName = fileName.empty() ? (currentFileName ? *currentFileName : "") : fileName;
@@ -401,6 +462,17 @@ void ErrorHandler::reportRuntimeError(const std::string& message, const std::str
     reportError(error);
 }
 
+/**
+ * @brief Report a lexical (tokenization) error at a specific file location.
+ *
+ * Attempts to attach the source line for the given file and line (preferring per-file sources when available),
+ * generates a contextual suggestion, and emits a formatted lexical error report.
+ *
+ * @param message Human-readable error message describing the lexical problem.
+ * @param line 1-based line number where the error occurred.
+ * @param column 1-based column number indicating the error position within the line.
+ * @param fileName File path associated with the error; if empty, the current file context is used when available.
+ */
 void ErrorHandler::reportLexicalError(const std::string& message, int line, int column,
                                       const std::string& fileName) {
     std::string actualFileName = fileName.empty() ? (currentFileName ? *currentFileName : "") : fileName;

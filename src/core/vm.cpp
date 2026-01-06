@@ -79,7 +79,19 @@ bool isTruthy(const Value& value) {
     return value.type != ValueType::NIL;
 }
 
-// Helper function for error reporting with stack trace
+/**
+ * @brief Reports a runtime error, produces a stack trace, and either transfers control to an in-flight handler or terminates.
+ *
+ * If an active exception handler that covers the current instruction is found, the VM frames are unwound to that handler
+ * and a VMException is thrown to resume execution in the VM's run loop. If no handler is found, the error and stack trace
+ * are reported and the process is terminated.
+ *
+ * @param vm The VM instance where the error occurred.
+ * @param message The error message to report.
+ * @param line Optional source line number to use as the error location; if -1 the line is inferred from the stack trace.
+ *
+ * @throws VMException When a matching in-flight exception handler is located; used to transfer control back into the VM.
+ */
 [[noreturn]] void runtimeError(VM* vm, const std::string& message, int line = -1) {
     // Check if there is an active exception handler that covers the current instruction
     // We need to search up the call stack
@@ -2356,6 +2368,26 @@ Value VM::execute_string(const std::string& source) {
     }
 }
 
+/**
+ * @brief Load and register a module by name into the VM.
+ *
+ * Attempts to locate and load a module named `name` from built-in modules, Neutron source
+ * (.nt) files in standard search paths, or native shared libraries. On success the module
+ * is registered in the VM (globals and module registry) and cached to avoid future reloads.
+ *
+ * @param name Name of the module to load (e.g., "json", "fmt", or a user module name).
+ *
+ * Observable behavior:
+ * - Initializes and registers built-in modules when `name` matches a builtin identifier.
+ * - When a `.nt` source file is found, parses, compiles, and executes it in an isolated
+ *   module environment; the module source is registered with the ErrorHandler for accurate
+ *   error mapping.
+ * - When a native library is found, loads it and calls its `neutron_module_init` (or
+ *   `_neutron_module_init`) entry point to populate the module environment.
+ * - On success the module is made available via the VM's module registry and cached.
+ * - If the module cannot be found or is invalid (missing init symbol), a runtime error is
+ *   reported with context suitable for stack traces and error reporting.
+ */
 void VM::load_module(const std::string& name) {
     // Check if module is already loaded in the cache
     if (loadedModuleCache.find(name) != loadedModuleCache.end()) {
@@ -2595,6 +2627,19 @@ void VM::addEmbeddedFile(const std::string& path, const std::string& content) {
     embeddedFiles[path] = content;
 }
 
+/**
+ * @brief Loads, compiles, and executes a Neutron source file into the VM's global scope.
+ *
+ * Searches embedded files first and then module search paths for the given filepath; when found,
+ * registers the file source with the error handler, parses and compiles the source, and executes
+ * the resulting code in the current global environment. Temporarily sets the VM's current file
+ * context to the file being executed to improve error tracebacks and restores it after execution.
+ *
+ * If the file cannot be located, reports a runtime error and does not modify globals.
+ *
+ * @param filepath Path or module-relative name of the source file to load. Embedded files and
+ *                 entries under the VM's module_search_paths are considered during lookup.
+ */
 void VM::load_file(const std::string& filepath) {
     std::string source;
     bool found = false;
@@ -2663,6 +2708,17 @@ void VM::load_file(const std::string& filepath) {
     }
 }
 
+/**
+ * @brief Load a Neutron source file, execute it in an isolated module environment, and produce a Module.
+ *
+ * Searches embedded files first and then module search paths for the given filepath, registers the file source
+ * with the error handler, parses and executes the source in a dedicated environment, and returns a Module
+ * wrapping that environment populated with the module's exported bindings.
+ *
+ * @param filepath Path or module-relative path to the Neutron source file to load.
+ * @return Module* Pointer to the newly created Module containing the module environment and exports, or `nullptr`
+ * if the file could not be found or loading failed (a runtime error is reported in that case).
+ */
 Module* VM::load_file_as_module(const std::string& filepath) {
     std::string source;
     bool found = false;
