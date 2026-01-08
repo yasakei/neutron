@@ -5,11 +5,11 @@ namespace lsp {
 
 // Helper to safely set JSON values (avoids string_view issues on older jsoncpp)
 static inline Json::Value& pset(Json::Value& v, const char* key) {
-    return v[std::string(key)];
+    return v[static_cast<const std::string&>(std::string(key))];
 }
 
 static inline const Json::Value& pget(const Json::Value& v, const char* key) {
-    return v[std::string(key)];
+    return v[static_cast<const std::string&>(std::string(key))];
 }
 
 Json::Value Position::toJson() const {
@@ -21,8 +21,8 @@ Json::Value Position::toJson() const {
 
 Position Position::fromJson(const Json::Value& json) {
     return {
-        json.get("line", 0).asInt(),
-        json.get("character", 0).asInt()
+        json.get(static_cast<const std::string&>(std::string("line")), 0).asInt(),
+        json.get(static_cast<const std::string&>(std::string("character")), 0).asInt()
     };
 }
 

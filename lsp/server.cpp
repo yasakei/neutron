@@ -8,13 +8,19 @@
 namespace neutron {
 namespace lsp {
 
-// Helper to safely get JSON values (avoids string_view issues on older jsoncpp)
+// Helper to safely access JSON values
+// We explicit cast to std::string const& to avoid ambiguous overload 
+// or preference for string_view which is missing in the linked library on macOS.
+static inline bool has(const Json::Value& v, const char* key) {
+    return v.isMember(static_cast<const std::string&>(std::string(key)));
+}
+
 static inline const Json::Value& get(const Json::Value& v, const char* key) {
-    return v[std::string(key)];
+    return v[static_cast<const std::string&>(std::string(key))];
 }
 
 static inline Json::Value& set(Json::Value& v, const char* key) {
-    return v[std::string(key)];
+    return v[static_cast<const std::string&>(std::string(key))];
 }
 
 LSPServer::LSPServer() : running(true) {}
@@ -77,9 +83,9 @@ void LSPServer::run() {
 }
 
 void LSPServer::handleMessage(const Json::Value& message) {
-    if (message.isMember("id")) {
+    if (has(message, "id")) {
         // Request or Response (we only handle incoming requests)
-        if (message.isMember("method")) {
+        if (has(message, "method")) {
             handleRequest(message);
         }
     } else {
