@@ -8,6 +8,15 @@
 namespace neutron {
 namespace lsp {
 
+// Helper to safely get JSON values (avoids string_view issues on older jsoncpp)
+static inline const Json::Value& get(const Json::Value& v, const char* key) {
+    return v[std::string(key)];
+}
+
+static inline Json::Value& set(Json::Value& v, const char* key) {
+    return v[std::string(key)];
+}
+
 LSPServer::LSPServer() : running(true) {}
 
 void LSPServer::run() {
@@ -80,57 +89,57 @@ void LSPServer::handleMessage(const Json::Value& message) {
 }
 
 void LSPServer::handleRequest(const Json::Value& message) {
-    std::string method = message["method"].asString();
-    Json::Value id = message["id"]; // Preserve original type (int or string)
+    std::string method = get(message, "method").asString();
+    Json::Value id = get(message, "id"); // Preserve original type (int or string)
     
     std::cerr << "[LSP] Handling Request: " << method << " [" << id.toStyledString() << "]" << std::endl;
 
     if (method == "initialize") {
-        onInitialize(message["params"], id);
+        onInitialize(get(message, "params"), id);
     } else if (method == "shutdown") {
         onShutdown(id);
     } else if (method == "textDocument/documentSymbol") {
-        onDocumentSymbol(message["params"], id);
+        onDocumentSymbol(get(message, "params"), id);
     } else if (method == "textDocument/completion") {
-        onCompletion(message["params"], id);
+        onCompletion(get(message, "params"), id);
     } else if (method == "textDocument/hover") {
-        onHover(message["params"], id);
+        onHover(get(message, "params"), id);
     } else if (method == "textDocument/codeLens") {
-        onCodeLens(message["params"], id);
+        onCodeLens(get(message, "params"), id);
     } else if (method == "codeLens/resolve") {
-        onCodeLensResolve(message["params"], id);
+        onCodeLensResolve(get(message, "params"), id);
     } else if (method == "textDocument/formatting") {
-        onFormatting(message["params"], id);
+        onFormatting(get(message, "params"), id);
     } else {
         std::cerr << "[LSP] Unknown request: " << method << std::endl;
         // Return null result for unknown methods
         Json::Value response;
-        response["jsonrpc"] = "2.0";
-        response["id"] = id;
-        response["result"] = Json::nullValue;
+        set(response, "jsonrpc") = "2.0";
+        set(response, "id") = id;
+        set(response, "result") = Json::nullValue;
         sendJson(response);
     }
 }
 
 void LSPServer::handleNotification(const Json::Value& message) {
-    std::string method = message["method"].asString();
+    std::string method = get(message, "method").asString();
     std::cerr << "[LSP] Handling Notification: " << method << std::endl;
     
     if (method == "initialized") {
         // Client is ready, we can send additional info if needed
         std::cerr << "[LSP] Client initialized successfully." << std::endl;
     } else if (method == "textDocument/didOpen") {
-        onTextDocumentDidOpen(message["params"]);
+        onTextDocumentDidOpen(get(message, "params"));
     } else if (method == "textDocument/didChange") {
-        onTextDocumentDidChange(message["params"]);
+        onTextDocumentDidChange(get(message, "params"));
     } else if (method == "textDocument/didSave") {
         // Re-validate on save
-        std::string uri = message["params"]["textDocument"]["uri"].asString();
+        std::string uri = get(get(get(message, "params"), "textDocument"), "uri").asString();
         if (openDocuments.find(uri) != openDocuments.end()) {
             validateDocument(uri, openDocuments[uri]);
         }
     } else if (method == "textDocument/didClose") {
-        std::string uri = message["params"]["textDocument"]["uri"].asString();
+        std::string uri = get(get(get(message, "params"), "textDocument"), "uri").asString();
         openDocuments.erase(uri);
     } else if (method == "exit") {
         running = false;
@@ -145,61 +154,61 @@ void LSPServer::onInitialize(const Json::Value& params, const Json::Value& id) {
     Json::Value capabilities;
     Json::Value textDocumentSync;
     
-    textDocumentSync["openClose"] = true;
-    textDocumentSync["change"] = 1; // Full sync (TextDocumentSyncKind.Full = 1)
+    set(textDocumentSync, "openClose") = true;
+    set(textDocumentSync, "change") = 1; // Full sync (TextDocumentSyncKind.Full = 1)
     
-    capabilities["textDocumentSync"] = textDocumentSync;
-    capabilities["documentSymbolProvider"] = true;
+    set(capabilities, "textDocumentSync") = textDocumentSync;
+    set(capabilities, "documentSymbolProvider") = true;
     
     // Completion provider
     Json::Value completionProvider;
-    completionProvider["triggerCharacters"] = Json::arrayValue;
-    completionProvider["triggerCharacters"].append(".");
-    capabilities["completionProvider"] = completionProvider;
+    set(completionProvider, "triggerCharacters") = Json::arrayValue;
+    set(completionProvider, "triggerCharacters").append(".");
+    set(capabilities, "completionProvider") = completionProvider;
     
     // Hover provider
-    capabilities["hoverProvider"] = true;
+    set(capabilities, "hoverProvider") = true;
     
     // CodeLens provider (for Run button)
     Json::Value codeLensProvider;
-    codeLensProvider["resolveProvider"] = true;
-    capabilities["codeLensProvider"] = codeLensProvider;
+    set(codeLensProvider, "resolveProvider") = true;
+    set(capabilities, "codeLensProvider") = codeLensProvider;
     
     // Document formatting provider
-    capabilities["documentFormattingProvider"] = true;
+    set(capabilities, "documentFormattingProvider") = true;
     
-    result["capabilities"] = capabilities;
+    set(result, "capabilities") = capabilities;
     
     Json::Value response;
-    response["jsonrpc"] = "2.0";
-    response["id"] = id;
-    response["result"] = result;
+    set(response, "jsonrpc") = "2.0";
+    set(response, "id") = id;
+    set(response, "result") = result;
     
     sendJson(response);
 }
 
 void LSPServer::onShutdown(const Json::Value& id) {
     Json::Value response;
-    response["jsonrpc"] = "2.0";
-    response["id"] = id;
-    response["result"] = Json::Value(Json::nullValue);
+    set(response, "jsonrpc") = "2.0";
+    set(response, "id") = id;
+    set(response, "result") = Json::Value(Json::nullValue);
     
     sendJson(response);
 }
 
 void LSPServer::onTextDocumentDidOpen(const Json::Value& params) {
-    std::string uri = params["textDocument"]["uri"].asString();
-    std::string text = params["textDocument"]["text"].asString();
+    std::string uri = get(get(params, "textDocument"), "uri").asString();
+    std::string text = get(get(params, "textDocument"), "text").asString();
     
     openDocuments[uri] = text;
     validateDocument(uri, text);
 }
 
 void LSPServer::onTextDocumentDidChange(const Json::Value& params) {
-    std::string uri = params["textDocument"]["uri"].asString();
+    std::string uri = get(get(params, "textDocument"), "uri").asString();
     // Assuming Full sync for now
-    if (params["contentChanges"].size() > 0) {
-        std::string text = params["contentChanges"][0]["text"].asString();
+    if (get(params, "contentChanges").size() > 0) {
+        std::string text = get(get(params, "contentChanges")[0], "text").asString();
         openDocuments[uri] = text;
         validateDocument(uri, text);
     }
@@ -263,8 +272,7 @@ void LSPServer::validateDocument(const std::string& uri, const std::string& text
      // Additional validation for .ntsc files and safe {} blocks
      bool isNtscFile = (uri.find(".ntsc") != std::string::npos);
      
-     // Track safe block nesting
-     int safeBlockDepth = 0;
+     // Track which lines are inside safe {} blocks
      std::vector<bool> lineInSafeBlock(lines.size(), false);
      
      // First pass: identify which lines are inside safe {} blocks
@@ -371,24 +379,24 @@ void LSPServer::validateDocument(const std::string& uri, const std::string& text
 
 void LSPServer::publishDiagnostics(const std::string& uri, const std::vector<Diagnostic>& diagnostics) {
     Json::Value params;
-    params["uri"] = uri;
+    set(params, "uri") = uri;
     
     Json::Value diagArray = Json::arrayValue;
     for (const auto& d : diagnostics) {
         diagArray.append(d.toJson());
     }
-    params["diagnostics"] = diagArray;
+    set(params, "diagnostics") = diagArray;
     
     Json::Value notification;
-    notification["jsonrpc"] = "2.0";
-    notification["method"] = "textDocument/publishDiagnostics";
-    notification["params"] = params;
+    set(notification, "jsonrpc") = "2.0";
+    set(notification, "method") = "textDocument/publishDiagnostics";
+    set(notification, "params") = params;
     
     sendJson(notification);
 }
 
 void LSPServer::onDocumentSymbol(const Json::Value& params, const Json::Value& id) {
-    std::string uri = params["textDocument"]["uri"].asString();
+    std::string uri = get(get(params, "textDocument"), "uri").asString();
     Json::Value result = Json::arrayValue;
     
     if (openDocuments.find(uri) != openDocuments.end()) {
@@ -409,9 +417,9 @@ void LSPServer::onDocumentSymbol(const Json::Value& params, const Json::Value& i
     }
     
     Json::Value response;
-    response["jsonrpc"] = "2.0";
-    response["id"] = id;
-    response["result"] = result;
+    set(response, "jsonrpc") = "2.0";
+    set(response, "id") = id;
+    set(response, "result") = result;
     
     sendJson(response);
 }
@@ -425,36 +433,36 @@ void LSPServer::collectSymbols(const std::vector<std::unique_ptr<Stmt>>& stateme
         
         if (stmt->type == StmtType::FUNCTION) {
             const auto* func = static_cast<const FunctionStmt*>(stmt.get());
-            symbol["name"] = func->name.lexeme;
-            symbol["kind"] = 12; // Function
+            set(symbol, "name") = func->name.lexeme;
+            set(symbol, "kind") = 12; // Function
             int line = func->name.line > 0 ? func->name.line - 1 : 0;
             
             Json::Value range;
-            range["start"]["line"] = line;
-            range["start"]["character"] = 0;
-            range["end"]["line"] = line;
-            range["end"]["character"] = 10; // arbitrary
+            set(set(range, "start"), "line") = line;
+            set(set(range, "start"), "character") = 0;
+            set(set(range, "end"), "line") = line;
+            set(set(range, "end"), "character") = 10; // arbitrary
             
-            symbol["location"]["uri"] = "";
+            set(set(symbol, "location"), "uri") = "";
             
-            symbol["range"] = range;
-            symbol["selectionRange"] = range;
+            set(symbol, "range") = range;
+            set(symbol, "selectionRange") = range;
             
             isSymbol = true;
         } else if (stmt->type == StmtType::CLASS) {
             const auto* cls = static_cast<const ClassStmt*>(stmt.get());
-            symbol["name"] = cls->name.lexeme;
-            symbol["kind"] = 5; // Class
+            set(symbol, "name") = cls->name.lexeme;
+            set(symbol, "kind") = 5; // Class
             int line = cls->name.line > 0 ? cls->name.line - 1 : 0;
             
             Json::Value range;
-            range["start"]["line"] = line;
-            range["start"]["character"] = 0;
-            range["end"]["line"] = line;
-            range["end"]["character"] = 10; 
+            set(set(range, "start"), "line") = line;
+            set(set(range, "start"), "character") = 0;
+            set(set(range, "end"), "line") = line;
+            set(set(range, "end"), "character") = 10; 
             
-            symbol["range"] = range;
-            symbol["selectionRange"] = range;
+            set(symbol, "range") = range;
+            set(symbol, "selectionRange") = range;
             
             isSymbol = true;
         }
@@ -468,9 +476,9 @@ void LSPServer::collectSymbols(const std::vector<std::unique_ptr<Stmt>>& stateme
 void LSPServer::onCompletion(const Json::Value& params, const Json::Value& id) {
     Json::Value result = Json::arrayValue;
     
-    std::string uri = params["textDocument"]["uri"].asString();
-    int line = params["position"]["line"].asInt();
-    int character = params["position"]["character"].asInt();
+    std::string uri = get(get(params, "textDocument"), "uri").asString();
+    int line = get(get(params, "position"), "line").asInt();
+    int character = get(get(params, "position"), "character").asInt();
     
     std::string documentText;
     std::string currentLine;
@@ -578,11 +586,11 @@ void LSPServer::onCompletion(const Json::Value& params, const Json::Value& id) {
                 if (modulePrefix == mod.name) {
                     for (const auto& func : mod.funcs) {
                         Json::Value item;
-                        item["label"] = func.first;
-                        item["kind"] = 3; // Function
-                        item["detail"] = func.second;
-                        item["insertText"] = std::string(func.first) + "($1)";
-                        item["insertTextFormat"] = 2; // Snippet
+                        set(item, "label") = func.first;
+                        set(item, "kind") = 3; // Function
+                        set(item, "detail") = func.second;
+                        set(item, "insertText") = std::string(func.first) + "($1)";
+                        set(item, "insertTextFormat") = 2; // Snippet
                         result.append(item);
                     }
                     break;
@@ -591,9 +599,9 @@ void LSPServer::onCompletion(const Json::Value& params, const Json::Value& id) {
         }
         
         Json::Value response;
-        response["jsonrpc"] = "2.0";
-        response["id"] = id;
-        response["result"] = result;
+        set(response, "jsonrpc") = "2.0";
+        set(response, "id") = id;
+        set(response, "result") = result;
         sendJson(response);
         return;
     }
@@ -610,9 +618,9 @@ void LSPServer::onCompletion(const Json::Value& params, const Json::Value& id) {
     };
     for (const char* kw : keywords) {
         Json::Value item;
-        item["label"] = kw;
-        item["kind"] = 14; // Keyword
-        item["detail"] = "keyword";
+        set(item, "label") = kw;
+        set(item, "kind") = 14; // Keyword
+        set(item, "detail") = "keyword";
         result.append(item);
     }
     
@@ -620,9 +628,9 @@ void LSPServer::onCompletion(const Json::Value& params, const Json::Value& id) {
     const char* types[] = {"int", "float", "string", "bool", "array", "object", "any"};
     for (const char* t : types) {
         Json::Value item;
-        item["label"] = t;
-        item["kind"] = 25; // Type parameter
-        item["detail"] = "type";
+        set(item, "label") = t;
+        set(item, "kind") = 25; // Type parameter
+        set(item, "detail") = "type";
         result.append(item);
     }
     
@@ -630,19 +638,19 @@ void LSPServer::onCompletion(const Json::Value& params, const Json::Value& id) {
     const char* modules[] = {"sys", "json", "math", "fmt", "arrays", "time", "http", "regex", "async", "process"};
     for (const char* m : modules) {
         Json::Value item;
-        item["label"] = m;
-        item["kind"] = 9; // Module
-        item["detail"] = "module";
+        set(item, "label") = m;
+        set(item, "kind") = 9; // Module
+        set(item, "detail") = "module";
         result.append(item);
     }
     
     // Built-in function
     Json::Value sayItem;
-    sayItem["label"] = "say";
-    sayItem["kind"] = 3; // Function
-    sayItem["detail"] = "Print to console";
-    sayItem["insertText"] = "say($1)";
-    sayItem["insertTextFormat"] = 2; // Snippet
+    set(sayItem, "label") = "say";
+    set(sayItem, "kind") = 3; // Function
+    set(sayItem, "detail") = "Print to console";
+    set(sayItem, "insertText") = "say($1)";
+    set(sayItem, "insertTextFormat") = 2; // Snippet
     result.append(sayItem);
     
     // Check if we're in a safe context (inside safe{} block or .ntsc file)
@@ -662,41 +670,41 @@ void LSPServer::onCompletion(const Json::Value& params, const Json::Value& id) {
         const char* typeNames[] = {"int", "float", "string", "bool", "array", "object", "any"};
         for (const char* t : typeNames) {
             Json::Value item;
-            item["label"] = std::string("var ") + t;
-            item["kind"] = 15; // Snippet
-            item["detail"] = "Typed variable declaration";
-            item["insertText"] = std::string("var ") + t + " ${1:name} = ${2:value};";
-            item["insertTextFormat"] = 2; // Snippet
+            set(item, "label") = std::string("var ") + t;
+            set(item, "kind") = 15; // Snippet
+            set(item, "detail") = "Typed variable declaration";
+            set(item, "insertText") = std::string("var ") + t + " ${1:name} = ${2:value};";
+            set(item, "insertTextFormat") = 2; // Snippet
             result.append(item);
         }
         
         // Typed function with return type
         Json::Value typedFun;
-        typedFun["label"] = "fun (typed)";
-        typedFun["kind"] = 15; // Snippet
-        typedFun["detail"] = "Function with type annotations";
-        typedFun["insertText"] = "fun ${1:name}(${2:type} ${3:param}) -> ${4:returnType} {\n\t$0\n}";
-        typedFun["insertTextFormat"] = 2;
+        set(typedFun, "label") = "fun (typed)";
+        set(typedFun, "kind") = 15; // Snippet
+        set(typedFun, "detail") = "Function with type annotations";
+        set(typedFun, "insertText") = "fun ${1:name}(${2:type} ${3:param}) -> ${4:returnType} {\n\t$0\n}";
+        set(typedFun, "insertTextFormat") = 2;
         result.append(typedFun);
         
         // Typed class
         Json::Value typedClass;
-        typedClass["label"] = "class (typed)";
-        typedClass["kind"] = 15; // Snippet
-        typedClass["detail"] = "Class with type annotations";
-        typedClass["insertText"] = "class ${1:Name} {\n\tvar ${2:type} ${3:field};\n\t\n\tfun init(${4:type} ${5:param}) -> int {\n\t\tthis.${3:field} = ${5:param};\n\t\treturn 0;\n\t}\n}";
-        typedClass["insertTextFormat"] = 2;
+        set(typedClass, "label") = "class (typed)";
+        set(typedClass, "kind") = 15; // Snippet
+        set(typedClass, "detail") = "Class with type annotations";
+        set(typedClass, "insertText") = "class ${1:Name} {\n\tvar ${2:type} ${3:field};\n\t\n\tfun init(${4:type} ${5:param}) -> int {\n\t\tthis.${3:field} = ${5:param};\n\t\treturn 0;\n\t}\n}";
+        set(typedClass, "insertTextFormat") = 2;
         result.append(typedClass);
     }
     
     // Safe block snippet
     Json::Value safeBlock;
-    safeBlock["label"] = "safe";
-    safeBlock["kind"] = 15; // Snippet
-    safeBlock["detail"] = "Type-safe code block";
-    safeBlock["documentation"] = "Enforces type annotations on all variables, functions, and classes within the block";
-    safeBlock["insertText"] = "safe {\n\t$0\n}";
-    safeBlock["insertTextFormat"] = 2;
+    set(safeBlock, "label") = "safe";
+    set(safeBlock, "kind") = 15; // Snippet
+    set(safeBlock, "detail") = "Type-safe code block";
+    set(safeBlock, "documentation") = "Enforces type annotations on all variables, functions, and classes within the block";
+    set(safeBlock, "insertText") = "safe {\n\t$0\n}";
+    set(safeBlock, "insertTextFormat") = 2;
     result.append(safeBlock);
     
     // Only suggest module functions for imported modules
@@ -704,28 +712,28 @@ void LSPServer::onCompletion(const Json::Value& params, const Json::Value& id) {
         if (importedModules.count(mod.name)) {
             for (const auto& func : mod.funcs) {
                 Json::Value item;
-                item["label"] = std::string(mod.name) + "." + func.first;
-                item["kind"] = 3; // Function
-                item["detail"] = func.second;
-                item["insertText"] = std::string(mod.name) + "." + func.first + "($1)";
-                item["insertTextFormat"] = 2; // Snippet
+                set(item, "label") = std::string(mod.name) + "." + func.first;
+                set(item, "kind") = 3; // Function
+                set(item, "detail") = func.second;
+                set(item, "insertText") = std::string(mod.name) + "." + func.first + "($1)";
+                set(item, "insertTextFormat") = 2; // Snippet
                 result.append(item);
             }
         }
     }
 
     Json::Value response;
-    response["jsonrpc"] = "2.0";
-    response["id"] = id;
-    response["result"] = result;
+    set(response, "jsonrpc") = "2.0";
+    set(response, "id") = id;
+    set(response, "result") = result;
     
     sendJson(response);
 }
 
 void LSPServer::onHover(const Json::Value& params, const Json::Value& id) {
-    std::string uri = params["textDocument"]["uri"].asString();
-    int line = params["position"]["line"].asInt();
-    int character = params["position"]["character"].asInt();
+    std::string uri = get(get(params, "textDocument"), "uri").asString();
+    int line = get(get(params, "position"), "line").asInt();
+    int character = get(get(params, "position"), "character").asInt();
     
     Json::Value result = Json::nullValue;
     
@@ -803,23 +811,23 @@ void LSPServer::onHover(const Json::Value& params, const Json::Value& id) {
             
             if (!doc.empty()) {
                 Json::Value contents;
-                contents["kind"] = "markdown";
-                contents["value"] = doc;
-                result["contents"] = contents;
+                set(contents, "kind") = "markdown";
+                set(contents, "value") = doc;
+                set(result, "contents") = contents;
             }
         }
     }
     
     Json::Value response;
-    response["jsonrpc"] = "2.0";
-    response["id"] = id;
-    response["result"] = result;
+    set(response, "jsonrpc") = "2.0";
+    set(response, "id") = id;
+    set(response, "result") = result;
     
     sendJson(response);
 }
 
 void LSPServer::onCodeLens(const Json::Value& params, const Json::Value& id) {
-    std::string uri = params["textDocument"]["uri"].asString();
+    std::string uri = get(get(params, "textDocument"), "uri").asString();
     Json::Value result = Json::arrayValue;
     
     // Add "Run" button at the top of the file
@@ -827,35 +835,35 @@ void LSPServer::onCodeLens(const Json::Value& params, const Json::Value& id) {
     Json::Value runRange;
     Json::Value startPos, endPos;
     
-    startPos["line"] = 0;
-    startPos["character"] = 0;
-    endPos["line"] = 0;
-    endPos["character"] = 0;
-    runRange["start"] = startPos;
-    runRange["end"] = endPos;
+    set(startPos, "line") = 0;
+    set(startPos, "character") = 0;
+    set(endPos, "line") = 0;
+    set(endPos, "character") = 0;
+    set(runRange, "start") = startPos;
+    set(runRange, "end") = endPos;
     
-    runLens["range"] = runRange;
+    set(runLens, "range") = runRange;
     
     // Command to run the file
     Json::Value runCommand;
-    runCommand["title"] = "▶ Run";
-    runCommand["command"] = "neutron.runFile";
-    runCommand["arguments"] = Json::arrayValue;
-    runCommand["arguments"].append(uri);
-    runLens["command"] = runCommand;
+    set(runCommand, "title") = "▶ Run";
+    set(runCommand, "command") = "neutron.runFile";
+    set(runCommand, "arguments") = Json::arrayValue;
+    get(runCommand, "arguments").append(uri);
+    set(runLens, "command") = runCommand;
     
     result.append(runLens);
     
     // Add "Format" button
     Json::Value formatLens;
-    formatLens["range"] = runRange;
+    set(formatLens, "range") = runRange;
     
     Json::Value formatCommand;
-    formatCommand["title"] = "⚙ Format";
-    formatCommand["command"] = "neutron.formatFile";
-    formatCommand["arguments"] = Json::arrayValue;
-    formatCommand["arguments"].append(uri);
-    formatLens["command"] = formatCommand;
+    set(formatCommand, "title") = "⚙ Format";
+    set(formatCommand, "command") = "neutron.formatFile";
+    set(formatCommand, "arguments") = Json::arrayValue;
+    get(formatCommand, "arguments").append(uri);
+    set(formatLens, "command") = formatCommand;
     
     result.append(formatLens);
     
@@ -882,21 +890,21 @@ void LSPServer::onCodeLens(const Json::Value& params, const Json::Value& id) {
                 Json::Value mainRange;
                 Json::Value mainStart, mainEnd;
                 
-                mainStart["line"] = lineNum;
-                mainStart["character"] = 0;
-                mainEnd["line"] = lineNum;
-                mainEnd["character"] = 0;
-                mainRange["start"] = mainStart;
-                mainRange["end"] = mainEnd;
+                set(mainStart, "line") = lineNum;
+                set(mainStart, "character") = 0;
+                set(mainEnd, "line") = lineNum;
+                set(mainEnd, "character") = 0;
+                set(mainRange, "start") = mainStart;
+                set(mainRange, "end") = mainEnd;
                 
-                mainLens["range"] = mainRange;
+                set(mainLens, "range") = mainRange;
                 
                 Json::Value mainCommand;
-                mainCommand["title"] = "▶ Run main()";
-                mainCommand["command"] = "neutron.runFile";
-                mainCommand["arguments"] = Json::arrayValue;
-                mainCommand["arguments"].append(uri);
-                mainLens["command"] = mainCommand;
+                set(mainCommand, "title") = "▶ Run main()";
+                set(mainCommand, "command") = "neutron.runFile";
+                set(mainCommand, "arguments") = Json::arrayValue;
+                get(mainCommand, "arguments").append(uri);
+                set(mainLens, "command") = mainCommand;
                 
                 result.append(mainLens);
             }
@@ -906,9 +914,9 @@ void LSPServer::onCodeLens(const Json::Value& params, const Json::Value& id) {
     }
     
     Json::Value response;
-    response["jsonrpc"] = "2.0";
-    response["id"] = id;
-    response["result"] = result;
+    set(response, "jsonrpc") = "2.0";
+    set(response, "id") = id;
+    set(response, "result") = result;
     
     sendJson(response);
 }
@@ -916,15 +924,15 @@ void LSPServer::onCodeLens(const Json::Value& params, const Json::Value& id) {
 void LSPServer::onCodeLensResolve(const Json::Value& params, const Json::Value& id) {
     // CodeLens is already resolved, just return it
     Json::Value response;
-    response["jsonrpc"] = "2.0";
-    response["id"] = id;
-    response["result"] = params;
+    set(response, "jsonrpc") = "2.0";
+    set(response, "id") = id;
+    set(response, "result") = params;
     
     sendJson(response);
 }
 
 void LSPServer::onFormatting(const Json::Value& params, const Json::Value& id) {
-    std::string uri = params["textDocument"]["uri"].asString();
+    std::string uri = get(get(params, "textDocument"), "uri").asString();
     Json::Value result = Json::arrayValue;
     
     if (openDocuments.find(uri) != openDocuments.end()) {
@@ -993,24 +1001,24 @@ void LSPServer::onFormatting(const Json::Value& params, const Json::Value& id) {
         Json::Value range;
         Json::Value startPos, endPos;
         
-        startPos["line"] = 0;
-        startPos["character"] = 0;
-        endPos["line"] = (int)lines.size();
-        endPos["character"] = 0;
+        set(startPos, "line") = 0;
+        set(startPos, "character") = 0;
+        set(endPos, "line") = (int)lines.size();
+        set(endPos, "character") = 0;
         
-        range["start"] = startPos;
-        range["end"] = endPos;
+        set(range, "start") = startPos;
+        set(range, "end") = endPos;
         
-        edit["range"] = range;
-        edit["newText"] = newText;
+        set(edit, "range") = range;
+        set(edit, "newText") = newText;
         
         result.append(edit);
     }
     
     Json::Value response;
-    response["jsonrpc"] = "2.0";
-    response["id"] = id;
-    response["result"] = result;
+    set(response, "jsonrpc") = "2.0";
+    set(response, "id") = id;
+    set(response, "result") = result;
     
     sendJson(response);
 }
