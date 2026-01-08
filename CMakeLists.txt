@@ -16,6 +16,9 @@ elseif(UNIX)
     add_definitions(-DNEUTRON_LINUX)
 endif()
 
+# Fix macOS linker issue with jsoncpp (vcpkg binary missing string_view symbols)
+add_compile_definitions(JSONCPP_HAS_STRING_VIEW=0 JSON_HAS_STRING_VIEW=0)
+
 # =============================================================================
 # Build Options
 # =============================================================================
