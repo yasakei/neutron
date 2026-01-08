@@ -849,7 +849,7 @@ void LSPServer::onCodeLens(const Json::Value& params, const Json::Value& id) {
     set(runCommand, "title") = "▶ Run";
     set(runCommand, "command") = "neutron.runFile";
     set(runCommand, "arguments") = Json::arrayValue;
-    get(runCommand, "arguments").append(uri);
+    set(runCommand, "arguments").append(uri);
     set(runLens, "command") = runCommand;
     
     result.append(runLens);
@@ -862,7 +862,7 @@ void LSPServer::onCodeLens(const Json::Value& params, const Json::Value& id) {
     set(formatCommand, "title") = "⚙ Format";
     set(formatCommand, "command") = "neutron.formatFile";
     set(formatCommand, "arguments") = Json::arrayValue;
-    get(formatCommand, "arguments").append(uri);
+    set(formatCommand, "arguments").append(uri);
     set(formatLens, "command") = formatCommand;
     
     result.append(formatLens);
@@ -903,7 +903,7 @@ void LSPServer::onCodeLens(const Json::Value& params, const Json::Value& id) {
                 set(mainCommand, "title") = "▶ Run main()";
                 set(mainCommand, "command") = "neutron.runFile";
                 set(mainCommand, "arguments") = Json::arrayValue;
-                get(mainCommand, "arguments").append(uri);
+                set(mainCommand, "arguments").append(uri);
                 set(mainLens, "command") = mainCommand;
                 
                 result.append(mainLens);
