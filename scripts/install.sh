@@ -98,6 +98,10 @@ if [ ! -f "./box" ]; then
     exit 1
 fi
 
+if [ ! -f "./neutron-lsp" ]; then
+    echo "Warning: neutron-lsp binary not found in current directory"
+fi
+
 if [ ! -d "./include" ]; then
     echo "Include directory not found in current directory"
     exit 1
@@ -118,6 +122,10 @@ sudo mkdir -p "$SHARE_DIR/neutron"
 echo "Installing binaries..."
 sudo cp "./neutron" "$BIN_DIR/"
 sudo cp "./box" "$BIN_DIR/"
+if [ -f "./neutron-lsp" ]; then
+    echo "Installing neutron-lsp..."
+    sudo cp "./neutron-lsp" "$BIN_DIR/"
+fi
 
 # Install include files
 echo "Installing header files..."
@@ -189,6 +197,9 @@ echo "Installation completed successfully!"
 echo ""
 echo "Components installed:"
 echo "  Executables: $BIN_DIR/neutron, $BIN_DIR/box"
+if [ -f "$BIN_DIR/neutron-lsp" ]; then
+    echo "  LSP Server: $BIN_DIR/neutron-lsp"
+fi
 echo "  Headers: $INCLUDE_DIR/"
 echo "  Libraries: $LIB_DIR/libneutron_runtime.*"
 if [ -d "$BIN_DIR/nt-box" ]; then
@@ -200,4 +211,7 @@ echo ""
 echo "To verify installation:"
 echo "  neutron --version"
 echo "  box --version"
+if [ -f "$BIN_DIR/neutron-lsp" ]; then
+    echo "  neutron-lsp --version"
+fi
 echo ""

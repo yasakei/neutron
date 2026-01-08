@@ -17,6 +17,7 @@
 namespace neutron {
 
 // Initialize static members
+ErrorHandler::ErrorCallback ErrorHandler::errorCallback = nullptr;
 bool ErrorHandler::useColor = true;
 bool ErrorHandler::showStackTrace = true;
 std::string* ErrorHandler::currentFileName = new std::string("");
@@ -51,6 +52,10 @@ static bool isTerminalColorSupported() {
 #else
     return ISATTY(FILENO(stderr));
 #endif
+}
+
+void ErrorHandler::setErrorCallback(ErrorCallback callback) {
+    errorCallback = callback;
 }
 
 void ErrorHandler::setColorEnabled(bool enabled) {
@@ -319,6 +324,11 @@ void ErrorHandler::reportError(const ErrorInfo& error) {
     hasError = true;
     errorCount++;
     
+    if (errorCallback) {
+        errorCallback(error);
+        return;
+    }
+
     // If we've exceeded the detailed error limit, just print a compact message
     if (errorCount > MAX_DETAILED_ERRORS) {
         std::ostringstream oss;

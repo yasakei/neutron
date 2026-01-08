@@ -5,10 +5,13 @@ obj/
 out/
 box-modules/
 vcpkg_installed/
+node_modules/
 
 # Compiled binaries and libraries
 neutronc
 /neutron
+/box
+*.vsix
 *.exe
 *.dll
 *.so
@@ -117,3 +120,18 @@ neutron-*.rar
 
 # Snaps
 *.snap
+
+# VS Code Extension build artifacts
+vscode-extension/out/
+vscode-extension/node_modules/
+vscode-extension/*.vsix
+
+# Test files
+test.nt
+test.ntsc
+test.quark
+test_*.py
+
+# CMake generated files
+CTestTestfile.cmake
+Testing/

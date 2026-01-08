@@ -65,6 +65,7 @@ Section "Neutron Core" SecNeutron
   ; Core executables
   File "neutron.exe"
   File "box.exe"
+  File /nonfatal "neutron-lsp.exe"
   
   ; Shared runtime DLL (required for native modules)
   File "neutron_shared.dll"
@@ -254,8 +255,10 @@ Section "Uninstall"
   Delete "$INSTDIR\Uninstall.exe"
   Delete "$INSTDIR\neutron.exe"
   Delete "$INSTDIR\box.exe"
+  Delete "$INSTDIR\neutron-lsp.exe"
   Delete "$INSTDIR\setup-msvc.bat"
   Delete "$INSTDIR\*.dll"
+  Delete "$INSTDIR\*.lib"
   Delete "$INSTDIR\LICENSE"
   Delete "$INSTDIR\README.md"
   

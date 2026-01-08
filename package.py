@@ -659,6 +659,7 @@ def main():
     # Binaries check
     neutron_exe = "neutron.exe" if os_type == "windows" else "neutron"
     box_exe = "box.exe" if os_type == "windows" else "box"
+    lsp_exe = "neutron-lsp.exe" if os_type == "windows" else "neutron-lsp"
 
     # On Windows with MSVC, binaries might be in Release/ subdirectory
     neutron_bin_paths = [
@@ -673,10 +674,17 @@ def main():
         os.path.join(box_build_dir, "Debug", box_exe)
     ]
 
+    lsp_bin_paths = [
+        os.path.join(build_dir, lsp_exe),
+        os.path.join(build_dir, "Release", lsp_exe),
+        os.path.join(build_dir, "Debug", lsp_exe)
+    ]
+
     # Check if we need to build
     need_build = True
     real_neutron_path = None
     real_box_path = None
+    real_lsp_path = None
 
     for p in neutron_bin_paths:
         if os.path.exists(p):
@@ -687,9 +695,14 @@ def main():
         if os.path.exists(p):
             real_box_path = p
             break
+            
+    for p in lsp_bin_paths:
+        if os.path.exists(p):
+            real_lsp_path = p
+            break
 
     # Always build to ensure latest version
-    Colors.print("Building Neutron and Box executables...", Colors.YELLOW)
+    Colors.print("Building Neutron, Box, and LSP executables...", Colors.YELLOW)
 
     # Preflight checks on Windows to catch common vcpkg/tooling problems before we start
     if os_type == 'windows' and not args.skip_vcpkg:
@@ -749,6 +762,20 @@ def main():
             if os.path.exists(p):
                 real_box_path = p
                 break
+                
+    if not real_lsp_path:
+        # Check standard locations or try to build
+        # We try to build it now if we can't find it
+        if os.path.exists(build_dir):
+             Colors.print("Attempting to build neutron-lsp target...", Colors.BLUE)
+             cmake_exe = get_cmake_command()
+             build_config = "Debug" if args.debug else "Release"
+             subprocess.call([cmake_exe, "--build", build_dir, "--target", "neutron-lsp", "--config", build_config])
+             # Check again
+             for p in lsp_bin_paths:
+                if os.path.exists(p):
+                    real_lsp_path = p
+                    break
 
     # Check if both builds were successful and binaries exist
     if not real_neutron_path and not real_box_path:
@@ -760,6 +787,8 @@ def main():
         Colors.print("Warning: neutron executable not found; installer may not include runtime files.", Colors.YELLOW)
     if not real_box_path:
         Colors.print("Warning: box executable not found; some packaging actions may be skipped.", Colors.YELLOW)
+    if not real_lsp_path:
+        Colors.print("Warning: neutron-lsp executable not found.", Colors.YELLOW)
 
     # Verify executables work (optional test)
     if real_neutron_path and os.path.exists(real_neutron_path):
@@ -798,6 +827,28 @@ def main():
         shutil.copy2(real_box_path, target_name)
     else:
         Colors.print("Skipping copy of box executable (not found).", Colors.YELLOW)
+    
+    # Copy executables
+    def format_bin_dst(name):
+        return os.path.join(target_name, name)
+
+    if real_neutron_path and os.path.exists(real_neutron_path):
+        shutil.copy2(real_neutron_path, format_bin_dst(neutron_exe))
+        # On Linux/macOS, chmod +x
+        if os_type != "windows":
+            os.chmod(format_bin_dst(neutron_exe), 0o755)
+            
+    if real_box_path and os.path.exists(real_box_path):
+        shutil.copy2(real_box_path, format_bin_dst(box_exe))
+        # On Linux/macOS, chmod +x
+        if os_type != "windows":
+            os.chmod(format_bin_dst(box_exe), 0o755)
+            
+    if real_lsp_path and os.path.exists(real_lsp_path):
+        shutil.copy2(real_lsp_path, format_bin_dst(lsp_exe))
+        # On Linux/macOS, chmod +x
+        if os_type != "windows":
+            os.chmod(format_bin_dst(lsp_exe), 0o755)
     
     # Create lib directory and copy runtime library
     lib_dir = os.path.join(target_name, "lib")
@@ -869,6 +920,33 @@ def main():
             # Make it executable
             os.chmod(os.path.join(target_name, "install.sh"), 0o755)
             Colors.print("Added install.sh script", Colors.GREEN)
+            
+    # Build VS Code Extension
+    extension_dir = os.path.join(root_dir, "vscode-extension")
+    if os.path.exists(extension_dir) and os.path.exists(os.path.join(extension_dir, "package.json")):
+        Colors.print("Building VS Code Extension...", Colors.BLUE)
+        
+        # Check for npm
+        npm_cmd = shutil.which("npm")
+        if npm_cmd:
+            try:
+                # Install dependencies
+                run_command([npm_cmd, "install"], cwd=extension_dir, fail_exit=False)
+                # Compile
+                run_command([npm_cmd, "run", "compile"], cwd=extension_dir, fail_exit=False)
+                # Package
+                # We need vsce, which is in devDependencies now, so we can run via npx or npm run package
+                # But 'npm run package' calls 'vsce package'. 
+                run_command([npm_cmd, "run", "package"], cwd=extension_dir, fail_exit=False)
+                
+                # Copy .vsix to output
+                for vsix in glob.glob(os.path.join(extension_dir, "*.vsix")):
+                     shutil.copy2(vsix, target_name)
+                     Colors.print(f"Copied {os.path.basename(vsix)} to package", Colors.GREEN)
+            except Exception as e:
+                Colors.print(f"Failed to build VS Code extension: {e}", Colors.YELLOW)
+        else:
+            Colors.print("npm not found, skipping VS Code extension build", Colors.YELLOW)
 
     # Version check (only if neutron executable present)
     version = "unknown"
@@ -930,6 +1008,12 @@ def main():
              Colors.print(f"Copied {real_box_path} to root", Colors.GREEN)
          else:
              Colors.print("WARNING: box executable not present; installer will not include it.", Colors.YELLOW)
+             
+         if real_lsp_path and os.path.exists(real_lsp_path):
+             shutil.copy2(real_lsp_path, root_dir)
+             Colors.print(f"Copied {real_lsp_path} to root", Colors.GREEN)
+         else:
+             Colors.print("WARNING: lsp executable not present; installer will not include it.", Colors.YELLOW)
          
          # Copy DLLs (needed for vcpkg dynamic linking)
          dll_count = 0

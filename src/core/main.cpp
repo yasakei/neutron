@@ -36,6 +36,7 @@
 #include "project/project_config.h"
 #include "project/project_builder.h"
 #include "platform/platform.h"
+#include "formatter.h"
 void runFile(const std::string& path, neutron::VM& vm);
 void runPrompt(neutron::VM& vm);
 
@@ -296,6 +297,100 @@ int main(int argc, char* argv[]) {
                 std::cerr << "Error: Unknown package: " << package << std::endl;
                 std::cerr << "Available packages: box" << std::endl;
                 return 1;
+            }
+        }
+        
+        // Format command
+        else if (arg == "fmt") {
+            if (argc < 3) {
+                std::cerr << "Usage: neutron fmt <file.nt> [--check]" << std::endl;
+                std::cerr << "       neutron fmt <directory> [--check]" << std::endl;
+                std::cerr << std::endl;
+                std::cerr << "Options:" << std::endl;
+                std::cerr << "  --check    Check if files are formatted (don't modify)" << std::endl;
+                std::cerr << "  --indent N Set indent size (default: 4)" << std::endl;
+                std::cerr << "  --tabs     Use tabs instead of spaces" << std::endl;
+                return 1;
+            }
+            
+            bool checkOnly = false;
+            neutron::Formatter::Options fmtOptions;
+            std::vector<std::string> targets;
+            
+            // Parse arguments
+            for (int i = 2; i < argc; i++) {
+                std::string fmtArg = argv[i];
+                if (fmtArg == "--check") {
+                    checkOnly = true;
+                } else if (fmtArg == "--tabs") {
+                    fmtOptions.useSpaces = false;
+                } else if (fmtArg == "--indent" && i + 1 < argc) {
+                    fmtOptions.indentSize = std::stoi(argv[++i]);
+                } else if (fmtArg[0] != '-') {
+                    targets.push_back(fmtArg);
+                }
+            }
+            
+            if (targets.empty()) {
+                std::cerr << "Error: No files specified" << std::endl;
+                return 1;
+            }
+            
+            int errorCount = 0;
+            int fileCount = 0;
+            
+            for (const auto& target : targets) {
+                if (std::filesystem::is_directory(target)) {
+                    // Format all .nt files in directory recursively
+                    for (const auto& entry : std::filesystem::recursive_directory_iterator(target)) {
+                        if (entry.is_regular_file()) {
+                            std::string ext = entry.path().extension().string();
+                            if (ext == ".nt" || ext == ".ntsc") {
+                                std::string filePath = entry.path().string();
+                                fileCount++;
+                                
+                                if (checkOnly) {
+                                    if (!neutron::Formatter::checkFormat(filePath, fmtOptions)) {
+                                        std::cout << "Would format: " << filePath << std::endl;
+                                        errorCount++;
+                                    }
+                                } else {
+                                    std::cout << "Formatting: " << filePath << std::endl;
+                                    if (!neutron::Formatter::formatFile(filePath, fmtOptions)) {
+                                        errorCount++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Format single file
+                    fileCount++;
+                    if (checkOnly) {
+                        if (!neutron::Formatter::checkFormat(target, fmtOptions)) {
+                            std::cout << "Would format: " << target << std::endl;
+                            errorCount++;
+                        }
+                    } else {
+                        std::cout << "Formatting: " << target << std::endl;
+                        if (!neutron::Formatter::formatFile(target, fmtOptions)) {
+                            errorCount++;
+                        }
+                    }
+                }
+            }
+            
+            if (checkOnly) {
+                if (errorCount > 0) {
+                    std::cout << "\n" << errorCount << " file(s) would be formatted." << std::endl;
+                    return 1;
+                } else {
+                    std::cout << "All " << fileCount << " file(s) are properly formatted." << std::endl;
+                    return 0;
+                }
+            } else {
+                std::cout << "\nFormatted " << fileCount << " file(s)." << std::endl;
+                return errorCount > 0 ? 1 : 0;
             }
         }
         

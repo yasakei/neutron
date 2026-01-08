@@ -220,6 +220,46 @@ jobs:
         path: neutron-windows-x64.zip
         retention-days: 7
 
+  build-vscode-extension:
+    name: Build VS Code Extension
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Install dependencies
+      working-directory: vscode-extension
+      run: npm ci
+      
+    - name: Compile TypeScript
+      working-directory: vscode-extension
+      run: npm run compile
+      
+    - name: Package Extension
+      working-directory: vscode-extension
+      run: |
+        npm install -g @vscode/vsce
+        vsce package --no-dependencies
+        
+    - name: Verify VSIX created
+      working-directory: vscode-extension
+      run: |
+        ls -lh *.vsix
+        echo "VS Code extension packaged successfully"
+        
+    - name: Upload Extension Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: vscode-extension
+        path: vscode-extension/*.vsix
+        retention-days: 7
+
   benchmark-summary:
     name: Performance Summary
     runs-on: ubuntu-latest
@@ -275,7 +315,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [build-linux, build-macos-universal, build-windows-msvc]
+    needs: [build-linux, build-macos-universal, build-windows-msvc, build-vscode-extension]
     if: always()
     
     steps:
@@ -285,10 +325,12 @@ jobs:
         echo "Linux: ${{ needs.build-linux.result }}"
         echo "macOS Universal: ${{ needs.build-macos-universal.result }}"
         echo "Windows: ${{ needs.build-windows-msvc.result }}"
+        echo "VS Code Extension: ${{ needs.build-vscode-extension.result }}"
         
     - name: Fail if any build failed
       if: |
         needs.build-linux.result != 'success' || 
         needs.build-macos-universal.result != 'success' || 
-        needs.build-windows-msvc.result != 'success'
+        needs.build-windows-msvc.result != 'success' ||
+        needs.build-vscode-extension.result != 'success'
       run: exit 1
