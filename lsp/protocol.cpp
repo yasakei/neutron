@@ -3,19 +3,10 @@
 namespace neutron {
 namespace lsp {
 
-// Helper to safely set JSON values (force const char* overload)
-static inline Json::Value& pset(Json::Value& v, const char* key) {
-    return v[key];
-}
-
-static inline const Json::Value& pget(const Json::Value& v, const char* key) {
-    return v[key];
-}
-
 Json::Value Position::toJson() const {
     Json::Value json;
-    pset(json, "line") = line;
-    pset(json, "character") = character;
+    json[std::string("line")] = line;
+    json[std::string("character")] = character;
     return json;
 }
 
@@ -28,24 +19,24 @@ Position Position::fromJson(const Json::Value& json) {
 
 Json::Value Range::toJson() const {
     Json::Value json;
-    pset(json, "start") = start.toJson();
-    pset(json, "end") = end.toJson();
+    json[std::string("start")] = start.toJson();
+    json[std::string("end")] = end.toJson();
     return json;
 }
 
 Range Range::fromJson(const Json::Value& json) {
     return {
-        Position::fromJson(pget(json, "start")),
-        Position::fromJson(pget(json, "end"))
+        Position::fromJson(json[std::string("start")]),
+        Position::fromJson(json[std::string("end")])
     };
 }
 
 Json::Value Diagnostic::toJson() const {
     Json::Value json;
-    pset(json, "range") = range.toJson();
-    pset(json, "severity") = static_cast<int>(severity);
-    pset(json, "message") = message;
-    pset(json, "source") = source;
+    json[std::string("range")] = range.toJson();
+    json[std::string("severity")] = static_cast<int>(severity);
+    json[std::string("message")] = message;
+    json[std::string("source")] = source;
     return json;
 }
 

@@ -8,18 +8,17 @@
 namespace neutron {
 namespace lsp {
 
-// Helper to safely access JSON values
-// Force const char* overload to avoid string_view issues
+// Helper to safely access JSON values using std::string to avoid string_view issues
 static inline bool has(const Json::Value& v, const char* key) {
-    return v.isMember(key);
+    return v.isMember(std::string(key));
 }
 
 static inline const Json::Value& get(const Json::Value& v, const char* key) {
-    return v[key];
+    return v[std::string(key)];
 }
 
 static inline Json::Value& set(Json::Value& v, const char* key) {
-    return v[key];
+    return v[std::string(key)];
 }
 
 LSPServer::LSPServer() : running(true) {}
