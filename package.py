@@ -640,13 +640,219 @@ def build_box(os_type, arch_type, build_dir="nt-box/build", skip_vcpkg=False, de
 
     return True
 
+def clean_project():
+    """Clean up build artifacts and temporary files."""
+    import stat
+    import glob
+    import fnmatch
+    
+    Colors.print("Cleaning up project...", Colors.BLUE)
+
+    def on_rm_error(func, path, exc_info):
+        # chmod to write and try again
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+
+    def force_remove_dir(path):
+        if os.path.exists(path):
+            Colors.print(f"Removing directory: {path}", Colors.YELLOW)
+            try:
+                shutil.rmtree(path, onerror=on_rm_error)
+            except Exception as e:
+                Colors.print(f"Python remove failed: {e}", Colors.RED)
+                # Try shell
+                if os.name == 'nt':
+                    os.system(f"rmdir /s /q {path}")
+                else:
+                    os.system(f"rm -rf {path}")
+
+    # Remove build directories
+    force_remove_dir("build")
+    force_remove_dir("nt-box/build")
+
+    # Try to remove files robustly (handles locked files on Windows)
+    def remove_with_retries(path, retries=10, delay=0.5):
+        for i in range(retries):
+            try:
+                if os.path.exists(path):
+                    Colors.print(f"Removing file: {path}", Colors.YELLOW)
+                    os.chmod(path, stat.S_IWRITE)
+                    os.remove(path)
+                return True
+            except PermissionError:
+                Colors.print(f"PermissionError removing {path}; retrying ({i+1}/{retries})...", Colors.YELLOW)
+                time.sleep(delay)
+            except Exception as e:
+                Colors.print(f"Error removing {path}: {e}", Colors.RED)
+                return False
+        Colors.print(f"Failed to remove {path} after {retries} attempts.", Colors.RED)
+        return False
+
+    # Remove top-level binaries and libs
+    patterns = []
+    if os.name == 'nt':
+        patterns = ["neutron.exe", "box.exe", "*.lib", "*.dll", "neutron-*-installer.exe", "NeutronInstaller.exe", "*.pdb"]
+    else:
+        patterns = ["neutron", "box", "libneutron_runtime.*", "*.a", "*.so", "*.dylib"]
+
+    for pat in patterns:
+        for f in glob.glob(pat):
+            remove_with_retries(f)
+
+    # Remove any copied lib/dll in project root (leftovers from packaging)
+    for f in glob.glob("*.lib") + glob.glob("*.dll") + glob.glob("*.a") + glob.glob("*.so") + glob.glob("*.dylib") + glob.glob("*.exe"):
+        remove_with_retries(f)
+
+    # Remove build artifacts recursively but avoid touching third-party folders
+    exclude_dirs = {'.git', 'vcpkg', 'neutron-linux-x64', 'neutron-windows-x64', 'build_test', 'node_modules', '.box', 'vscode-extension'}
+    # Patterns to remove (add .obj and .exe as requested)
+    patterns = ['*.dll', '*.lib', '*.a', '*.so', '*.dylib', '*.obj', '*.exe', '*.pdb', '*.ilk', '*.exp']
+
+    Colors.print("Scanning project tree for build artifacts (excluding common third-party dirs)...", Colors.BLUE)
+    for root, dirs, files in os.walk('.'):
+        # Normalize and skip excluded folders
+        # Modify dirs in-place to prevent os.walk from recursing into them
+        dirs[:] = [d for d in dirs if d not in exclude_dirs]
+
+        for pat in patterns:
+            for filename in fnmatch.filter(files, pat):
+                path = os.path.join(root, filename)
+                remove_with_retries(path)
+
+    Colors.print("Clean complete.", Colors.GREEN)
+
+def check_dependencies():
+    """Check for development dependencies and suggest installation commands."""
+    import shutil
+    import subprocess
+    
+    Colors.print("Checking for required dependencies...", Colors.BLUE)
+    
+    def command_exists(cmd):
+        return shutil.which(cmd) is not None
+
+    def check_pkg_config(pkg_name):
+        if not command_exists("pkg-config"):
+            return False
+        try:
+            subprocess.check_call(["pkg-config", "--exists", pkg_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
+    system = platform.system()
+    missing_deps = []
+    
+    # Check common tools
+    if not command_exists("cmake"):
+        missing_deps.append("cmake")
+    if not command_exists("git"):
+        missing_deps.append("git")
+        
+    jsoncpp_installed = False
+    install_cmd = ""
+    
+    if system == "Darwin":
+        Colors.print("Detected macOS.", Colors.YELLOW)
+        if not command_exists("clang++") and not command_exists("g++"):
+            missing_deps.append("clang++")
+            
+        install_cmd = "brew install"
+        
+        # Check jsoncpp in common locations
+        common_paths = [
+            "/opt/homebrew/lib/libjsoncpp.dylib",
+            "/usr/local/lib/libjsoncpp.dylib"
+        ]
+        if any(os.path.exists(p) for p in common_paths):
+            jsoncpp_installed = True
+            
+        if not jsoncpp_installed:
+             missing_deps.append("jsoncpp")
+
+    elif system == "Linux":
+        Colors.print("Detected Linux.", Colors.YELLOW)
+        if not command_exists("g++") and not command_exists("clang++"):
+            missing_deps.append("g++")
+        
+        if not command_exists("pkg-config"):
+            missing_deps.append("pkg-config")
+
+        # Distro detection
+        jsoncpp_pkg = "jsoncpp (dev)"
+        if os.path.exists("/etc/os-release"):
+            try:
+                with open("/etc/os-release") as f:
+                    content = f.read().lower()
+                    if "ubuntu" in content or "debian" in content:
+                        install_cmd = "sudo apt-get install -y"
+                        jsoncpp_pkg = "libjsoncpp-dev"
+                    elif "arch" in content:
+                        install_cmd = "sudo pacman -S --noconfirm"
+                        jsoncpp_pkg = "jsoncpp"
+                    elif "fedora" in content:
+                        install_cmd = "sudo dnf install -y"
+                        jsoncpp_pkg = "jsoncpp-devel"
+            except:
+                pass
+             
+        if check_pkg_config("jsoncpp"):
+            jsoncpp_installed = True
+            
+        if not jsoncpp_installed:
+            missing_deps.append(jsoncpp_pkg)
+
+    elif system == "Windows":
+        Colors.print("Detected Windows.", Colors.YELLOW)
+        if not command_exists("cl") and not command_exists("g++"):
+             missing_deps.append("Visual Studio (C++ Desktop Development) or MinGW")
+        
+        Colors.print("Note: On Windows, we recommend using Visual Studio 2019+ and vcpkg.", Colors.YELLOW)
+        
+    else:
+        Colors.print(f"Unsupported OS: {system}", Colors.RED)
+
+    if missing_deps:
+        Colors.print("\nThe following dependencies appear to be missing:", Colors.RED)
+        for dep in missing_deps:
+            Colors.print(f"  - {dep}")
+        
+        Colors.print("\nYou can try to install them via:", Colors.BLUE)
+        if system == "Windows":
+             Colors.print("  Install Visual Studio Community with C++ workload.")
+             Colors.print("  Install CMake: winget install Kitware.CMake")
+             Colors.print("  Install Git: winget install Git.Git")
+        else:
+             deps_str = " ".join(missing_deps)
+             if install_cmd:
+                Colors.print(f"  {install_cmd} {deps_str}")
+             else:
+                Colors.print(f"  (Use your package manager to install: {deps_str})")
+             
+        sys.exit(1)
+    else:
+        Colors.print("All dependencies seem to be present.", Colors.GREEN)
+        Colors.print("\nReady to build!", Colors.BLUE)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Neutron Packaging Script")
     parser.add_argument("--output", help="Output directory name for the package", default=None)
     parser.add_argument("--installer", help="Build NSIS installer (Windows only)", action="store_true")
     parser.add_argument("--skip-vcpkg", help="Skip vcpkg bootstrap and proceed (may fail if runtime deps missing)", action="store_true")
     parser.add_argument("--debug", help="Build with debug symbols (CMAKE_BUILD_TYPE=Debug)", action="store_true")
+    parser.add_argument("--clean", help="Clean build artifacts and exit", action="store_true")
+    parser.add_argument("--check-deps", help="Check for required dependencies and exit", action="store_true")
     args = parser.parse_args()
+
+    if args.clean:
+        clean_project()
+        sys.exit(0)
+        
+    if args.check_deps:
+        check_dependencies()
+        sys.exit(0)
+
 
     os_type, arch_type = get_os_info()
     Colors.print(f"Detected {os_type} {arch_type}", Colors.YELLOW)

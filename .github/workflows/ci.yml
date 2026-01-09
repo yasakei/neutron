@@ -144,79 +144,7 @@ jobs:
         path: neutron-macos-arm64.tar.gz
         retention-days: 7
 
-  build-macos-intel:
-    name: Build on macOS (Intel)
-    runs-on: macos-14
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-      
-    - name: Install dependencies
-      run: |
-        brew install cmake
-        # Build x86_64 jsoncpp since runner is arm64
-        git clone https://github.com/open-source-parsers/jsoncpp.git
-        cd jsoncpp
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64" -DBUILD_SHARED_LIBS=OFF -DJSONCPP_WITH_TESTS=OFF -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF
-        sudo cmake --build build --target install
-        
-    - name: Build Neutron Runtime
-      run: |
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64"
-        cmake --build build
-      
-    - name: Build Box Package Manager
-      run: |
-        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64"
-        cmake --build nt-box/build
-        cp nt-box/build/box .
-      
-    - name: Package
-      run: python3 package.py --output neutron-macos-intel
-      
-    - name: Verify binaries
-      run: |
-        ls -lh build/neutron
-        ls -lh box
-        file build/neutron
-        file box
-        # We cannot run the binary if rosetta is not installed, but verification via file command confirms architecture
-        
-    - name: Run tests
-      # Skip running tests if rosetta is not guaranteed, or attempt to run and allow fail
-      # GitHub macos-14 runners might not have Rosetta 2 installed by default or pre-warmed for this action context
-      continue-on-error: true
-      run: python3 run_tests.py
 
-    - name: Run Performance Benchmarks
-      continue-on-error: true
-      run: |
-        echo "==========================================================="
-        echo "  macOS (Intel) PERFORMANCE BENCHMARKS"
-        echo "==========================================================="
-        python3 run_benchmark.py | tee benchmark-macos-intel.txt || echo "Benchmark failed or skipped"
-        echo ""
-        echo "==========================================================="
-      
-    - name: Upload Benchmark Results
-      uses: actions/upload-artifact@v4
-      with:
-        name: benchmark-macos-intel
-        path: benchmark-macos-intel.txt
-        retention-days: 30
-
-    - name: Create Archive
-      run: tar -czf neutron-macos-intel.tar.gz neutron-macos-intel
-      
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: neutron-macos-intel
-        path: neutron-macos-intel.tar.gz
-        retention-days: 7
 
   build-windows-msvc:
     name: Build on Windows (MSVC)
@@ -332,7 +260,7 @@ jobs:
   benchmark-summary:
     name: Performance Summary
     runs-on: ubuntu-latest
-    needs: [build-linux, build-macos-arm64, build-macos-intel, build-windows-msvc]
+    needs: [build-linux, build-macos-arm64, build-windows-msvc]
     if: always()
     
     steps:
@@ -369,16 +297,6 @@ jobs:
           echo "  macOS (ARM64) benchmark results not available"
         fi
         echo ""
-
-        echo "+--------------------------------------------------------------------+"
-        echo "| macOS (Intel) RESULTS                                              |"
-        echo "+--------------------------------------------------------------------+"
-        if [ -f benchmark-macos-intel.txt ]; then
-          cat benchmark-macos-intel.txt | grep -E "(Win Rate|Neutron Faster|Python Faster|SUMMARY)" || cat benchmark-macos-intel.txt | tail -20
-        else
-          echo "  macOS (Intel) benchmark results not available"
-        fi
-        echo ""
         
         echo "+--------------------------------------------------------------------+"
         echo "| WINDOWS RESULTS                                                    |"
@@ -394,7 +312,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [build-linux, build-macos-arm64, build-macos-intel, build-windows-msvc, build-vscode-extension]
+    needs: [build-linux, build-macos-arm64, build-windows-msvc, build-vscode-extension]
     if: always()
     
     steps:
@@ -403,7 +321,6 @@ jobs:
         echo "Build Summary:"
         echo "Linux: ${{ needs.build-linux.result }}"
         echo "macOS ARM64: ${{ needs.build-macos-arm64.result }}"
-        echo "macOS Intel: ${{ needs.build-macos-intel.result }}"
         echo "Windows: ${{ needs.build-windows-msvc.result }}"
         echo "VS Code Extension: ${{ needs.build-vscode-extension.result }}"
         
@@ -411,7 +328,6 @@ jobs:
       if: |
         needs.build-linux.result != 'success' || 
         needs.build-macos-arm64.result != 'success' || 
-        needs.build-macos-intel.result != 'success' || 
         needs.build-windows-msvc.result != 'success' ||
         needs.build-vscode-extension.result != 'success'
       run: exit 1

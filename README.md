@@ -14,105 +14,52 @@
 > [!IMPORTANT]
 > **Solo Developer Project:** Neutron is actively developed by a single developer and currently lacks many advanced features and libraries found in mature languages. The ecosystem is small with no established community yet. Contributions are highly encouraged to help grow the language and its ecosystem!
 
-
-
 ---
 
-## Overview
-
-**Neutron** is a high-performance, dynamically-typed programming language with a modern C++ runtime. Designed for developers who want Python's simplicity with significantly better performance, Neutron combines familiar syntax with native compilation capabilities and a comprehensive standard library.
-
-### Key Highlights
-
-| Feature | Description |
-|---------|-------------|
-| **High Performance** | C++ bytecode VM - significantly faster than Python for computational tasks |
-| **Project System** | Built-in project management with `.quark` configs - init, build, and run with ease |
-| **Native Executables** | Build standalone binaries with all dependencies bundled |
-| **Modern Package Manager** | Box package manager for native C++ modules with automatic platform detection |
-| **Cross-Platform** | Write once, run anywhere - Linux, macOS, and Windows support |
-| **Extensible** | Easy C++ integration for performance-critical operations |
-
-> [!NOTE]
-> **New to Neutron?** Check out the [Quick Start Guide](docs/guides/quickstart.md) to get running in under 5 minutes.
-
----
-
-## Why Choose Neutron?
-
-### Performance That Matters
-
-Neutron's C++ bytecode virtual machine delivers **2-10x faster execution** compared to Python for computational workloads. The combination of efficient bytecode compilation and native C++ runtime makes it ideal for:
-
-- Data processing pipelines
-- System automation scripts
-- Web servers and API backends
-- Command-line tools
-- Algorithm implementations
-
-### Developer-Friendly Design
-
-**Familiar Syntax** - C-style syntax that feels natural if you know JavaScript, Python, or Java  
-**Dynamic Typing** - Write code quickly without type annotations, with runtime type safety  
-**Rich Standard Library** - Batteries included: HTTP client, JSON, file I/O, math, time, and more  
-**Zero Configuration** - No virtual environments, pip issues, or dependency conflicts
-
----
+## Installation
+ 
+ ### Download Pre-built Binaries
+ 
+ **[Download Latest Release](https://github.com/yasakei/neutron/releases/latest)**
+ 
+ #### Linux
+ - **Debian/Ubuntu/Others:** Download `neutron-linux-x64.tar.gz` from Releases.
+ - **Arch Linux:**
+   ```bash
+   yay -S neutron
+   ```
+ 
+ #### macOS
+ - **Apple Silicon:** Download `neutron-macos-arm64.tar.gz` from Releases.
+ - **Intel Macs:** Build from source: `python3 package.py`
+ 
+ #### Windows
+ - Download the **Installer** (`NeutronInstaller.exe`) from Releases.
+ 
+ ---
+ 
+ ## Overview
+ 
+ **Neutron** is a high-performance scripting language with a C++ runtime. It combines Python's simplicity with significantly better performance for computational tasks.
+ 
+ **Key Features:**
+ - **Fast:** C++ bytecode VM (2-10x faster than Python)
+ - **Native:** Compiles to standalone executables
+ - **Battery-Included:** Standard library with HTTP, JSON, RegEx, and more
+ - **Cross-Platform:** Runs on Linux, macOS, Windows
+ 
+ > [!NOTE]
+ > **New?** Check the **[Quick Start Guide](docs/guides/quickstart.md)** to get running in 5 minutes.
+ 
+ ---
 
 ## Architecture
-
-Neutron is built on a modern three-stage architecture designed for both performance and flexibility:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Neutron Architecture                         │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Source Code (.nt)                                              │
-│        ↓                                                         │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │ Scanner & Parser (C++)                                    │  │
-│  │ • Lexical analysis                                        │  │
-│  │ • Syntax tree generation                                  │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│        ↓                                                         │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │ Bytecode Compiler                                         │  │
-│  │ • Optimized bytecode generation                           │  │
-│  │ • Static analysis                                         │  │
-│  │ • Constant folding                                        │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│        ↓                                                         │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │ Virtual Machine (C++ Runtime)                             │  │
-│  │ • Stack-based bytecode interpreter                        │  │
-│  │ • Native function integration                             │  │
-│  │ • Automatic memory management                             │  │
-│  │ • JIT-ready architecture                                  │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Core Components
-
-**Scanner & Parser** - Hand-written lexer and recursive descent parser in C++ for maximum speed
-
-**Bytecode Compiler** - Converts AST to optimized bytecode with single-pass compilation
-
-**Virtual Machine** - Stack-based VM with efficient instruction dispatch using C++ switch statements
-
-**Memory Management** - Smart pointers and RAII patterns ensure zero memory leaks
-
-**Native Module Interface** - Direct C++ integration without FFI overhead
-
-### Performance Optimizations
-
-- **Bytecode Caching** - Compiled bytecode can be serialized for faster startup
-- **Inline Caching** - Method lookup optimization for object-oriented code
-- **Native Modules** - Performance-critical code runs at C++ speed
-- **Efficient Value Representation** - Tagged unions minimize memory overhead
-- **Direct System Calls** - No interpreter overhead for I/O operations
+ 
+ Neutron uses a modern three-stage pipeline: **Scanner/Parser** → **Bytecode Compiler** → **Stack-based VM**.
+ 
+ - **Zero Dependencies:** Written in C++17 with minimal external reliance.
+ - **Smart Memory:** Deterministic RC/GC memory management.
+ - **Native Modules:** Direct C++ integration for max performance.
 
 ## Core Features
 
@@ -205,74 +152,6 @@ Write performance-critical code in C++ and call it from Neutron
 </td>
 </tr>
 </table>
-
-## Installation
-
-### Prerequisites
-
-| Platform | Requirements |
-|----------|-------------|
-| **Linux** | GCC/Clang, CMake 3.15+, libcurl, libjsoncpp |
-| **macOS** | Xcode Command Line Tools, CMake, curl, jsoncpp |
-| **Windows** | Visual Studio 2019+ or MSYS2/MinGW-w64, CMake |
-
-### Build from Source
-
-```bash
-# Linux (Debian/Ubuntu)
-sudo apt-get install build-essential cmake libcurl4-openssl-dev libjsoncpp-dev
-cmake -B build && cmake --build build -j$(nproc)
-
-# macOS
-brew install cmake curl jsoncpp
-cmake -B build && cmake --build build -j$(sysctl -n hw.ncpu)
-
-# Windows (Visual Studio)
-cmake -B build && cmake --build build --config Release
-
-# Windows (MSYS2 MINGW64 - Alternative)
-pacman -S mingw-w64-x86_64-{gcc,cmake,curl,jsoncpp} make
-cmake -B build -G "MSYS Makefiles" && cmake --build build
-```
-
-### Build Options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `NEUTRON_UNSAFE_OPTIMIZATIONS` | `OFF` | Enable aggressive performance optimizations that may reduce security. Disables MSVC stack buffer security checks (`/GS-`). Only use for benchmarking or when the security trade-off is acceptable. |
-
-```bash
-# Example: Enable unsafe optimizations for benchmarking
-cmake -B build -DNEUTRON_UNSAFE_OPTIMIZATIONS=ON
-cmake --build build --config Release
-```
-
-> [!WARNING]
-> For detailed platform-specific instructions and troubleshooting, see the [Build Guide](docs/guides/build.md).
-
-### Running Tests
-
-```bash
-python3 run_tests.py          # Linux/macOS
-python3 run_tests.py
-```
-
-The test suite includes 21 comprehensive tests covering all language features. See [Test Suite Documentation](docs/guides/test-suite.md) for details.
-
-### Shell Completion (Optional)
-
-Enable tab completion for better command-line experience:
-
-```bash
-# ZSH - Add to ~/.zshrc
-fpath=(/path/to/neutron/scripts $fpath)
-autoload -U compinit && compinit
-
-# Bash - Add to ~/.bashrc
-source /path/to/neutron/scripts/neutron-completion.bash
-```
-
-See [scripts/README.md](scripts/README.md) for detailed installation instructions.
 
 ## Quick Start
 
@@ -604,45 +483,6 @@ try {
 
 > [!NOTE]
 > For complete language documentation, see the [Language Reference](docs/reference/language-reference.md).
-
-## Performance Comparison
-
-### Neutron vs Python
-
-Neutron significantly outperforms Python in computational tasks thanks to its C++ bytecode VM and efficient runtime:
-
-| Benchmark | Python 3.11 | Neutron | Speedup |
-|-----------|-------------|---------|---------|
-| Fibonacci (recursive) | 2.45s | 0.31s | **7.9x faster** |
-| Prime Generation | 3.12s | 0.48s | **6.5x faster** |
-| Matrix Operations | 1.89s | 0.53s | **3.6x faster** |
-| String Manipulation | 1.24s | 0.41s | **3.0x faster** |
-| Loop Performance | 0.98s | 0.15s | **6.5x faster** |
-
-> [!TIP]
-> Run `./run_benchmark.sh` to see real-time performance comparisons on your hardware.
-
-### Why Neutron is Faster
-
-**1. C++ Native Runtime**
-- No interpreter overhead - bytecode executes directly in C++
-- Efficient instruction dispatch with optimized switch statements
-- Native data structures with minimal boxing/unboxing
-
-**2. Optimized Bytecode**
-- Single-pass compilation with constant folding
-- Efficient stack-based operations
-- Minimal bytecode instruction set for better cache locality
-
-**3. Direct System Integration**
-- Native C++ modules run at full CPU speed
-- No FFI marshalling overhead
-- Direct memory access for I/O operations
-
-**4. Smart Memory Management**
-- C++ smart pointers with deterministic destruction
-- No stop-the-world garbage collection pauses
-- Efficient reference counting for complex types
 
 ## Contributing
 
