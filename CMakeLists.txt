@@ -200,6 +200,7 @@ set(NEUTRON_CORE_SOURCES
     src/core/vm.cpp
     src/core/checkpoint.cpp
     src/core/capi.cpp
+    src/core/formatter.cpp
     src/token.cpp
     ${NEUTRON_COMPILER_SOURCES}
     ${NEUTRON_TYPES_SOURCES}
@@ -462,3 +463,24 @@ add_test(NAME control_flow_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/te
 add_test(NAME operators_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/test_operators.nt)
 add_test(NAME arrays_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/test_arrays_objects.nt)
 add_test(NAME functions_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/test_functions_modules.nt)
+
+# --------------------------------------------------------
+# LSP Server
+# --------------------------------------------------------
+add_executable(neutron-lsp 
+    lsp/main.cpp 
+    lsp/server.cpp 
+    lsp/protocol.cpp
+)
+
+target_link_libraries(neutron-lsp 
+    neutron_runtime
+    ${JSONCPP_LIBRARIES}
+)
+
+if(WIN32)
+    set_target_properties(neutron-lsp PROPERTIES
+        OUTPUT_NAME neutron-lsp
+    )
+    target_link_libraries(neutron-lsp ${DLFCN_WIN})
+endif()

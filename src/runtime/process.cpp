@@ -330,6 +330,7 @@ void ProcessScheduler::executeProcess(Process* proc, VM& vm) {
 // ============================================================================
 
 Value ProcessVM::spawn(VM& vm, std::vector<Value> args) {
+    (void)vm; // Mark unused
     if (args.empty()) {
         throw std::runtime_error("spawn() requires a function argument");
     }

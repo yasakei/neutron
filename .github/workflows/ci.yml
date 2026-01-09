@@ -78,8 +78,8 @@ jobs:
         path: neutron-linux-x64.tar.gz
         retention-days: 7
 
-  build-macos-universal:
-    name: Build on macOS Universal
+  build-macos-arm64:
+    name: Build on macOS (Apple Silicon)
     runs-on: macos-14
     
     steps:
@@ -90,26 +90,21 @@ jobs:
       
     - name: Install dependencies
       run: |
-        brew install cmake
-        # Build universal jsoncpp
-        git clone https://github.com/open-source-parsers/jsoncpp.git
-        cd jsoncpp
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DBUILD_SHARED_LIBS=OFF -DJSONCPP_WITH_TESTS=OFF -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF
-        sudo cmake --build build --target install
+        brew install cmake jsoncpp
         
     - name: Build Neutron Runtime
       run: |
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
         cmake --build build
       
     - name: Build Box Package Manager
       run: |
-        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
+        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
         cmake --build nt-box/build
         cp nt-box/build/box .
       
     - name: Package
-      run: python3 package.py --output neutron-macos-universal
+      run: python3 package.py --output neutron-macos-arm64
       
     - name: Verify binaries
       run: |
@@ -128,26 +123,28 @@ jobs:
         echo "==========================================================="
         echo "  macOS (Apple Silicon) PERFORMANCE BENCHMARKS"
         echo "==========================================================="
-        python3 run_benchmark.py | tee benchmark-macos.txt
+        python3 run_benchmark.py | tee benchmark-macos-arm64.txt
         echo ""
         echo "==========================================================="
       
     - name: Upload Benchmark Results
       uses: actions/upload-artifact@v4
       with:
-        name: benchmark-macos
-        path: benchmark-macos.txt
+        name: benchmark-macos-arm64
+        path: benchmark-macos-arm64.txt
         retention-days: 30
 
     - name: Create Archive
-      run: tar -czf neutron-macos-universal.tar.gz neutron-macos-universal
+      run: tar -czf neutron-macos-arm64.tar.gz neutron-macos-arm64
       
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: neutron-macos-universal
-        path: neutron-macos-universal.tar.gz
+        name: neutron-macos-arm64
+        path: neutron-macos-arm64.tar.gz
         retention-days: 7
+
+
 
   build-windows-msvc:
     name: Build on Windows (MSVC)
@@ -220,10 +217,50 @@ jobs:
         path: neutron-windows-x64.zip
         retention-days: 7
 
+  build-vscode-extension:
+    name: Build VS Code Extension
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Install dependencies
+      working-directory: vscode-extension
+      run: npm ci
+      
+    - name: Compile TypeScript
+      working-directory: vscode-extension
+      run: npm run compile
+      
+    - name: Package Extension
+      working-directory: vscode-extension
+      run: |
+        npm install -g @vscode/vsce
+        vsce package --no-dependencies
+        
+    - name: Verify VSIX created
+      working-directory: vscode-extension
+      run: |
+        ls -lh *.vsix
+        echo "VS Code extension packaged successfully"
+        
+    - name: Upload Extension Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: vscode-extension
+        path: vscode-extension/*.vsix
+        retention-days: 7
+
   benchmark-summary:
     name: Performance Summary
     runs-on: ubuntu-latest
-    needs: [build-linux, build-macos-universal, build-windows-msvc]
+    needs: [build-linux, build-macos-arm64, build-windows-msvc]
     if: always()
     
     steps:
@@ -252,12 +289,12 @@ jobs:
         echo ""
         
         echo "+--------------------------------------------------------------------+"
-        echo "| macOS RESULTS                                                      |"
+        echo "| macOS (Apple Silicon) RESULTS                                      |"
         echo "+--------------------------------------------------------------------+"
-        if [ -f benchmark-macos.txt ]; then
-          cat benchmark-macos.txt | grep -E "(Win Rate|Neutron Faster|Python Faster|SUMMARY)" || cat benchmark-macos.txt | tail -20
+        if [ -f benchmark-macos-arm64.txt ]; then
+          cat benchmark-macos-arm64.txt | grep -E "(Win Rate|Neutron Faster|Python Faster|SUMMARY)" || cat benchmark-macos-arm64.txt | tail -20
         else
-          echo "  macOS benchmark results not available"
+          echo "  macOS (ARM64) benchmark results not available"
         fi
         echo ""
         
@@ -275,7 +312,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [build-linux, build-macos-universal, build-windows-msvc]
+    needs: [build-linux, build-macos-arm64, build-windows-msvc, build-vscode-extension]
     if: always()
     
     steps:
@@ -283,12 +320,14 @@ jobs:
       run: |
         echo "Build Summary:"
         echo "Linux: ${{ needs.build-linux.result }}"
-        echo "macOS Universal: ${{ needs.build-macos-universal.result }}"
+        echo "macOS ARM64: ${{ needs.build-macos-arm64.result }}"
         echo "Windows: ${{ needs.build-windows-msvc.result }}"
+        echo "VS Code Extension: ${{ needs.build-vscode-extension.result }}"
         
     - name: Fail if any build failed
       if: |
         needs.build-linux.result != 'success' || 
-        needs.build-macos-universal.result != 'success' || 
-        needs.build-windows-msvc.result != 'success'
+        needs.build-macos-arm64.result != 'success' || 
+        needs.build-windows-msvc.result != 'success' ||
+        needs.build-vscode-extension.result != 'success'
       run: exit 1

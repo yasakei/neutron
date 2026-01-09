@@ -37,7 +37,13 @@ jobs:
       run: |
         cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
         cmake --build build
-      
+        cmake --build build --target neutron-lsp
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+        
     - name: Build Box Package Manager
       run: |
         cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
@@ -47,6 +53,7 @@ jobs:
       run: |
         cp build/neutron .
         cp nt-box/build/box .
+        cp build/neutron-lsp . 2>/dev/null || echo "neutron-lsp not found in expected build dir"
         cp build/*.so . 2>/dev/null || echo "No .so files to copy"
         cp build/*.a . 2>/dev/null || echo "No .a files to copy"
       
@@ -74,8 +81,8 @@ jobs:
         path: neutron-${{ steps.get_version.outputs.version }}-linux-x64.tar.gz
 
 
-  build-macos-universal:
-    name: Build macOS Universal Release
+  build-macos-arm64:
+    name: Build macOS ARM64 Release
     runs-on: macos-14
     
     steps:
@@ -86,32 +93,34 @@ jobs:
       
     - name: Install dependencies
       run: |
-        brew install cmake
-        # Build universal jsoncpp
-        git clone https://github.com/open-source-parsers/jsoncpp.git
-        cd jsoncpp
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DBUILD_SHARED_LIBS=OFF -DJSONCPP_WITH_TESTS=OFF -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF
-        sudo cmake --build build --target install
+        brew install cmake jsoncpp
       
     - name: Build Neutron Runtime
       run: |
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
         cmake --build build
+        cmake --build build --target neutron-lsp
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
       
     - name: Build Box Package Manager
       run: |
-        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
+        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
         cmake --build nt-box/build
       
     - name: Copy binaries and libraries to root for packaging
       run: |
         cp build/neutron .
         cp nt-box/build/box .
+        cp build/neutron-lsp . 2>/dev/null || echo "neutron-lsp not found"
         cp build/*.dylib . 2>/dev/null || echo "No .dylib files to copy"
         cp build/*.a . 2>/dev/null || echo "No .a files to copy"
       
     - name: Package
-      run: python3 package.py --output neutron-macos-universal
+      run: python3 package.py --output neutron-macos-arm64
 
     - name: Get version
       id: get_version
@@ -125,13 +134,13 @@ jobs:
         echo "Version: ${VERSION}"
         
     - name: Create Release Archive
-      run: tar -czf neutron-${{ steps.get_version.outputs.version }}-macos-universal.tar.gz neutron-macos-universal
+      run: tar -czf neutron-${{ steps.get_version.outputs.version }}-macos-arm64.tar.gz neutron-macos-arm64
 
     - name: Upload Release Asset
       uses: actions/upload-artifact@v4
       with:
-        name: neutron-macos-universal
-        path: neutron-${{ steps.get_version.outputs.version }}-macos-universal.tar.gz
+        name: neutron-macos-arm64
+        path: neutron-${{ steps.get_version.outputs.version }}-macos-arm64.tar.gz
 
 
   build-windows-zip:
@@ -294,9 +303,67 @@ jobs:
         name: neutron-windows-x64-installer
         path: NeutronInstaller.exe
 
+  build-vscode-extension:
+    name: Build VS Code Extension
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Get version
+      id: get_version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.tag }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        # Remove 'v' prefix for npm version
+        NPM_VERSION=${VERSION#v}
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "npm_version=${NPM_VERSION}" >> $GITHUB_OUTPUT
+        echo "Version: ${VERSION}, NPM Version: ${NPM_VERSION}"
+        
+    - name: Update extension version
+      working-directory: vscode-extension
+      run: |
+        npm version ${{ steps.get_version.outputs.npm_version }} --no-git-tag-version --allow-same-version || true
+        
+    - name: Install dependencies
+      working-directory: vscode-extension
+      run: npm ci
+      
+    - name: Compile TypeScript
+      working-directory: vscode-extension
+      run: npm run compile
+      
+    - name: Package Extension
+      working-directory: vscode-extension
+      run: |
+        npm install -g @vscode/vsce
+        vsce package --no-dependencies -o neutron-${{ steps.get_version.outputs.version }}.vsix
+        
+    - name: Verify VSIX created
+      working-directory: vscode-extension
+      run: |
+        ls -lh *.vsix
+        echo "VS Code extension packaged successfully"
+        
+    - name: Upload Extension Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: neutron-vscode-extension
+        path: vscode-extension/*.vsix
+
   create-release:
     name: Create GitHub Release
-    needs: [build-linux-x64, build-macos-universal, build-windows-zip, build-windows-installer]
+    needs: [build-linux-x64, build-macos-arm64, build-windows-zip, build-windows-installer, build-vscode-extension]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -329,9 +396,10 @@ jobs:
         prerelease: ${{ contains(steps.get_version.outputs.version, 'alpha') || contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'rc') }}
         files: |
           artifacts/neutron-linux-x64/*
-          artifacts/neutron-macos-universal/*
+          artifacts/neutron-macos-arm64/*
           artifacts/neutron-windows-x64-zip/*
           artifacts/neutron-windows-x64-installer/*
+          artifacts/neutron-vscode-extension/*
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

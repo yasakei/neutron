@@ -6,6 +6,7 @@
 #include <memory>
 #include <iostream>
 #include <unordered_map>
+#include <functional>
 #include "token.h"
 
 /**
@@ -180,10 +181,14 @@ struct ErrorInfo {
 // Main error handler class
 class ErrorHandler {
 public:
+    using ErrorCallback = std::function<void(const ErrorInfo&)>;
+    static void setErrorCallback(ErrorCallback callback);
+
     // Helper methods (public for NeutronException)
     static std::string getErrorTypeName(ErrorType type);
 
 private:
+    static ErrorCallback errorCallback;
     static bool useColor;
     static bool showStackTrace;
     static std::string* currentFileName;

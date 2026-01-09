@@ -640,13 +640,219 @@ def build_box(os_type, arch_type, build_dir="nt-box/build", skip_vcpkg=False, de
 
     return True
 
+def clean_project():
+    """Clean up build artifacts and temporary files."""
+    import stat
+    import glob
+    import fnmatch
+    
+    Colors.print("Cleaning up project...", Colors.BLUE)
+
+    def on_rm_error(func, path, exc_info):
+        # chmod to write and try again
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+
+    def force_remove_dir(path):
+        if os.path.exists(path):
+            Colors.print(f"Removing directory: {path}", Colors.YELLOW)
+            try:
+                shutil.rmtree(path, onerror=on_rm_error)
+            except Exception as e:
+                Colors.print(f"Python remove failed: {e}", Colors.RED)
+                # Try shell
+                if os.name == 'nt':
+                    os.system(f"rmdir /s /q {path}")
+                else:
+                    os.system(f"rm -rf {path}")
+
+    # Remove build directories
+    force_remove_dir("build")
+    force_remove_dir("nt-box/build")
+
+    # Try to remove files robustly (handles locked files on Windows)
+    def remove_with_retries(path, retries=10, delay=0.5):
+        for i in range(retries):
+            try:
+                if os.path.exists(path):
+                    Colors.print(f"Removing file: {path}", Colors.YELLOW)
+                    os.chmod(path, stat.S_IWRITE)
+                    os.remove(path)
+                return True
+            except PermissionError:
+                Colors.print(f"PermissionError removing {path}; retrying ({i+1}/{retries})...", Colors.YELLOW)
+                time.sleep(delay)
+            except Exception as e:
+                Colors.print(f"Error removing {path}: {e}", Colors.RED)
+                return False
+        Colors.print(f"Failed to remove {path} after {retries} attempts.", Colors.RED)
+        return False
+
+    # Remove top-level binaries and libs
+    patterns = []
+    if os.name == 'nt':
+        patterns = ["neutron.exe", "box.exe", "*.lib", "*.dll", "neutron-*-installer.exe", "NeutronInstaller.exe", "*.pdb"]
+    else:
+        patterns = ["neutron", "box", "libneutron_runtime.*", "*.a", "*.so", "*.dylib"]
+
+    for pat in patterns:
+        for f in glob.glob(pat):
+            remove_with_retries(f)
+
+    # Remove any copied lib/dll in project root (leftovers from packaging)
+    for f in glob.glob("*.lib") + glob.glob("*.dll") + glob.glob("*.a") + glob.glob("*.so") + glob.glob("*.dylib") + glob.glob("*.exe"):
+        remove_with_retries(f)
+
+    # Remove build artifacts recursively but avoid touching third-party folders
+    exclude_dirs = {'.git', 'vcpkg', 'neutron-linux-x64', 'neutron-windows-x64', 'build_test', 'node_modules', '.box', 'vscode-extension'}
+    # Patterns to remove (add .obj and .exe as requested)
+    patterns = ['*.dll', '*.lib', '*.a', '*.so', '*.dylib', '*.obj', '*.exe', '*.pdb', '*.ilk', '*.exp']
+
+    Colors.print("Scanning project tree for build artifacts (excluding common third-party dirs)...", Colors.BLUE)
+    for root, dirs, files in os.walk('.'):
+        # Normalize and skip excluded folders
+        # Modify dirs in-place to prevent os.walk from recursing into them
+        dirs[:] = [d for d in dirs if d not in exclude_dirs]
+
+        for pat in patterns:
+            for filename in fnmatch.filter(files, pat):
+                path = os.path.join(root, filename)
+                remove_with_retries(path)
+
+    Colors.print("Clean complete.", Colors.GREEN)
+
+def check_dependencies():
+    """Check for development dependencies and suggest installation commands."""
+    import shutil
+    import subprocess
+    
+    Colors.print("Checking for required dependencies...", Colors.BLUE)
+    
+    def command_exists(cmd):
+        return shutil.which(cmd) is not None
+
+    def check_pkg_config(pkg_name):
+        if not command_exists("pkg-config"):
+            return False
+        try:
+            subprocess.check_call(["pkg-config", "--exists", pkg_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
+    system = platform.system()
+    missing_deps = []
+    
+    # Check common tools
+    if not command_exists("cmake"):
+        missing_deps.append("cmake")
+    if not command_exists("git"):
+        missing_deps.append("git")
+        
+    jsoncpp_installed = False
+    install_cmd = ""
+    
+    if system == "Darwin":
+        Colors.print("Detected macOS.", Colors.YELLOW)
+        if not command_exists("clang++") and not command_exists("g++"):
+            missing_deps.append("clang++")
+            
+        install_cmd = "brew install"
+        
+        # Check jsoncpp in common locations
+        common_paths = [
+            "/opt/homebrew/lib/libjsoncpp.dylib",
+            "/usr/local/lib/libjsoncpp.dylib"
+        ]
+        if any(os.path.exists(p) for p in common_paths):
+            jsoncpp_installed = True
+            
+        if not jsoncpp_installed:
+             missing_deps.append("jsoncpp")
+
+    elif system == "Linux":
+        Colors.print("Detected Linux.", Colors.YELLOW)
+        if not command_exists("g++") and not command_exists("clang++"):
+            missing_deps.append("g++")
+        
+        if not command_exists("pkg-config"):
+            missing_deps.append("pkg-config")
+
+        # Distro detection
+        jsoncpp_pkg = "jsoncpp (dev)"
+        if os.path.exists("/etc/os-release"):
+            try:
+                with open("/etc/os-release") as f:
+                    content = f.read().lower()
+                    if "ubuntu" in content or "debian" in content:
+                        install_cmd = "sudo apt-get install -y"
+                        jsoncpp_pkg = "libjsoncpp-dev"
+                    elif "arch" in content:
+                        install_cmd = "sudo pacman -S --noconfirm"
+                        jsoncpp_pkg = "jsoncpp"
+                    elif "fedora" in content:
+                        install_cmd = "sudo dnf install -y"
+                        jsoncpp_pkg = "jsoncpp-devel"
+            except:
+                pass
+             
+        if check_pkg_config("jsoncpp"):
+            jsoncpp_installed = True
+            
+        if not jsoncpp_installed:
+            missing_deps.append(jsoncpp_pkg)
+
+    elif system == "Windows":
+        Colors.print("Detected Windows.", Colors.YELLOW)
+        if not command_exists("cl") and not command_exists("g++"):
+             missing_deps.append("Visual Studio (C++ Desktop Development) or MinGW")
+        
+        Colors.print("Note: On Windows, we recommend using Visual Studio 2019+ and vcpkg.", Colors.YELLOW)
+        
+    else:
+        Colors.print(f"Unsupported OS: {system}", Colors.RED)
+
+    if missing_deps:
+        Colors.print("\nThe following dependencies appear to be missing:", Colors.RED)
+        for dep in missing_deps:
+            Colors.print(f"  - {dep}")
+        
+        Colors.print("\nYou can try to install them via:", Colors.BLUE)
+        if system == "Windows":
+             Colors.print("  Install Visual Studio Community with C++ workload.")
+             Colors.print("  Install CMake: winget install Kitware.CMake")
+             Colors.print("  Install Git: winget install Git.Git")
+        else:
+             deps_str = " ".join(missing_deps)
+             if install_cmd:
+                Colors.print(f"  {install_cmd} {deps_str}")
+             else:
+                Colors.print(f"  (Use your package manager to install: {deps_str})")
+             
+        sys.exit(1)
+    else:
+        Colors.print("All dependencies seem to be present.", Colors.GREEN)
+        Colors.print("\nReady to build!", Colors.BLUE)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Neutron Packaging Script")
     parser.add_argument("--output", help="Output directory name for the package", default=None)
     parser.add_argument("--installer", help="Build NSIS installer (Windows only)", action="store_true")
     parser.add_argument("--skip-vcpkg", help="Skip vcpkg bootstrap and proceed (may fail if runtime deps missing)", action="store_true")
     parser.add_argument("--debug", help="Build with debug symbols (CMAKE_BUILD_TYPE=Debug)", action="store_true")
+    parser.add_argument("--clean", help="Clean build artifacts and exit", action="store_true")
+    parser.add_argument("--check-deps", help="Check for required dependencies and exit", action="store_true")
     args = parser.parse_args()
+
+    if args.clean:
+        clean_project()
+        sys.exit(0)
+        
+    if args.check_deps:
+        check_dependencies()
+        sys.exit(0)
+
 
     os_type, arch_type = get_os_info()
     Colors.print(f"Detected {os_type} {arch_type}", Colors.YELLOW)
@@ -659,6 +865,7 @@ def main():
     # Binaries check
     neutron_exe = "neutron.exe" if os_type == "windows" else "neutron"
     box_exe = "box.exe" if os_type == "windows" else "box"
+    lsp_exe = "neutron-lsp.exe" if os_type == "windows" else "neutron-lsp"
 
     # On Windows with MSVC, binaries might be in Release/ subdirectory
     neutron_bin_paths = [
@@ -673,10 +880,17 @@ def main():
         os.path.join(box_build_dir, "Debug", box_exe)
     ]
 
+    lsp_bin_paths = [
+        os.path.join(build_dir, lsp_exe),
+        os.path.join(build_dir, "Release", lsp_exe),
+        os.path.join(build_dir, "Debug", lsp_exe)
+    ]
+
     # Check if we need to build
     need_build = True
     real_neutron_path = None
     real_box_path = None
+    real_lsp_path = None
 
     for p in neutron_bin_paths:
         if os.path.exists(p):
@@ -687,9 +901,14 @@ def main():
         if os.path.exists(p):
             real_box_path = p
             break
+            
+    for p in lsp_bin_paths:
+        if os.path.exists(p):
+            real_lsp_path = p
+            break
 
     # Always build to ensure latest version
-    Colors.print("Building Neutron and Box executables...", Colors.YELLOW)
+    Colors.print("Building Neutron, Box, and LSP executables...", Colors.YELLOW)
 
     # Preflight checks on Windows to catch common vcpkg/tooling problems before we start
     if os_type == 'windows' and not args.skip_vcpkg:
@@ -749,6 +968,20 @@ def main():
             if os.path.exists(p):
                 real_box_path = p
                 break
+                
+    if not real_lsp_path:
+        # Check standard locations or try to build
+        # We try to build it now if we can't find it
+        if os.path.exists(build_dir):
+             Colors.print("Attempting to build neutron-lsp target...", Colors.BLUE)
+             cmake_exe = get_cmake_command()
+             build_config = "Debug" if args.debug else "Release"
+             subprocess.call([cmake_exe, "--build", build_dir, "--target", "neutron-lsp", "--config", build_config])
+             # Check again
+             for p in lsp_bin_paths:
+                if os.path.exists(p):
+                    real_lsp_path = p
+                    break
 
     # Check if both builds were successful and binaries exist
     if not real_neutron_path and not real_box_path:
@@ -760,6 +993,8 @@ def main():
         Colors.print("Warning: neutron executable not found; installer may not include runtime files.", Colors.YELLOW)
     if not real_box_path:
         Colors.print("Warning: box executable not found; some packaging actions may be skipped.", Colors.YELLOW)
+    if not real_lsp_path:
+        Colors.print("Warning: neutron-lsp executable not found.", Colors.YELLOW)
 
     # Verify executables work (optional test)
     if real_neutron_path and os.path.exists(real_neutron_path):
@@ -798,6 +1033,28 @@ def main():
         shutil.copy2(real_box_path, target_name)
     else:
         Colors.print("Skipping copy of box executable (not found).", Colors.YELLOW)
+    
+    # Copy executables
+    def format_bin_dst(name):
+        return os.path.join(target_name, name)
+
+    if real_neutron_path and os.path.exists(real_neutron_path):
+        shutil.copy2(real_neutron_path, format_bin_dst(neutron_exe))
+        # On Linux/macOS, chmod +x
+        if os_type != "windows":
+            os.chmod(format_bin_dst(neutron_exe), 0o755)
+            
+    if real_box_path and os.path.exists(real_box_path):
+        shutil.copy2(real_box_path, format_bin_dst(box_exe))
+        # On Linux/macOS, chmod +x
+        if os_type != "windows":
+            os.chmod(format_bin_dst(box_exe), 0o755)
+            
+    if real_lsp_path and os.path.exists(real_lsp_path):
+        shutil.copy2(real_lsp_path, format_bin_dst(lsp_exe))
+        # On Linux/macOS, chmod +x
+        if os_type != "windows":
+            os.chmod(format_bin_dst(lsp_exe), 0o755)
     
     # Create lib directory and copy runtime library
     lib_dir = os.path.join(target_name, "lib")
@@ -869,6 +1126,33 @@ def main():
             # Make it executable
             os.chmod(os.path.join(target_name, "install.sh"), 0o755)
             Colors.print("Added install.sh script", Colors.GREEN)
+            
+    # Build VS Code Extension
+    extension_dir = os.path.join(root_dir, "vscode-extension")
+    if os.path.exists(extension_dir) and os.path.exists(os.path.join(extension_dir, "package.json")):
+        Colors.print("Building VS Code Extension...", Colors.BLUE)
+        
+        # Check for npm
+        npm_cmd = shutil.which("npm")
+        if npm_cmd:
+            try:
+                # Install dependencies
+                run_command([npm_cmd, "install"], cwd=extension_dir, fail_exit=False)
+                # Compile
+                run_command([npm_cmd, "run", "compile"], cwd=extension_dir, fail_exit=False)
+                # Package
+                # We need vsce, which is in devDependencies now, so we can run via npx or npm run package
+                # But 'npm run package' calls 'vsce package'. 
+                run_command([npm_cmd, "run", "package"], cwd=extension_dir, fail_exit=False)
+                
+                # Copy .vsix to output
+                for vsix in glob.glob(os.path.join(extension_dir, "*.vsix")):
+                     shutil.copy2(vsix, target_name)
+                     Colors.print(f"Copied {os.path.basename(vsix)} to package", Colors.GREEN)
+            except Exception as e:
+                Colors.print(f"Failed to build VS Code extension: {e}", Colors.YELLOW)
+        else:
+            Colors.print("npm not found, skipping VS Code extension build", Colors.YELLOW)
 
     # Version check (only if neutron executable present)
     version = "unknown"
@@ -930,6 +1214,12 @@ def main():
              Colors.print(f"Copied {real_box_path} to root", Colors.GREEN)
          else:
              Colors.print("WARNING: box executable not present; installer will not include it.", Colors.YELLOW)
+             
+         if real_lsp_path and os.path.exists(real_lsp_path):
+             shutil.copy2(real_lsp_path, root_dir)
+             Colors.print(f"Copied {real_lsp_path} to root", Colors.GREEN)
+         else:
+             Colors.print("WARNING: lsp executable not present; installer will not include it.", Colors.YELLOW)
          
          # Copy DLLs (needed for vcpkg dynamic linking)
          dll_count = 0
