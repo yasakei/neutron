@@ -1,6 +1,15 @@
 #ifndef NEUTRON_LSP_PROTOCOL_H
 #define NEUTRON_LSP_PROTOCOL_H
 
+// Force disable string_view support in JsonCpp on macOS to avoid linker errors
+// This must be defined before including json/json.h
+#if defined(__APPLE__)
+#undef JSON_HAS_STRING_VIEW
+#define JSON_HAS_STRING_VIEW 0
+#undef JSON_USE_STRING_VIEW
+#define JSON_USE_STRING_VIEW 0
+#endif
+
 #include <json/json.h>
 #include <optional>
 #include <string>

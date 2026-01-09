@@ -525,6 +525,7 @@ endif()
 # Force disable string_view support in JsonCpp to avoid linker errors on macOS
 if(APPLE)
     target_compile_definitions(neutron-lsp PRIVATE JSON_HAS_STRING_VIEW=0 JSON_USE_STRING_VIEW=0)
+    add_compile_definitions(JSON_HAS_STRING_VIEW=0 JSON_USE_STRING_VIEW=0)
 endif()
 
 target_link_libraries(neutron-lsp 
