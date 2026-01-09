@@ -476,6 +476,17 @@ add_executable(neutron-lsp
     lsp/protocol.cpp
 )
 
+# Disable LTO for LSP to avoid string_view overload resolution issues with JsonCpp
+set_target_properties(neutron-lsp PROPERTIES
+    INTERPROCEDURAL_OPTIMIZATION FALSE
+)
+
+# Remove LTO flags for LSP compilation
+if(NOT MSVC)
+    target_compile_options(neutron-lsp PRIVATE -fno-lto)
+    target_link_options(neutron-lsp PRIVATE -fno-lto)
+endif()
+
 target_link_libraries(neutron-lsp 
     neutron_runtime
     ${JSONCPP_LIBRARIES}
