@@ -8,6 +8,7 @@
   "displayName": "Neutron: Language Support",
   "description": "Language support for Neutron",
   "version": "1.0.0",
+  "icon": "neutron-icon.svg",
   "engines": {
     "vscode": "^1.75.0"
   },

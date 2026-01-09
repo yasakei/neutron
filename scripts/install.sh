@@ -87,6 +87,78 @@ else
     exit 1
 fi
 
+# Function to check and install dependencies
+check_dependencies() {
+    echo "Checking system dependencies..."
+    
+    if [[ "$SYSTEM_TYPE" == "Linux" ]]; then
+        # Check for package manager and install dependencies
+        if command -v apt-get >/dev/null 2>&1; then
+            echo "Detected apt package manager"
+            echo "Installing dependencies with apt..."
+            sudo apt-get update
+            sudo apt-get install -y libjsoncpp-dev libcurl4-openssl-dev
+        elif command -v yum >/dev/null 2>&1; then
+            echo "Detected yum package manager"
+            echo "Installing dependencies with yum..."
+            sudo yum install -y jsoncpp-devel libcurl-devel
+        elif command -v dnf >/dev/null 2>&1; then
+            echo "Detected dnf package manager"
+            echo "Installing dependencies with dnf..."
+            sudo dnf install -y jsoncpp-devel libcurl-devel
+        elif command -v pacman >/dev/null 2>&1; then
+            echo "Detected pacman package manager"
+            echo "Installing dependencies with pacman..."
+            sudo pacman -S --noconfirm jsoncpp curl
+        elif command -v zypper >/dev/null 2>&1; then
+            echo "Detected zypper package manager"
+            echo "Installing dependencies with zypper..."
+            sudo zypper install -y libjsoncpp-devel libcurl-devel
+        else
+            echo "Warning: Could not detect package manager. Please install manually:"
+            echo "  - libjsoncpp (development package)"
+            echo "  - libcurl (development package)"
+        fi
+    elif [[ "$SYSTEM_TYPE" == "macOS" ]]; then
+        if command -v brew >/dev/null 2>&1; then
+            echo "Installing dependencies with Homebrew..."
+            brew install jsoncpp curl
+        else
+            echo "Warning: Homebrew not found. Please install manually:"
+            echo "  - jsoncpp"
+            echo "  - curl"
+        fi
+    fi
+}
+
+# Function to check if a binary works
+check_binary() {
+    local binary_path="$1"
+    local binary_name="$2"
+    
+    if [ -f "$binary_path" ]; then
+        echo "Checking $binary_name dependencies..."
+        if [[ "$SYSTEM_TYPE" == "Linux" ]]; then
+            if ldd "$binary_path" | grep -q "not found"; then
+                echo "Warning: $binary_name has missing dependencies:"
+                ldd "$binary_path" | grep "not found"
+                return 1
+            fi
+        elif [[ "$SYSTEM_TYPE" == "macOS" ]]; then
+            if ! otool -L "$binary_path" >/dev/null 2>&1; then
+                echo "Warning: $binary_name has dependency issues"
+                return 1
+            fi
+        fi
+        echo "$binary_name dependencies OK"
+        return 0
+    fi
+    return 1
+}
+
+# Check dependencies first
+check_dependencies
+
 # Check if required binaries exist in current directory
 if [ ! -f "./neutron" ]; then
     echo "Neutron binary not found in current directory"
@@ -98,8 +170,18 @@ if [ ! -f "./box" ]; then
     exit 1
 fi
 
-if [ ! -f "./neutron-lsp" ]; then
-    echo "Warning: neutron-lsp binary not found in current directory"
+# Check for neutron-lsp in build directory first, then current directory
+NEUTRON_LSP_PATH=""
+if [ -f "./build/neutron-lsp" ]; then
+    NEUTRON_LSP_PATH="./build/neutron-lsp"
+elif [ -f "./neutron-lsp" ]; then
+    NEUTRON_LSP_PATH="./neutron-lsp"
+fi
+
+if [ -z "$NEUTRON_LSP_PATH" ]; then
+    echo "Warning: neutron-lsp binary not found in current directory or build/"
+else
+    echo "Found neutron-lsp at: $NEUTRON_LSP_PATH"
 fi
 
 if [ ! -d "./include" ]; then
@@ -122,9 +204,18 @@ sudo mkdir -p "$SHARE_DIR/neutron"
 echo "Installing binaries..."
 sudo cp "./neutron" "$BIN_DIR/"
 sudo cp "./box" "$BIN_DIR/"
-if [ -f "./neutron-lsp" ]; then
+
+# Install neutron-lsp if found and working
+if [ -n "$NEUTRON_LSP_PATH" ]; then
     echo "Installing neutron-lsp..."
-    sudo cp "./neutron-lsp" "$BIN_DIR/"
+    if check_binary "$NEUTRON_LSP_PATH" "neutron-lsp"; then
+        sudo cp "$NEUTRON_LSP_PATH" "$BIN_DIR/"
+        echo "neutron-lsp installed successfully"
+    else
+        echo "Warning: neutron-lsp has dependency issues. Installing anyway..."
+        sudo cp "$NEUTRON_LSP_PATH" "$BIN_DIR/"
+        echo "You may need to install missing dependencies manually"
+    fi
 fi
 
 # Install include files
@@ -151,6 +242,11 @@ for lib_file in libneutron_runtime.so* libneutron_runtime.dylib* libneutron_runt
     fi
 done
 
+# Copy shared library from build directory if it exists
+if [ -f "./build/libneutron_shared.so" ]; then
+    sudo cp "./build/libneutron_shared.so" "$LIB_DIR/"
+fi
+
 # Install source files for fallback compilation
 if [ -d "./src" ]; then
     sudo mkdir -p "$SHARE_DIR/neutron/src"
@@ -170,6 +266,12 @@ if [ -d "./nt-box" ]; then
     sudo mkdir -p "$BIN_DIR/nt-box"
     sudo cp -r "./nt-box/." "$BIN_DIR/nt-box/"
     echo "  nt-box installed to: $BIN_DIR/nt-box"
+fi
+
+# Update library cache on Linux
+if [[ "$SYSTEM_TYPE" == "Linux" ]]; then
+    echo "Updating library cache..."
+    sudo ldconfig
 fi
 
 # Set NEUTRON_HOME environment variable hint
@@ -215,3 +317,18 @@ if [ -f "$BIN_DIR/neutron-lsp" ]; then
     echo "  neutron-lsp --version"
 fi
 echo ""
+
+# Final dependency check
+echo "Final dependency check:"
+check_binary "$BIN_DIR/neutron" "neutron"
+check_binary "$BIN_DIR/box" "box"
+if [ -f "$BIN_DIR/neutron-lsp" ]; then
+    if check_binary "$BIN_DIR/neutron-lsp" "neutron-lsp"; then
+        echo "All binaries are working correctly!"
+    else
+        echo ""
+        echo "WARNING: neutron-lsp may not work due to missing dependencies."
+        echo "Try running: sudo apt-get install libjsoncpp-dev libcurl4-openssl-dev"
+        echo "Or install the equivalent packages for your distribution."
+    fi
+fi

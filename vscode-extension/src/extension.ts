@@ -56,12 +56,35 @@ export function activate(context: ExtensionContext) {
         
         // Try each workspace folder
         for (const folder of workspace.workspaceFolders) {
+            // Check build directory first
             const buildPath = path.join(folder.uri.fsPath, 'build', executableName);
             outputChannel.appendLine(`[Extension] Checking: ${buildPath}`);
             
             if (fs.existsSync(buildPath)) {
                 serverCommand = buildPath;
                 outputChannel.appendLine(`[Extension] Found LSP at: ${buildPath}`);
+                break;
+            }
+            
+            // Check build/Release directory (Windows MSVC)
+            if (isWindows) {
+                const releasePath = path.join(folder.uri.fsPath, 'build', 'Release', executableName);
+                outputChannel.appendLine(`[Extension] Checking: ${releasePath}`);
+                
+                if (fs.existsSync(releasePath)) {
+                    serverCommand = releasePath;
+                    outputChannel.appendLine(`[Extension] Found LSP at: ${releasePath}`);
+                    break;
+                }
+            }
+            
+            // Check project root (after running fix-lsp script)
+            const rootPath = path.join(folder.uri.fsPath, executableName);
+            outputChannel.appendLine(`[Extension] Checking: ${rootPath}`);
+            
+            if (fs.existsSync(rootPath)) {
+                serverCommand = rootPath;
+                outputChannel.appendLine(`[Extension] Found LSP at: ${rootPath}`);
                 break;
             }
         }
@@ -129,7 +152,30 @@ export function activate(context: ExtensionContext) {
   }).catch((error: Error) => {
       outputChannel.appendLine(`[Extension] Client start error: ${error.message}`);
       outputChannel.appendLine(`[Extension] Stack: ${error.stack}`);
-      window.showErrorMessage(`Neutron LSP failed: ${error.message}`);
+      
+      // Provide helpful error messages based on the error
+      if (error.message.includes('EPIPE') || error.message.includes('ENOENT')) {
+          const isWindows = process.platform === 'win32';
+          const fixScript = isWindows ? 'scripts\\fix-lsp.bat' : 'scripts/fix-lsp.sh';
+          
+          window.showErrorMessage(
+              `Neutron LSP failed to start. This is usually due to missing dependencies.`,
+              'Open Fix Guide',
+              'Retry'
+          ).then(selection => {
+              if (selection === 'Open Fix Guide') {
+                  const message = isWindows 
+                      ? `To fix LSP issues on Windows:\n\n1. Run ${fixScript} from the Neutron source directory\n2. Or install Visual C++ Redistributable from:\n   https://aka.ms/vs/17/release/vc_redist.x64.exe\n3. Reload VS Code`
+                      : `To fix LSP issues on Linux/macOS:\n\n1. Run ${fixScript} from the Neutron source directory\n2. Or install dependencies manually:\n   sudo apt install libjsoncpp-dev libcurl4-openssl-dev\n3. Reload VS Code`;
+                  
+                  window.showInformationMessage(message, { modal: true });
+              } else if (selection === 'Retry') {
+                  commands.executeCommand('workbench.action.reloadWindow');
+              }
+          });
+      } else {
+          window.showErrorMessage(`Neutron LSP failed: ${error.message}`);
+      }
   });
   
   // Register Run command

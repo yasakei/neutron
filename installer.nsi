@@ -75,6 +75,16 @@ Section "Neutron Core" SecNeutron
   File /nonfatal "zlib1.dll"
   File /nonfatal "dl.dll"
   
+  ; Copy vcpkg DLLs for neutron-lsp
+  File /nonfatal "build\vcpkg_installed\x64-windows\bin\jsoncpp.dll"
+  File /nonfatal "build\vcpkg_installed\x64-windows\bin\libcurl.dll"
+  File /nonfatal "build\vcpkg_installed\x64-windows\bin\zlib1.dll"
+  
+  ; Copy Visual C++ runtime DLLs if available
+  File /nonfatal "vcruntime140.dll"
+  File /nonfatal "msvcp140.dll"
+  File /nonfatal "vcruntime140_1.dll"
+  
   ; Install headers (required for building native modules)
   ; Copy the entire include directory structure
   SetOutPath "$INSTDIR"

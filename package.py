@@ -1223,13 +1223,36 @@ def main():
          
          # Copy DLLs (needed for vcpkg dynamic linking)
          dll_count = 0
+         
+         # Copy DLLs from build directory
          for dll in glob.glob(os.path.join(build_dir, "Release", "*.dll")):
              shutil.copy2(dll, root_dir)
              dll_count += 1
          for dll in glob.glob(os.path.join(build_dir, "*.dll")):
              shutil.copy2(dll, root_dir)
              dll_count += 1
-         Colors.print(f"Copied {dll_count} DLL files", Colors.GREEN)
+             
+         # Copy vcpkg DLLs (for neutron-lsp dependencies)
+         vcpkg_bin_dir = os.path.join(root_dir, "vcpkg", "installed", "x64-windows", "bin")
+         if os.path.exists(vcpkg_bin_dir):
+             for dll_name in ["jsoncpp.dll", "libcurl.dll", "zlib1.dll"]:
+                 dll_path = os.path.join(vcpkg_bin_dir, dll_name)
+                 if os.path.exists(dll_path):
+                     shutil.copy2(dll_path, root_dir)
+                     dll_count += 1
+                     Colors.print(f"Copied vcpkg DLL: {dll_name}", Colors.GREEN)
+         
+         # Try alternative vcpkg path structure
+         vcpkg_bin_dir2 = os.path.join(build_dir, "vcpkg_installed", "x64-windows", "bin")
+         if os.path.exists(vcpkg_bin_dir2):
+             for dll_name in ["jsoncpp.dll", "libcurl.dll", "zlib1.dll"]:
+                 dll_path = os.path.join(vcpkg_bin_dir2, dll_name)
+                 if os.path.exists(dll_path):
+                     shutil.copy2(dll_path, root_dir)
+                     dll_count += 1
+                     Colors.print(f"Copied vcpkg DLL: {dll_name}", Colors.GREEN)
+         
+         Colors.print(f"Copied {dll_count} DLL files total", Colors.GREEN)
          
          # Copy runtime lib if it exists
          lib_count = 0
