@@ -9,18 +9,20 @@ namespace neutron {
 namespace lsp {
 
 // Helper to safely access JSON values
-// We explicit cast to std::string const& to avoid ambiguous overload 
-// or preference for string_view which is missing in the linked library on macOS.
+// Explicitly use std::string to avoid string_view overloads
 static inline bool has(const Json::Value& v, const char* key) {
-    return v.isMember(static_cast<const std::string&>(std::string(key)));
+    std::string k(key);
+    return v.isMember(k);
 }
 
 static inline const Json::Value& get(const Json::Value& v, const char* key) {
-    return v[static_cast<const std::string&>(std::string(key))];
+    std::string k(key);
+    return v[k];
 }
 
 static inline Json::Value& set(Json::Value& v, const char* key) {
-    return v[static_cast<const std::string&>(std::string(key))];
+    std::string k(key);
+    return v[k];
 }
 
 LSPServer::LSPServer() : running(true) {}
