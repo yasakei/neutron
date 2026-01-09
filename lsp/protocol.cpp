@@ -3,15 +3,13 @@
 namespace neutron {
 namespace lsp {
 
-// Helper to safely set JSON values (avoids string_view issues on older jsoncpp)
+// Helper to safely set JSON values (force const char* overload)
 static inline Json::Value& pset(Json::Value& v, const char* key) {
-    std::string k(key);
-    return v[k];
+    return v[key];
 }
 
 static inline const Json::Value& pget(const Json::Value& v, const char* key) {
-    std::string k(key);
-    return v[k];
+    return v[key];
 }
 
 Json::Value Position::toJson() const {
@@ -22,11 +20,9 @@ Json::Value Position::toJson() const {
 }
 
 Position Position::fromJson(const Json::Value& json) {
-    std::string lineKey("line");
-    std::string charKey("character");
     return {
-        json.get(lineKey, 0).asInt(),
-        json.get(charKey, 0).asInt()
+        json.get("line", 0).asInt(),
+        json.get("character", 0).asInt()
     };
 }
 
