@@ -417,7 +417,7 @@ elseif(WIN32)
 endif()
 
 # Install targets
-install(TARGETS neutron neutron_runtime neutron_shared neutron-lsp
+install(TARGETS neutron neutron_runtime neutron_shared
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib-native
     ARCHIVE DESTINATION lib-native
@@ -487,3 +487,8 @@ if(WIN32)
     )
     target_link_libraries(neutron-lsp ${DLFCN_WIN})
 endif()
+
+# Install LSP server
+install(TARGETS neutron-lsp
+    RUNTIME DESTINATION bin
+)
