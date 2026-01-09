@@ -10,15 +10,15 @@ namespace lsp {
 
 // Helper to safely access JSON values using string literals
 static inline bool has(const Json::Value &v, const char *key) {
-  return v.isMember(JKey(key));
+  return v.isMember(key);
 }
 
 static inline const Json::Value &get(const Json::Value &v, const char *key) {
-  return v[JKey(key)];
+  return v[key];
 }
 
 static inline Json::Value &set(Json::Value &v, const char *key) {
-  return v[JKey(key)];
+  return v[key];
 }
 
 LSPServer::LSPServer() : running(true) {}

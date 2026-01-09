@@ -522,6 +522,11 @@ if(NOT MSVC)
     target_link_options(neutron-lsp PRIVATE -fno-lto)
 endif()
 
+# Force disable string_view support in JsonCpp to avoid linker errors on macOS
+if(APPLE)
+    target_compile_definitions(neutron-lsp PRIVATE JSON_HAS_STRING_VIEW=0 JSON_USE_STRING_VIEW=0)
+endif()
+
 target_link_libraries(neutron-lsp 
     neutron_runtime_nolto
     ${JSONCPP_LIBRARIES}

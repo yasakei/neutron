@@ -11,8 +11,7 @@ Json::Value Position::toJson() const {
 }
 
 Position Position::fromJson(const Json::Value &json) {
-  return {json.get(JKey("line"), 0).asInt(),
-          json.get(JKey("character"), 0).asInt()};
+  return {json.get("line", 0).asInt(), json.get("character", 0).asInt()};
 }
 
 Json::Value Range::toJson() const {
@@ -23,8 +22,7 @@ Json::Value Range::toJson() const {
 }
 
 Range Range::fromJson(const Json::Value &json) {
-  return {Position::fromJson(json[JKey("start")]),
-          Position::fromJson(json[JKey("end")])};
+  return {Position::fromJson(json["start"]), Position::fromJson(json["end"])};
 }
 
 Json::Value Diagnostic::toJson() const {

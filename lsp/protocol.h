@@ -1,7 +1,7 @@
 #ifndef NEUTRON_LSP_PROTOCOL_H
 #define NEUTRON_LSP_PROTOCOL_H
 
-#include "json_compat.h"
+#include <json/json.h>
 #include <optional>
 #include <string>
 #include <vector>
