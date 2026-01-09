@@ -16,9 +16,6 @@ elseif(UNIX)
     add_definitions(-DNEUTRON_LINUX)
 endif()
 
-# JsonCpp string_view support - let the library decide
-# Don't force disable string_view as it may be compiled into the library
-
 # =============================================================================
 # Build Options
 # =============================================================================
@@ -470,73 +467,16 @@ add_test(NAME functions_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/test_
 # --------------------------------------------------------
 # LSP Server
 # --------------------------------------------------------
-# Create a non-LTO runtime library for LSP to avoid mixing LTO/non-LTO objects
-add_library(neutron_runtime_nolto STATIC
-    ${NEUTRON_LIBRARY_SOURCES}
-)
-
-# Disable LTO for this library
-set_target_properties(neutron_runtime_nolto PROPERTIES
-    INTERPROCEDURAL_OPTIMIZATION FALSE
-    POSITION_INDEPENDENT_CODE ON
-)
-
-# Remove LTO flags
-if(NOT MSVC)
-    target_compile_options(neutron_runtime_nolto PRIVATE -fno-lto)
-endif()
-
-target_link_libraries(neutron_runtime_nolto
-    ${JSONCPP_LIBRARIES}
-    ${DLFCN_WIN}
-)
-
-if(TARGET CURL::libcurl)
-    target_link_libraries(neutron_runtime_nolto CURL::libcurl)
-    target_compile_definitions(neutron_runtime_nolto PRIVATE HAVE_CURL)
-elseif(TARGET PkgConfig::CURL)
-    target_link_libraries(neutron_runtime_nolto PkgConfig::CURL)
-    target_compile_definitions(neutron_runtime_nolto PRIVATE HAVE_CURL)
-endif()
-
-if(WIN32)
-    target_link_libraries(neutron_runtime_nolto kernel32 ws2_32)
-    target_compile_definitions(neutron_runtime_nolto PRIVATE _CRT_SECURE_NO_WARNINGS)
-endif()
-
-# Now create the LSP executable
 add_executable(neutron-lsp 
     lsp/main.cpp 
     lsp/server.cpp 
     lsp/protocol.cpp
 )
 
-# Disable LTO for LSP to avoid string_view overload resolution issues with JsonCpp
-set_target_properties(neutron-lsp PROPERTIES
-    INTERPROCEDURAL_OPTIMIZATION FALSE
-)
-
-# Remove LTO flags for LSP compilation
-if(NOT MSVC)
-    target_compile_options(neutron-lsp PRIVATE -fno-lto)
-    target_link_options(neutron-lsp PRIVATE -fno-lto)
-endif()
-
-# Force disable string_view support in JsonCpp to avoid linker errors on macOS
-if(APPLE)
-    target_compile_definitions(neutron-lsp PRIVATE JSON_HAS_STRING_VIEW=0 JSON_USE_STRING_VIEW=0)
-    add_compile_definitions(JSON_HAS_STRING_VIEW=0 JSON_USE_STRING_VIEW=0)
-endif()
-
 target_link_libraries(neutron-lsp 
-    neutron_runtime_nolto
+    neutron_runtime
     ${JSONCPP_LIBRARIES}
 )
-
-# On macOS with Homebrew JsonCpp, explicitly link the library to avoid ABI issues
-if(APPLE AND TARGET PkgConfig::JSONCPP)
-    target_link_libraries(neutron-lsp -ljsoncpp)
-endif()
 
 if(WIN32)
     set_target_properties(neutron-lsp PROPERTIES
@@ -544,8 +484,3 @@ if(WIN32)
     )
     target_link_libraries(neutron-lsp ${DLFCN_WIN})
 endif()
-
-# Install LSP server
-install(TARGETS neutron-lsp
-    RUNTIME DESTINATION bin
-)
