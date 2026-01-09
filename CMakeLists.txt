@@ -417,7 +417,7 @@ elseif(WIN32)
 endif()
 
 # Install targets
-install(TARGETS neutron neutron_runtime neutron_shared
+install(TARGETS neutron neutron_runtime neutron_shared neutron-lsp
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib-native
     ARCHIVE DESTINATION lib-native
@@ -474,12 +474,6 @@ add_executable(neutron-lsp
     lsp/main.cpp 
     lsp/server.cpp 
     lsp/protocol.cpp
-)
-
-# Ensure LSP uses the same JsonCpp compatibility settings
-target_compile_definitions(neutron-lsp PRIVATE 
-    JSONCPP_HAS_STRING_VIEW=0 
-    JSON_HAS_STRING_VIEW=0
 )
 
 target_link_libraries(neutron-lsp 
