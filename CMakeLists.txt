@@ -511,6 +511,12 @@ set_target_properties(neutron-lsp PROPERTIES
     INTERPROCEDURAL_OPTIMIZATION FALSE
 )
 
+# Force disable string_view in JsonCpp
+target_compile_definitions(neutron-lsp PRIVATE 
+    JSONCPP_HAS_STRING_VIEW=0 
+    JSON_HAS_STRING_VIEW=0
+)
+
 # Remove LTO flags for LSP compilation
 if(NOT MSVC)
     target_compile_options(neutron-lsp PRIVATE -fno-lto)
