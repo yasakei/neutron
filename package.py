@@ -498,7 +498,7 @@ def preflight_check_windows():
     return ok
 
 
-def build_neutron(os_type, arch_type, build_dir="build", skip_vcpkg=False, debug=False):
+def build_neutron(os_type, arch_type, build_dir="build", skip_vcpkg=False, debug=False, static_lsp=False):
     """Configure and build Neutron. If vcpkg fails due to third-party tool issues
     (e.g. PowerShell extraction toolchain), we will warn and continue so that
     other parts (like Box) can still be built and the packaging flow can proceed.
@@ -525,6 +525,8 @@ def build_neutron(os_type, arch_type, build_dir="build", skip_vcpkg=False, debug
     else:
         build_type = "Debug" if debug else "Release"
         cmake_cmd = [cmake_exe, "..", f"-DCMAKE_BUILD_TYPE={build_type}"]
+        if static_lsp and os_type == "linux":
+            cmake_cmd.append("-DCMAKE_EXE_LINKER_FLAGS=-static-libgcc -static-libstdc++")
         run_cwd = build_dir
         os.chdir(build_dir)  # Change to build directory for Unix systems
 

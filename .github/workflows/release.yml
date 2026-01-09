@@ -15,7 +15,7 @@ on:
 jobs:
   build-linux-x64:
     name: Build Linux x64 Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     
     steps:
     - name: Checkout code
@@ -32,12 +32,21 @@ jobs:
           pkg-config \
           libcurl4-openssl-dev \
           libjsoncpp-dev
+        
+        # Check jsoncpp version
+        echo "Installed jsoncpp version:"
+        pkg-config --modversion jsoncpp || echo "jsoncpp version not available via pkg-config"
+        ls -la /usr/lib/x86_64-linux-gnu/libjsoncpp.so* || ls -la /usr/lib/libjsoncpp.so* || echo "jsoncpp library files not found"
           
     - name: Build Neutron Runtime
       run: |
         cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
         cmake --build build
         cmake --build build --target neutron-lsp
+        
+        # Verify LSP dependencies
+        echo "LSP dependencies:"
+        ldd build/neutron-lsp || echo "Static binary (no dynamic dependencies)"
         
     - name: Setup Node.js
       uses: actions/setup-node@v3
@@ -100,6 +109,10 @@ jobs:
         cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
         cmake --build build
         cmake --build build --target neutron-lsp
+        
+        # Verify LSP dependencies
+        echo "LSP dependencies:"
+        otool -L build/neutron-lsp || echo "Could not check dependencies"
         
     - name: Setup Node.js
       uses: actions/setup-node@v3

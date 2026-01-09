@@ -27,9 +27,24 @@ fi
 
 echo "Testing neutron-lsp dependencies..."
 if ldd neutron-lsp | grep -q "not found"; then
-    echo "Warning: neutron-lsp still has missing dependencies:"
+    echo "Warning: neutron-lsp has missing dependencies:"
     ldd neutron-lsp | grep "not found"
     echo ""
+    
+    # Check for jsoncpp version mismatch
+    if ldd neutron-lsp | grep -q "libjsoncpp.so.25.*not found"; then
+        echo "Detected jsoncpp version mismatch."
+        echo "neutron-lsp requires libjsoncpp version 1.9.5 (libjsoncpp25)"
+        echo "Installing correct version..."
+        
+        if command -v apt-get >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y libjsoncpp25
+        else
+            echo "Please install libjsoncpp25 (version 1.9.5) manually"
+        fi
+    fi
+    
     echo "Installing missing dependencies..."
     
     # Try to install dependencies based on the distribution

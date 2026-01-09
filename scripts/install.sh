@@ -97,6 +97,8 @@ check_dependencies() {
             echo "Detected apt package manager"
             echo "Installing dependencies with apt..."
             sudo apt-get update
+            # Try to install the version that matches CI build, fallback to latest
+            sudo apt-get install -y libjsoncpp25 libcurl4-openssl-dev || \
             sudo apt-get install -y libjsoncpp-dev libcurl4-openssl-dev
         elif command -v yum >/dev/null 2>&1; then
             echo "Detected yum package manager"
@@ -116,7 +118,7 @@ check_dependencies() {
             sudo zypper install -y libjsoncpp-devel libcurl-devel
         else
             echo "Warning: Could not detect package manager. Please install manually:"
-            echo "  - libjsoncpp (development package)"
+            echo "  - jsoncpp (development package)"
             echo "  - libcurl (development package)"
         fi
     elif [[ "$SYSTEM_TYPE" == "macOS" ]]; then
@@ -328,7 +330,9 @@ if [ -f "$BIN_DIR/neutron-lsp" ]; then
     else
         echo ""
         echo "WARNING: neutron-lsp may not work due to missing dependencies."
-        echo "Try running: sudo apt-get install libjsoncpp-dev libcurl4-openssl-dev"
-        echo "Or install the equivalent packages for your distribution."
+        
+        echo "Try running: sudo apt-get install libjsoncpp25 libcurl4-openssl-dev"
+        echo "Or install jsoncpp and libcurl for your distribution."
+        echo "Note: If you get library version errors, rebuild neutron-lsp locally with: cmake --build build --target neutron-lsp"
     fi
 fi
