@@ -1,10 +1,6 @@
 #ifndef NEUTRON_LSP_PROTOCOL_H
 #define NEUTRON_LSP_PROTOCOL_H
 
-// Force JsonCpp to NOT use string_view
-#define JSONCPP_HAS_STRING_VIEW 0
-#define JSON_HAS_STRING_VIEW 0
-
 #include <string>
 #include <vector>
 #include <optional>

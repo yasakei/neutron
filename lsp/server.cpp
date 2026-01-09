@@ -1,7 +1,3 @@
-// Force JsonCpp to NOT use string_view
-#define JSONCPP_HAS_STRING_VIEW 0
-#define JSON_HAS_STRING_VIEW 0
-
 #include "server.h"
 #include <iostream>
 #include <sstream>
@@ -12,17 +8,17 @@
 namespace neutron {
 namespace lsp {
 
-// Helper to safely access JSON values using std::string to avoid string_view issues
+// Helper to safely access JSON values using string literals
 static inline bool has(const Json::Value& v, const char* key) {
-    return v.isMember(std::string(key));
+    return v.isMember(key);
 }
 
 static inline const Json::Value& get(const Json::Value& v, const char* key) {
-    return v[std::string(key)];
+    return v[key];
 }
 
 static inline Json::Value& set(Json::Value& v, const char* key) {
-    return v[std::string(key)];
+    return v[key];
 }
 
 LSPServer::LSPServer() : running(true) {}

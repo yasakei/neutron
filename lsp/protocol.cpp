@@ -1,7 +1,3 @@
-// Force JsonCpp to NOT use string_view
-#define JSONCPP_HAS_STRING_VIEW 0
-#define JSON_HAS_STRING_VIEW 0
-
 #include "protocol.h"
 
 namespace neutron {
@@ -9,8 +5,8 @@ namespace lsp {
 
 Json::Value Position::toJson() const {
     Json::Value json;
-    json[std::string("line")] = line;
-    json[std::string("character")] = character;
+    json["line"] = line;
+    json["character"] = character;
     return json;
 }
 
@@ -23,24 +19,24 @@ Position Position::fromJson(const Json::Value& json) {
 
 Json::Value Range::toJson() const {
     Json::Value json;
-    json[std::string("start")] = start.toJson();
-    json[std::string("end")] = end.toJson();
+    json["start"] = start.toJson();
+    json["end"] = end.toJson();
     return json;
 }
 
 Range Range::fromJson(const Json::Value& json) {
     return {
-        Position::fromJson(json[std::string("start")]),
-        Position::fromJson(json[std::string("end")])
+        Position::fromJson(json["start"]),
+        Position::fromJson(json["end"])
     };
 }
 
 Json::Value Diagnostic::toJson() const {
     Json::Value json;
-    json[std::string("range")] = range.toJson();
-    json[std::string("severity")] = static_cast<int>(severity);
-    json[std::string("message")] = message;
-    json[std::string("source")] = source;
+    json["range"] = range.toJson();
+    json["severity"] = static_cast<int>(severity);
+    json["message"] = message;
+    json["source"] = source;
     return json;
 }
 
