@@ -499,6 +499,11 @@ elseif(TARGET PkgConfig::CURL)
     target_compile_definitions(neutron_runtime_nolto PRIVATE HAVE_CURL)
 endif()
 
+if(WIN32)
+    target_link_libraries(neutron_runtime_nolto kernel32 ws2_32)
+    target_compile_definitions(neutron_runtime_nolto PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+
 # Now create the LSP executable
 add_executable(neutron-lsp 
     lsp/main.cpp 
