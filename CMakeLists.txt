@@ -522,6 +522,11 @@ target_link_libraries(neutron-lsp
     ${JSONCPP_LIBRARIES}
 )
 
+# On macOS with Homebrew JsonCpp, explicitly link the library to avoid ABI issues
+if(APPLE AND TARGET PkgConfig::JSONCPP)
+    target_link_libraries(neutron-lsp -ljsoncpp)
+endif()
+
 if(WIN32)
     set_target_properties(neutron-lsp PROPERTIES
         OUTPUT_NAME neutron-lsp
