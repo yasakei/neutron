@@ -476,6 +476,12 @@ add_executable(neutron-lsp
     lsp/protocol.cpp
 )
 
+# Ensure LSP uses the same JsonCpp compatibility settings
+target_compile_definitions(neutron-lsp PRIVATE 
+    JSONCPP_HAS_STRING_VIEW=0 
+    JSON_HAS_STRING_VIEW=0
+)
+
 target_link_libraries(neutron-lsp 
     neutron_runtime
     ${JSONCPP_LIBRARIES}
