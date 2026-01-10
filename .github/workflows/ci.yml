@@ -14,6 +14,10 @@ jobs:
     container: archlinux:latest
     
     steps:
+    - name: Install Git (required for checkout with submodules)
+      run: |
+        pacman -Sy --noconfirm git
+    
     - name: Checkout code
       uses: actions/checkout@v4
       with:
