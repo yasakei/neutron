@@ -1,0 +1,141 @@
+say("=== Test String Case Conversion Methods ===");
+
+// Test upper method
+var testStr = "Hello World";
+var upperResult = testStr.upper();
+if (upperResult == "HELLO WORLD") {
+    say("✓ upper() method passed");
+} else {
+    say("✗ upper() method failed: '" + upperResult + "'");
+}
+
+// Test lower method
+var lowerResult = testStr.lower();
+if (lowerResult == "hello world") {
+    say("✓ lower() method passed");
+} else {
+    say("✗ lower() method failed: '" + lowerResult + "'");
+}
+
+// Test capitalize method
+var capitalizeResult = testStr.capitalize();
+if (capitalizeResult == "Hello world") {
+    say("✓ capitalize() method passed");
+} else {
+    say("✗ capitalize() method failed: '" + capitalizeResult + "'");
+}
+
+// Test capitalize with leading non-alpha characters
+var leadingNonAlpha = "123hello world";
+var capitalizeNonAlpha = leadingNonAlpha.capitalize();
+if (capitalizeNonAlpha == "123hello world") {
+    say("✓ capitalize() with leading numbers passed");
+} else {
+    say("✗ capitalize() with leading numbers failed: '" + capitalizeNonAlpha + "'");
+}
+
+// Test title method
+var titleResult = testStr.title();
+if (titleResult == "Hello World") {
+    say("✓ title() method passed");
+} else {
+    say("✗ title() method failed: '" + titleResult + "'");
+}
+
+// Test title with multiple words and punctuation
+var complexTitle = "hello-world test_case";
+var complexTitleResult = complexTitle.title();
+if (complexTitleResult == "Hello-World Test_Case") {
+    say("✓ title() with punctuation passed");
+} else {
+    say("✗ title() with punctuation failed: '" + complexTitleResult + "'");
+}
+
+// Test title with numbers
+var titleWithNumbers = "hello123world";
+var titleNumbersResult = titleWithNumbers.title();
+if (titleNumbersResult == "Hello123World") {
+    say("✓ title() with numbers passed");
+} else {
+    say("✗ title() with numbers failed: '" + titleNumbersResult + "'");
+}
+
+// Test empty string cases
+var emptyStr = "";
+if (emptyStr.upper() == "" and emptyStr.lower() == "" and emptyStr.capitalize() == "" and emptyStr.title() == "") {
+    say("✓ Empty string case methods passed");
+} else {
+    say("✗ Empty string case methods failed");
+}
+
+// Test single character
+var singleChar = "a";
+if (singleChar.upper() == "A" and singleChar.capitalize() == "A" and singleChar.title() == "A") {
+    say("✓ Single character case methods passed");
+} else {
+    say("✗ Single character case methods failed");
+}
+
+// Test all uppercase string
+var allUpper = "HELLO WORLD";
+if (allUpper.lower() == "hello world" and allUpper.capitalize() == "Hello world") {
+    say("✓ All uppercase conversion passed");
+} else {
+    say("✗ All uppercase conversion failed");
+}
+
+// Test mixed case with special characters
+var mixedSpecial = "hELLo@WoRLD!123";
+var mixedUpper = mixedSpecial.upper();
+var mixedLower = mixedSpecial.lower();
+var mixedTitle = mixedSpecial.title();
+if (mixedUpper == "HELLO@WORLD!123" and mixedLower == "hello@world!123" and mixedTitle == "Hello@World!123") {
+    say("✓ Mixed case with special characters passed");
+} else {
+    say("✗ Mixed case with special characters failed: upper='" + mixedUpper + "', lower='" + mixedLower + "', title='" + mixedTitle + "'");
+}
+
+// Test swapcase method
+var swapTest = "Hello World";
+var swapResult = swapTest.swapcase();
+if (swapResult == "hELLO wORLD") {
+    say("✓ swapcase() method passed");
+} else {
+    say("✗ swapcase() method failed: '" + swapResult + "'");
+}
+
+// Test swapcase with mixed content
+var swapMixed = "hELLo123WoRLD!";
+var swapMixedResult = swapMixed.swapcase();
+if (swapMixedResult == "HellO123wOrld!") {
+    say("✓ swapcase() with mixed content passed");
+} else {
+    say("✗ swapcase() with mixed content failed: '" + swapMixedResult + "'");
+}
+
+// Test casefold method (should be same as lower for ASCII)
+var casefoldTest = "Hello World";
+var casefoldResult = casefoldTest.casefold();
+if (casefoldResult == "hello world") {
+    say("✓ casefold() method passed");
+} else {
+    say("✗ casefold() method failed: '" + casefoldResult + "'");
+}
+
+// Test casefold with mixed case
+var casefoldMixed = "HeLLo WoRLD";
+var casefoldMixedResult = casefoldMixed.casefold();
+if (casefoldMixedResult == "hello world") {
+    say("✓ casefold() with mixed case passed");
+} else {
+    say("✗ casefold() with mixed case failed: '" + casefoldMixedResult + "'");
+}
+
+// Test empty string for new methods
+if (emptyStr.swapcase() == "" and emptyStr.casefold() == "") {
+    say("✓ Empty string swapcase/casefold methods passed");
+} else {
+    say("✗ Empty string swapcase/casefold methods failed");
+}
+
+say("=== String Case Conversion Methods Tests Complete ===");

@@ -240,6 +240,7 @@ def main():
     test_dirs = [
         "tests/fixes",
         "tests/core", 
+        "tests/string",
         "tests/operators",
         "tests/control-flow",
         "tests/functions",

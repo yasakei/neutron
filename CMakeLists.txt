@@ -164,6 +164,8 @@ set(NEUTRON_TYPES_SOURCES
     src/types/return.cpp
     src/types/version.cpp
     src/types/obj_string.cpp
+    src/types/string_method_registry.cpp
+    src/types/string_search_methods.cpp
 )
 
 # Runtime source files

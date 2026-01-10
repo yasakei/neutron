@@ -1,0 +1,137 @@
+say("=== Property Test: Case Conversion Consistency ===");
+
+// Property Test 3: Case Conversion Consistency
+// This validates that case conversion methods behave consistently
+// and maintain expected relationships between different case operations
+
+var passed = 0;
+var total = 0;
+
+// Property 1: upper().lower() should be idempotent with lower()
+total = total + 1;
+var testStr = "Hello World";
+var upperLower = testStr.upper().lower();
+var directLower = testStr.lower();
+if (upperLower == directLower and upperLower == "hello world") {
+    say("✓ Property: upper().lower() equivalent to lower()");
+    passed = passed + 1;
+} else {
+    say("✗ Property: upper().lower() not equivalent: '" + upperLower + "' vs '" + directLower + "'");
+}
+
+// Property 2: lower().upper() should be idempotent with upper()
+total = total + 1;
+var lowerUpper = testStr.lower().upper();
+var directUpper = testStr.upper();
+if (lowerUpper == directUpper and lowerUpper == "HELLO WORLD") {
+    say("✓ Property: lower().upper() equivalent to upper()");
+    passed = passed + 1;
+} else {
+    say("✗ Property: lower().upper() not equivalent: '" + lowerUpper + "' vs '" + directUpper + "'");
+}
+
+// Property 3: swapcase().swapcase() should return original string
+total = total + 1;
+var doubleSwap = testStr.swapcase().swapcase();
+if (doubleSwap == testStr) {
+    say("✓ Property: swapcase() is self-inverse");
+    passed = passed + 1;
+} else {
+    say("✗ Property: swapcase() not self-inverse: '" + doubleSwap + "' vs '" + testStr + "'");
+}
+
+// Property 4: casefold() should be equivalent to lower() for ASCII
+total = total + 1;
+var casefoldResult = testStr.casefold();
+var lowerResult = testStr.lower();
+if (casefoldResult == lowerResult and casefoldResult == "hello world") {
+    say("✓ Property: casefold() equivalent to lower() for ASCII");
+    passed = passed + 1;
+} else {
+    say("✗ Property: casefold() not equivalent to lower(): '" + casefoldResult + "' vs '" + lowerResult + "'");
+}
+
+// Property 5: capitalize() should lowercase all but first alphabetic character
+total = total + 1;
+var mixedCase = "hELLO wORLD";
+var capitalizeResult = mixedCase.capitalize();
+if (capitalizeResult == "Hello world") {
+    say("✓ Property: capitalize() lowercases all but first");
+    passed = passed + 1;
+} else {
+    say("✗ Property: capitalize() failed: '" + capitalizeResult + "'");
+}
+
+// Property 6: title() should capitalize first letter of each word
+total = total + 1;
+var multiWord = "hello world test";
+var titleResult = multiWord.title();
+if (titleResult == "Hello World Test") {
+    say("✓ Property: title() capitalizes each word");
+    passed = passed + 1;
+} else {
+    say("✗ Property: title() failed: '" + titleResult + "'");
+}
+
+// Property 7: Case methods should preserve string length
+total = total + 1;
+var originalLength = testStr.length;
+if (testStr.upper().length == originalLength and 
+    testStr.lower().length == originalLength and
+    testStr.capitalize().length == originalLength and
+    testStr.title().length == originalLength and
+    testStr.swapcase().length == originalLength and
+    testStr.casefold().length == originalLength) {
+    say("✓ Property: Case methods preserve string length");
+    passed = passed + 1;
+} else {
+    say("✗ Property: Case methods don't preserve length");
+}
+
+// Property 8: Case methods should preserve non-alphabetic characters
+total = total + 1;
+var withSpecial = "Hello@World!123";
+var upperSpecial = withSpecial.upper();
+var lowerSpecial = withSpecial.lower();
+if (upperSpecial == "HELLO@WORLD!123" and lowerSpecial == "hello@world!123") {
+    say("✓ Property: Case methods preserve non-alphabetic characters");
+    passed = passed + 1;
+} else {
+    say("✗ Property: Case methods don't preserve special chars: upper='" + upperSpecial + "', lower='" + lowerSpecial + "'");
+}
+
+// Property 9: Empty string should remain empty for all case operations
+total = total + 1;
+var emptyStr = "";
+if (emptyStr.upper() == "" and emptyStr.lower() == "" and 
+    emptyStr.capitalize() == "" and emptyStr.title() == "" and
+    emptyStr.swapcase() == "" and emptyStr.casefold() == "") {
+    say("✓ Property: Empty string remains empty for all case operations");
+    passed = passed + 1;
+} else {
+    say("✗ Property: Empty string case operations failed");
+}
+
+// Property 10: Case operations should be consistent with character position
+total = total + 1;
+var singleLower = "a";
+var singleUpper = "A";
+if (singleLower.upper() == "A" and singleUpper.lower() == "a" and
+    singleLower.swapcase() == "A" and singleUpper.swapcase() == "a") {
+    say("✓ Property: Single character case operations consistent");
+    passed = passed + 1;
+} else {
+    say("✗ Property: Single character case operations inconsistent");
+}
+
+// Property Test Summary
+say("=== Case Conversion Property Test Results ===");
+say("Passed: " + passed + "/" + total);
+
+if (passed == total) {
+    say("✓ All case conversion property tests passed!");
+} else {
+    say("✗ Some case conversion property tests failed");
+}
+
+say("=== String Case Conversion Property Test Complete ===");
