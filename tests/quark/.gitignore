@@ -1,0 +1,7 @@
+# Neutron build artifacts
+build/
+deps/
+!deps/activate_env
+.box/
+bin/
+*.out

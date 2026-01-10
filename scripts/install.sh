@@ -333,6 +333,6 @@ if [ -f "$BIN_DIR/neutron-lsp" ]; then
         
         echo "Try running: sudo apt-get install libjsoncpp25 libcurl4-openssl-dev"
         echo "Or install jsoncpp and libcurl for your distribution."
-        echo "Note: If you get library version errors, rebuild neutron-lsp locally with: cmake --build build --target neutron-lsp"
+        echo "Note: If you get LTO version errors, rebuild neutron locally with: cmake --build build"
     fi
 fi

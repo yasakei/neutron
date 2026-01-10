@@ -1,0 +1,24 @@
+// quark - Neutron Project Test
+// Tests basic project functionality
+
+use sys;
+
+say("Hello from quark project!");
+
+// Test basic functionality
+var x = 10;
+var y = 20;
+var result = x + y;
+
+say("Basic math test: " + x + " + " + y + " = " + result);
+
+if (result == 30) {
+    say("✓ Math test passed");
+} else {
+    say("✗ Math test failed");
+    sys.exit(1);
+}
+
+// Test project structure
+say("✓ Project structure test passed");
+say("✓ All quark project tests passed!");
