@@ -264,10 +264,22 @@ for lib_file in libneutron_runtime.so* libneutron_runtime.dylib* libneutron_runt
     fi
 done
 
-# Copy shared library from build directory if it exists
-if [ -f "./build/libneutron_shared.so" ]; then
+# Copy shared library from build directory or root if it exists
+if [ -f "./libneutron_shared.so" ]; then
+    sudo cp "./libneutron_shared.so" "$LIB_DIR/"
+    echo "Copied libneutron_shared.so from root"
+elif [ -f "./build/libneutron_shared.so" ]; then
     sudo cp "./build/libneutron_shared.so" "$LIB_DIR/"
+    echo "Copied libneutron_shared.so from build directory"
 fi
+
+# Copy any other shared libraries that might be needed
+for lib_file in libneutron_shared.so* libbox_*.so*; do
+    if [ -f "./$lib_file" ]; then
+        sudo cp "./$lib_file" "$LIB_DIR/"
+        echo "Copied $lib_file"
+    fi
+done
 
 # Install source files for fallback compilation
 if [ -d "./src" ]; then
@@ -293,7 +305,24 @@ fi
 # Update library cache on Linux
 if [[ "$SYSTEM_TYPE" == "Linux" ]]; then
     echo "Updating library cache..."
+    
+    # Add /usr/local/lib to ld.so.conf if not already there
+    if [ ! -f "/etc/ld.so.conf.d/usr-local.conf" ]; then
+        echo "Adding /usr/local/lib to library search path..."
+        echo "/usr/local/lib" | sudo tee /etc/ld.so.conf.d/usr-local.conf
+    fi
+    
+    # Update the library cache
     sudo ldconfig
+    
+    # Verify the library can be found
+    if ldconfig -p | grep -q libneutron_shared; then
+        echo "✓ libneutron_shared.so is now in library cache"
+    else
+        echo "⚠ Warning: libneutron_shared.so not found in library cache"
+        echo "You may need to set LD_LIBRARY_PATH manually:"
+        echo "  export LD_LIBRARY_PATH=/usr/local/lib:\$LD_LIBRARY_PATH"
+    fi
 fi
 
 # Set NEUTRON_HOME environment variable hint
@@ -357,5 +386,9 @@ if [ -f "$BIN_DIR/neutron-lsp" ]; then
         echo "  Ubuntu/Debian: sudo apt-get install gcc-13 g++-13"
         echo "  Arch/Manjaro: sudo pacman -S gcc"
         echo "  Then rebuild with: cmake --build build"
+        echo ""
+        echo "If you get 'libneutron_shared.so: cannot open shared object file':"
+        echo "  sudo ldconfig"
+        echo "  Or add to your shell profile: export LD_LIBRARY_PATH=/usr/local/lib:\$LD_LIBRARY_PATH"
     fi
 fi

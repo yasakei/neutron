@@ -391,15 +391,15 @@ if(UNIX AND NOT APPLE)
     # Export symbols from the executable so modules can access C API functions
     target_link_options(neutron PRIVATE "-Wl,--export-dynamic")
     set_target_properties(neutron PROPERTIES
-        BUILD_RPATH "$ORIGIN"
-        INSTALL_RPATH "$ORIGIN"
+        BUILD_RPATH "$ORIGIN:$ORIGIN/../lib:/usr/local/lib"
+        INSTALL_RPATH "$ORIGIN:$ORIGIN/../lib:/usr/local/lib"
         ENABLE_EXPORTS ON
     )
 elseif(APPLE)
     target_link_libraries(neutron_runtime "-framework CoreFoundation")
     set_target_properties(neutron PROPERTIES
-        BUILD_RPATH "@executable_path"
-        INSTALL_RPATH "@executable_path"
+        BUILD_RPATH "@executable_path:@executable_path/../lib:/usr/local/lib"
+        INSTALL_RPATH "@executable_path:@executable_path/../lib:/usr/local/lib"
     )
 elseif(WIN32)
     # Windows-specific settings
