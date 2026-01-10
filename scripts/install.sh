@@ -91,6 +91,26 @@ fi
 check_dependencies() {
     echo "Checking system dependencies..."
     
+    # Check GCC version for LTO compatibility
+    if command -v gcc >/dev/null 2>&1; then
+        GCC_VERSION=$(gcc -dumpversion | cut -d. -f1)
+        echo "Detected GCC version: $GCC_VERSION"
+        
+        if [ "$GCC_VERSION" -lt 13 ]; then
+            echo "Warning: GCC $GCC_VERSION detected. For best compatibility with pre-built binaries, consider upgrading to GCC 13+:"
+            if [[ "$SYSTEM_TYPE" == "Linux" ]]; then
+                if command -v apt-get >/dev/null 2>&1; then
+                    echo "  sudo apt-get install gcc-13 g++-13"
+                elif command -v pacman >/dev/null 2>&1; then
+                    echo "  sudo pacman -S gcc"
+                elif command -v dnf >/dev/null 2>&1; then
+                    echo "  sudo dnf install gcc"
+                fi
+            fi
+            echo "  Or rebuild locally: cmake --build build"
+        fi
+    fi
+    
     if [[ "$SYSTEM_TYPE" == "Linux" ]]; then
         # Check for package manager and install dependencies
         if command -v apt-get >/dev/null 2>&1; then
@@ -333,6 +353,9 @@ if [ -f "$BIN_DIR/neutron-lsp" ]; then
         
         echo "Try running: sudo apt-get install libjsoncpp25 libcurl4-openssl-dev"
         echo "Or install jsoncpp and libcurl for your distribution."
-        echo "Note: If you get LTO version errors, rebuild neutron locally with: cmake --build build"
+        echo "Note: If you get LTO version errors, you may need to upgrade GCC:"
+        echo "  Ubuntu/Debian: sudo apt-get install gcc-13 g++-13"
+        echo "  Arch/Manjaro: sudo pacman -S gcc"
+        echo "  Then rebuild with: cmake --build build"
     fi
 fi

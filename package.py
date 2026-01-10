@@ -842,6 +842,7 @@ def main():
     parser.add_argument("--output", help="Output directory name for the package", default=None)
     parser.add_argument("--installer", help="Build NSIS installer (Windows only)", action="store_true")
     parser.add_argument("--skip-vcpkg", help="Skip vcpkg bootstrap and proceed (may fail if runtime deps missing)", action="store_true")
+    parser.add_argument("--skip-build", help="Skip building and use existing binaries", action="store_true")
     parser.add_argument("--debug", help="Build with debug symbols (CMAKE_BUILD_TYPE=Debug)", action="store_true")
     parser.add_argument("--clean", help="Clean build artifacts and exit", action="store_true")
     parser.add_argument("--check-deps", help="Check for required dependencies and exit", action="store_true")
@@ -889,7 +890,7 @@ def main():
     ]
 
     # Check if we need to build
-    need_build = True
+    need_build = not args.skip_build
     real_neutron_path = None
     real_box_path = None
     real_lsp_path = None
@@ -909,19 +910,28 @@ def main():
             real_lsp_path = p
             break
 
-    # Always build to ensure latest version
-    Colors.print("Building Neutron, Box, and LSP executables...", Colors.YELLOW)
+    if need_build:
+        # Always build to ensure latest version
+        Colors.print("Building Neutron, Box, and LSP executables...", Colors.YELLOW)
 
-    # Preflight checks on Windows to catch common vcpkg/tooling problems before we start
-    if os_type == 'windows' and not args.skip_vcpkg:
-        ok = preflight_check_windows()
-        if not ok:
-            Colors.print("Preflight checks failed. Either install the listed prerequisites or re-run with --skip-vcpkg to proceed (may still fail).", Colors.RED)
-            sys.exit(1)
+        # Preflight checks on Windows to catch common vcpkg/tooling problems before we start
+        if os_type == 'windows' and not args.skip_vcpkg:
+            ok = preflight_check_windows()
+            if not ok:
+                Colors.print("Preflight checks failed. Either install the listed prerequisites or re-run with --skip-vcpkg to proceed (may still fail).", Colors.RED)
+                sys.exit(1)
 
-    # Build both executables
-    neutron_success = build_neutron(os_type, arch_type, build_dir, args.skip_vcpkg, args.debug)
-    box_success = build_box(os_type, arch_type, box_build_dir, args.skip_vcpkg, args.debug)
+        # Build both executables
+        neutron_success = build_neutron(os_type, arch_type, build_dir, args.skip_vcpkg, args.debug)
+        box_success = build_box(os_type, arch_type, box_build_dir, args.skip_vcpkg, args.debug)
+
+        # Ensure we have found both binaries after building
+        # Wait a bit in case build process is still copying files
+        time.sleep(2)
+    else:
+        Colors.print("Skipping build, using existing binaries...", Colors.BLUE)
+        neutron_success = True
+        box_success = True
 
     # Ensure we have found both binaries after building
     # Wait a bit in case build process is still copying files

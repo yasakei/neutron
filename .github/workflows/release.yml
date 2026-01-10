@@ -16,6 +16,7 @@ jobs:
   build-linux-x64:
     name: Build Linux x64 Release
     runs-on: ubuntu-latest
+    container: archlinux:latest
     
     steps:
     - name: Checkout code
@@ -25,18 +26,25 @@ jobs:
       
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          build-essential \
+        # Update package database and install dependencies
+        pacman -Syu --noconfirm
+        pacman -S --noconfirm \
+          base-devel \
           cmake \
-          pkg-config \
-          libcurl4-openssl-dev \
-          libjsoncpp-dev
+          gcc \
+          pkgconf \
+          curl \
+          jsoncpp \
+          python
+        
+        # Verify GCC version (should be 15.x)
+        echo "Using GCC version:"
+        gcc --version
         
         # Check jsoncpp version
         echo "Installed jsoncpp version:"
         pkg-config --modversion jsoncpp || echo "jsoncpp version not available via pkg-config"
-        ls -la /usr/lib/x86_64-linux-gnu/libjsoncpp.so* || ls -la /usr/lib/libjsoncpp.so* || echo "jsoncpp library files not found"
+        ls -la /usr/lib/libjsoncpp.so* || echo "jsoncpp library files not found"
           
     - name: Build Neutron Runtime
       run: |
@@ -67,7 +75,7 @@ jobs:
         cp build/*.a . 2>/dev/null || echo "No .a files to copy"
       
     - name: Package
-      run: python3 package.py --output neutron-linux-x64
+      run: python package.py --output neutron-linux-x64 --skip-build
 
     - name: Get version
       id: get_version
@@ -102,7 +110,12 @@ jobs:
       
     - name: Install dependencies
       run: |
+        # Use latest GCC for best performance
         brew install cmake jsoncpp
+        
+        # Verify compiler version
+        echo "Using compiler version:"
+        clang --version
       
     - name: Build Neutron Runtime
       run: |
@@ -133,7 +146,7 @@ jobs:
         cp build/*.a . 2>/dev/null || echo "No .a files to copy"
       
     - name: Package
-      run: python3 package.py --output neutron-macos-arm64
+      run: python3 package.py --output neutron-macos-arm64 --skip-build
 
     - name: Get version
       id: get_version
@@ -193,7 +206,7 @@ jobs:
       shell: cmd
       
     - name: Package
-      run: python package.py --output neutron-windows-x64
+      run: python package.py --output neutron-windows-x64 --skip-build
       shell: pwsh
       
     - name: Get version
@@ -296,7 +309,7 @@ jobs:
     - name: Create Installer
       run: |
         Write-Host "=== Creating Windows Installer ==="
-        python package.py --installer
+        python package.py --installer --skip-build
         Write-Host "`n=== Checking if installer was created ==="
         if (Test-Path "NeutronInstaller.exe") {
           Write-Host "✓ NeutronInstaller.exe created successfully"

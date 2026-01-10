@@ -60,6 +60,16 @@ def build_neutron(root_dir):
     try:
         # Configure
         Colors.print("Configuring build...", Colors.BLUE)
+        
+        # Show compiler version
+        try:
+            result = subprocess.run(["gcc", "--version"], capture_output=True, text=True)
+            if result.returncode == 0:
+                gcc_version = result.stdout.split('\n')[0]
+                Colors.print(f"Using compiler: {gcc_version}", Colors.BLUE)
+        except:
+            pass
+        
         cmake_cmd = ["cmake", "..", "-DCMAKE_BUILD_TYPE=Release"]
         result = subprocess.run(cmake_cmd, cwd=build_dir, capture_output=True, text=True)
         if result.returncode != 0:
