@@ -544,27 +544,16 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
     searchStart = match.suffix().first;
   }
 
-  // Check if we're completing after a module prefix (e.g., "sys.")
-  std::string modulePrefix;
-  std::regex dotRegex(R"((\w+)\.\s*$)");
+  // Check if we're completing after a dot (e.g., "sys.", "hello"., myVar.)
+  std::string dotContext;
+  std::regex dotRegex(R"((\w+|"[^"]*")\.\s*$)");
   if (std::regex_search(currentLine, match, dotRegex)) {
-    modulePrefix = match[1].str();
+    dotContext = match[1].str();
   }
 
-  // Check if we're completing after a string literal or string variable (e.g., "hello"., str.)
-  std::string stringContext;
+  // Check if we're completing after a string literal
   std::regex stringLiteralRegex(R"("[^"]*"\.\s*$)");
-  std::regex stringVariableRegex(R"(([a-zA-Z_][a-zA-Z0-9_]*)\.\s*$)");
-  
-  bool isStringCompletion = false;
-  if (std::regex_search(currentLine, stringLiteralRegex)) {
-    isStringCompletion = true;
-    stringContext = "string literal";
-  } else if (std::regex_search(currentLine, match, stringVariableRegex)) {
-    // This could be a string variable - we'll provide string methods optimistically
-    isStringCompletion = true;
-    stringContext = match[1].str();
-  }
+  bool isStringLiteral = std::regex_search(currentLine, stringLiteralRegex);
 
   // Module function definitions
   struct ModuleFuncs {
@@ -672,23 +661,26 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
         {"is_alive", "Check if process is alive"},
         {"kill", "Kill process"}}}};
 
-  // If we're completing after a module prefix like "sys."
-  // Only show functions if the module has been imported
-  if (!modulePrefix.empty()) {
-    if (importedModules.count(modulePrefix)) {
-      for (const auto &mod : allModules) {
-        if (modulePrefix == mod.name) {
-          for (const auto &func : mod.funcs) {
-            Json::Value item;
-            set(item, "label") = func.first;
-            set(item, "kind") = 3; // Function
-            set(item, "detail") = func.second;
-            set(item, "insertText") = std::string(func.first) + "($1)";
-            set(item, "insertTextFormat") = 2; // Snippet
-            result.append(item);
-          }
-          break;
+  // Check if the dot context is a known imported module
+  bool isModuleCompletion = false;
+  if (!dotContext.empty() && !isStringLiteral && importedModules.count(dotContext)) {
+    isModuleCompletion = true;
+  }
+
+  // If it's a module completion, provide module functions
+  if (isModuleCompletion) {
+    for (const auto &mod : allModules) {
+      if (dotContext == mod.name) {
+        for (const auto &func : mod.funcs) {
+          Json::Value item;
+          set(item, "label") = func.first;
+          set(item, "kind") = 3; // Function
+          set(item, "detail") = func.second;
+          set(item, "insertText") = std::string(func.first) + "($1)";
+          set(item, "insertTextFormat") = 2; // Snippet
+          result.append(item);
         }
+        break;
       }
     }
 
@@ -698,6 +690,40 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
     set(response, "result") = result;
     sendJson(response);
     return;
+  }
+
+  // If we have a dot context but it's not a known module, assume it could be a string variable
+  // This includes string literals and any variable that might be a string
+  bool isStringCompletion = false;
+  std::string variableName;
+  if (!dotContext.empty()) {
+    if (isStringLiteral) {
+      isStringCompletion = true;
+    } else {
+      // For variables, try to determine if they might be strings by analyzing the document
+      variableName = dotContext;
+      
+      // Always provide string completions for variables - this is optimistic but helpful
+      // since we don't have full type inference in the LSP
+      isStringCompletion = true;
+      
+      // Optional: Try to be smarter by looking for string-like patterns in the document
+      // Check if the variable is assigned a string literal or string method result
+      std::string varPattern = variableName + R"(\s*=\s*("[^"]*"|.*\.(upper|lower|strip|replace|substring)\(\)))";
+      std::regex stringAssignmentRegex(varPattern);
+      if (std::regex_search(documentText, stringAssignmentRegex)) {
+        // High confidence this is a string variable
+        isStringCompletion = true;
+      }
+      
+      // Check if variable has string type annotation
+      std::string typePattern = R"(var\s+string\s+)" + variableName;
+      std::regex stringTypeRegex(typePattern);
+      if (std::regex_search(documentText, stringTypeRegex)) {
+        // Definitely a string variable
+        isStringCompletion = true;
+      }
+    }
   }
 
   // If we're completing after a string (e.g., "hello"., str.)
@@ -788,6 +814,82 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
       std::string snippet = std::string(method.name) + "(";
       if (strstr(method.name, "contains") || strstr(method.name, "find") || 
           strstr(method.name, "index") || strstr(method.name, "replace")) {
+        snippet += "$1";
+      }
+      snippet += ")";
+      
+      set(item, "insertText") = snippet;
+      set(item, "insertTextFormat") = 2; // Snippet
+      result.append(item);
+    }
+
+    Json::Value response;
+    set(response, "jsonrpc") = "2.0";
+    set(response, "id") = id;
+    set(response, "result") = result;
+    sendJson(response);
+    return;
+  }
+
+  // Check if we might be completing array methods
+  bool isArrayCompletion = false;
+  if (!dotContext.empty() && !isStringCompletion) {
+    // Check for array patterns in the document
+    std::string arrayPattern = dotContext + R"(\s*=\s*(\[.*\]|.*\.split\(|.*\.chars))";
+    std::regex arrayAssignmentRegex(arrayPattern);
+    if (std::regex_search(documentText, arrayAssignmentRegex)) {
+      isArrayCompletion = true;
+    }
+    
+    // Check if variable has array type annotation
+    std::string arrayTypePattern = R"(var\s+array\s+)" + dotContext;
+    std::regex arrayTypeRegex(arrayTypePattern);
+    if (std::regex_search(documentText, arrayTypeRegex)) {
+      isArrayCompletion = true;
+    }
+  }
+
+  // If we're completing after an array variable
+  if (isArrayCompletion) {
+    // Array property
+    Json::Value lengthProp;
+    set(lengthProp, "label") = "length";
+    set(lengthProp, "kind") = 10; // Property
+    set(lengthProp, "detail") = "Number of elements";
+    set(lengthProp, "documentation") = "Returns the number of elements in the array";
+    set(lengthProp, "insertText") = "length";
+    result.append(lengthProp);
+
+    // Array methods
+    struct ArrayMethod {
+      const char* name;
+      const char* signature;
+      const char* detail;
+    };
+    
+    ArrayMethod arrayMethods[] = {
+      {"push", "push(element)", "Add element to end"},
+      {"pop", "pop()", "Remove and return last element"},
+      {"slice", "slice(start, [end])", "Get portion of array"},
+      {"map", "map(function)", "Transform each element"},
+      {"filter", "filter(function)", "Filter elements"},
+      {"find", "find(function)", "Find first matching element"},
+      {"indexOf", "indexOf(element)", "Get index of element"},
+      {"join", "join(separator)", "Join elements into string"},
+      {"reverse", "reverse()", "Reverse array in place"},
+      {"sort", "sort()", "Sort array in place"}
+    };
+    
+    for (const auto& method : arrayMethods) {
+      Json::Value item;
+      set(item, "label") = method.name;
+      set(item, "kind") = 2; // Method
+      set(item, "detail") = method.signature;
+      set(item, "documentation") = method.detail;
+      
+      std::string snippet = std::string(method.name) + "(";
+      if (strcmp(method.name, "push") == 0 || strcmp(method.name, "indexOf") == 0 || 
+          strcmp(method.name, "join") == 0) {
         snippet += "$1";
       }
       snippet += ")";
