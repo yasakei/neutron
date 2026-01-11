@@ -551,6 +551,21 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
     modulePrefix = match[1].str();
   }
 
+  // Check if we're completing after a string literal or string variable (e.g., "hello"., str.)
+  std::string stringContext;
+  std::regex stringLiteralRegex(R"("[^"]*"\.\s*$)");
+  std::regex stringVariableRegex(R"(([a-zA-Z_][a-zA-Z0-9_]*)\.\s*$)");
+  
+  bool isStringCompletion = false;
+  if (std::regex_search(currentLine, stringLiteralRegex)) {
+    isStringCompletion = true;
+    stringContext = "string literal";
+  } else if (std::regex_search(currentLine, match, stringVariableRegex)) {
+    // This could be a string variable - we'll provide string methods optimistically
+    isStringCompletion = true;
+    stringContext = match[1].str();
+  }
+
   // Module function definitions
   struct ModuleFuncs {
     const char *name;
@@ -675,6 +690,111 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
           break;
         }
       }
+    }
+
+    Json::Value response;
+    set(response, "jsonrpc") = "2.0";
+    set(response, "id") = id;
+    set(response, "result") = result;
+    sendJson(response);
+    return;
+  }
+
+  // If we're completing after a string (e.g., "hello"., str.)
+  if (isStringCompletion) {
+    // String properties (no parentheses)
+    struct StringProperty {
+      const char* name;
+      const char* detail;
+      const char* documentation;
+    };
+    
+    StringProperty stringProperties[] = {
+      {"length", "Number of characters", "Returns the number of characters in the string"},
+      {"chars", "Array of characters", "Returns an array of individual characters"}
+    };
+    
+    for (const auto& prop : stringProperties) {
+      Json::Value item;
+      set(item, "label") = prop.name;
+      set(item, "kind") = 10; // Property
+      set(item, "detail") = prop.detail;
+      set(item, "documentation") = prop.documentation;
+      set(item, "insertText") = prop.name;
+      result.append(item);
+    }
+
+    // String methods (with parentheses)
+    struct StringMethod {
+      const char* name;
+      const char* signature;
+      const char* detail;
+      const char* documentation;
+    };
+    
+    StringMethod stringMethods[] = {
+      // Basic methods
+      {"contains", "contains(substring)", "Check if string contains substring", "Returns true if the string contains the specified substring"},
+      {"split", "split(delimiter)", "Split string into array", "Splits the string into an array using the specified delimiter"},
+      {"substring", "substring(start, [end])", "Extract substring", "Returns a portion of the string from start to end"},
+      {"strip", "strip([chars])", "Remove whitespace", "Removes whitespace or specified characters from both ends"},
+      {"lstrip", "lstrip([chars])", "Remove left whitespace", "Removes whitespace or specified characters from the left end"},
+      {"rstrip", "rstrip([chars])", "Remove right whitespace", "Removes whitespace or specified characters from the right end"},
+      {"replace", "replace(old, new, [count])", "Replace substring", "Replaces occurrences of old substring with new substring"},
+      
+      // Search methods
+      {"find", "find(substring, [start], [end])", "Find substring index", "Returns the index of the first occurrence of substring, -1 if not found"},
+      {"rfind", "rfind(substring, [start], [end])", "Find last substring index", "Returns the index of the last occurrence of substring, -1 if not found"},
+      {"index", "index(substring, [start], [end])", "Find substring (throws error)", "Like find() but throws an error if substring is not found"},
+      {"rindex", "rindex(substring, [start], [end])", "Find last substring (throws error)", "Like rfind() but throws an error if substring is not found"},
+      
+      // Case conversion (Unicode-aware)
+      {"upper", "upper()", "Convert to uppercase", "Converts the string to uppercase (Unicode-aware, supports é → É)"},
+      {"lower", "lower()", "Convert to lowercase", "Converts the string to lowercase (Unicode-aware, supports É → é)"},
+      {"capitalize", "capitalize()", "Capitalize first character", "Capitalizes the first character and lowercases the rest"},
+      {"title", "title()", "Convert to title case", "Converts the string to title case (first letter of each word capitalized)"},
+      {"swapcase", "swapcase()", "Swap character case", "Swaps the case of all characters (upper becomes lower, lower becomes upper)"},
+      {"casefold", "casefold()", "Aggressive lowercase", "Converts to lowercase for case-insensitive comparisons"},
+      
+      // Character classification
+      {"isalnum", "isalnum()", "Check if alphanumeric", "Returns true if all characters are alphanumeric (letters or digits)"},
+      {"isalpha", "isalpha()", "Check if alphabetic", "Returns true if all characters are alphabetic (letters)"},
+      {"isdigit", "isdigit()", "Check if digits", "Returns true if all characters are digits"},
+      {"islower", "islower()", "Check if lowercase", "Returns true if all cased characters are lowercase"},
+      {"isupper", "isupper()", "Check if uppercase", "Returns true if all cased characters are uppercase"},
+      {"isspace", "isspace()", "Check if whitespace", "Returns true if all characters are whitespace"},
+      {"istitle", "istitle()", "Check if title case", "Returns true if the string is in title case"},
+      
+      // Sequence operations
+      {"slice", "slice(start, [end], [step])", "Advanced slicing", "Returns a slice of the string with optional step parameter"},
+      
+      // Unicode methods
+      {"normalize", "normalize(form)", "Unicode normalization", "Normalizes Unicode text (forms: NFC, NFD, NFKC, NFKD)"},
+      {"encode", "encode(encoding)", "Encode to bytes", "Encodes the string using the specified encoding (utf-8, utf-16, ascii)"},
+      {"isunicode", "isunicode()", "Check if contains Unicode", "Returns true if the string contains Unicode characters"},
+      
+      // Formatting
+      {"format", "format(args...)", "Format string", "Formats the string with positional arguments using {0}, {1}, etc."}
+    };
+    
+    for (const auto& method : stringMethods) {
+      Json::Value item;
+      set(item, "label") = method.name;
+      set(item, "kind") = 2; // Method
+      set(item, "detail") = method.signature;
+      set(item, "documentation") = method.documentation;
+      
+      // Create snippet with appropriate parameters
+      std::string snippet = std::string(method.name) + "(";
+      if (strstr(method.name, "contains") || strstr(method.name, "find") || 
+          strstr(method.name, "index") || strstr(method.name, "replace")) {
+        snippet += "$1";
+      }
+      snippet += ")";
+      
+      set(item, "insertText") = snippet;
+      set(item, "insertTextFormat") = 2; // Snippet
+      result.append(item);
     }
 
     Json::Value response;
@@ -963,6 +1083,40 @@ void LSPServer::onHover(const Json::Value &params, const Json::Value &id) {
       else if (word == "any")
         doc = "**any**\n\nAny type (accepts any value).\n```neutron\nvar any "
               "value = 42;\nvalue = \"now a string\";\n```";
+      
+      // String properties and methods
+      else if (word == "length")
+        doc = "**length** (property)\n\nReturns the number of characters in the string.\n```neutron\nvar text = \"hello\";\nsay(text.length);  // 5\n```";
+      else if (word == "chars")
+        doc = "**chars** (property)\n\nReturns an array of individual characters.\n```neutron\nvar text = \"abc\";\nsay(text.chars);  // [\"a\", \"b\", \"c\"]\n```";
+      else if (word == "upper")
+        doc = "**upper()** (method)\n\nConverts string to uppercase (Unicode-aware).\n```neutron\nsay(\"hello\".upper());  // \"HELLO\"\nsay(\"café\".upper());   // \"CAFÉ\"\n```";
+      else if (word == "lower")
+        doc = "**lower()** (method)\n\nConverts string to lowercase (Unicode-aware).\n```neutron\nsay(\"HELLO\".lower());  // \"hello\"\nsay(\"CAFÉ\".lower());   // \"café\"\n```";
+      else if (word == "contains")
+        doc = "**contains(substring)** (method)\n\nChecks if string contains substring.\n```neutron\nsay(\"hello world\".contains(\"world\"));  // true\n```";
+      else if (word == "find")
+        doc = "**find(substring, [start], [end])** (method)\n\nReturns index of first occurrence, -1 if not found.\n```neutron\nsay(\"hello\".find(\"ll\"));  // 2\nsay(\"hello\".find(\"xyz\"));  // -1\n```";
+      else if (word == "replace")
+        doc = "**replace(old, new, [count])** (method)\n\nReplaces occurrences of substring.\n```neutron\nsay(\"hello\".replace(\"l\", \"x\"));  // \"hexxo\"\n```";
+      else if (word == "strip")
+        doc = "**strip([chars])** (method)\n\nRemoves whitespace from both ends.\n```neutron\nsay(\"  hello  \".strip());  // \"hello\"\n```";
+      else if (word == "split")
+        doc = "**split(delimiter)** (method)\n\nSplits string into array.\n```neutron\nsay(\"a,b,c\".split(\",\"));  // [\"a\", \"b\", \"c\"]\n```";
+      else if (word == "isalpha")
+        doc = "**isalpha()** (method)\n\nChecks if all characters are alphabetic.\n```neutron\nsay(\"hello\".isalpha());  // true\nsay(\"hello123\".isalpha());  // false\n```";
+      else if (word == "isdigit")
+        doc = "**isdigit()** (method)\n\nChecks if all characters are digits.\n```neutron\nsay(\"123\".isdigit());  // true\nsay(\"12a\".isdigit());  // false\n```";
+      else if (word == "slice")
+        doc = "**slice(start, [end], [step])** (method)\n\nAdvanced string slicing with step support.\n```neutron\nsay(\"hello\".slice(1, 4));  // \"ell\"\nsay(\"hello\".slice(0, -1, 2));  // \"hlo\"\n```";
+      else if (word == "format")
+        doc = "**format(args...)** (method)\n\nFormats string with positional arguments.\n```neutron\nsay(\"Hello {0}!\".format(\"World\"));  // \"Hello World!\"\n```";
+      else if (word == "normalize")
+        doc = "**normalize(form)** (method)\n\nUnicode normalization.\n```neutron\nvar text = \"café\";\nsay(text.normalize(\"NFC\"));\n```";
+      else if (word == "encode")
+        doc = "**encode(encoding)** (method)\n\nEncodes string to bytes.\n```neutron\nvar bytes = \"hello\".encode(\"utf-8\");\n```";
+      else if (word == "isunicode")
+        doc = "**isunicode()** (method)\n\nChecks if string contains Unicode characters.\n```neutron\nsay(\"café\".isunicode());  // true\nsay(\"hello\".isunicode());  // false\n```";
 
       if (!doc.empty()) {
         Json::Value contents;

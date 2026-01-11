@@ -2,6 +2,46 @@
 
 ---
 
+### [FIXED] [NEUT-031] LSP String Method Completions and Documentation
+
+**Date:** 2025-01-11
+**Status:** Fixed
+**Priority:** Medium
+**Description:**
+The Language Server Protocol (LSP) implementation lacked autocomplete support for string methods and properties. When users typed `"hello".` or `stringVar.`, the LSP would not provide completions for string methods like `upper()`, `lower()`, `find()`, etc.
+
+**Root Cause:**
+The LSP server's `onCompletion` method only provided completions for:
+1. Keywords (`var`, `fun`, `class`, etc.)
+2. Module functions (when imported, e.g., `sys.read()`)
+3. Built-in functions (`say`)
+
+It did not detect when the user was completing after a string literal or string variable and provide string-specific completions.
+
+**Resolution:**
+1. **Enhanced completion detection**: Added regex patterns to detect string literal completions (`"text".`) and string variable completions (`variable.`)
+2. **Added string property completions**: 
+   - `length` (property) - Number of characters
+   - `chars` (property) - Array of characters
+3. **Added comprehensive string method completions** (30+ methods):
+   - Basic: `contains()`, `split()`, `substring()`, `strip()`, `replace()`
+   - Search: `find()`, `rfind()`, `index()`, `rindex()`
+   - Case conversion: `upper()`, `lower()`, `capitalize()`, `title()`, `swapcase()`, `casefold()`
+   - Character classification: `isalnum()`, `isalpha()`, `isdigit()`, `islower()`, `isupper()`, `isspace()`, `istitle()`
+   - Sequence: `slice()`
+   - Unicode: `normalize()`, `encode()`, `isunicode()`
+   - Formatting: `format()`
+4. **Added hover documentation**: Comprehensive documentation for all string methods with examples showing Unicode support
+5. **Proper completion metadata**: Each completion includes appropriate `kind` (Property vs Method), `detail` (signature), and `documentation`
+
+**Verification:**
+- Typing `"hello".` now shows all string methods and properties
+- Typing `stringVar.` provides string completions
+- Hover over string methods shows detailed documentation with examples
+- Unicode-aware methods are properly documented (e.g., `"café".upper()` → `"CAFÉ"`)
+
+---
+
 ### [FIXED] [NEUT-030] Unicode Case Conversion Support
 
 **Date:** 2025-01-11
