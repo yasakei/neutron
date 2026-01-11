@@ -69,6 +69,38 @@ jobs:
     - name: Run tests
       run: python3 run_tests.py
       
+    - name: Install Neutron globally
+      run: |
+        # Install neutron and box to system PATH
+        sudo cp build/neutron /usr/local/bin/
+        sudo cp box /usr/local/bin/
+        sudo chmod +x /usr/local/bin/neutron
+        sudo chmod +x /usr/local/bin/box
+        
+        # Verify global installation
+        which neutron
+        which box
+        neutron --version
+        box --version
+        
+    - name: Test Neutron Integration
+      run: |
+        # Create a temporary test directory
+        mkdir -p /tmp/neutron-integration-test
+        cd /tmp/neutron-integration-test
+        
+        echo "Testing neutron init..."
+        neutron init test
+        cd test
+        
+        echo "Testing box install base64..."
+        box install base64
+        
+        echo "Testing neutron build..."
+        neutron build
+        
+        echo "Integration tests completed successfully!"
+      
     - name: Run Performance Benchmarks
       run: |
         echo "==========================================================="
@@ -134,6 +166,38 @@ jobs:
         
     - name: Run tests
       run: python3 run_tests.py
+
+    - name: Install Neutron globally
+      run: |
+        # Install neutron and box to system PATH
+        sudo cp build/neutron /usr/local/bin/
+        sudo cp box /usr/local/bin/
+        sudo chmod +x /usr/local/bin/neutron
+        sudo chmod +x /usr/local/bin/box
+        
+        # Verify global installation
+        which neutron
+        which box
+        neutron --version
+        box --version
+        
+    - name: Test Neutron Integration
+      run: |
+        # Create a temporary test directory
+        mkdir -p /tmp/neutron-integration-test
+        cd /tmp/neutron-integration-test
+        
+        echo "Testing neutron init..."
+        neutron init test
+        cd test
+        
+        echo "Testing box install base64..."
+        box install base64
+        
+        echo "Testing neutron build..."
+        neutron build
+        
+        echo "Integration tests completed successfully!"
 
     - name: Run Performance Benchmarks
       run: |
@@ -204,6 +268,46 @@ jobs:
         
     - name: Run tests
       run: python run_tests.py
+
+    - name: Install Neutron globally (Windows)
+      run: |
+        # Create a directory in PATH for neutron binaries
+        $neutronPath = "C:\neutron-bin"
+        New-Item -ItemType Directory -Force -Path $neutronPath
+        
+        # Copy binaries
+        Copy-Item "build\Release\neutron.exe" "$neutronPath\neutron.exe"
+        Copy-Item "box.exe" "$neutronPath\box.exe"
+        
+        # Add to PATH for this session
+        $env:PATH = "$neutronPath;$env:PATH"
+        
+        # Verify installation
+        neutron.exe --version
+        box.exe --version
+        
+    - name: Test Neutron Integration (Windows)
+      run: |
+        # Set PATH for this step
+        $neutronPath = "C:\neutron-bin"
+        $env:PATH = "$neutronPath;$env:PATH"
+        
+        # Create a temporary test directory
+        $testDir = "C:\temp\neutron-integration-test"
+        New-Item -ItemType Directory -Force -Path $testDir
+        Set-Location $testDir
+        
+        Write-Host "Testing neutron init..."
+        neutron.exe init test
+        Set-Location test
+        
+        Write-Host "Testing box install base64..."
+        box.exe install base64
+        
+        Write-Host "Testing neutron build..."
+        neutron.exe build
+        
+        Write-Host "Integration tests completed successfully!"
 
     - name: Run Performance Benchmarks
       run: |
