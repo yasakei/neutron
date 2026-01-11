@@ -29,6 +29,8 @@
 #include "types/bound_method.h"
 #include "types/bound_array_method.h"
 #include "types/bound_string_method.h"
+#include "types/string_method_registry.h"
+#include "types/string_formatter.h"
 #include "types/buffer.h"
 #include <iostream>
 #include <stdexcept>
@@ -828,87 +830,30 @@ bool VM::callStringMethod(BoundStringMethod* method, int argCount) {
     Value result;
     
     try {
-        if (methodName == "length") {
-            // length() - return string length
-            if (argCount != 0) {
-                runtimeError(this, "length() expects 0 arguments.", frames.empty() ? -1 : frames.back().currentLine);
-                return false;
-            }
-            result = Value(static_cast<double>(str.length()));
-        } else if (methodName == "contains") {
-            // contains(substring)
-            if (argCount != 1) {
-                runtimeError(this, "contains() expects 1 argument.", frames.empty() ? -1 : frames.back().currentLine);
-                return false;
-            }
-            std::string substr = args[0].toString();
-            bool found = str.find(substr) != std::string::npos;
-            result = Value(found);
-        } else if (methodName == "split") {
-            // split(delimiter)
-            if (argCount != 1) {
-                runtimeError(this, "split() expects 1 argument.", frames.empty() ? -1 : frames.back().currentLine);
-                return false;
-            }
-            std::string delimiter = args[0].toString();
-            std::vector<Value> parts;
-            
-            if (delimiter.empty()) {
-                // Split by character
-                for (char c : str) {
-                    parts.push_back(Value(std::string(1, c)));
-                }
-            } else {
-                size_t pos = 0;
-                std::string token;
-                std::string s = str; // Make a copy to modify
-                while ((pos = s.find(delimiter)) != std::string::npos) {
-                    token = s.substr(0, pos);
-                    parts.push_back(Value(token));
-                    s.erase(0, pos + delimiter.length());
-                }
-                parts.push_back(Value(s));
-            }
-            result = Value(allocate<Array>(parts));
-        } else if (methodName == "substring") {
-            // substring(start, [end])
-            if (argCount < 1 || argCount > 2) {
-                runtimeError(this, "substring() expects 1 or 2 arguments.", frames.empty() ? -1 : frames.back().currentLine);
-                return false;
-            }
-            
-            if (args[0].type != ValueType::NUMBER) {
-                runtimeError(this, "substring() expects first argument to be a number.", frames.empty() ? -1 : frames.back().currentLine);
-                return false;
-            }
-            int start = static_cast<int>(args[0].as.number);
-            int len = static_cast<int>(str.length());
-            
-            if (start < 0) start = 0;
-            if (start > len) start = len;
-            
-            int end = len;
-            if (argCount == 2) {
-                if (args[1].type != ValueType::NUMBER) {
-                    runtimeError(this, "substring() expects second argument to be a number.", frames.empty() ? -1 : frames.back().currentLine);
-                    return false;
-                }
-                end = static_cast<int>(args[1].as.number);
-                if (end < 0) end = 0;
-                if (end > len) end = len;
-            }
-            
-            if (end < start) {
-                int temp = start;
-                start = end;
-                end = temp;
-            }
-            
-            result = Value(str.substr(start, end - start));
-        } else {
+        // Use the registry to get the method handler
+        StringMethodRegistry& registry = StringMethodRegistry::getInstance();
+        StringMethodHandler* handler = registry.getMethod(methodName);
+        
+        if (handler == nullptr) {
             runtimeError(this, "Unknown string method: " + methodName, frames.empty() ? -1 : frames.back().currentLine);
             return false;
         }
+        
+        // Validate arguments
+        if (!handler->validateArgs(args)) {
+            int expectedArity = handler->getArity();
+            std::string errorMsg = methodName + "() ";
+            if (expectedArity >= 0) {
+                errorMsg += "expects " + std::to_string(expectedArity) + " arguments, got " + std::to_string(argCount);
+            } else {
+                errorMsg += "received invalid arguments. Expected: " + handler->getDescription();
+            }
+            runtimeError(this, errorMsg, frames.empty() ? -1 : frames.back().currentLine);
+            return false;
+        }
+        
+        // Execute the method
+        result = handler->execute(this, str, args);
         
         // Restore stack to original size and push result
         stack.resize(stackBase);
@@ -970,6 +915,7 @@ void VM::run(size_t minFrameDepth) {
     static void* dispatch_table[] = {
         &&CASE_OP_RETURN,
         &&CASE_OP_CONSTANT,
+        &&CASE_OP_CONSTANT_LONG,
         &&CASE_OP_NIL,
         &&CASE_OP_TRUE,
         &&CASE_OP_FALSE,
@@ -1098,6 +1044,15 @@ void VM::run(size_t minFrameDepth) {
             }
             CASE(OP_CONSTANT) {
                 Value constant = READ_CONSTANT();
+                push(constant);
+                DISPATCH();
+            }
+            CASE(OP_CONSTANT_LONG) {
+                // Read 16-bit constant index (big-endian) - sequence reads to avoid undefined behavior
+                uint8_t high = READ_BYTE();
+                uint8_t low = READ_BYTE();
+                uint16_t constantIndex = (high << 8) | low;
+                Value constant = frame->function->chunk->constants[constantIndex];
                 push(constant);
                 DISPATCH();
             }
@@ -1447,26 +1402,28 @@ void VM::run(size_t minFrameDepth) {
                     }
                 } else if (object.type == ValueType::OBJ_STRING) {
                     // Handle string properties and methods
-                    std::string str = object.asString()->chars;
-                    
-                    if (propertyName == "length") {
-                        stack.pop_back();
-                        push(Value(static_cast<double>(str.length())));
-                    } else if (propertyName == "chars") {
-                        // Return an array of individual characters
-                        Array* charArray = allocate<Array>();
-                        for (char c : str) {
-                            charArray->push(Value(internString(std::string(1, c))));
+                    {
+                        std::string str = object.asString()->chars;
+                        
+                        if (propertyName == "length") {
+                            stack.pop_back();
+                            push(Value(static_cast<double>(str.length())));
+                        } else if (propertyName == "chars") {
+                            // Return an array of individual characters
+                            Array* charArray = allocate<Array>();
+                            for (char c : str) {
+                                charArray->push(Value(internString(std::string(1, c))));
+                            }
+                            stack.pop_back();
+                            push(Value(charArray));
+                        } else if (StringMethodRegistry::getInstance().hasMethod(propertyName)) {
+                            // Return a bound method that captures the string
+                            stack.pop_back();
+                            push(Value(allocate<BoundStringMethod>(str, propertyName)));
+                        } else {
+                            runtimeError(this, "String does not have property '" + propertyName + "'.",
+                                        frames.empty() ? -1 : frames.back().currentLine);
                         }
-                        stack.pop_back();
-                        push(Value(charArray));
-                    } else if (propertyName == "contains" || propertyName == "split" || propertyName == "substring") {
-                        // Return a bound method that captures the string
-                        stack.pop_back();
-                        push(Value(allocate<BoundStringMethod>(str, propertyName)));
-                    } else {
-                        runtimeError(this, "String does not have property '" + propertyName + "'.",
-                                    frames.empty() ? -1 : frames.back().currentLine);
                     }
                 } else if (object.type == ValueType::INSTANCE) {
                     // Handle instance properties and methods
@@ -1664,12 +1621,54 @@ void VM::run(size_t minFrameDepth) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
-                    runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
+                
+                // Handle string * int and int * string
+                if (a.type == ValueType::OBJ_STRING && b.type == ValueType::NUMBER) {
+                    // string * int
+                    {
+                        std::string str = a.asString()->chars;
+                        int count = static_cast<int>(b.as.number);
+                        
+                        if (count < 0) count = 0; // Negative count results in empty string
+                        
+                        std::string result;
+                        result.reserve(str.length() * count); // Optimize for large repetitions
+                        
+                        for (int i = 0; i < count; i++) {
+                            result += str;
+                        }
+                        
+                        a = Value(internString(result));
+                    }
+                    stk.pop_back();
+                    DISPATCH();
+                } else if (a.type == ValueType::NUMBER && b.type == ValueType::OBJ_STRING) {
+                    // int * string
+                    {
+                        int count = static_cast<int>(a.as.number);
+                        std::string str = b.asString()->chars;
+                        
+                        if (count < 0) count = 0; // Negative count results in empty string
+                        
+                        std::string result;
+                        result.reserve(str.length() * count); // Optimize for large repetitions
+                        
+                        for (int i = 0; i < count; i++) {
+                            result += str;
+                        }
+                        
+                        a = Value(internString(result));
+                    }
+                    stk.pop_back();
+                    DISPATCH();
+                } else if (a.type == ValueType::NUMBER && b.type == ValueType::NUMBER) {
+                    // number * number (existing functionality)
+                    a.as.number *= b.as.number;
+                    stk.pop_back();
+                    DISPATCH();
+                } else {
+                    runtimeError(this, "Unsupported operand types for multiplication.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as.number *= b.as.number;
-                stk.pop_back();
-                DISPATCH();
             }
             CASE(OP_DIVIDE) {
                 size_t sz = stk.size();
@@ -1893,20 +1892,28 @@ void VM::run(size_t minFrameDepth) {
                         return;
                     }
                     
-                    int idx = static_cast<int>(index.as.number);
-                    std::string str = object.asString()->chars;
-                    
-                    if (idx < 0 || idx >= static_cast<int>(str.length())) {
-                        std::string range = str.length() == 0 ? "[]" : "[0, " + std::to_string(str.length()-1) + "]";
-                        std::string errorMsg = "String index out of bounds: index " + std::to_string(idx) + 
-                                              " is not within " + range;
-                        runtimeError(this, errorMsg, 
-                                    frames.empty() ? -1 : frames.back().currentLine);
-                        return;
+                    {
+                        int idx = static_cast<int>(index.as.number);
+                        std::string str = object.asString()->chars;
+                        int strLen = static_cast<int>(str.length());
+                        
+                        // Handle negative indices (Python-style)
+                        if (idx < 0) {
+                            idx = strLen + idx;
+                        }
+                        
+                        if (idx < 0 || idx >= strLen) {
+                            std::string range = strLen == 0 ? "[]" : "[" + std::to_string(-strLen) + ", " + std::to_string(strLen-1) + "]";
+                            std::string errorMsg = "String index out of bounds: index " + std::to_string(static_cast<int>(index.as.number)) + 
+                                                  " is not within " + range;
+                            runtimeError(this, errorMsg, 
+                                        frames.empty() ? -1 : frames.back().currentLine);
+                            return;
+                        }
+                        
+                        // Return the character at the index as a string
+                        push(Value(std::string(1, str[idx])));
                     }
-                    
-                    // Return the character at the index as a string
-                    push(Value(std::string(1, str[idx])));
                 } else if (object.type == ValueType::BUFFER) {
                     if (index.type != ValueType::NUMBER) {
                         runtimeError(this, "Buffer index must be a number.", frames.empty() ? -1 : frames.back().currentLine);

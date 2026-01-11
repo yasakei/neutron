@@ -29,7 +29,7 @@ public:
     void emitByte(uint8_t byte);
     void emitBytes(uint8_t byte1, uint8_t byte2);
     void emitReturn();
-    uint8_t makeConstant(const Value& value);
+    uint16_t makeConstant(const Value& value);
     void emitConstant(const Value& value);
     int emitJump(uint8_t instruction);
     void patchJump(int offset);

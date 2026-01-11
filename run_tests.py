@@ -240,6 +240,7 @@ def main():
     test_dirs = [
         "tests/fixes",
         "tests/core", 
+        "tests/string",
         "tests/operators",
         "tests/control-flow",
         "tests/functions",
@@ -285,10 +286,17 @@ def main():
                     capture_output=True,
                     text=True,
                     encoding='utf-8',
-                    errors='replace'
+                    errors='replace',
+                    timeout=30  # Add timeout to prevent hanging
                 )
                 
-                if result.returncode == 0:
+                # Debug: Check the actual return code
+                actual_returncode = result.returncode
+                
+                # Determine if test passed based on return code only
+                test_passed = (actual_returncode == 0)
+                
+                if test_passed:
                     print(f"  ", end="")
                     Colors.print("[PASS]", Colors.GREEN, end="")
                     print(f" {test_name}")
@@ -298,16 +306,29 @@ def main():
                     print(f"  ", end="")
                     Colors.print("[FAIL]", Colors.RED, end="")
                     print(f" {test_name}")
+                    print(f"    Return code: {actual_returncode}")
                     
                     # Print stderr/stdout indented
-                    output = result.stdout + result.stderr
-                    for line in output.splitlines():
-                        print(f"    {line}")
+                    if result.stdout:
+                        print("    STDOUT:")
+                        for line in result.stdout.splitlines():
+                            print(f"      {line}")
+                    if result.stderr:
+                        print("    STDERR:")
+                        for line in result.stderr.splitlines():
+                            print(f"      {line}")
                         
                     failed_tests.append(os.path.relpath(test_file, root_dir))
                     dir_failed += 1
                     total_failed += 1
                     
+            except subprocess.TimeoutExpired:
+                print(f"  ", end="")
+                Colors.print("[FAIL]", Colors.RED, end="")
+                print(f" {test_name} (Timeout)")
+                failed_tests.append(os.path.relpath(test_file, root_dir))
+                dir_failed += 1
+                total_failed += 1
             except Exception as e:
                 print(f"  ", end="")
                 Colors.print("[FAIL]", Colors.RED, end="")

@@ -1,0 +1,96 @@
+say("=== String Advanced Methods Tests ===");
+
+// Test 1: Search methods
+say("Test 1: Search methods");
+var search_str = "hello world hello";
+var search_tests = (
+    search_str.find("hello") == 0 &&
+    search_str.find("world") == 6 &&
+    search_str.find("xyz") == -1 &&
+    search_str.rfind("hello") == 12 &&
+    search_str.find("hello", 1) == 12 &&
+    search_str.find("", 0) == 0
+);
+
+if (search_tests) {
+    say("✓ Search methods work correctly");
+} else {
+    say("✗ Search methods failed");
+}
+
+// Test 2: Case conversion methods
+say("Test 2: Case conversion methods");
+var case_tests = (
+    "hello".upper() == "HELLO" &&
+    "HELLO".lower() == "hello" &&
+    "hello world".capitalize() == "Hello world" &&
+    "hello world".title() == "Hello World" &&
+    "Hello World".swapcase() == "hELLO wORLD" &&
+    "HELLO".casefold() == "hello"
+);
+
+if (case_tests) {
+    say("✓ Case conversion methods work correctly");
+} else {
+    say("✗ Case conversion methods failed");
+}
+
+// Test 3: Character classification methods
+say("Test 3: Character classification methods");
+var class_tests = (
+    "hello".isalpha() == true &&
+    "123".isdigit() == true &&
+    "hello123".isalnum() == true &&
+    "HELLO".isupper() == true &&
+    "hello".islower() == true &&
+    "   ".isspace() == true &&
+    "Hello World".istitle() == true &&
+    "".isalpha() == false
+);
+
+if (class_tests) {
+    say("✓ Character classification methods work correctly");
+} else {
+    say("✗ Character classification methods failed");
+}
+
+// Test 4: String formatting
+say("Test 4: String formatting");
+var format_tests = (
+    "Hello {0}!".format("World") == "Hello World!" &&
+    "Hello {0} and {1}!".format("Alice", "Bob") == "Hello Alice and Bob!" &&
+    "{0} + {1} = {2}".format(2, 3, 5) == "2 + 3 = 5" &&
+    "Test: {}".format("value") == "Test: value"
+);
+
+if (format_tests) {
+    say("✓ String formatting works correctly");
+} else {
+    say("✗ String formatting failed");
+}
+
+// Test 5: Property-based consistency tests
+say("Test 5: Property-based consistency");
+
+// Search consistency
+var prop_str = "abcdefg";
+var search_consistency = (
+    prop_str.find("c") >= 0 &&
+    prop_str.rfind("c") >= 0 &&
+    prop_str.find("c") == prop_str.rfind("c")  // Single occurrence
+);
+
+// Case conversion consistency
+var case_consistency = (
+    prop_str.upper().lower() == prop_str &&  // Should be reversible for lowercase strings
+    prop_str.upper().length == prop_str.length &&
+    prop_str.lower().length == prop_str.length
+);
+
+if (search_consistency && case_consistency) {
+    say("✓ Property-based consistency holds");
+} else {
+    say("✗ Property-based consistency failed");
+}
+
+say("=== String Advanced Methods Tests Complete ===");

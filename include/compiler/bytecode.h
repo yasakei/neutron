@@ -12,6 +12,7 @@ struct Value;
 enum class OpCode : uint8_t {
     OP_RETURN,
     OP_CONSTANT,
+    OP_CONSTANT_LONG,  // For constants with 16-bit indices (>255)
     OP_NIL,
     OP_TRUE,
     OP_FALSE,

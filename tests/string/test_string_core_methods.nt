@@ -1,0 +1,88 @@
+say("=== String Core Methods Tests ===");
+
+// Test 1: Basic string methods
+say("Test 1: Basic string methods");
+var test_str = "Hello World";
+
+var basic_tests = (
+    test_str.length == 11 &&
+    test_str.contains("World") == true &&
+    test_str.contains("xyz") == false &&
+    test_str.substring(0, 5) == "Hello" &&
+    test_str.substring(6, 11) == "World"
+);
+
+if (basic_tests) {
+    say("✓ Basic string methods work correctly");
+} else {
+    say("✗ Basic string methods failed");
+}
+
+// Test 2: String splitting
+say("Test 2: String splitting");
+var split_str = "apple,banana,cherry";
+var parts = split_str.split(",");
+
+if (parts.length == 3 && parts[0] == "apple" && parts[1] == "banana" && parts[2] == "cherry") {
+    say("✓ String splitting works correctly");
+} else {
+    say("✗ String splitting failed");
+}
+
+// Test 3: String modification - strip methods
+say("Test 3: String strip methods");
+var strip_tests = (
+    "  hello  ".strip() == "hello" &&
+    "  hello  ".lstrip() == "hello  " &&
+    "  hello  ".rstrip() == "  hello" &&
+    "xxxhelloxxx".strip("x") == "hello"
+);
+
+if (strip_tests) {
+    say("✓ String strip methods work correctly");
+} else {
+    say("✗ String strip methods failed");
+}
+
+// Test 4: String replacement
+say("Test 4: String replacement");
+var replace_tests = (
+    "hello world".replace("world", "neutron") == "hello neutron" &&
+    "hello hello hello".replace("hello", "hi", 2) == "hi hi hello" &&
+    "test".replace("", "x") == "xtxexsxtx"
+);
+
+if (replace_tests) {
+    say("✓ String replacement works correctly");
+} else {
+    say("✗ String replacement failed");
+}
+
+// Test 5: Method registry functionality
+say("Test 5: Method registry functionality");
+var registry_tests = (
+    "test".length == 4 &&
+    "TEST".lower() == "test" &&
+    "test".upper() == "TEST" &&
+    "hello world".find("world") == 6
+);
+
+if (registry_tests) {
+    say("✓ Method registry works correctly");
+} else {
+    say("✗ Method registry failed");
+}
+
+// Test 6: String interpolation
+say("Test 6: String interpolation");
+var name = "Neutron";
+var version = 2.0;
+var interpolated = "Welcome to ${name} v${version}!";
+
+if (interpolated == "Welcome to Neutron v2!") {
+    say("✓ String interpolation works correctly");
+} else {
+    say("✗ String interpolation failed");
+}
+
+say("=== String Core Methods Tests Complete ===");

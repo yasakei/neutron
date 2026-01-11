@@ -2,6 +2,7 @@
 #include "token.h"
 #include "runtime/error_handler.h"
 #include <stdexcept>
+#include <string>
 
 namespace neutron {
 
@@ -270,7 +271,100 @@ void Scanner::string(char quote) {
                     case '\\': value += '\\'; break;
                     case '"': value += '"'; break;
                     case '\'': value += '\''; break;
-                    default: value += escaped; break;
+                    case 'a': value += '\a'; break;  // Bell/alert
+                    case 'b': value += '\b'; break;  // Backspace
+                    case 'f': value += '\f'; break;  // Form feed
+                    case 'v': value += '\v'; break;  // Vertical tab
+                    case '0': value += '\0'; break;  // Null character
+                    case 'u': {
+                        // Unicode escape \uXXXX
+                        std::string hexDigits;
+                        for (int i = 0; i < 4 && !isAtEnd(); i++) {
+                            char c = peek();
+                            if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+                                hexDigits += advance();
+                            } else {
+                                ErrorHandler::reportLexicalError("Invalid Unicode escape sequence - expected 4 hex digits", 
+                                                               line, current - start);
+                                exit(1);
+                            }
+                        }
+                        if (hexDigits.length() == 4) {
+                            // Convert hex to Unicode codepoint
+                            unsigned int codepoint = std::stoul(hexDigits, nullptr, 16);
+                            // Simple UTF-8 encoding for Basic Multilingual Plane
+                            if (codepoint <= 0x7F) {
+                                value += static_cast<char>(codepoint);
+                            } else if (codepoint <= 0x7FF) {
+                                value += static_cast<char>(0xC0 | (codepoint >> 6));
+                                value += static_cast<char>(0x80 | (codepoint & 0x3F));
+                            } else {
+                                value += static_cast<char>(0xE0 | (codepoint >> 12));
+                                value += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+                                value += static_cast<char>(0x80 | (codepoint & 0x3F));
+                            }
+                        }
+                        break;
+                    }
+                    case 'U': {
+                        // Unicode escape \UXXXXXXXX
+                        std::string hexDigits;
+                        for (int i = 0; i < 8 && !isAtEnd(); i++) {
+                            char c = peek();
+                            if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+                                hexDigits += advance();
+                            } else {
+                                ErrorHandler::reportLexicalError("Invalid Unicode escape sequence - expected 8 hex digits", 
+                                                               line, current - start);
+                                exit(1);
+                            }
+                        }
+                        if (hexDigits.length() == 8) {
+                            // Convert hex to Unicode codepoint
+                            unsigned int codepoint = std::stoul(hexDigits, nullptr, 16);
+                            // Simple UTF-8 encoding (supports up to 4 bytes)
+                            if (codepoint <= 0x7F) {
+                                value += static_cast<char>(codepoint);
+                            } else if (codepoint <= 0x7FF) {
+                                value += static_cast<char>(0xC0 | (codepoint >> 6));
+                                value += static_cast<char>(0x80 | (codepoint & 0x3F));
+                            } else if (codepoint <= 0xFFFF) {
+                                value += static_cast<char>(0xE0 | (codepoint >> 12));
+                                value += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+                                value += static_cast<char>(0x80 | (codepoint & 0x3F));
+                            } else if (codepoint <= 0x10FFFF) {
+                                value += static_cast<char>(0xF0 | (codepoint >> 18));
+                                value += static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F));
+                                value += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+                                value += static_cast<char>(0x80 | (codepoint & 0x3F));
+                            }
+                        }
+                        break;
+                    }
+                    case 'x': {
+                        // Hexadecimal escape \xXX
+                        std::string hexDigits;
+                        for (int i = 0; i < 2 && !isAtEnd(); i++) {
+                            char c = peek();
+                            if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+                                hexDigits += advance();
+                            } else {
+                                ErrorHandler::reportLexicalError("Invalid hex escape sequence - expected 2 hex digits", 
+                                                               line, current - start);
+                                exit(1);
+                            }
+                        }
+                        if (hexDigits.length() == 2) {
+                            unsigned int byteValue = std::stoul(hexDigits, nullptr, 16);
+                            value += static_cast<char>(byteValue);
+                        }
+                        break;
+                    }
+                    default: 
+                        // Unknown escape sequence, include the backslash and character
+                        value += '\\';
+                        value += escaped; 
+                        break;
                 }
             }
         } else {
@@ -318,6 +412,25 @@ void Scanner::string(char quote) {
     }
 }
 
+void Scanner::rawString(char quote) {
+    std::string value;
+    
+    // In raw strings, no escape sequences are processed
+    while (peek() != quote && !isAtEnd()) {
+        if (peek() == '\n') line++;
+        value += advance();
+    }
+
+    if (isAtEnd()) {
+        ErrorHandler::reportLexicalError("Unterminated raw string - missing closing quote", 
+                                        line, current - start);
+        exit(1);
+    }
+
+    advance(); // Skip the closing quote
+    addToken(TokenType::STRING, value);
+}
+
 void Scanner::number() {
     while (isDigit(peek())) advance();
 
@@ -333,6 +446,14 @@ void Scanner::identifier() {
     while (isAlphaNumeric(peek())) advance();
 
     std::string text = source.substr(start, current - start);
+    
+    // Check for raw string prefix
+    if (text == "r" && (peek() == '"' || peek() == '\'')) {
+        char quote = advance(); // consume the quote
+        rawString(quote);
+        return;
+    }
+    
     TokenType type = keywords.count(text) ? keywords[text] : TokenType::IDENTIFIER;
     addToken(type);
 }

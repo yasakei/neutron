@@ -71,17 +71,27 @@ void Compiler::emitReturn() {
     emitByte((uint8_t)OpCode::OP_RETURN);
 }
 
-uint8_t Compiler::makeConstant(const Value& value) {
+uint16_t Compiler::makeConstant(const Value& value) {
     int constant = chunk->addConstant(value);
-    if (constant > UINT8_MAX) {
-        // Handle error: too many constants
-        throw std::runtime_error("Error: Too many constants in one chunk. Maximum of 256 constants allowed.");
+    if (constant > UINT16_MAX) {
+        // Handle error: too many constants (now 65536 limit)
+        throw std::runtime_error("Error: Too many constants in one chunk. Maximum of 65536 constants allowed.");
     }
-    return (uint8_t)constant;
+    return (uint16_t)constant;
 }
 
 void Compiler::emitConstant(const Value& value) {
-    emitBytes((uint8_t)OpCode::OP_CONSTANT, makeConstant(value));
+    uint16_t constant = makeConstant(value);
+    
+    if (constant <= UINT8_MAX) {
+        // Use 8-bit constant for backward compatibility and efficiency
+        emitBytes((uint8_t)OpCode::OP_CONSTANT, (uint8_t)constant);
+    } else {
+        // Use 16-bit constant for large constant pools
+        emitByte((uint8_t)OpCode::OP_CONSTANT_LONG);
+        emitByte((uint8_t)(constant >> 8));    // High byte
+        emitByte((uint8_t)(constant & 0xFF));  // Low byte
+    }
 }
 
 int Compiler::emitJump(uint8_t instruction) {

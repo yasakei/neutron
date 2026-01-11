@@ -2,6 +2,33 @@
 
 ---
 
+### [FIXED] [NEUT-030] Unicode Case Conversion Support
+
+**Date:** 2025-01-11
+**Status:** Fixed
+**Priority:** Medium
+**Description:**
+String case conversion methods (`upper()`, `lower()`) only worked for ASCII characters. Unicode characters like `é`, `ñ`, `ü` were not properly converted to their uppercase/lowercase equivalents (e.g., `"café".upper()` returned `"CAFé"` instead of `"CAFÉ"`).
+
+**Root Cause:**
+1. `UpperMethodHandler` and `LowerMethodHandler` used `std::toupper()` and `std::tolower()` which only handle ASCII characters.
+2. `UnicodeHandler::utf8ToCodepoints()` treated non-ASCII bytes as replacement characters instead of properly decoding UTF-8 sequences.
+3. `UnicodeHandler::toUpper()` and `toLower()` only handled ASCII a-z and A-Z ranges.
+
+**Resolution:**
+1. **Enhanced Unicode case conversion**: Added comprehensive Unicode case mappings for Latin-1 Supplement (U+00C0-U+00FF) including À, Á, Â, Ã, Ä, Å, Æ, Ç, È, É, Ê, Ë, etc.
+2. **Fixed UTF-8 decoding**: Implemented proper multi-byte UTF-8 sequence decoding in `utf8ToCodepoints()` to handle 2-byte, 3-byte, and 4-byte sequences.
+3. **Fixed UTF-8 encoding**: Updated `codepointsToUtf8()` to properly encode Unicode codepoints back to UTF-8.
+4. **Updated string methods**: Modified `UpperMethodHandler` and `LowerMethodHandler` to use Unicode-aware conversion via `UnicodeHandler`.
+
+**Verification:**
+- `"café".upper()` now correctly returns `"CAFÉ"`
+- `"résumé".upper()` returns `"RÉSUMÉ"`
+- `"ZÜRICH".lower()` returns `"zürich"`
+- All 92 tests pass including updated Unicode integration tests
+
+---
+
 ### [FIXED] [NEUT-029] Async Module Stack Corruption Fix
 
 **Date:** 2025-12-11
