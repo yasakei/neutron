@@ -71,9 +71,35 @@ jobs:
       
     - name: Install Neutron globally
       run: |
-        # Use the install script which properly handles all libraries and dependencies
-        chmod +x scripts/install.sh
-        sudo ./scripts/install.sh
+        # Dependencies are already installed from the build step
+        # Install neutron and box to system PATH
+        sudo cp build/neutron /usr/local/bin/
+        sudo cp box /usr/local/bin/
+        sudo chmod +x /usr/local/bin/neutron
+        sudo chmod +x /usr/local/bin/box
+        
+        # Install include files needed for neutron build
+        sudo cp -r include /usr/local/
+        
+        # Install source files needed for runtime compilation  
+        sudo cp -r src /usr/local/
+        sudo cp -r libs /usr/local/
+        
+        # Install runtime libraries (essential for linking)
+        if [ -f "build/libneutron_runtime.a" ]; then
+          sudo cp build/libneutron_runtime.a /usr/local/lib/
+        fi
+        if [ -f "build/libneutron_shared.so" ]; then
+          sudo cp build/libneutron_shared.so /usr/local/lib/
+        fi
+        if [ -f "build/libneutron_shared.dylib" ]; then
+          sudo cp build/libneutron_shared.dylib /usr/local/lib/
+        fi
+        
+        # Update library cache on Linux
+        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+          sudo ldconfig
+        fi
         
         # Verify global installation
         which neutron
@@ -166,9 +192,35 @@ jobs:
 
     - name: Install Neutron globally
       run: |
-        # Use the install script which properly handles all libraries and dependencies
-        chmod +x scripts/install.sh
-        sudo ./scripts/install.sh
+        # Dependencies are already installed from the build step
+        # Install neutron and box to system PATH
+        sudo cp build/neutron /usr/local/bin/
+        sudo cp box /usr/local/bin/
+        sudo chmod +x /usr/local/bin/neutron
+        sudo chmod +x /usr/local/bin/box
+        
+        # Install include files needed for neutron build
+        sudo cp -r include /usr/local/
+        
+        # Install source files needed for runtime compilation  
+        sudo cp -r src /usr/local/
+        sudo cp -r libs /usr/local/
+        
+        # Install runtime libraries (essential for linking)
+        if [ -f "build/libneutron_runtime.a" ]; then
+          sudo cp build/libneutron_runtime.a /usr/local/lib/
+        fi
+        if [ -f "build/libneutron_shared.so" ]; then
+          sudo cp build/libneutron_shared.so /usr/local/lib/
+        fi
+        if [ -f "build/libneutron_shared.dylib" ]; then
+          sudo cp build/libneutron_shared.dylib /usr/local/lib/
+        fi
+        
+        # Update library cache on Linux
+        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+          sudo ldconfig
+        fi
         
         # Verify global installation
         which neutron
@@ -265,47 +317,56 @@ jobs:
 
     - name: Install Neutron globally (Windows)
       run: |
-        # Create a directory in PATH for neutron binaries
-        $neutronPath = "C:\neutron-bin"
-        New-Item -ItemType Directory -Force -Path $neutronPath
+        # Create a proper directory structure that neutron expects
+        $neutronRoot = "C:\neutron"
+        $neutronBin = "$neutronRoot\bin"
+        New-Item -ItemType Directory -Force -Path $neutronBin
         
-        # Copy binaries
-        Copy-Item "build\Release\neutron.exe" "$neutronPath\neutron.exe"
-        Copy-Item "box.exe" "$neutronPath\box.exe"
+        # Copy binaries to bin subdirectory
+        Copy-Item "build\Release\neutron.exe" "$neutronBin\neutron.exe"
+        Copy-Item "box.exe" "$neutronBin\box.exe"
         if (Test-Path "build\Release\neutron-lsp.exe") {
-            Copy-Item "build\Release\neutron-lsp.exe" "$neutronPath\neutron-lsp.exe"
+            Copy-Item "build\Release\neutron-lsp.exe" "$neutronBin\neutron-lsp.exe"
         }
         
-        # Copy shared runtime DLL (essential for neutron build)
+        # Copy shared runtime DLL to bin directory (essential for neutron build)
         if (Test-Path "build\Release\neutron_shared.dll") {
-            Copy-Item "build\Release\neutron_shared.dll" "$neutronPath\neutron_shared.dll"
+            Copy-Item "build\Release\neutron_shared.dll" "$neutronBin\neutron_shared.dll"
         }
         
-        # Copy runtime libraries (needed for linking)
-        if (Test-Path "build\Release\neutron_runtime.lib") {
-            Copy-Item "build\Release\neutron_runtime.lib" "$neutronPath\neutron_runtime.lib"
-        }
-        if (Test-Path "build\Release\neutron_shared.lib") {
-            Copy-Item "build\Release\neutron_shared.lib" "$neutronPath\neutron_shared.lib"
-        }
-        
-        # Install include files needed for neutron build (relative to neutron.exe)
-        Copy-Item -Recurse "include" "C:\"
+        # Install include files in the expected location (relative to bin/../include)
+        Copy-Item -Recurse "include" "$neutronRoot\include"
         
         # Install source files needed for runtime compilation
-        Copy-Item -Recurse "src" "C:\"
-        Copy-Item -Recurse "libs" "C:\"
+        Copy-Item -Recurse "src" "$neutronRoot\src"
+        Copy-Item -Recurse "libs" "$neutronRoot\libs"
+        
+        # Copy runtime libraries to bin directory for linking
+        if (Test-Path "build\Release\neutron_runtime.lib") {
+            Copy-Item "build\Release\neutron_runtime.lib" "$neutronBin\neutron_runtime.lib"
+        }
+        if (Test-Path "build\Release\neutron_shared.lib") {
+            Copy-Item "build\Release\neutron_shared.lib" "$neutronBin\neutron_shared.lib"
+        }
         
         # Copy vcpkg DLLs if available
         $vcpkgBin = "build\vcpkg_installed\x64-windows\bin"
         if (Test-Path $vcpkgBin) {
             Get-ChildItem "$vcpkgBin\*.dll" | ForEach-Object {
-                Copy-Item $_.FullName "$neutronPath\"
+                Copy-Item $_.FullName "$neutronBin\"
             }
         }
         
-        # Add to PATH for this session
-        $env:PATH = "$neutronPath;$env:PATH"
+        # Copy vcpkg libs for linking
+        $vcpkgLib = "build\vcpkg_installed\x64-windows\lib"
+        if (Test-Path $vcpkgLib) {
+            Get-ChildItem "$vcpkgLib\*.lib" | ForEach-Object {
+                Copy-Item $_.FullName "$neutronBin\"
+            }
+        }
+        
+        # Add bin directory to PATH for this session
+        $env:PATH = "$neutronBin;$env:PATH"
         
         # Verify installation
         neutron.exe --version
@@ -314,8 +375,8 @@ jobs:
     - name: Test Neutron Integration (Windows)
       run: |
         # Set PATH for this step
-        $neutronPath = "C:\neutron-bin"
-        $env:PATH = "$neutronPath;$env:PATH"
+        $neutronBin = "C:\neutron\bin"
+        $env:PATH = "$neutronBin;$env:PATH"
         
         # Create a temporary test directory
         $testDir = "C:\temp\neutron-integration-test\test-project"
