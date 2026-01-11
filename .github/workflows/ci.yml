@@ -223,6 +223,26 @@ jobs:
           sudo cp build/libneutron_shared.dylib /usr/local/lib/
         fi
         
+        # On macOS, create symlinks to Homebrew libraries so neutron build can find them
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+          # Find Homebrew prefix (Apple Silicon vs Intel)
+          if [ -d "/opt/homebrew" ]; then
+            BREW_PREFIX="/opt/homebrew"
+          else
+            BREW_PREFIX="/usr/local"
+          fi
+          
+          # Create symlinks for jsoncpp and curl libraries
+          if [ -f "$BREW_PREFIX/lib/libjsoncpp.dylib" ]; then
+            sudo ln -sf "$BREW_PREFIX/lib/libjsoncpp.dylib" /usr/local/lib/libjsoncpp.dylib
+          fi
+          if [ -f "$BREW_PREFIX/lib/libcurl.dylib" ]; then
+            sudo ln -sf "$BREW_PREFIX/lib/libcurl.dylib" /usr/local/lib/libcurl.dylib
+          fi
+          
+          echo "Created symlinks for Homebrew libraries"
+        fi
+        
         # Update library cache on Linux
         if [[ "$OSTYPE" == "linux-gnu"* ]]; then
           sudo ldconfig
