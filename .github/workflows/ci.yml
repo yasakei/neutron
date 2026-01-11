@@ -77,6 +77,13 @@ jobs:
         sudo chmod +x /usr/local/bin/neutron
         sudo chmod +x /usr/local/bin/box
         
+        # Install include files needed for neutron build
+        sudo cp -r include /usr/local/
+        
+        # Install source files needed for runtime compilation  
+        sudo cp -r src /usr/local/
+        sudo cp -r libs /usr/local/
+        
         # Verify global installation
         which neutron
         which box
@@ -173,6 +180,13 @@ jobs:
         sudo cp box /usr/local/bin/
         sudo chmod +x /usr/local/bin/neutron
         sudo chmod +x /usr/local/bin/box
+        
+        # Install include files needed for neutron build
+        sudo cp -r include /usr/local/
+        
+        # Install source files needed for runtime compilation  
+        sudo cp -r src /usr/local/
+        sudo cp -r libs /usr/local/
         
         # Verify global installation
         which neutron
@@ -277,6 +291,13 @@ jobs:
         Copy-Item "build\Release\neutron.exe" "$neutronPath\neutron.exe"
         Copy-Item "box.exe" "$neutronPath\box.exe"
         
+        # Install include files needed for neutron build (relative to neutron.exe)
+        Copy-Item -Recurse "include" "C:\"
+        
+        # Install source files needed for runtime compilation
+        Copy-Item -Recurse "src" "C:\"
+        Copy-Item -Recurse "libs" "C:\"
+        
         # Add to PATH for this session
         $env:PATH = "$neutronPath;$env:PATH"
         
@@ -295,8 +316,16 @@ jobs:
         New-Item -ItemType Directory -Force -Path $testDir
         Set-Location $testDir
         
+        Write-Host "Current directory: $(Get-Location)"
+        Write-Host "PATH: $env:PATH"
+        Write-Host "Checking if neutron.exe is accessible..."
+        neutron.exe --version
+        
         Write-Host "Testing neutron init..."
         neutron.exe init test
+        
+        Write-Host "Listing files after init..."
+        Get-ChildItem
         
         Write-Host "Testing box install base64..."
         box.exe install base64
