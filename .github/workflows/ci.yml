@@ -85,6 +85,9 @@ jobs:
         sudo cp -r src /usr/local/
         sudo cp -r libs /usr/local/
         
+        # Create lib directory if it doesn't exist
+        sudo mkdir -p /usr/local/lib
+        
         # Install runtime libraries (essential for linking)
         if [ -f "build/libneutron_runtime.a" ]; then
           sudo cp build/libneutron_runtime.a /usr/local/lib/
@@ -205,6 +208,9 @@ jobs:
         # Install source files needed for runtime compilation  
         sudo cp -r src /usr/local/
         sudo cp -r libs /usr/local/
+        
+        # Create lib directory if it doesn't exist
+        sudo mkdir -p /usr/local/lib
         
         # Install runtime libraries (essential for linking)
         if [ -f "build/libneutron_runtime.a" ]; then
