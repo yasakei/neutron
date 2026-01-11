@@ -86,12 +86,11 @@ jobs:
     - name: Test Neutron Integration
       run: |
         # Create a temporary test directory
-        mkdir -p /tmp/neutron-integration-test
-        cd /tmp/neutron-integration-test
+        mkdir -p /tmp/neutron-integration-test/test-project
+        cd /tmp/neutron-integration-test/test-project
         
         echo "Testing neutron init..."
         neutron init test
-        cd test
         
         echo "Testing box install base64..."
         box install base64
@@ -184,12 +183,11 @@ jobs:
     - name: Test Neutron Integration
       run: |
         # Create a temporary test directory
-        mkdir -p /tmp/neutron-integration-test
-        cd /tmp/neutron-integration-test
+        mkdir -p /tmp/neutron-integration-test/test-project
+        cd /tmp/neutron-integration-test/test-project
         
         echo "Testing neutron init..."
         neutron init test
-        cd test
         
         echo "Testing box install base64..."
         box install base64
@@ -293,13 +291,12 @@ jobs:
         $env:PATH = "$neutronPath;$env:PATH"
         
         # Create a temporary test directory
-        $testDir = "C:\temp\neutron-integration-test"
+        $testDir = "C:\temp\neutron-integration-test\test-project"
         New-Item -ItemType Directory -Force -Path $testDir
         Set-Location $testDir
         
         Write-Host "Testing neutron init..."
         neutron.exe init test
-        Set-Location test
         
         Write-Host "Testing box install base64..."
         box.exe install base64
