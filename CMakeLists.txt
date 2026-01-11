@@ -165,6 +165,9 @@ set(NEUTRON_TYPES_SOURCES
     src/types/version.cpp
     src/types/obj_string.cpp
     src/types/string_method_registry.cpp
+    src/types/unicode_handler.cpp
+    src/types/string_formatter.cpp
+    src/types/string_error.cpp
     src/types/string_search_methods.cpp
 )
 

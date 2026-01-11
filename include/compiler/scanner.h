@@ -28,6 +28,7 @@ private:
     
     // Helpers for literals
     void string(char quote);
+    void rawString(char quote);
     void number();
     void identifier();
 

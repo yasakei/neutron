@@ -1,0 +1,106 @@
+say("=== String Sequence Operations Tests ===");
+
+// Test 1: String indexing (positive and negative)
+say("Test 1: String indexing");
+var index_str = "hello";
+var indexing_tests = (
+    index_str[0] == "h" &&
+    index_str[1] == "e" &&
+    index_str[4] == "o" &&
+    index_str[-1] == "o" &&
+    index_str[-2] == "l" &&
+    index_str[-5] == "h"
+);
+
+if (indexing_tests) {
+    say("✓ String indexing works correctly");
+} else {
+    say("✗ String indexing failed");
+}
+
+// Test 2: String slicing
+say("Test 2: String slicing");
+var slice_str = "abcdefgh";
+var slicing_tests = (
+    slice_str.slice(0, 3) == "abc" &&
+    slice_str.slice(2, 5) == "cde" &&
+    slice_str.slice(0, 8, 2) == "aceg" &&
+    slice_str.slice(7, 0, -1) == "hgfedcb" &&
+    slice_str.slice(-3, -1) == "fg" &&
+    slice_str.slice(0, 0) == ""
+);
+
+if (slicing_tests) {
+    say("✓ String slicing works correctly");
+} else {
+    say("✗ String slicing failed");
+}
+
+// Test 3: String multiplication
+say("Test 3: String multiplication");
+var mult_tests = (
+    "test" * 3 == "testtesttest" &&
+    "a" * 5 == "aaaaa" &&
+    "test" * 0 == "" &&
+    "test" * -1 == "" &&
+    "test" * 1 == "test"
+);
+
+if (mult_tests) {
+    say("✓ String multiplication works correctly");
+} else {
+    say("✗ String multiplication failed");
+}
+
+// Test 4: Sequence property tests
+say("Test 4: Sequence properties");
+
+// Negative indexing consistency
+var neg_test_str = "abcde";
+var neg_consistency = (
+    neg_test_str[0] == neg_test_str[-5] &&
+    neg_test_str[1] == neg_test_str[-4] &&
+    neg_test_str[2] == neg_test_str[-3] &&
+    neg_test_str[3] == neg_test_str[-2] &&
+    neg_test_str[4] == neg_test_str[-1]
+);
+
+// Slicing boundary behavior
+var slice_boundaries = (
+    neg_test_str.slice(0, 0) == "" &&
+    neg_test_str.slice(5, 5) == "" &&
+    neg_test_str.slice(0, 10) == neg_test_str &&
+    neg_test_str.slice(-10, 10) == neg_test_str
+);
+
+// String multiplication properties
+var mult_properties = (
+    ("abc" * 0) == "" &&
+    ("abc" * 1) == "abc" &&
+    ("abc" * 2).length == 6 &&
+    ("abc" * 3).contains("abc")
+);
+
+if (neg_consistency && slice_boundaries && mult_properties) {
+    say("✓ Sequence properties hold correctly");
+} else {
+    say("✗ Sequence properties failed");
+}
+
+// Test 5: Complex sequence operations
+say("Test 5: Complex sequence operations");
+var complex_str = "Hello World";
+var complex_ops_fixed = (
+    complex_str.slice(0, 5).upper() == "HELLO" &&
+    complex_str.slice(6, 11).lower() == "world" &&
+    (complex_str * 2).find("World") == 6 &&
+    complex_str.slice(-5, -2) == "Wor"
+);
+
+if (complex_ops_fixed) {
+    say("✓ Complex sequence operations work correctly");
+} else {
+    say("✗ Complex sequence operations failed");
+}
+
+say("=== String Sequence Operations Tests Complete ===");

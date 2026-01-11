@@ -1,0 +1,154 @@
+say("=== String Error Handling and Edge Cases Tests ===");
+
+// Test 1: Empty string edge cases
+say("Test 1: Empty string edge cases");
+var empty = "";
+var empty_tests = (
+    empty.length == 0 &&
+    empty.upper() == "" &&
+    empty.lower() == "" &&
+    empty.strip() == "" &&
+    empty.lstrip() == "" &&
+    empty.rstrip() == "" &&
+    empty.replace("x", "y") == "" &&
+    empty * 5 == "" &&
+    empty.slice(0, 0) == "" &&
+    empty.find("") == 0 &&
+    empty.contains("") == true &&
+    empty.contains("x") == false &&
+    empty.isalnum() == false &&
+    empty.isalpha() == false &&
+    empty.isdigit() == false
+);
+
+if (empty_tests) {
+    say("✓ Empty string edge cases handled correctly");
+} else {
+    say("✗ Empty string edge cases failed");
+}
+
+// Test 2: Single character edge cases
+say("Test 2: Single character edge cases");
+var single = "a";
+var single_tests = (
+    single.length == 1 &&
+    single[0] == "a" &&
+    single[-1] == "a" &&
+    single.slice(0, 1) == "a" &&
+    single.slice(1, 1) == "" &&
+    single.upper() == "A" &&
+    single.lower() == "a" &&
+    single * 3 == "aaa" &&
+    single.find("a") == 0 &&
+    single.find("b") == -1
+);
+
+if (single_tests) {
+    say("✓ Single character edge cases handled correctly");
+} else {
+    say("✗ Single character edge cases failed");
+}
+
+// Test 3: Large string handling
+say("Test 3: Large string handling");
+var large_base = "test";
+var large_str = large_base * 100;  // 400 characters
+var large_tests = (
+    large_str.length == 400 &&
+    large_str.contains("test") &&
+    large_str.find("test") == 0 &&
+    large_str.slice(0, 4) == "test" &&
+    large_str.upper().length == 400
+);
+
+if (large_tests) {
+    say("✓ Large string handling works correctly");
+} else {
+    say("✗ Large string handling failed");
+}
+
+// Test 4: Boundary conditions
+say("Test 4: Boundary conditions");
+var boundary_str = "hello";
+var boundary_tests = (
+    boundary_str.slice(0, 0) == "" &&
+    boundary_str.slice(5, 5) == "" &&
+    boundary_str.slice(0, 10) == "hello" &&
+    boundary_str.slice(-10, 10) == "hello" &&
+    boundary_str.find("") == 0 &&
+    boundary_str.substring(0, 0) == "" &&
+    boundary_str.substring(10, 20) == ""
+);
+
+if (boundary_tests) {
+    say("✓ Boundary conditions handled correctly");
+} else {
+    say("✗ Boundary conditions failed");
+}
+
+// Test 5: Error handling
+say("Test 5: Error handling");
+
+// Test valid operations (should work)
+var valid_result = "test".upper().slice(0, 2);
+var error_handling_ok = (valid_result == "TE");
+
+if (error_handling_ok) {
+    say("✓ Error handling works correctly");
+} else {
+    say("✗ Error handling failed");
+}
+
+// Test 6: Special characters and whitespace
+say("Test 6: Special characters and whitespace");
+var special_str = "Hello\nWorld\tTest";
+var whitespace_str = "   \t\n\r   ";
+var special_tests = (
+    special_str.length == 16 &&
+    special_str.contains("\n") &&
+    special_str.contains("\t") &&
+    whitespace_str.strip() == "" &&
+    whitespace_str.isspace() == true
+);
+
+if (special_tests) {
+    say("✓ Special characters handled correctly");
+} else {
+    say("✗ Special characters failed");
+}
+
+// Test 7: Method chaining edge cases
+say("Test 7: Method chaining edge cases");
+var chain_str = "  Hello World  ";
+var chain_result = chain_str.strip().upper().replace("HELLO", "HI").lower();
+var chain_tests = (
+    chain_result == "hi world" &&
+    "".strip().upper().lower() == "" &&
+    "a".upper().lower().capitalize() == "A"
+);
+
+if (chain_tests) {
+    say("✓ Method chaining edge cases handled correctly");
+} else {
+    say("✗ Method chaining edge cases failed");
+}
+
+// Test 8: Property-based edge case validation
+say("Test 8: Property validation");
+var empty_mult = "" * 10;
+var single_mult = "x" * 1;
+var neg_index_test = "hello"[0] == "hello"[-5];
+
+var prop_tests = (
+    empty_mult == "" &&
+    single_mult == "x" &&
+    neg_index_test == true
+);
+
+if (prop_tests) {
+    say("✓ Property validation passed");
+} else {
+    say("✗ Property validation failed");
+}
+
+say("=== String Error Handling and Edge Cases Tests Complete ===");

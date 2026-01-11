@@ -30,6 +30,7 @@
 #include "types/bound_array_method.h"
 #include "types/bound_string_method.h"
 #include "types/string_method_registry.h"
+#include "types/string_formatter.h"
 #include "types/buffer.h"
 #include <iostream>
 #include <stdexcept>
@@ -914,6 +915,7 @@ void VM::run(size_t minFrameDepth) {
     static void* dispatch_table[] = {
         &&CASE_OP_RETURN,
         &&CASE_OP_CONSTANT,
+        &&CASE_OP_CONSTANT_LONG,
         &&CASE_OP_NIL,
         &&CASE_OP_TRUE,
         &&CASE_OP_FALSE,
@@ -1042,6 +1044,13 @@ void VM::run(size_t minFrameDepth) {
             }
             CASE(OP_CONSTANT) {
                 Value constant = READ_CONSTANT();
+                push(constant);
+                DISPATCH();
+            }
+            CASE(OP_CONSTANT_LONG) {
+                // Read 16-bit constant index (big-endian)
+                uint16_t constantIndex = (READ_BYTE() << 8) | READ_BYTE();
+                Value constant = frame->function->chunk->constants[constantIndex];
                 push(constant);
                 DISPATCH();
             }
@@ -1608,12 +1617,50 @@ void VM::run(size_t minFrameDepth) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
-                    runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
+                
+                // Handle string * int and int * string
+                if (a.type == ValueType::OBJ_STRING && b.type == ValueType::NUMBER) {
+                    // string * int
+                    std::string str = a.asString()->chars;
+                    int count = static_cast<int>(b.as.number);
+                    
+                    if (count < 0) count = 0; // Negative count results in empty string
+                    
+                    std::string result;
+                    result.reserve(str.length() * count); // Optimize for large repetitions
+                    
+                    for (int i = 0; i < count; i++) {
+                        result += str;
+                    }
+                    
+                    a = Value(internString(result));
+                    stk.pop_back();
+                    DISPATCH();
+                } else if (a.type == ValueType::NUMBER && b.type == ValueType::OBJ_STRING) {
+                    // int * string
+                    int count = static_cast<int>(a.as.number);
+                    std::string str = b.asString()->chars;
+                    
+                    if (count < 0) count = 0; // Negative count results in empty string
+                    
+                    std::string result;
+                    result.reserve(str.length() * count); // Optimize for large repetitions
+                    
+                    for (int i = 0; i < count; i++) {
+                        result += str;
+                    }
+                    
+                    a = Value(internString(result));
+                    stk.pop_back();
+                    DISPATCH();
+                } else if (a.type == ValueType::NUMBER && b.type == ValueType::NUMBER) {
+                    // number * number (existing functionality)
+                    a.as.number *= b.as.number;
+                    stk.pop_back();
+                    DISPATCH();
+                } else {
+                    runtimeError(this, "Unsupported operand types for multiplication.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as.number *= b.as.number;
-                stk.pop_back();
-                DISPATCH();
             }
             CASE(OP_DIVIDE) {
                 size_t sz = stk.size();
@@ -1839,10 +1886,16 @@ void VM::run(size_t minFrameDepth) {
                     
                     int idx = static_cast<int>(index.as.number);
                     std::string str = object.asString()->chars;
+                    int strLen = static_cast<int>(str.length());
                     
-                    if (idx < 0 || idx >= static_cast<int>(str.length())) {
-                        std::string range = str.length() == 0 ? "[]" : "[0, " + std::to_string(str.length()-1) + "]";
-                        std::string errorMsg = "String index out of bounds: index " + std::to_string(idx) + 
+                    // Handle negative indices (Python-style)
+                    if (idx < 0) {
+                        idx = strLen + idx;
+                    }
+                    
+                    if (idx < 0 || idx >= strLen) {
+                        std::string range = strLen == 0 ? "[]" : "[" + std::to_string(-strLen) + ", " + std::to_string(strLen-1) + "]";
+                        std::string errorMsg = "String index out of bounds: index " + std::to_string(static_cast<int>(index.as.number)) + 
                                               " is not within " + range;
                         runtimeError(this, errorMsg, 
                                     frames.empty() ? -1 : frames.back().currentLine);

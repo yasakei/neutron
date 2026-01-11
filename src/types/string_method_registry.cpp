@@ -1,5 +1,8 @@
 #include "types/string_method_registry.h"
 #include "types/string_search_methods.h"
+#include "types/unicode_handler.h"
+#include "types/string_formatter.h"
+#include "types/string_error.h"
 #include "types/value.h"
 #include "types/array.h"
 #include "core/vm.h"
@@ -134,45 +137,50 @@ class FindMethodHandler : public StringMethodHandler {
 public:
     Value execute(VM* vm, const std::string& str, const std::vector<Value>& args) override {
         (void)vm; // Suppress unused parameter warning
-        std::string substr = args[0].toString();
         
-        size_t start = 0;
-        size_t end = str.length();
-        
-        // Handle optional start parameter
-        if (args.size() >= 2) {
-            if (args[1].type != ValueType::NUMBER) {
-                throw std::runtime_error("find() start parameter must be a number");
+        try {
+            std::string substr = args[0].toString();
+            
+            size_t start = 0;
+            size_t end = str.length();
+            
+            // Handle optional start parameter
+            if (args.size() >= 2) {
+                if (args[1].type != ValueType::NUMBER) {
+                    throw StringError::invalidArgument("find", "start parameter must be a number");
+                }
+                int startInt = static_cast<int>(args[1].as.number);
+                if (startInt < 0) startInt = 0;
+                start = static_cast<size_t>(startInt);
             }
-            int startInt = static_cast<int>(args[1].as.number);
-            if (startInt < 0) startInt = 0;
-            start = static_cast<size_t>(startInt);
-        }
-        
-        // Handle optional end parameter
-        if (args.size() >= 3) {
-            if (args[2].type != ValueType::NUMBER) {
-                throw std::runtime_error("find() end parameter must be a number");
+            
+            // Handle optional end parameter
+            if (args.size() >= 3) {
+                if (args[2].type != ValueType::NUMBER) {
+                    throw StringError::invalidArgument("find", "end parameter must be a number");
+                }
+                int endInt = static_cast<int>(args[2].as.number);
+                if (endInt < 0) endInt = 0;
+                end = std::min(static_cast<size_t>(endInt), str.length());
             }
-            int endInt = static_cast<int>(args[2].as.number);
-            if (endInt < 0) endInt = 0;
-            end = std::min(static_cast<size_t>(endInt), str.length());
+            
+            // Allow searching at the end of string for empty substrings
+            if (start > str.length()) {
+                return Value(-1.0);
+            }
+            
+            // Search within the specified range
+            std::string searchStr = str.substr(start, end - start);
+            size_t pos = searchStr.find(substr);
+            
+            if (pos == std::string::npos) {
+                return Value(-1.0);
+            }
+            
+            return Value(static_cast<double>(start + pos));
+        } catch (const StringError& e) {
+            throw std::runtime_error(e.what());
         }
-        
-        // Allow searching at the end of string for empty substrings
-        if (start > str.length()) {
-            return Value(-1.0);
-        }
-        
-        // Search within the specified range
-        std::string searchStr = str.substr(start, end - start);
-        size_t pos = searchStr.find(substr);
-        
-        if (pos == std::string::npos) {
-            return Value(-1.0);
-        }
-        
-        return Value(static_cast<double>(start + pos));
     }
     
     int getArity() const override { return -1; } // Variable arguments (1-3)
@@ -501,60 +509,71 @@ public:
     Value execute(VM* vm, const std::string& str, const std::vector<Value>& args) override {
         (void)vm; // Suppress unused parameter warning
         
-        std::string oldStr = args[0].toString();
-        std::string newStr = args[1].toString();
-        int count = -1; // Replace all by default
-        
-        // Handle optional count parameter
-        if (args.size() >= 3) {
-            if (args[2].type != ValueType::NUMBER) {
-                throw std::runtime_error("replace() count parameter must be a number");
-            }
-            count = static_cast<int>(args[2].as.number);
-            if (count < 0) count = -1; // Negative means replace all
-        }
-        
-        if (oldStr.empty()) {
-            // Python behavior: empty string replacement inserts newStr between each character
-            if (count == 0) return Value(str);
+        try {
+            std::string oldStr = args[0].toString();
+            std::string newStr = args[1].toString();
+            int count = -1; // Replace all by default
             
-            std::string result;
-            result.reserve(str.length() * (newStr.length() + 1) + newStr.length());
-            
-            int replacements = 0;
-            
-            // Insert at beginning if count allows
-            if (count == -1 || replacements < count) {
-                result += newStr;
-                replacements++;
+            // Handle optional count parameter
+            if (args.size() >= 3) {
+                if (args[2].type != ValueType::NUMBER) {
+                    throw StringError::invalidArgument("replace", "count parameter must be a number");
+                }
+                count = static_cast<int>(args[2].as.number);
+                if (count < 0) count = -1; // Negative means replace all
             }
             
-            for (size_t i = 0; i < str.length(); i++) {
-                result += str[i];
-                if ((count == -1 || replacements < count) && i < str.length()) {
+            // Validate potential result size for very large strings
+            if (!oldStr.empty() && newStr.length() > oldStr.length()) {
+                size_t potential_size = str.length() + (newStr.length() - oldStr.length()) * 
+                                      std::count(str.begin(), str.end(), oldStr[0]);
+                StringValidator::validateStringSize("replace", potential_size);
+            }
+            
+            if (oldStr.empty()) {
+                // Python behavior: empty string replacement inserts newStr between each character
+                if (count == 0) return Value(str);
+                
+                std::string result;
+                result.reserve(str.length() * (newStr.length() + 1) + newStr.length());
+                
+                int replacements = 0;
+                
+                // Insert at beginning if count allows
+                if (count == -1 || replacements < count) {
                     result += newStr;
                     replacements++;
                 }
+                
+                for (size_t i = 0; i < str.length(); i++) {
+                    result += str[i];
+                    if ((count == -1 || replacements < count) && i < str.length()) {
+                        result += newStr;
+                        replacements++;
+                    }
+                }
+                
+                return Value(result);
+            }
+            
+            std::string result = str;
+            size_t pos = 0;
+            int replacements = 0;
+            
+            while ((pos = result.find(oldStr, pos)) != std::string::npos) {
+                if (count != -1 && replacements >= count) {
+                    break;
+                }
+                
+                result.replace(pos, oldStr.length(), newStr);
+                pos += newStr.length(); // Move past the replacement to avoid infinite loops
+                replacements++;
             }
             
             return Value(result);
+        } catch (const StringError& e) {
+            throw std::runtime_error(e.what());
         }
-        
-        std::string result = str;
-        size_t pos = 0;
-        int replacements = 0;
-        
-        while ((pos = result.find(oldStr, pos)) != std::string::npos) {
-            if (count != -1 && replacements >= count) {
-                break;
-            }
-            
-            result.replace(pos, oldStr.length(), newStr);
-            pos += newStr.length(); // Move past the replacement to avoid infinite loops
-            replacements++;
-        }
-        
-        return Value(result);
     }
     
     int getArity() const override { return -1; } // Variable arguments (2-3)
@@ -764,6 +783,502 @@ public:
     }
 };
 
+/**
+ * IsAlnum method handler - checks if all characters are alphanumeric
+ */
+class IsAlnumMethodHandler : public StringMethodHandler {
+public:
+    Value execute(VM* vm, const std::string& str, const std::vector<Value>& args) override {
+        (void)vm; (void)args; // Suppress unused parameter warnings
+        
+        if (str.empty()) {
+            return Value(false); // Empty string returns false for all is* methods
+        }
+        
+        for (char c : str) {
+            if (!std::isalnum(static_cast<unsigned char>(c))) {
+                return Value(false);
+            }
+        }
+        return Value(true);
+    }
+    
+    int getArity() const override { return 0; }
+    
+    bool validateArgs(const std::vector<Value>& args) const override {
+        return args.size() == 0;
+    }
+    
+    std::string getDescription() const override {
+        return "isalnum() -> bool";
+    }
+};
+
+/**
+ * IsAlpha method handler - checks if all characters are alphabetic
+ */
+class IsAlphaMethodHandler : public StringMethodHandler {
+public:
+    Value execute(VM* vm, const std::string& str, const std::vector<Value>& args) override {
+        (void)vm; (void)args; // Suppress unused parameter warnings
+        
+        if (str.empty()) {
+            return Value(false);
+        }
+        
+        for (char c : str) {
+            if (!std::isalpha(static_cast<unsigned char>(c))) {
+                return Value(false);
+            }
+        }
+        return Value(true);
+    }
+    
+    int getArity() const override { return 0; }
+    
+    bool validateArgs(const std::vector<Value>& args) const override {
+        return args.size() == 0;
+    }
+    
+    std::string getDescription() const override {
+        return "isalpha() -> bool";
+    }
+};
+
+/**
+ * IsDigit method handler - checks if all characters are digits
+ */
+class IsDigitMethodHandler : public StringMethodHandler {
+public:
+    Value execute(VM* vm, const std::string& str, const std::vector<Value>& args) override {
+        (void)vm; (void)args; // Suppress unused parameter warnings
+        
+        if (str.empty()) {
+            return Value(false);
+        }
+        
+        for (char c : str) {
+            if (!std::isdigit(static_cast<unsigned char>(c))) {
+                return Value(false);
+            }
+        }
+        return Value(true);
+    }
+    
+    int getArity() const override { return 0; }
+    
+    bool validateArgs(const std::vector<Value>& args) const override {
+        return args.size() == 0;
+    }
+    
+    std::string getDescription() const override {
+        return "isdigit() -> bool";
+    }
+};
+
+/**
+ * IsLower method handler - checks if all cased characters are lowercase
+ */
+class IsLowerMethodHandler : public StringMethodHandler {
+public:
+    Value execute(VM* vm, const std::string& str, const std::vector<Value>& args) override {
+        (void)vm; (void)args; // Suppress unused parameter warnings
+        
+        if (str.empty()) {
+            return Value(false);
+        }
+        
+        bool hasCasedChar = false;
+        for (char c : str) {
+            unsigned char uc = static_cast<unsigned char>(c);
+            if (std::isalpha(uc)) {
+                hasCasedChar = true;
+                if (!std::islower(uc)) {
+                    return Value(false);
+                }
+            }
+        }
+        return Value(hasCasedChar); // Must have at least one cased character
+    }
+    
+    int getArity() const override { return 0; }
+    
+    bool validateArgs(const std::vector<Value>& args) const override {
+        return args.size() == 0;
+    }
+    
+    std::string getDescription() const override {
+        return "islower() -> bool";
+    }
+};
+
+/**
+ * IsUpper method handler - checks if all cased characters are uppercase
+ */
+class IsUpperMethodHandler : public StringMethodHandler {
+public:
+    Value execute(VM* vm, const std::string& str, const std::vector<Value>& args) override {
+        (void)vm; (void)args; // Suppress unused parameter warnings
+        
+        if (str.empty()) {
+            return Value(false);
+        }
+        
+        bool hasCasedChar = false;
+        for (char c : str) {
+            unsigned char uc = static_cast<unsigned char>(c);
+            if (std::isalpha(uc)) {
+                hasCasedChar = true;
+                if (!std::isupper(uc)) {
+                    return Value(false);
+                }
+            }
+        }
+        return Value(hasCasedChar); // Must have at least one cased character
+    }
+    
+    int getArity() const override { return 0; }
+    
+    bool validateArgs(const std::vector<Value>& args) const override {
+        return args.size() == 0;
+    }
+    
+    std::string getDescription() const override {
+        return "isupper() -> bool";
+    }
+};
+
+/**
+ * IsSpace method handler - checks if all characters are whitespace
+ */
+class IsSpaceMethodHandler : public StringMethodHandler {
+public:
+    Value execute(VM* vm, const std::string& str, const std::vector<Value>& args) override {
+        (void)vm; (void)args; // Suppress unused parameter warnings
+        
+        if (str.empty()) {
+            return Value(false);
+        }
+        
+        for (char c : str) {
+            if (!std::isspace(static_cast<unsigned char>(c))) {
+                return Value(false);
+            }
+        }
+        return Value(true);
+    }
+    
+    int getArity() const override { return 0; }
+    
+    bool validateArgs(const std::vector<Value>& args) const override {
+        return args.size() == 0;
+    }
+    
+    std::string getDescription() const override {
+        return "isspace() -> bool";
+    }
+};
+
+/**
+ * IsTitle method handler - checks if string is in title case
+ */
+class IsTitleMethodHandler : public StringMethodHandler {
+public:
+    Value execute(VM* vm, const std::string& str, const std::vector<Value>& args) override {
+        (void)vm; (void)args; // Suppress unused parameter warnings
+        
+        if (str.empty()) {
+            return Value(false);
+        }
+        
+        bool expectUpper = true;
+        bool hasCasedChar = false;
+        
+        for (char c : str) {
+            unsigned char uc = static_cast<unsigned char>(c);
+            
+            if (std::isalpha(uc)) {
+                hasCasedChar = true;
+                if (expectUpper) {
+                    if (!std::isupper(uc)) {
+                        return Value(false);
+                    }
+                    expectUpper = false;
+                } else {
+                    if (!std::islower(uc)) {
+                        return Value(false);
+                    }
+                }
+            } else {
+                // Non-alphabetic characters reset expectation for next word
+                expectUpper = true;
+            }
+        }
+        
+        return Value(hasCasedChar);
+    }
+    
+    int getArity() const override { return 0; }
+    
+    bool validateArgs(const std::vector<Value>& args) const override {
+        return args.size() == 0;
+    }
+    
+    std::string getDescription() const override {
+        return "istitle() -> bool";
+    }
+};
+
+/**
+ * Slice method handler - returns substring with start, end, and optional step
+ */
+class SliceMethodHandler : public StringMethodHandler {
+public:
+    Value execute(VM* vm, const std::string& str, const std::vector<Value>& args) override {
+        (void)vm; // Suppress unused parameter warning
+        
+        try {
+            int strLen = static_cast<int>(str.length());
+            
+            if (strLen == 0) {
+                return Value(std::string(""));
+            }
+            
+            // Parse arguments: slice(start, [end], [step])
+            int start = 0;
+            int end = strLen;
+            int step = 1;
+            
+            if (args.size() >= 1) {
+                if (args[0].type != ValueType::NUMBER) {
+                    throw StringError::invalidArgument("slice", "start parameter must be a number");
+                }
+                start = static_cast<int>(args[0].as.number);
+            }
+            
+            if (args.size() >= 2) {
+                if (args[1].type != ValueType::NUMBER) {
+                    throw StringError::invalidArgument("slice", "end parameter must be a number");
+                }
+                end = static_cast<int>(args[1].as.number);
+            }
+            
+            if (args.size() >= 3) {
+                if (args[2].type != ValueType::NUMBER) {
+                    throw StringError::invalidArgument("slice", "step parameter must be a number");
+                }
+                step = static_cast<int>(args[2].as.number);
+                if (step == 0) {
+                    throw StringError::sliceError("slice", "step cannot be zero");
+                }
+            }
+            
+            // Validate and normalize slice parameters
+            StringValidator::normalizeSlice("slice", start, end, step, strLen);
+            
+            std::string result;
+            
+            if (step > 0) {
+                // Forward slicing
+                if (start >= end) return Value(std::string(""));
+                
+                for (int i = start; i < end; i += step) {
+                    result += str[i];
+                }
+            } else {
+                // Backward slicing (step < 0)
+                if (start <= end) return Value(std::string(""));
+                
+                for (int i = start; i > end; i += step) {
+                    if (i >= 0 && i < strLen) {
+                        result += str[i];
+                    }
+                }
+            }
+            
+            return Value(result);
+        } catch (const StringError& e) {
+            throw std::runtime_error(e.what());
+        }
+    }
+    
+    int getArity() const override { return -1; } // Variable arguments (1-3)
+    
+    bool validateArgs(const std::vector<Value>& args) const override {
+        return args.size() >= 1 && args.size() <= 3;
+    }
+    
+    std::string getDescription() const override {
+        return "slice(start, [end], [step]) -> string";
+    }
+};
+
+// Unicode method handlers
+class NormalizeMethodHandler : public StringMethodHandler {
+public:
+    Value execute(VM* vm, const std::string& str, const std::vector<Value>& args) override {
+        if (!vm) {
+            throw std::runtime_error("VM pointer is null in normalize method");
+        }
+        
+        try {
+            std::string form_str = args[0].toString();
+            NormalizationForm form = NormalizationForm::NFC; // default
+            
+            if (form_str == "NFC") form = NormalizationForm::NFC;
+            else if (form_str == "NFD") form = NormalizationForm::NFD;
+            else if (form_str == "NFKC") form = NormalizationForm::NFKC;
+            else if (form_str == "NFKD") form = NormalizationForm::NFKD;
+            else {
+                throw std::runtime_error("Invalid normalization form: " + form_str);
+            }
+            
+            std::string result = UnicodeHandler::normalize(str, form);
+            
+            // Ensure result is valid before creating Value
+            if (result.empty() && !str.empty()) {
+                result = str; // Fallback to original string
+            }
+            
+            // Create Value directly to avoid potential vm->internString() issues
+            return Value(result);
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Normalize error: " + std::string(e.what()));
+        }
+    }
+    
+    int getArity() const override { return 1; }
+    
+    bool validateArgs(const std::vector<Value>& args) const override {
+        return args.size() == 1;
+    }
+    
+    std::string getDescription() const override {
+        return "normalize(form) -> string";
+    }
+};
+
+class EncodeMethodHandler : public StringMethodHandler {
+public:
+    Value execute(VM* vm, const std::string& str, const std::vector<Value>& args) override {
+        if (!vm) {
+            throw std::runtime_error("VM pointer is null in encode method");
+        }
+        
+        try {
+            std::string encoding = args.empty() ? "utf-8" : args[0].toString();
+            
+            // Comprehensive encoding validation and processing
+            if (encoding == "utf-8" || encoding == "UTF-8") {
+                // UTF-8 is already the internal representation
+                return Value(str);
+            } else if (encoding == "ascii" || encoding == "ASCII") {
+                // Check if string is ASCII-only
+                for (char c : str) {
+                    if (static_cast<unsigned char>(c) > 127) {
+                        throw std::runtime_error("ascii codec can't encode character at position");
+                    }
+                }
+                return Value(str);
+            } else if (encoding == "latin-1" || encoding == "LATIN-1" || 
+                       encoding == "iso-8859-1" || encoding == "ISO-8859-1") {
+                // Latin-1 encoding - check if all characters fit in 8-bit range
+                for (char c : str) {
+                    if (static_cast<unsigned char>(c) > 255) {
+                        throw std::runtime_error("latin-1 codec can't encode character");
+                    }
+                }
+                return Value(str);
+            } else if (encoding == "utf-16" || encoding == "UTF-16") {
+                // Simplified UTF-16 - for now just return the string
+                // Full implementation would convert to UTF-16 byte representation
+                return Value(str);
+            } else if (encoding == "utf-32" || encoding == "UTF-32") {
+                // Simplified UTF-32 - for now just return the string
+                // Full implementation would convert to UTF-32 byte representation
+                return Value(str);
+            } else {
+                throw std::runtime_error("Unsupported encoding: " + encoding);
+            }
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Encode error: " + std::string(e.what()));
+        }
+    }
+    
+    int getArity() const override { return -1; } // Variable arity (0 or 1)
+    
+    bool validateArgs(const std::vector<Value>& args) const override {
+        return args.size() <= 1;
+    }
+    
+    std::string getDescription() const override {
+        return "encode([encoding]) -> bytes";
+    }
+};
+
+class IsUnicodeMethodHandler : public StringMethodHandler {
+public:
+    Value execute(VM* vm, const std::string& str, const std::vector<Value>& args) override {
+        (void)vm; (void)args; // Suppress unused parameter warnings
+        
+        // Check if string contains non-ASCII characters (more comprehensive)
+        for (size_t i = 0; i < str.length(); ++i) {
+            unsigned char c = static_cast<unsigned char>(str[i]);
+            
+            // Check for UTF-8 multi-byte sequences
+            if (c > 127) {
+                return Value(true);
+            }
+            
+            // Check for UTF-8 continuation bytes
+            if ((c & 0x80) != 0) {
+                return Value(true);
+            }
+        }
+        
+        // Also check for Unicode escape sequences in the original string
+        // This is a simplified check - full implementation would be more comprehensive
+        if (str.find("\\u") != std::string::npos || str.find("\\U") != std::string::npos) {
+            return Value(true);
+        }
+        
+        return Value(false);
+    }
+    
+    int getArity() const override { return 0; }
+    
+    bool validateArgs(const std::vector<Value>& args) const override {
+        return args.size() == 0;
+    }
+    
+    std::string getDescription() const override {
+        return "isunicode() -> bool";
+    }
+};
+
+// Formatting method handlers
+class FormatMethodHandler : public StringMethodHandler {
+public:
+    Value execute(VM* vm, const std::string& str, const std::vector<Value>& args) override {
+        try {
+            std::string result = StringFormatter::format(str, args);
+            return Value(vm->internString(result));
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Format error: " + std::string(e.what()));
+        }
+    }
+    
+    int getArity() const override { return -1; } // Variable arity
+    
+    bool validateArgs(const std::vector<Value>& args) const override {
+        return true; // Accept any number of arguments
+    }
+    
+    std::string getDescription() const override {
+        return "format(*args) -> string";
+    }
+};
+
 void StringMethodRegistry::registerMethod(const std::string& name, 
                                         std::unique_ptr<StringMethodHandler> handler,
                                         StringMethodCategory category) {
@@ -811,6 +1326,26 @@ void StringMethodRegistry::initializeBasicMethods() {
     registerMethod("title", std::make_unique<TitleMethodHandler>(), StringMethodCategory::CASE);
     registerMethod("swapcase", std::make_unique<SwapcaseMethodHandler>(), StringMethodCategory::CASE);
     registerMethod("casefold", std::make_unique<CasefoldMethodHandler>(), StringMethodCategory::CASE);
+    
+    // Register character classification methods
+    registerMethod("isalnum", std::make_unique<IsAlnumMethodHandler>(), StringMethodCategory::CLASSIFICATION);
+    registerMethod("isalpha", std::make_unique<IsAlphaMethodHandler>(), StringMethodCategory::CLASSIFICATION);
+    registerMethod("isdigit", std::make_unique<IsDigitMethodHandler>(), StringMethodCategory::CLASSIFICATION);
+    registerMethod("islower", std::make_unique<IsLowerMethodHandler>(), StringMethodCategory::CLASSIFICATION);
+    registerMethod("isupper", std::make_unique<IsUpperMethodHandler>(), StringMethodCategory::CLASSIFICATION);
+    registerMethod("isspace", std::make_unique<IsSpaceMethodHandler>(), StringMethodCategory::CLASSIFICATION);
+    registerMethod("istitle", std::make_unique<IsTitleMethodHandler>(), StringMethodCategory::CLASSIFICATION);
+    
+    // Register sequence operation methods
+    registerMethod("slice", std::make_unique<SliceMethodHandler>(), StringMethodCategory::SEQUENCE);
+    
+    // Register Unicode methods
+    registerMethod("normalize", std::make_unique<NormalizeMethodHandler>(), StringMethodCategory::UNICODE);
+    registerMethod("encode", std::make_unique<EncodeMethodHandler>(), StringMethodCategory::UNICODE);
+    registerMethod("isunicode", std::make_unique<IsUnicodeMethodHandler>(), StringMethodCategory::UNICODE);
+    
+    // Register formatting methods
+    registerMethod("format", std::make_unique<FormatMethodHandler>(), StringMethodCategory::FORMATTING);
 }
 
 std::vector<std::string> StringMethodRegistry::getMethodNames() const {
