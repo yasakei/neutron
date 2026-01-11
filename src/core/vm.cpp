@@ -1400,26 +1400,28 @@ void VM::run(size_t minFrameDepth) {
                     }
                 } else if (object.type == ValueType::OBJ_STRING) {
                     // Handle string properties and methods
-                    std::string str = object.asString()->chars;
-                    
-                    if (propertyName == "length") {
-                        stack.pop_back();
-                        push(Value(static_cast<double>(str.length())));
-                    } else if (propertyName == "chars") {
-                        // Return an array of individual characters
-                        Array* charArray = allocate<Array>();
-                        for (char c : str) {
-                            charArray->push(Value(internString(std::string(1, c))));
+                    {
+                        std::string str = object.asString()->chars;
+                        
+                        if (propertyName == "length") {
+                            stack.pop_back();
+                            push(Value(static_cast<double>(str.length())));
+                        } else if (propertyName == "chars") {
+                            // Return an array of individual characters
+                            Array* charArray = allocate<Array>();
+                            for (char c : str) {
+                                charArray->push(Value(internString(std::string(1, c))));
+                            }
+                            stack.pop_back();
+                            push(Value(charArray));
+                        } else if (StringMethodRegistry::getInstance().hasMethod(propertyName)) {
+                            // Return a bound method that captures the string
+                            stack.pop_back();
+                            push(Value(allocate<BoundStringMethod>(str, propertyName)));
+                        } else {
+                            runtimeError(this, "String does not have property '" + propertyName + "'.",
+                                        frames.empty() ? -1 : frames.back().currentLine);
                         }
-                        stack.pop_back();
-                        push(Value(charArray));
-                    } else if (StringMethodRegistry::getInstance().hasMethod(propertyName)) {
-                        // Return a bound method that captures the string
-                        stack.pop_back();
-                        push(Value(allocate<BoundStringMethod>(str, propertyName)));
-                    } else {
-                        runtimeError(this, "String does not have property '" + propertyName + "'.",
-                                    frames.empty() ? -1 : frames.back().currentLine);
                     }
                 } else if (object.type == ValueType::INSTANCE) {
                     // Handle instance properties and methods
@@ -1621,36 +1623,40 @@ void VM::run(size_t minFrameDepth) {
                 // Handle string * int and int * string
                 if (a.type == ValueType::OBJ_STRING && b.type == ValueType::NUMBER) {
                     // string * int
-                    std::string str = a.asString()->chars;
-                    int count = static_cast<int>(b.as.number);
-                    
-                    if (count < 0) count = 0; // Negative count results in empty string
-                    
-                    std::string result;
-                    result.reserve(str.length() * count); // Optimize for large repetitions
-                    
-                    for (int i = 0; i < count; i++) {
-                        result += str;
+                    {
+                        std::string str = a.asString()->chars;
+                        int count = static_cast<int>(b.as.number);
+                        
+                        if (count < 0) count = 0; // Negative count results in empty string
+                        
+                        std::string result;
+                        result.reserve(str.length() * count); // Optimize for large repetitions
+                        
+                        for (int i = 0; i < count; i++) {
+                            result += str;
+                        }
+                        
+                        a = Value(internString(result));
                     }
-                    
-                    a = Value(internString(result));
                     stk.pop_back();
                     DISPATCH();
                 } else if (a.type == ValueType::NUMBER && b.type == ValueType::OBJ_STRING) {
                     // int * string
-                    int count = static_cast<int>(a.as.number);
-                    std::string str = b.asString()->chars;
-                    
-                    if (count < 0) count = 0; // Negative count results in empty string
-                    
-                    std::string result;
-                    result.reserve(str.length() * count); // Optimize for large repetitions
-                    
-                    for (int i = 0; i < count; i++) {
-                        result += str;
+                    {
+                        int count = static_cast<int>(a.as.number);
+                        std::string str = b.asString()->chars;
+                        
+                        if (count < 0) count = 0; // Negative count results in empty string
+                        
+                        std::string result;
+                        result.reserve(str.length() * count); // Optimize for large repetitions
+                        
+                        for (int i = 0; i < count; i++) {
+                            result += str;
+                        }
+                        
+                        a = Value(internString(result));
                     }
-                    
-                    a = Value(internString(result));
                     stk.pop_back();
                     DISPATCH();
                 } else if (a.type == ValueType::NUMBER && b.type == ValueType::NUMBER) {
@@ -1884,26 +1890,28 @@ void VM::run(size_t minFrameDepth) {
                         return;
                     }
                     
-                    int idx = static_cast<int>(index.as.number);
-                    std::string str = object.asString()->chars;
-                    int strLen = static_cast<int>(str.length());
-                    
-                    // Handle negative indices (Python-style)
-                    if (idx < 0) {
-                        idx = strLen + idx;
+                    {
+                        int idx = static_cast<int>(index.as.number);
+                        std::string str = object.asString()->chars;
+                        int strLen = static_cast<int>(str.length());
+                        
+                        // Handle negative indices (Python-style)
+                        if (idx < 0) {
+                            idx = strLen + idx;
+                        }
+                        
+                        if (idx < 0 || idx >= strLen) {
+                            std::string range = strLen == 0 ? "[]" : "[" + std::to_string(-strLen) + ", " + std::to_string(strLen-1) + "]";
+                            std::string errorMsg = "String index out of bounds: index " + std::to_string(static_cast<int>(index.as.number)) + 
+                                                  " is not within " + range;
+                            runtimeError(this, errorMsg, 
+                                        frames.empty() ? -1 : frames.back().currentLine);
+                            return;
+                        }
+                        
+                        // Return the character at the index as a string
+                        push(Value(std::string(1, str[idx])));
                     }
-                    
-                    if (idx < 0 || idx >= strLen) {
-                        std::string range = strLen == 0 ? "[]" : "[" + std::to_string(-strLen) + ", " + std::to_string(strLen-1) + "]";
-                        std::string errorMsg = "String index out of bounds: index " + std::to_string(static_cast<int>(index.as.number)) + 
-                                              " is not within " + range;
-                        runtimeError(this, errorMsg, 
-                                    frames.empty() ? -1 : frames.back().currentLine);
-                        return;
-                    }
-                    
-                    // Return the character at the index as a string
-                    push(Value(std::string(1, str[idx])));
                 } else if (object.type == ValueType::BUFFER) {
                     if (index.type != ValueType::NUMBER) {
                         runtimeError(this, "Buffer index must be a number.", frames.empty() ? -1 : frames.back().currentLine);
