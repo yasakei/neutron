@@ -284,7 +284,7 @@ public:
             end = std::min(static_cast<size_t>(endInt), str.length());
         }
         
-        if (start >= str.length()) {
+        if (start > str.length()) {
             throw std::runtime_error("substring not found");
         }
         
@@ -342,7 +342,7 @@ public:
             end = std::min(static_cast<size_t>(endInt), str.length());
         }
         
-        if (start >= str.length()) {
+        if (start > str.length()) {
             throw std::runtime_error("substring not found");
         }
         
@@ -595,9 +595,13 @@ public:
     Value execute(VM* vm, const std::string& str, const std::vector<Value>& args) override {
         (void)vm; (void)args; // Suppress unused parameter warnings
         
-        std::string result = str;
-        std::transform(result.begin(), result.end(), result.begin(), 
-                      [](unsigned char c) { return std::toupper(c); });
+        // Use Unicode-aware case conversion
+        std::vector<uint32_t> codepoints = UnicodeHandler::utf8ToCodepoints(str);
+        for (uint32_t& cp : codepoints) {
+            cp = UnicodeHandler::toUpper(cp);
+        }
+        std::string result = UnicodeHandler::codepointsToUtf8(codepoints);
+        
         return Value(result);
     }
     
@@ -620,9 +624,13 @@ public:
     Value execute(VM* vm, const std::string& str, const std::vector<Value>& args) override {
         (void)vm; (void)args; // Suppress unused parameter warnings
         
-        std::string result = str;
-        std::transform(result.begin(), result.end(), result.begin(), 
-                      [](unsigned char c) { return std::tolower(c); });
+        // Use Unicode-aware case conversion
+        std::vector<uint32_t> codepoints = UnicodeHandler::utf8ToCodepoints(str);
+        for (uint32_t& cp : codepoints) {
+            cp = UnicodeHandler::toLower(cp);
+        }
+        std::string result = UnicodeHandler::codepointsToUtf8(codepoints);
+        
         return Value(result);
     }
     
@@ -1279,6 +1287,10 @@ public:
     }
 };
 
+StringMethodRegistry::StringMethodRegistry() {
+    initializeBasicMethods();
+}
+
 void StringMethodRegistry::registerMethod(const std::string& name, 
                                         std::unique_ptr<StringMethodHandler> handler,
                                         StringMethodCategory category) {
@@ -1359,13 +1371,6 @@ std::vector<std::string> StringMethodRegistry::getMethodNames() const {
 
 StringMethodRegistry& StringMethodRegistry::getInstance() {
     static StringMethodRegistry instance;
-    static bool initialized = false;
-    
-    if (!initialized) {
-        instance.initializeBasicMethods();
-        initialized = true;
-    }
-    
     return instance;
 }
 

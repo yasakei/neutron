@@ -82,7 +82,7 @@ var search_consistency = (
 
 // Case conversion consistency
 var case_consistency = (
-    prop_str.upper().lower() != prop_str &&  // Not always reversible
+    prop_str.upper().lower() == prop_str &&  // Should be reversible for lowercase strings
     prop_str.upper().length == prop_str.length &&
     prop_str.lower().length == prop_str.length
 );

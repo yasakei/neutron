@@ -65,6 +65,14 @@ static int constantInstruction(const char* name, const Chunk* chunk, int offset)
     return offset + 2;
 }
 
+static int constantLongInstruction(const char* name, const Chunk* chunk, int offset) {
+    uint16_t constantIndex = (chunk->code[offset + 1] << 8) | chunk->code[offset + 2];
+    printf("%-16s %4d '", name, constantIndex);
+    std::cout << chunk->constants[constantIndex].toString();
+    std::cout << "' (" << chunk->constants[constantIndex].type << ")" << std::endl;
+    return offset + 3;
+}
+
 // static int byteInstruction(const char* name, const Chunk* chunk, int offset) {
 //     uint8_t slot = chunk->code[offset + 1];
 //     printf("%-16s %4d\n", name, slot);
@@ -85,6 +93,8 @@ size_t disassembleInstruction(const Chunk* chunk, size_t offset) {
             return simpleInstruction("OP_RETURN", offset);
         case OpCode::OP_CONSTANT:
             return constantInstruction("OP_CONSTANT", chunk, offset);
+        case OpCode::OP_CONSTANT_LONG:
+            return constantLongInstruction("OP_CONSTANT_LONG", chunk, offset);
         case OpCode::OP_NIL:
             return simpleInstruction("OP_NIL", offset);
         case OpCode::OP_TRUE:

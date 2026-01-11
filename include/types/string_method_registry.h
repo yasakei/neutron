@@ -31,6 +31,11 @@ private:
     
 public:
     /**
+     * Constructor - initializes all basic methods
+     */
+    StringMethodRegistry();
+    
+    /**
      * Register a new string method handler
      * @param name The method name
      * @param handler The handler implementation

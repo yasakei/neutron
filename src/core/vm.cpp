@@ -1048,8 +1048,10 @@ void VM::run(size_t minFrameDepth) {
                 DISPATCH();
             }
             CASE(OP_CONSTANT_LONG) {
-                // Read 16-bit constant index (big-endian)
-                uint16_t constantIndex = (READ_BYTE() << 8) | READ_BYTE();
+                // Read 16-bit constant index (big-endian) - sequence reads to avoid undefined behavior
+                uint8_t high = READ_BYTE();
+                uint8_t low = READ_BYTE();
+                uint16_t constantIndex = (high << 8) | low;
                 Value constant = frame->function->chunk->constants[constantIndex];
                 push(constant);
                 DISPATCH();

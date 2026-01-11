@@ -86,8 +86,11 @@ UnicodeCategory UnicodeHandler::getCategory(uint32_t codepoint) {
         return UnicodeCategory::LETTER_LOWERCASE;
     } else if (codepoint >= '0' && codepoint <= '9') {
         return UnicodeCategory::NUMBER_DECIMAL_DIGIT;
-    } else if (codepoint == ' ' || codepoint == '\t' || codepoint == '\n' || codepoint == '\r') {
+    } else if (codepoint == ' ') {
         return UnicodeCategory::SEPARATOR_SPACE;
+    } else if (codepoint == '\t' || codepoint == '\n' || codepoint == '\r') {
+        // \t, \n, \r are control characters per Unicode
+        return UnicodeCategory::OTHER_CONTROL;
     }
     
     return UnicodeCategory::OTHER_NOT_ASSIGNED;
@@ -100,14 +103,63 @@ bool UnicodeHandler::isCategory(uint32_t codepoint, UnicodeCategory category) {
 std::vector<uint32_t> UnicodeHandler::utf8ToCodepoints(const std::string& str) {
     std::vector<uint32_t> codepoints;
     
-    // Simplified UTF-8 decoding (handles ASCII only for now)
-    // Full implementation would properly decode multi-byte UTF-8 sequences
-    for (unsigned char c : str) {
-        if (c < 0x80) {  // ASCII
+    for (size_t i = 0; i < str.length(); ) {
+        unsigned char c = str[i];
+        
+        if (c < 0x80) {  // ASCII (0xxxxxxx)
             codepoints.push_back(static_cast<uint32_t>(c));
+            i++;
+        } else if ((c & 0xE0) == 0xC0) {  // 2-byte sequence (110xxxxx 10xxxxxx)
+            if (i + 1 < str.length()) {
+                unsigned char c2 = str[i + 1];
+                if ((c2 & 0xC0) == 0x80) {
+                    uint32_t codepoint = ((c & 0x1F) << 6) | (c2 & 0x3F);
+                    codepoints.push_back(codepoint);
+                    i += 2;
+                } else {
+                    codepoints.push_back(0xFFFD);  // Invalid sequence
+                    i++;
+                }
+            } else {
+                codepoints.push_back(0xFFFD);  // Incomplete sequence
+                i++;
+            }
+        } else if ((c & 0xF0) == 0xE0) {  // 3-byte sequence (1110xxxx 10xxxxxx 10xxxxxx)
+            if (i + 2 < str.length()) {
+                unsigned char c2 = str[i + 1];
+                unsigned char c3 = str[i + 2];
+                if ((c2 & 0xC0) == 0x80 && (c3 & 0xC0) == 0x80) {
+                    uint32_t codepoint = ((c & 0x0F) << 12) | ((c2 & 0x3F) << 6) | (c3 & 0x3F);
+                    codepoints.push_back(codepoint);
+                    i += 3;
+                } else {
+                    codepoints.push_back(0xFFFD);  // Invalid sequence
+                    i++;
+                }
+            } else {
+                codepoints.push_back(0xFFFD);  // Incomplete sequence
+                i++;
+            }
+        } else if ((c & 0xF8) == 0xF0) {  // 4-byte sequence (11110xxx 10xxxxxx 10xxxxxx 10xxxxxx)
+            if (i + 3 < str.length()) {
+                unsigned char c2 = str[i + 1];
+                unsigned char c3 = str[i + 2];
+                unsigned char c4 = str[i + 3];
+                if ((c2 & 0xC0) == 0x80 && (c3 & 0xC0) == 0x80 && (c4 & 0xC0) == 0x80) {
+                    uint32_t codepoint = ((c & 0x07) << 18) | ((c2 & 0x3F) << 12) | ((c3 & 0x3F) << 6) | (c4 & 0x3F);
+                    codepoints.push_back(codepoint);
+                    i += 4;
+                } else {
+                    codepoints.push_back(0xFFFD);  // Invalid sequence
+                    i++;
+                }
+            } else {
+                codepoints.push_back(0xFFFD);  // Incomplete sequence
+                i++;
+            }
         } else {
-            // For now, treat non-ASCII as replacement character
-            codepoints.push_back(0xFFFD);  // Unicode replacement character
+            codepoints.push_back(0xFFFD);  // Invalid start byte
+            i++;
         }
     }
     
@@ -117,13 +169,24 @@ std::vector<uint32_t> UnicodeHandler::utf8ToCodepoints(const std::string& str) {
 std::string UnicodeHandler::codepointsToUtf8(const std::vector<uint32_t>& codepoints) {
     std::string result;
     
-    // Simplified UTF-8 encoding (handles ASCII only for now)
     for (uint32_t cp : codepoints) {
-        if (cp < 0x80) {  // ASCII
+        if (cp < 0x80) {  // ASCII (0xxxxxxx)
             result += static_cast<char>(cp);
+        } else if (cp < 0x800) {  // 2-byte sequence (110xxxxx 10xxxxxx)
+            result += static_cast<char>(0xC0 | (cp >> 6));
+            result += static_cast<char>(0x80 | (cp & 0x3F));
+        } else if (cp < 0x10000) {  // 3-byte sequence (1110xxxx 10xxxxxx 10xxxxxx)
+            result += static_cast<char>(0xE0 | (cp >> 12));
+            result += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+            result += static_cast<char>(0x80 | (cp & 0x3F));
+        } else if (cp < 0x110000) {  // 4-byte sequence (11110xxx 10xxxxxx 10xxxxxx 10xxxxxx)
+            result += static_cast<char>(0xF0 | (cp >> 18));
+            result += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+            result += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+            result += static_cast<char>(0x80 | (cp & 0x3F));
         } else {
-            // For now, use replacement character for non-ASCII
-            result += '?';
+            // Invalid codepoint, use replacement character
+            result += "\xEF\xBF\xBD";  // UTF-8 encoding of U+FFFD
         }
     }
     
@@ -131,19 +194,95 @@ std::string UnicodeHandler::codepointsToUtf8(const std::vector<uint32_t>& codepo
 }
 
 uint32_t UnicodeHandler::toUpper(uint32_t codepoint) {
-    // Avoid static initialization - simple uppercase conversion
+    // Handle ASCII first
     if (codepoint >= 'a' && codepoint <= 'z') {
         return codepoint - 'a' + 'A';
     }
-    return codepoint;
+    
+    // Handle common Unicode characters
+    switch (codepoint) {
+        // Latin-1 Supplement (U+00C0-U+00FF)
+        case 0x00E0: return 0x00C0; // à → À
+        case 0x00E1: return 0x00C1; // á → Á
+        case 0x00E2: return 0x00C2; // â → Â
+        case 0x00E3: return 0x00C3; // ã → Ã
+        case 0x00E4: return 0x00C4; // ä → Ä
+        case 0x00E5: return 0x00C5; // å → Å
+        case 0x00E6: return 0x00C6; // æ → Æ
+        case 0x00E7: return 0x00C7; // ç → Ç
+        case 0x00E8: return 0x00C8; // è → È
+        case 0x00E9: return 0x00C9; // é → É
+        case 0x00EA: return 0x00CA; // ê → Ê
+        case 0x00EB: return 0x00CB; // ë → Ë
+        case 0x00EC: return 0x00CC; // ì → Ì
+        case 0x00ED: return 0x00CD; // í → Í
+        case 0x00EE: return 0x00CE; // î → Î
+        case 0x00EF: return 0x00CF; // ï → Ï
+        case 0x00F0: return 0x00D0; // ð → Ð
+        case 0x00F1: return 0x00D1; // ñ → Ñ
+        case 0x00F2: return 0x00D2; // ò → Ò
+        case 0x00F3: return 0x00D3; // ó → Ó
+        case 0x00F4: return 0x00D4; // ô → Ô
+        case 0x00F5: return 0x00D5; // õ → Õ
+        case 0x00F6: return 0x00D6; // ö → Ö
+        case 0x00F8: return 0x00D8; // ø → Ø
+        case 0x00F9: return 0x00D9; // ù → Ù
+        case 0x00FA: return 0x00DA; // ú → Ú
+        case 0x00FB: return 0x00DB; // û → Û
+        case 0x00FC: return 0x00DC; // ü → Ü
+        case 0x00FD: return 0x00DD; // ý → Ý
+        case 0x00FE: return 0x00DE; // þ → Þ
+        case 0x00FF: return 0x0178; // ÿ → Ÿ
+        
+        default:
+            return codepoint; // No uppercase mapping
+    }
 }
 
 uint32_t UnicodeHandler::toLower(uint32_t codepoint) {
-    // Avoid static initialization - simple lowercase conversion
+    // Handle ASCII first
     if (codepoint >= 'A' && codepoint <= 'Z') {
         return codepoint - 'A' + 'a';
     }
-    return codepoint;
+    
+    // Handle common Unicode characters
+    switch (codepoint) {
+        // Latin-1 Supplement (U+00C0-U+00FF)
+        case 0x00C0: return 0x00E0; // À → à
+        case 0x00C1: return 0x00E1; // Á → á
+        case 0x00C2: return 0x00E2; // Â → â
+        case 0x00C3: return 0x00E3; // Ã → ã
+        case 0x00C4: return 0x00E4; // Ä → ä
+        case 0x00C5: return 0x00E5; // Å → å
+        case 0x00C6: return 0x00E6; // Æ → æ
+        case 0x00C7: return 0x00E7; // Ç → ç
+        case 0x00C8: return 0x00E8; // È → è
+        case 0x00C9: return 0x00E9; // É → é
+        case 0x00CA: return 0x00EA; // Ê → ê
+        case 0x00CB: return 0x00EB; // Ë → ë
+        case 0x00CC: return 0x00EC; // Ì → ì
+        case 0x00CD: return 0x00ED; // Í → í
+        case 0x00CE: return 0x00EE; // Î → î
+        case 0x00CF: return 0x00EF; // Ï → ï
+        case 0x00D0: return 0x00F0; // Ð → ð
+        case 0x00D1: return 0x00F1; // Ñ → ñ
+        case 0x00D2: return 0x00F2; // Ò → ò
+        case 0x00D3: return 0x00F3; // Ó → ó
+        case 0x00D4: return 0x00F4; // Ô → ô
+        case 0x00D5: return 0x00F5; // Õ → õ
+        case 0x00D6: return 0x00F6; // Ö → ö
+        case 0x00D8: return 0x00F8; // Ø → ø
+        case 0x00D9: return 0x00F9; // Ù → ù
+        case 0x00DA: return 0x00FA; // Ú → ú
+        case 0x00DB: return 0x00FB; // Û → û
+        case 0x00DC: return 0x00FC; // Ü → ü
+        case 0x00DD: return 0x00FD; // Ý → ý
+        case 0x00DE: return 0x00FE; // Þ → þ
+        case 0x0178: return 0x00FF; // Ÿ → ÿ
+        
+        default:
+            return codepoint; // No lowercase mapping
+    }
 }
 
 uint32_t UnicodeHandler::toTitle(uint32_t codepoint) {
