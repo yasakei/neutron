@@ -578,7 +578,10 @@ bool ProjectBuilder::buildProjectExecutable(
         }
         
         // Use /MD to match the runtime library, suppress warnings for cleaner output
-        compileCommand = compiler + " /std:c++17 /EHsc /W3 /O2 /MD /D_CRT_SECURE_NO_WARNINGS /nologo " + includePaths + " \"" + tempSourcePath + "\" ";
+        // Use /Fo with directory to let MSVC generate unique object names for modules with same filename
+        std::string objDir = std::filesystem::path(finalOutputPath).parent_path().string();
+        if (objDir.empty()) objDir = ".";
+        compileCommand = compiler + " /std:c++17 /EHsc /W3 /O2 /MD /D_CRT_SECURE_NO_WARNINGS /nologo /Fo\"" + objDir + "/\" " + includePaths + " \"" + tempSourcePath + "\" ";
     } else {
         includePaths = "-I\"" + includeDir + "\" -I\"" + includeDir + "/core\" -I\"" + includeDir + "/compiler\" -I\"" + includeDir + "/runtime\" -I\"" + includeDir + "/types\" -I\"" + includeDir + "/utils\" -I\"" + neutronSrcDir + "\" -I\"" + libsDir + "\"";
         compileCommand = compiler + " -std=c++17 -Wall -Wextra -O2 " + includePaths + " \"" + tempSourcePath + "\" ";
@@ -629,16 +632,7 @@ bool ProjectBuilder::buildProjectExecutable(
         for (const auto& src : builtinSources) {
             std::string fullPath = neutronSrcDir + "/" + src;
             if (fileExists(fullPath)) {
-                if (isWindows && !isMingw) {
-                    // On Windows MSVC, specify unique object file names to avoid native.obj conflicts
-                    std::string moduleName = src.substr(src.find_last_of('/') + 1);
-                    moduleName = moduleName.substr(0, moduleName.find_last_of('.'));
-                    std::string moduleDir = src.substr(5, src.find_last_of('/') - 5); // Remove "libs/" prefix
-                    std::string objName = moduleDir + "_" + moduleName + ".obj";
-                    compileCommand += "\"" + fullPath + "\" /Fo\"" + objName + "\" ";
-                } else {
-                    compileCommand += "\"" + fullPath + "\" ";
-                }
+                compileCommand += "\"" + fullPath + "\" ";
             }
         }
     }
