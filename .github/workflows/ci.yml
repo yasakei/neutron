@@ -434,6 +434,46 @@ jobs:
         
         Write-Host "Integration tests completed successfully!"
 
+    - name: Create Windows Installer
+      run: |
+        Write-Host "Creating Windows installer..."
+        
+        # Copy binaries to root for installer
+        Copy-Item "build\Release\neutron.exe" "."
+        Copy-Item "box.exe" "."
+        if (Test-Path "build\Release\neutron-lsp.exe") {
+            Copy-Item "build\Release\neutron-lsp.exe" "."
+        }
+        
+        # Copy runtime libraries for installer
+        if (Test-Path "build\Release\neutron_runtime.lib") {
+            Copy-Item "build\Release\neutron_runtime.lib" "."
+        }
+        if (Test-Path "build\Release\neutron_shared.lib") {
+            Copy-Item "build\Release\neutron_shared.lib" "."
+        }
+        if (Test-Path "build\Release\neutron_shared.dll") {
+            Copy-Item "build\Release\neutron_shared.dll" "."
+        }
+        
+        # Install NSIS
+        choco install nsis -y
+        
+        # Create installer
+        & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
+        
+        Write-Host "Windows installer created successfully!"
+        
+        # List created files
+        Get-ChildItem "*.exe" | Where-Object { $_.Name -like "*installer*" -or $_.Name -like "*setup*" -or $_.Name -like "Neutron*" }
+
+    - name: Upload Windows Installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: neutron-windows-installer
+        path: "*.exe"
+        retention-days: 7
+
     - name: Run Performance Benchmarks
       run: |
         [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
