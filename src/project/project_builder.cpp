@@ -91,29 +91,53 @@ std::vector<std::string> ProjectBuilder::findBoxModules(const std::string& proje
 
 std::vector<std::string> ProjectBuilder::getRuntimeSources() {
     return {
-        "src/vm.cpp",
+        // Core system sources
+        "src/core/vm.cpp",
+        "src/core/checkpoint.cpp", 
+        "src/core/capi.cpp",
+        "src/core/formatter.cpp",
         "src/token.cpp",
-        "src/capi.cpp",
+        
+        // Compiler sources
         "src/compiler/scanner.cpp",
         "src/compiler/parser.cpp",
         "src/compiler/compiler.cpp",
         "src/compiler/bytecode.cpp",
+        
+        // Type system sources
         "src/types/value.cpp",
         "src/types/array.cpp",
+        "src/types/buffer.cpp",
         "src/types/json_object.cpp",
         "src/types/json_array.cpp",
         "src/types/return.cpp",
         "src/types/version.cpp",
+        "src/types/obj_string.cpp",
+        "src/types/string_method_registry.cpp",
+        "src/types/unicode_handler.cpp",
+        "src/types/string_formatter.cpp",
+        "src/types/string_error.cpp",
+        "src/types/string_search_methods.cpp",
+        
+        // Runtime sources
         "src/runtime/environment.cpp",
         "src/runtime/error_handler.cpp",
         "src/runtime/runtime.cpp",
         "src/runtime/debug.cpp",
+        "src/runtime/process.cpp",
+        
+        // Module system sources
         "src/modules/module.cpp",
         "src/modules/module_loader.cpp",
         "src/modules/module_registry.cpp",
         "src/modules/module_utils.cpp",
+        
+        // Project system sources
         "src/project/project_config.cpp",
         "src/project/project_manager.cpp",
+        "src/project/project_builder.cpp",
+        
+        // Platform sources
         "src/platform/platform.cpp",
         "src/utils/component_interface.cpp"
     };
@@ -584,6 +608,14 @@ bool ProjectBuilder::buildProjectExecutable(
             std::string fullPath = neutronSrcDir + "/" + src;
             if (fileExists(fullPath)) {
                 compileCommand += "\"" + fullPath + "\" ";
+            }
+        }
+        
+        // On Windows, add dlfcn compatibility shim
+        if (isWindows && !isMingw) {
+            std::string dlfcnCompat = neutronSrcDir + "/src/platform/dlfcn_compat_win.cpp";
+            if (std::filesystem::exists(dlfcnCompat)) {
+                compileCommand += "\"" + dlfcnCompat + "\" ";
             }
         }
     }
