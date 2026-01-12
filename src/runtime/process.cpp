@@ -1,6 +1,6 @@
 /*
  * Neutron Programming Language - Process System Implementation
- * Erlang-style lightweight processes with message passing
+ * Cross-platform: Windows (native APIs) and POSIX (pthreads)
  */
 
 #include "runtime/process.h"
@@ -8,13 +8,222 @@
 #include "types/function.h"
 #include "types/array.h"
 #include "runtime/environment.h"
-#include <chrono>
-#include <algorithm>
 
 namespace neutron {
 
+// ============================================================================
+// Cross-platform Threading Primitives Implementation
+// ============================================================================
+
+#ifdef _WIN32
+
+void nt_mutex_init(nt_mutex_t* mtx) {
+    InitializeCriticalSection(mtx);
+}
+
+void nt_mutex_destroy(nt_mutex_t* mtx) {
+    DeleteCriticalSection(mtx);
+}
+
+void nt_mutex_lock(nt_mutex_t* mtx) {
+    EnterCriticalSection(mtx);
+}
+
+void nt_mutex_unlock(nt_mutex_t* mtx) {
+    LeaveCriticalSection(mtx);
+}
+
+void nt_cond_init(nt_cond_t* cond) {
+    InitializeConditionVariable(cond);
+}
+
+void nt_cond_destroy(nt_cond_t* cond) {
+    (void)cond; // Windows condition variables don't need destruction
+}
+
+void nt_cond_wait(nt_cond_t* cond, nt_mutex_t* mtx) {
+    SleepConditionVariableCS(cond, mtx, INFINITE);
+}
+
+bool nt_cond_timedwait(nt_cond_t* cond, nt_mutex_t* mtx, int64_t timeout_ms) {
+    return SleepConditionVariableCS(cond, mtx, (DWORD)timeout_ms) != 0;
+}
+
+void nt_cond_signal(nt_cond_t* cond) {
+    WakeConditionVariable(cond);
+}
+
+void nt_cond_broadcast(nt_cond_t* cond) {
+    WakeAllConditionVariable(cond);
+}
+
+bool nt_atomic_load_bool(nt_atomic_bool_t* val) {
+    return InterlockedCompareExchange(val, 0, 0) != 0;
+}
+
+void nt_atomic_store_bool(nt_atomic_bool_t* val, bool newval) {
+    InterlockedExchange(val, newval ? 1 : 0);
+}
+
+bool nt_atomic_exchange_bool(nt_atomic_bool_t* val, bool newval) {
+    return InterlockedExchange(val, newval ? 1 : 0) != 0;
+}
+
+uint64_t nt_atomic_load_uint64(nt_atomic_uint64_t* val) {
+    return InterlockedCompareExchange64(val, 0, 0);
+}
+
+uint64_t nt_atomic_fetch_add_uint64(nt_atomic_uint64_t* val, uint64_t add) {
+    return InterlockedExchangeAdd64(val, add);
+}
+
+static DWORD WINAPI win_thread_wrapper(LPVOID arg);
+
+struct WinThreadData {
+    nt_thread_func_t func;
+    void* arg;
+};
+
+static DWORD WINAPI win_thread_wrapper(LPVOID arg) {
+    WinThreadData* data = (WinThreadData*)arg;
+    nt_thread_func_t func = data->func;
+    void* funcArg = data->arg;
+    delete data;
+    func(funcArg);
+    return 0;
+}
+
+bool nt_thread_create(nt_thread_t* thread, nt_thread_func_t func, void* arg) {
+    WinThreadData* data = new WinThreadData{func, arg};
+    *thread = CreateThread(NULL, 0, win_thread_wrapper, data, 0, NULL);
+    if (*thread == NULL) {
+        delete data;
+        return false;
+    }
+    return true;
+}
+
+void nt_thread_join(nt_thread_t thread) {
+    WaitForSingleObject(thread, INFINITE);
+    CloseHandle(thread);
+}
+
+void nt_thread_detach(nt_thread_t thread) {
+    CloseHandle(thread);
+}
+
+unsigned int nt_hardware_concurrency() {
+    SYSTEM_INFO sysinfo;
+    GetSystemInfo(&sysinfo);
+    return sysinfo.dwNumberOfProcessors;
+}
+
+void nt_sleep_ms(int64_t ms) {
+    Sleep((DWORD)ms);
+}
+
+#else // POSIX
+
+void nt_mutex_init(nt_mutex_t* mtx) {
+    pthread_mutex_init(mtx, NULL);
+}
+
+void nt_mutex_destroy(nt_mutex_t* mtx) {
+    pthread_mutex_destroy(mtx);
+}
+
+void nt_mutex_lock(nt_mutex_t* mtx) {
+    pthread_mutex_lock(mtx);
+}
+
+void nt_mutex_unlock(nt_mutex_t* mtx) {
+    pthread_mutex_unlock(mtx);
+}
+
+void nt_cond_init(nt_cond_t* cond) {
+    pthread_cond_init(cond, NULL);
+}
+
+void nt_cond_destroy(nt_cond_t* cond) {
+    pthread_cond_destroy(cond);
+}
+
+void nt_cond_wait(nt_cond_t* cond, nt_mutex_t* mtx) {
+    pthread_cond_wait(cond, mtx);
+}
+
+bool nt_cond_timedwait(nt_cond_t* cond, nt_mutex_t* mtx, int64_t timeout_ms) {
+    struct timespec ts;
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    ts.tv_sec = tv.tv_sec + timeout_ms / 1000;
+    ts.tv_nsec = tv.tv_usec * 1000 + (timeout_ms % 1000) * 1000000;
+    if (ts.tv_nsec >= 1000000000) {
+        ts.tv_sec++;
+        ts.tv_nsec -= 1000000000;
+    }
+    return pthread_cond_timedwait(cond, mtx, &ts) == 0;
+}
+
+void nt_cond_signal(nt_cond_t* cond) {
+    pthread_cond_signal(cond);
+}
+
+void nt_cond_broadcast(nt_cond_t* cond) {
+    pthread_cond_broadcast(cond);
+}
+
+bool nt_atomic_load_bool(nt_atomic_bool_t* val) {
+    return __sync_fetch_and_add(val, 0) != 0;
+}
+
+void nt_atomic_store_bool(nt_atomic_bool_t* val, bool newval) {
+    __sync_lock_test_and_set(val, newval ? 1 : 0);
+}
+
+bool nt_atomic_exchange_bool(nt_atomic_bool_t* val, bool newval) {
+    return __sync_lock_test_and_set(val, newval ? 1 : 0) != 0;
+}
+
+uint64_t nt_atomic_load_uint64(nt_atomic_uint64_t* val) {
+    return __sync_fetch_and_add(val, 0);
+}
+
+uint64_t nt_atomic_fetch_add_uint64(nt_atomic_uint64_t* val, uint64_t add) {
+    return __sync_fetch_and_add(val, add);
+}
+
+bool nt_thread_create(nt_thread_t* thread, nt_thread_func_t func, void* arg) {
+    return pthread_create(thread, NULL, func, arg) == 0;
+}
+
+void nt_thread_join(nt_thread_t thread) {
+    pthread_join(thread, NULL);
+}
+
+void nt_thread_detach(nt_thread_t thread) {
+    pthread_detach(thread);
+}
+
+unsigned int nt_hardware_concurrency() {
+    return sysconf(_SC_NPROCESSORS_ONLN);
+}
+
+void nt_sleep_ms(int64_t ms) {
+    usleep(ms * 1000);
+}
+
+#endif
+
+// ============================================================================
 // Thread-local current process ID
-thread_local PID tls_currentPID = 0;
+// ============================================================================
+
+#ifdef _WIN32
+static __declspec(thread) PID tls_currentPID = 0;
+#else
+static __thread PID tls_currentPID = 0;
+#endif
 
 // ============================================================================
 // Process Implementation
@@ -28,70 +237,97 @@ Process::Process(PID pid, Function* func, std::vector<Value> args)
     , pid(pid)
     , state(ProcessState::READY)
 {
+    nt_mutex_init(&mailboxMutex);
+    nt_cond_init(&mailboxCV);
 }
 
-Process::~Process() = default;
+Process::~Process() {
+    nt_mutex_destroy(&mailboxMutex);
+    nt_cond_destroy(&mailboxCV);
+}
 
 void Process::sendMessage(const Message& msg) {
-    std::lock_guard<std::mutex> lock(mailboxMutex);
+    nt_mutex_lock(&mailboxMutex);
     mailbox.push(msg);
-    mailboxCV.notify_one();
+    nt_cond_signal(&mailboxCV);
+    nt_mutex_unlock(&mailboxMutex);
 }
 
 bool Process::hasMessages() const {
-    std::lock_guard<std::mutex> lock(mailboxMutex);
-    return !mailbox.empty();
+    nt_mutex_lock(&mailboxMutex);
+    bool result = !mailbox.empty();
+    nt_mutex_unlock(&mailboxMutex);
+    return result;
 }
 
 Message Process::receiveMessage() {
-    std::unique_lock<std::mutex> lock(mailboxMutex);
-    mailboxCV.wait(lock, [this]{ return !mailbox.empty() || state == ProcessState::DEAD; });
+    nt_mutex_lock(&mailboxMutex);
+    while (mailbox.empty() && state != ProcessState::DEAD) {
+        nt_cond_wait(&mailboxCV, &mailboxMutex);
+    }
     
     if (mailbox.empty()) {
-        return Message(0, Value());  // Process was killed
+        nt_mutex_unlock(&mailboxMutex);
+        return Message(0, Value());
     }
     
     Message msg = mailbox.front();
     mailbox.pop();
+    nt_mutex_unlock(&mailboxMutex);
     return msg;
 }
 
 bool Process::tryReceiveMessage(Message& msg, int64_t timeoutMs) {
-    std::unique_lock<std::mutex> lock(mailboxMutex);
+    nt_mutex_lock(&mailboxMutex);
     
     if (timeoutMs < 0) {
-        // Blocking wait
-        mailboxCV.wait(lock, [this]{ return !mailbox.empty() || state == ProcessState::DEAD; });
-    } else if (timeoutMs > 0) {
-        // Timed wait
-        auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
-        if (!mailboxCV.wait_until(lock, deadline, [this]{ return !mailbox.empty(); })) {
-            return false;  // Timeout
+        while (mailbox.empty() && state != ProcessState::DEAD) {
+            nt_cond_wait(&mailboxCV, &mailboxMutex);
         }
-    } else {
-        // Non-blocking
+    } else if (timeoutMs > 0) {
         if (mailbox.empty()) {
-            return false;
+            if (!nt_cond_timedwait(&mailboxCV, &mailboxMutex, timeoutMs)) {
+                nt_mutex_unlock(&mailboxMutex);
+                return false;
+            }
         }
     }
     
     if (mailbox.empty()) {
+        nt_mutex_unlock(&mailboxMutex);
         return false;
     }
     
     msg = mailbox.front();
     mailbox.pop();
+    nt_mutex_unlock(&mailboxMutex);
     return true;
+}
+
+void Process::notifyMailbox() {
+    nt_cond_broadcast(&mailboxCV);
 }
 
 // ============================================================================
 // ProcessScheduler Implementation
 // ============================================================================
 
-ProcessScheduler::ProcessScheduler() = default;
+ProcessScheduler::ProcessScheduler() {
+    nt_mutex_init(&processesMutex);
+    nt_mutex_init(&readyMutex);
+    nt_cond_init(&readyCV);
+    nt_atomic_store_bool(&running, false);
+    stats.processesSpawned = 0;
+    stats.messagesDelivered = 0;
+    stats.contextSwitches = 0;
+    nextPID = 1;
+}
 
 ProcessScheduler::~ProcessScheduler() {
     stop();
+    nt_mutex_destroy(&processesMutex);
+    nt_mutex_destroy(&readyMutex);
+    nt_cond_destroy(&readyCV);
 }
 
 ProcessScheduler& ProcessScheduler::instance() {
@@ -99,105 +335,118 @@ ProcessScheduler& ProcessScheduler::instance() {
     return scheduler;
 }
 
+struct WorkerArg {
+    ProcessScheduler* scheduler;
+    size_t workerId;
+};
+
+void* ProcessScheduler::workerLoopStatic(void* arg) {
+    WorkerArg* wa = (WorkerArg*)arg;
+    wa->scheduler->workerLoop(wa->workerId);
+    delete wa;
+    return NULL;
+}
+
 void ProcessScheduler::start(size_t numWorkers) {
-    if (running.exchange(true)) {
-        return;  // Already running
+    if (nt_atomic_exchange_bool(&running, true)) {
+        return;
     }
     
     if (numWorkers == 0) {
-        numWorkers = std::max(1u, std::thread::hardware_concurrency());
+        numWorkers = nt_hardware_concurrency();
+        if (numWorkers == 0) numWorkers = 1;
     }
     
-    workers.reserve(numWorkers);
+    workers.resize(numWorkers);
     for (size_t i = 0; i < numWorkers; ++i) {
-        workers.emplace_back(&ProcessScheduler::workerLoop, this, i);
+        WorkerArg* arg = new WorkerArg{this, i};
+        nt_thread_create(&workers[i], workerLoopStatic, arg);
     }
 }
 
 void ProcessScheduler::stop() {
-    if (!running.exchange(false)) {
-        return;  // Already stopped
+    if (!nt_atomic_exchange_bool(&running, false)) {
+        return;
     }
     
-    // Wake up all workers
-    readyCV.notify_all();
+    nt_cond_broadcast(&readyCV);
     
-    // Wake up all waiting processes and their mailboxes
-    {
-        std::lock_guard<std::mutex> lock(processesMutex);
-        for (auto& pair : processes) {
-            pair.second->setState(ProcessState::DEAD);
-            pair.second->notifyMailbox();  // Wake up any process waiting on receive
-        }
+    nt_mutex_lock(&processesMutex);
+    for (auto& pair : processes) {
+        pair.second->setState(ProcessState::DEAD);
+        pair.second->notifyMailbox();
     }
+    nt_mutex_unlock(&processesMutex);
     
-    // Join all workers with timeout protection
     for (auto& worker : workers) {
-        if (worker.joinable()) {
-            worker.detach();  // Detach instead of join to avoid deadlock on exit
-        }
+        nt_thread_detach(worker);
     }
     workers.clear();
 }
 
 PID ProcessScheduler::spawn(Function* func, std::vector<Value> args) {
-    // Auto-start scheduler on first spawn
-    if (!running) {
+    if (!nt_atomic_load_bool(&running)) {
         start();
     }
     
-    PID pid = nextPID.fetch_add(1);
+    PID pid = nt_atomic_fetch_add_uint64(&nextPID, 1);
     
     auto process = std::make_unique<Process>(pid, func, std::move(args));
     
-    {
-        std::lock_guard<std::mutex> lock(processesMutex);
-        processes[pid] = std::move(process);
-    }
+    nt_mutex_lock(&processesMutex);
+    processes[pid] = std::move(process);
+    nt_mutex_unlock(&processesMutex);
     
-    stats.processesSpawned++;
+    nt_atomic_fetch_add_uint64(&stats.processesSpawned, 1);
     schedule(pid);
     
     return pid;
 }
 
 void ProcessScheduler::kill(PID pid) {
-    std::lock_guard<std::mutex> lock(processesMutex);
+    nt_mutex_lock(&processesMutex);
     auto it = processes.find(pid);
     if (it != processes.end()) {
         it->second->setState(ProcessState::DEAD);
     }
+    nt_mutex_unlock(&processesMutex);
 }
 
 bool ProcessScheduler::isAlive(PID pid) {
-    std::lock_guard<std::mutex> lock(processesMutex);
+    nt_mutex_lock(&processesMutex);
     auto it = processes.find(pid);
     if (it == processes.end()) {
+        nt_mutex_unlock(&processesMutex);
         return false;
     }
     auto state = it->second->getState();
+    nt_mutex_unlock(&processesMutex);
     return state != ProcessState::DEAD && state != ProcessState::FINISHED;
 }
 
 bool ProcessScheduler::send(PID to, PID from, Value message) {
-    std::lock_guard<std::mutex> lock(processesMutex);
+    nt_mutex_lock(&processesMutex);
     auto it = processes.find(to);
     if (it == processes.end()) {
+        nt_mutex_unlock(&processesMutex);
         return false;
     }
     
     Process* proc = it->second.get();
     if (proc->getState() == ProcessState::DEAD || proc->getState() == ProcessState::FINISHED) {
+        nt_mutex_unlock(&processesMutex);
         return false;
     }
     
     proc->sendMessage(Message(from, message));
-    stats.messagesDelivered++;
+    nt_atomic_fetch_add_uint64(&stats.messagesDelivered, 1);
     
-    // If process was waiting, make it ready
     if (proc->getState() == ProcessState::WAITING) {
         proc->setState(ProcessState::READY);
+        nt_mutex_unlock(&processesMutex);
         schedule(to);
+    } else {
+        nt_mutex_unlock(&processesMutex);
     }
     
     return true;
@@ -208,18 +457,19 @@ bool ProcessScheduler::receive(PID pid, Message& msg, int64_t timeoutMs) {
     if (!proc) {
         return false;
     }
-    
     return proc->tryReceiveMessage(msg, timeoutMs);
 }
 
 Process* ProcessScheduler::getProcess(PID pid) {
-    std::lock_guard<std::mutex> lock(processesMutex);
+    nt_mutex_lock(&processesMutex);
     auto it = processes.find(pid);
-    return (it != processes.end()) ? it->second.get() : nullptr;
+    Process* result = (it != processes.end()) ? it->second.get() : nullptr;
+    nt_mutex_unlock(&processesMutex);
+    return result;
 }
 
 size_t ProcessScheduler::processCount() const {
-    std::lock_guard<std::mutex> lock(processesMutex);
+    nt_mutex_lock(&processesMutex);
     size_t count = 0;
     for (const auto& pair : processes) {
         auto state = pair.second->getState();
@@ -227,6 +477,7 @@ size_t ProcessScheduler::processCount() const {
             count++;
         }
     }
+    nt_mutex_unlock(&processesMutex);
     return count;
 }
 
@@ -239,48 +490,45 @@ void ProcessScheduler::setCurrentPID(PID pid) {
 }
 
 void ProcessScheduler::schedule(PID pid) {
-    {
-        std::lock_guard<std::mutex> lock(readyMutex);
-        readyQueue.push(pid);
-    }
-    readyCV.notify_one();
+    nt_mutex_lock(&readyMutex);
+    readyQueue.push(pid);
+    nt_cond_signal(&readyCV);
+    nt_mutex_unlock(&readyMutex);
 }
 
 void ProcessScheduler::workerLoop(size_t workerId) {
-    (void)workerId;  // May be used for debugging
+    (void)workerId;
     
-    // Each worker has its own VM instance for executing processes
     VM workerVM;
     
-    while (running) {
+    while (nt_atomic_load_bool(&running)) {
         PID pid = 0;
         
-        // Get a process from the ready queue
-        {
-            std::unique_lock<std::mutex> lock(readyMutex);
-            readyCV.wait(lock, [this]{ return !readyQueue.empty() || !running; });
-            
-            if (!running) {
-                break;
-            }
-            
-            if (readyQueue.empty()) {
-                continue;
-            }
-            
+        nt_mutex_lock(&readyMutex);
+        while (readyQueue.empty() && nt_atomic_load_bool(&running)) {
+            nt_cond_wait(&readyCV, &readyMutex);
+        }
+        
+        if (!nt_atomic_load_bool(&running)) {
+            nt_mutex_unlock(&readyMutex);
+            break;
+        }
+        
+        if (!readyQueue.empty()) {
             pid = readyQueue.front();
             readyQueue.pop();
         }
+        nt_mutex_unlock(&readyMutex);
         
-        // Get the process
+        if (pid == 0) continue;
+        
         Process* proc = getProcess(pid);
         if (!proc || proc->getState() == ProcessState::DEAD || proc->getState() == ProcessState::FINISHED) {
             continue;
         }
         
-        // Execute the process
         executeProcess(proc, workerVM);
-        stats.contextSwitches++;
+        nt_atomic_fetch_add_uint64(&stats.contextSwitches, 1);
     }
 }
 
@@ -289,28 +537,21 @@ void ProcessScheduler::executeProcess(Process* proc, VM& vm) {
     proc->setState(ProcessState::RUNNING);
     
     try {
-        // Ensure process module is loaded in worker VM
         vm.load_module("process");
-        
-        // Push the function and arguments onto the stack
         vm.stack.clear();
         vm.frames.clear();
         
-        // Push function
         vm.push(Value(static_cast<Callable*>(proc->function)));
         
-        // Push arguments
         for (const auto& arg : proc->arguments) {
             vm.push(arg);
         }
         
-        // Call the function
         if (vm.callValuePublic(Value(static_cast<Callable*>(proc->function)), 
                                static_cast<int>(proc->arguments.size()))) {
             vm.runPublic();
         }
         
-        // Get result from stack
         if (!vm.stack.empty()) {
             proc->result = vm.stack.back();
         }
@@ -326,11 +567,11 @@ void ProcessScheduler::executeProcess(Process* proc, VM& vm) {
 }
 
 // ============================================================================
-// ProcessVM - Native functions for process management
+// ProcessVM - Native functions
 // ============================================================================
 
 Value ProcessVM::spawn(VM& vm, std::vector<Value> args) {
-    (void)vm; // Mark unused
+    (void)vm;
     if (args.empty()) {
         throw std::runtime_error("spawn() requires a function argument");
     }
@@ -344,15 +585,9 @@ Value ProcessVM::spawn(VM& vm, std::vector<Value> args) {
         throw std::runtime_error("spawn() requires a user-defined function");
     }
     
-    // Remaining args are passed to the function
     std::vector<Value> funcArgs(args.begin() + 1, args.end());
     
-    // Ensure scheduler is running
-    auto& scheduler = ProcessScheduler::instance();
-    static std::once_flag startFlag;
-    std::call_once(startFlag, [&scheduler]{ scheduler.start(); });
-    
-    PID pid = scheduler.spawn(func, funcArgs);
+    PID pid = ProcessScheduler::instance().spawn(func, funcArgs);
     
     return Value(static_cast<double>(pid));
 }
@@ -377,7 +612,7 @@ Value ProcessVM::send(VM& vm, std::vector<Value> args) {
 
 Value ProcessVM::receive(VM& vm, std::vector<Value> args) {
     (void)vm;
-    int64_t timeout = -1;  // Blocking by default
+    int64_t timeout = -1;
     
     if (!args.empty() && args[0].type == ValueType::NUMBER) {
         timeout = static_cast<int64_t>(args[0].as.number);
@@ -385,17 +620,15 @@ Value ProcessVM::receive(VM& vm, std::vector<Value> args) {
     
     PID pid = ProcessScheduler::currentPID();
     if (pid == 0) {
-        // Main thread - create a temporary process for receiving
         throw std::runtime_error("receive() can only be called from a spawned process");
     }
     
     Message msg(0, Value());
     if (ProcessScheduler::instance().receive(pid, msg, timeout)) {
-        // Return just the message data for simplicity
         return msg.data;
     }
     
-    return Value();  // Timeout or no message
+    return Value();
 }
 
 Value ProcessVM::self(VM& vm, std::vector<Value> args) {
@@ -438,12 +671,11 @@ Value ProcessVM::sleep(VM& vm, std::vector<Value> args) {
     }
     
     int64_t ms = static_cast<int64_t>(args[0].as.number);
-    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+    nt_sleep_ms(ms);
     return Value();
 }
 
 void ProcessVM::registerFunctions(VM& vm, std::shared_ptr<Environment> env) {
-    // Register process functions (all need VM access)
     env->define("spawn", Value(vm.allocate<NativeFn>(spawn, -1, true)));
     env->define("send", Value(vm.allocate<NativeFn>(send, 2, true)));
     env->define("receive", Value(vm.allocate<NativeFn>(receive, -1, true)));
