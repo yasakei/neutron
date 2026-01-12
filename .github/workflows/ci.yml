@@ -438,21 +438,25 @@ jobs:
       run: |
         Write-Host "Creating Windows installer..."
         
-        # Copy binaries to root for installer
-        Copy-Item "build\Release\neutron.exe" "."
-        Copy-Item "box.exe" "."
-        if (Test-Path "build\Release\neutron-lsp.exe") {
+        # Copy binaries to root for installer (only if not already there)
+        if (-not (Test-Path "neutron.exe")) {
+            Copy-Item "build\Release\neutron.exe" "."
+        }
+        if (-not (Test-Path "box.exe")) {
+            Copy-Item "box.exe" "."
+        }
+        if ((Test-Path "build\Release\neutron-lsp.exe") -and (-not (Test-Path "neutron-lsp.exe"))) {
             Copy-Item "build\Release\neutron-lsp.exe" "."
         }
         
-        # Copy runtime libraries for installer
-        if (Test-Path "build\Release\neutron_runtime.lib") {
+        # Copy runtime libraries for installer (only if not already there)
+        if ((Test-Path "build\Release\neutron_runtime.lib") -and (-not (Test-Path "neutron_runtime.lib"))) {
             Copy-Item "build\Release\neutron_runtime.lib" "."
         }
-        if (Test-Path "build\Release\neutron_shared.lib") {
+        if ((Test-Path "build\Release\neutron_shared.lib") -and (-not (Test-Path "neutron_shared.lib"))) {
             Copy-Item "build\Release\neutron_shared.lib" "."
         }
-        if (Test-Path "build\Release\neutron_shared.dll") {
+        if ((Test-Path "build\Release\neutron_shared.dll") -and (-not (Test-Path "neutron_shared.dll"))) {
             Copy-Item "build\Release\neutron_shared.dll" "."
         }
         
