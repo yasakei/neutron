@@ -464,6 +464,15 @@ void register_http_functions(VM& vm, std::shared_ptr<Environment> env) {
     env->define("stopServer", Value(vm.allocate<NativeFn>(http_stopServer, 0, true)));
 }
 
+extern "C" {
+    void neutron_init_http_module(VM* vm) {
+        auto env = std::make_shared<Environment>();
+        register_http_functions(*vm, env);
+        auto module = vm->allocate<Module>("http", env);
+        vm->define_module("http", module);
+    }
+}
+
 } // namespace neutron
 
 #else // !HAVE_CURL
@@ -479,6 +488,13 @@ void register_http_functions(VM& vm, std::shared_ptr<Environment> env) {
     (void)vm;
     (void)env;
     // HTTP module not available without CURL
+}
+
+extern "C" {
+    void neutron_init_http_module(VM* vm) {
+        (void)vm;
+        // HTTP module not available without CURL
+    }
 }
 
 } // namespace neutron
