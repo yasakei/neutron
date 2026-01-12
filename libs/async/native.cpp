@@ -14,9 +14,15 @@
  * SOFTWARE.
  */
 
-// Windows needs process.h for std::thread to work (provides _beginthreadex)
-// MUST be included before any header that might include <thread>
+// Windows threading fix - must be first
 #ifdef _WIN32
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #include <windows.h>
     #include <process.h>
 #endif
 
