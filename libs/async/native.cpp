@@ -19,6 +19,13 @@
     #include <process.h>
 #endif
 
+#include <iostream>
+#include <future>
+#include <thread>
+#include <functional>
+#include <memory>
+#include <chrono>
+
 #include "native.h"
 #include "vm.h"
 #include "types/obj_string.h"
@@ -27,12 +34,6 @@
 #include "types/json_object.h"
 #include "types/array.h"
 #include "expr.h"
-#include <iostream>
-#include <future>
-#include <thread>
-#include <functional>
-#include <memory>
-#include <chrono>
 
 using namespace neutron;
 
