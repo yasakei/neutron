@@ -565,6 +565,7 @@ bool ProjectBuilder::buildProjectExecutable(
 
     // Build compile command
     std::string compileCommand;
+    std::vector<std::string> objectFiles; // Track object files for Windows
     
     // Add all necessary include paths
     std::string includePaths;
@@ -577,11 +578,36 @@ bool ProjectBuilder::buildProjectExecutable(
             includePaths += " /I\"" + vcpkgInclude + "\"";
         }
         
-        // Use /MD to match the runtime library, suppress warnings for cleaner output
-        // Use /Fo with directory to let MSVC generate unique object names for modules with same filename
+        // On Windows MSVC, compile modules separately to avoid native.obj conflicts
         std::string objDir = std::filesystem::path(finalOutputPath).parent_path().string();
         if (objDir.empty()) objDir = ".";
-        compileCommand = compiler + " /std:c++17 /EHsc /W3 /O2 /MD /D_CRT_SECURE_NO_WARNINGS /nologo /Fo\"" + objDir + "/\" " + includePaths + " \"" + tempSourcePath + "\" ";
+        
+        // First, compile each builtin module separately with unique object names
+        if (!useStaticLib || runtimeLibPath.empty()) {
+            std::cout << "[2/4] Compiling modules..." << std::endl;
+            auto builtinSources = getBuiltinModuleSources();
+            for (const auto& src : builtinSources) {
+                std::string fullPath = neutronSrcDir + "/" + src;
+                if (fileExists(fullPath)) {
+                    // Extract module name from path like "libs/sys/native.cpp" -> "sys"
+                    size_t libsPos = src.find("libs/");
+                    size_t nextSlash = src.find('/', libsPos + 5);
+                    std::string moduleName = src.substr(libsPos + 5, nextSlash - libsPos - 5);
+                    std::string objFile = objDir + "/" + moduleName + "_module.obj";
+                    
+                    std::string moduleCmd = compiler + " /c /std:c++17 /EHsc /W3 /O2 /MD /D_CRT_SECURE_NO_WARNINGS /nologo " + includePaths + " \"" + fullPath + "\" /Fo\"" + objFile + "\"";
+                    int result = system(moduleCmd.c_str());
+                    if (result != 0) {
+                        std::cerr << "Error compiling module: " << moduleName << std::endl;
+                        return false;
+                    }
+                    objectFiles.push_back(objFile);
+                }
+            }
+        }
+        
+        // Now build the main compile command with runtime sources
+        compileCommand = compiler + " /std:c++17 /EHsc /W3 /O2 /MD /D_CRT_SECURE_NO_WARNINGS /nologo " + includePaths + " \"" + tempSourcePath + "\" ";
     } else {
         includePaths = "-I\"" + includeDir + "\" -I\"" + includeDir + "/core\" -I\"" + includeDir + "/compiler\" -I\"" + includeDir + "/runtime\" -I\"" + includeDir + "/types\" -I\"" + includeDir + "/utils\" -I\"" + neutronSrcDir + "\" -I\"" + libsDir + "\"";
         compileCommand = compiler + " -std=c++17 -Wall -Wextra -O2 " + includePaths + " \"" + tempSourcePath + "\" ";
@@ -626,14 +652,21 @@ bool ProjectBuilder::buildProjectExecutable(
     }
     
     // Add builtin modules (only if compiling from source, otherwise they are in the lib)
-    // Actually, builtin modules are part of the runtime lib, so we only need them if NOT linking lib
-    if (!useStaticLib || runtimeLibPath.empty()) {
+    // On Windows MSVC, modules are already compiled separately above
+    if ((!useStaticLib || runtimeLibPath.empty()) && !(isWindows && !isMingw)) {
         auto builtinSources = getBuiltinModuleSources();
         for (const auto& src : builtinSources) {
             std::string fullPath = neutronSrcDir + "/" + src;
             if (fileExists(fullPath)) {
                 compileCommand += "\"" + fullPath + "\" ";
             }
+        }
+    }
+    
+    // On Windows, add the pre-compiled module object files
+    if (isWindows && !isMingw && !objectFiles.empty()) {
+        for (const auto& objFile : objectFiles) {
+            compileCommand += "\"" + objFile + "\" ";
         }
     }
     
