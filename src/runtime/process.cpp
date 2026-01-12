@@ -3,7 +3,10 @@
  * Cross-platform: Windows (native APIs) and POSIX (pthreads)
  */
 
+// Include process.h first to get Windows headers with proper undefs
 #include "runtime/process.h"
+
+// Now safe to include other headers
 #include "core/vm.h"
 #include "types/function.h"
 #include "types/array.h"
@@ -255,9 +258,9 @@ void Process::sendMessage(const Message& msg) {
 
 bool Process::hasMessages() const {
     nt_mutex_lock(&mailboxMutex);
-    bool result = !mailbox.empty();
+    bool hasMsg = !mailbox.empty();
     nt_mutex_unlock(&mailboxMutex);
-    return result;
+    return hasMsg;
 }
 
 Message Process::receiveMessage() {
@@ -463,9 +466,9 @@ bool ProcessScheduler::receive(PID pid, Message& msg, int64_t timeoutMs) {
 Process* ProcessScheduler::getProcess(PID pid) {
     nt_mutex_lock(&processesMutex);
     auto it = processes.find(pid);
-    Process* result = (it != processes.end()) ? it->second.get() : nullptr;
+    Process* proc = (it != processes.end()) ? it->second.get() : nullptr;
     nt_mutex_unlock(&processesMutex);
-    return result;
+    return proc;
 }
 
 size_t ProcessScheduler::processCount() const {

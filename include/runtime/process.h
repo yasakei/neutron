@@ -22,6 +22,18 @@
         #define NOMINMAX
     #endif
     #include <windows.h>
+    // Undefine Windows macros that conflict with our code
+    #undef TRUE
+    #undef FALSE
+    #undef NEAR
+    #undef FAR
+    #undef DELETE
+    #undef ERROR
+    #undef IN
+    #undef OUT
+    #undef OPTIONAL
+    #undef interface
+    #undef small
 #else
     #include <pthread.h>
     #include <unistd.h>
