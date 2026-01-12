@@ -34,12 +34,12 @@ if(MSVC)
     # Use individual optimization flags instead of /O2 or /Ox
     # /Oi: Enable intrinsic functions
     # /Ot: Favor fast code over small code
-    # /Og: Enable global optimizations
     # /fp:fast: Fast floating-point model
     # /GL: Whole program optimization (works with LTO)
     # /Gy: Enable function-level linking
     # /permissive-: Disable non-conforming code (helps with standard library)
-    add_compile_options(/W4 /utf-8 /EHsc /Oi /Ot /Og /fp:fast /GL /Gy /permissive-)
+    # Note: /Og is deprecated in newer MSVC versions, removed
+    add_compile_options(/W4 /utf-8 /EHsc /Oi /Ot /fp:fast /GL /Gy /permissive-)
     
     # Ensure threading support is enabled
     add_compile_definitions(_WIN32_WINNT=0x0601)  # Windows 7 or later for threading
@@ -50,13 +50,17 @@ if(MSVC)
         message(STATUS "NEUTRON_UNSAFE_OPTIMIZATIONS enabled: Adding /GS- (disabling stack security checks)")
         add_compile_options(/GS-)
     endif()
-    # Check if MSVC supports /Ob3 (VS2019 16.3+)
+    # Check if MSVC supports /Ob3 (VS2019 16.3+) and avoid conflicts
     include(CheckCXXCompilerFlag)
     check_cxx_compiler_flag(/Ob3 HAS_OB3)
     if(HAS_OB3)
-        add_compile_options(/Ob3)
+        # Remove any existing /Ob flags and add /Ob3
+        string(REGEX REPLACE "/Ob[0-9]" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+        add_compile_options($<$<CONFIG:Release>:/Ob3>)
     else()
-        add_compile_options(/Ob2)
+        # Remove any existing /Ob flags and add /Ob2
+        string(REGEX REPLACE "/Ob[0-9]" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+        add_compile_options($<$<CONFIG:Release>:/Ob2>)
     endif()
     # Linker optimizations
     add_link_options(/LTCG /OPT:REF /OPT:ICF)
@@ -357,6 +361,11 @@ target_link_libraries(neutron_runtime
     Threads::Threads
 )
 
+# Windows-specific libraries for socket functions
+if(WIN32)
+    target_link_libraries(neutron_runtime ws2_32)
+endif()
+
 if(HAVE_CURL)
     if(TARGET CURL::libcurl)
         target_link_libraries(neutron_runtime CURL::libcurl)
@@ -410,6 +419,11 @@ endif()
 
 # Link threading library on all platforms
 target_link_libraries(neutron_shared Threads::Threads)
+
+# Windows-specific libraries for socket functions
+if(WIN32)
+    target_link_libraries(neutron_shared ws2_32)
+endif()
 
 # Define BUILDING_NEUTRON so C API functions are exported properly
 target_compile_definitions(neutron_shared PRIVATE BUILDING_NEUTRON)
@@ -467,8 +481,8 @@ elseif(WIN32)
     set_target_properties(neutron PROPERTIES ENABLE_EXPORTS ON)
 
     # Link with Windows library for dynamic loading (LoadLibrary, GetProcAddress, etc.)
-    # Also link with Ws2_32 for socket functions and threading libraries
-    target_link_libraries(neutron_runtime kernel32 ws2_32)
+    # Note: ws2_32 is already linked above for socket functions
+    target_link_libraries(neutron_runtime kernel32)
 endif()
 
 # Install targets
