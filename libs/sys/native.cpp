@@ -34,6 +34,9 @@
 #include <memory>
 #include <filesystem>
 #include <chrono>
+#ifdef _WIN32
+#include <process.h>  // Required for std::thread on Windows
+#endif
 #include <thread>
 #include <iomanip>
 

@@ -6,6 +6,9 @@
 #include <curl/curl.h>
 #include <sstream>
 #include <cstring>
+#ifdef _WIN32
+#include <process.h>  // Required for std::thread on Windows
+#endif
 #include <thread>
 #include <atomic>
 

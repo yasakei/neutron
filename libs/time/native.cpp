@@ -5,6 +5,9 @@
 #include <ctime>
 #include <iomanip>
 #include <sstream>
+#ifdef _WIN32
+#include <process.h>  // Required for std::thread on Windows
+#endif
 #include <thread>
 
 using namespace neutron;

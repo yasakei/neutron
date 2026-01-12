@@ -13,6 +13,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
+// Windows needs process.h for std::thread to work (provides _beginthreadex)
+#ifdef _WIN32
+    #include <process.h>
+#endif
+
 #include "native.h"
 #include "vm.h"
 #include "types/obj_string.h"
@@ -92,7 +98,7 @@ static Value async_run(VM& vm, const std::vector<Value>& args) {
             handle->result = result;
             handle->completed = true;
             handle->promise.set_value(result);
-        } catch (const std::exception& e) {
+        } catch (const std::exception&) {
             handle->completed = true;
             try {
                 handle->promise.set_exception(std::current_exception());

@@ -56,6 +56,9 @@
 #include <utility>
 #include <set>
 #include <mutex>
+#ifdef _WIN32
+#include <process.h>  // Required for std::thread on Windows (provides _beginthreadex)
+#endif
 #include <thread>
 
 // Forward declarations only for types defined elsewhere
