@@ -34,7 +34,11 @@ if(MSVC)
     # /GL: Whole program optimization (works with LTO)
     # /Gy: Enable function-level linking
     # /Ob3: Aggressive inlining (VS2019+)
-    add_compile_options(/W4 /utf-8 /EHsc /O2 /Oi /Ot /fp:fast /GL /Gy)
+    # /permissive-: Disable non-conforming code (helps with standard library)
+    add_compile_options(/W4 /utf-8 /EHsc /O2 /Oi /Ot /fp:fast /GL /Gy /permissive-)
+    
+    # Ensure threading support is enabled
+    add_compile_definitions(_WIN32_WINNT=0x0601)  # Windows 7 or later for threading
     
     # /GS-: Disable stack buffer security checks (small speedup, security trade-off)
     # Only enabled when NEUTRON_UNSAFE_OPTIMIZATIONS is ON
@@ -78,6 +82,9 @@ include_directories(
 
 # Dependencies
 include(FetchContent)
+
+# Threading support (required for process system)
+find_package(Threads REQUIRED)
 
 # JSONCPP
 find_package(jsoncpp CONFIG QUIET)
@@ -313,6 +320,7 @@ endif()
 target_link_libraries(neutron_runtime
     ${JSONCPP_LIBRARIES}
     ${DLFCN_WIN}
+    Threads::Threads
 )
 
 if(TARGET CURL::libcurl)
@@ -357,6 +365,9 @@ elseif(TARGET PkgConfig::CURL)
     target_compile_definitions(neutron_shared PRIVATE HAVE_CURL)
 endif()
 
+# Link threading library on all platforms
+target_link_libraries(neutron_shared Threads::Threads)
+
 # Define BUILDING_NEUTRON so C API functions are exported properly
 target_compile_definitions(neutron_shared PRIVATE BUILDING_NEUTRON)
 
@@ -384,6 +395,9 @@ if(UNIX AND NOT APPLE)
 else()
     target_link_libraries(neutron neutron_runtime neutron_shared)
 endif()
+
+# Ensure threading support for main executable
+target_link_libraries(neutron Threads::Threads)
 
 # On macOS, also link jsoncpp to the main executable to ensure the library can be found at runtime
 if(APPLE)
@@ -414,7 +428,7 @@ elseif(WIN32)
     set_target_properties(neutron PROPERTIES ENABLE_EXPORTS ON)
 
     # Link with Windows library for dynamic loading (LoadLibrary, GetProcAddress, etc.)
-    # Also link with Ws2_32 for socket functions
+    # Also link with Ws2_32 for socket functions and threading libraries
     target_link_libraries(neutron_runtime kernel32 ws2_32)
 endif()
 
