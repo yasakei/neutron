@@ -446,8 +446,8 @@ add_executable(neutron src/core/main.cpp)
 # Define BUILDING_NEUTRON for the main executable so functions are exported
 target_compile_definitions(neutron PRIVATE BUILDING_NEUTRON)
 
-# Link executable against shared library
-target_link_libraries(neutron neutron_shared)
+# Link executable against static library (not shared library)
+target_link_libraries(neutron neutron_runtime)
 
 # Ensure threading support for main executable
 target_link_libraries(neutron Threads::Threads)
