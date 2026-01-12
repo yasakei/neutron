@@ -629,7 +629,16 @@ bool ProjectBuilder::buildProjectExecutable(
         for (const auto& src : builtinSources) {
             std::string fullPath = neutronSrcDir + "/" + src;
             if (fileExists(fullPath)) {
-                compileCommand += "\"" + fullPath + "\" ";
+                if (isWindows && !isMingw) {
+                    // On Windows MSVC, specify unique object file names to avoid native.obj conflicts
+                    std::string moduleName = src.substr(src.find_last_of('/') + 1);
+                    moduleName = moduleName.substr(0, moduleName.find_last_of('.'));
+                    std::string moduleDir = src.substr(5, src.find_last_of('/') - 5); // Remove "libs/" prefix
+                    std::string objName = moduleDir + "_" + moduleName + ".obj";
+                    compileCommand += "\"" + fullPath + "\" /Fo\"" + objName + "\" ";
+                } else {
+                    compileCommand += "\"" + fullPath + "\" ";
+                }
             }
         }
     }
