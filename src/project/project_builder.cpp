@@ -152,7 +152,9 @@ std::vector<std::string> ProjectBuilder::getBuiltinModuleSources() {
         "libs/http/native.cpp",
         "libs/time/native.cpp",
         "libs/arrays/native.cpp",
-        "libs/async/native.cpp"
+        "libs/async/native.cpp",
+        "libs/regex/native.cpp",
+        "libs/process/native.cpp"
     };
 }
 
