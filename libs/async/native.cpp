@@ -15,16 +15,10 @@
  */
 
 // Windows needs process.h for std::thread to work (provides _beginthreadex)
+// MUST be included before any header that might include <thread>
 #ifdef _WIN32
     #include <process.h>
 #endif
-
-#include <iostream>
-#include <future>
-#include <thread>
-#include <functional>
-#include <memory>
-#include <chrono>
 
 #include "native.h"
 #include "vm.h"
@@ -34,6 +28,12 @@
 #include "types/json_object.h"
 #include "types/array.h"
 #include "expr.h"
+#include <iostream>
+#include <future>
+#include <thread>
+#include <functional>
+#include <memory>
+#include <chrono>
 
 using namespace neutron;
 
