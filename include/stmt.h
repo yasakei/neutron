@@ -10,13 +10,11 @@
     #endif
     #include <windows.h>
     // Undefine Windows macros that conflict with C++ code
-    // NOTE: Do NOT undefine FAR and NEAR as they are needed by some Windows headers
+    // NOTE: Do NOT undefine FAR, NEAR, IN, OUT as they are needed by Windows headers
     #undef TRUE
     #undef FALSE
     #undef DELETE
     #undef ERROR
-    #undef IN
-    #undef OUT
     #undef OPTIONAL
     #undef interface
     #undef small

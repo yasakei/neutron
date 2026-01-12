@@ -30,15 +30,16 @@ if(MSVC)
     # Set multithreaded runtime library (required for _beginthreadex and std::thread)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     
-    # Optimization flags (avoid /O2 to prevent /Ob2 vs /Ob3 conflict)
-    # /Ox: Maximum optimizations
+    # Optimization flags (avoid /O2 and /Ox to prevent /Ob2 vs /Ob3 conflict)
+    # Use individual optimization flags instead of /O2 or /Ox
     # /Oi: Enable intrinsic functions
     # /Ot: Favor fast code over small code
+    # /Og: Enable global optimizations
     # /fp:fast: Fast floating-point model
     # /GL: Whole program optimization (works with LTO)
     # /Gy: Enable function-level linking
     # /permissive-: Disable non-conforming code (helps with standard library)
-    add_compile_options(/W4 /utf-8 /EHsc /Ox /Oi /Ot /fp:fast /GL /Gy /permissive-)
+    add_compile_options(/W4 /utf-8 /EHsc /Oi /Ot /Og /fp:fast /GL /Gy /permissive-)
     
     # Ensure threading support is enabled
     add_compile_definitions(_WIN32_WINNT=0x0601)  # Windows 7 or later for threading
