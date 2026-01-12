@@ -1,6 +1,31 @@
 #ifndef NEUTRON_COMPILER_H
 #define NEUTRON_COMPILER_H
 
+// Windows macro undefs - must be before any standard library includes
+#ifdef _WIN32
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #include <windows.h>
+    // Undefine Windows macros that conflict with C++ code
+    #undef TRUE
+    #undef FALSE
+    #undef NEAR
+    #undef FAR
+    #undef DELETE
+    #undef ERROR
+    #undef IN
+    #undef OUT
+    #undef OPTIONAL
+    #undef interface
+    #undef small
+    #undef max
+    #undef min
+#endif
+
 #include "compiler/bytecode.h"
 #include "expr.h"
 #include "vm.h"

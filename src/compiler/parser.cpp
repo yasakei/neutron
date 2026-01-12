@@ -1,3 +1,28 @@
+// Windows macro undefs - must be before any includes that might include Windows headers
+#ifdef _WIN32
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #include <windows.h>
+    // Undefine Windows macros that conflict with C++ code
+    #undef TRUE
+    #undef FALSE
+    #undef NEAR
+    #undef FAR
+    #undef DELETE
+    #undef ERROR
+    #undef IN
+    #undef OUT
+    #undef OPTIONAL
+    #undef interface
+    #undef small
+    #undef max
+    #undef min
+#endif
+
 #include "compiler/parser.h"
 #include "token.h"
 #include "runtime/error_handler.h"

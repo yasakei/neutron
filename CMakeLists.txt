@@ -27,6 +27,9 @@ option(NEUTRON_UNSAFE_OPTIMIZATIONS "Enable unsafe performance optimizations (di
 
 # Compiler options
 if(MSVC)
+    # Set multithreaded runtime library (required for _beginthreadex and std::thread)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    
     # /O2: Maximize speed
     # /Oi: Enable intrinsic functions
     # /Ot: Favor fast code over small code

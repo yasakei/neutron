@@ -40,9 +40,6 @@
     #undef min
 #endif
 
-// Temporarily disable async module on Windows due to threading issues
-#ifndef _WIN32
-
 #include "native.h"
 #include "vm.h"
 #include "types/obj_string.h"
@@ -251,28 +248,3 @@ void neutron_init_async_module(VM* vm) {
     auto module = vm->allocate<Module>("async", env);
     vm->define_module("async", module);
 }
-#else // _WIN32
-
-// Stub implementation for Windows (async module disabled due to threading issues)
-#include "native.h"
-#include "vm.h"
-#include "runtime/environment.h"
-
-namespace neutron {
-
-void register_async_functions(VM& vm, std::shared_ptr<Environment> env) {
-    (void)vm;
-    (void)env;
-    // Async module not available on Windows due to threading issues
-}
-
-} // namespace neutron
-
-extern "C" void neutron_init_async_module(neutron::VM* vm) {
-    auto env = std::make_shared<neutron::Environment>();
-    neutron::register_async_functions(*vm, env);
-    auto module = vm->allocate<neutron::Module>("async", env);
-    vm->define_module("async", module);
-}
-
-#endif // _WIN32
