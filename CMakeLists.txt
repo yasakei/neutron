@@ -449,6 +449,11 @@ target_compile_definitions(neutron PRIVATE BUILDING_NEUTRON)
 # Link executable against shared library
 target_link_libraries(neutron neutron_shared)
 
+# On Windows, also link static library to resolve missing symbols
+if(WIN32)
+    target_link_libraries(neutron neutron_runtime)
+endif()
+
 # Ensure threading support for main executable
 target_link_libraries(neutron Threads::Threads)
 
