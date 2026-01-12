@@ -101,26 +101,17 @@ else()
     set(JSONCPP_LIBRARIES JsonCpp::JsonCpp)
 endif()
 
-# CURL (optional - HTTP module will be disabled if not found)
+# CURL
 find_package(CURL CONFIG QUIET)
 if(NOT CURL_FOUND)
-    # Try pkg-config on Unix systems
+    # Use system CURL if CMake config not available
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND)
-        pkg_check_modules(CURL libcurl IMPORTED_TARGET QUIET)
+        pkg_check_modules(CURL libcurl IMPORTED_TARGET)
     endif()
     if(NOT CURL_FOUND)
-        # Final fallback - basic find
-        find_package(CURL QUIET)
+        find_package(CURL REQUIRED)  # Fallback to basic find
     endif()
-endif()
-
-if(CURL_FOUND OR TARGET CURL::libcurl OR TARGET PkgConfig::CURL)
-    message(STATUS "CURL found - HTTP module enabled")
-    set(HAVE_CURL_AVAILABLE TRUE)
-else()
-    message(STATUS "CURL not found - HTTP module disabled")
-    set(HAVE_CURL_AVAILABLE FALSE)
 endif()
 
 # Function to add a new module easily
