@@ -3,8 +3,8 @@
  * Cross-platform: Windows (native APIs) and POSIX (pthreads)
  */
 
-// Include process.h first to get Windows headers with proper undefs
-#include "runtime/process.h"
+// Include neutron_process.h first to get Windows headers with proper undefs
+#include "runtime/neutron_process.h"
 
 // Now safe to include other headers
 #include "core/vm.h"

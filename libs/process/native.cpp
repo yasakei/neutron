@@ -3,7 +3,7 @@
  */
 
 #include "process/native.h"
-#include "runtime/process.h"
+#include "runtime/neutron_process.h"
 #include "types/native_fn.h"
 #include "modules/module.h"
 
