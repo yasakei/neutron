@@ -114,6 +114,18 @@ if(NOT CURL_FOUND)
         pkg_check_modules(CURL libcurl IMPORTED_TARGET)
     endif()
 endif()
+
+# Debug output
+message(STATUS "CURL_FOUND: ${CURL_FOUND}")
+message(STATUS "CURL_INCLUDE_DIRS: ${CURL_INCLUDE_DIRS}")
+message(STATUS "CURL_LIBRARIES: ${CURL_LIBRARIES}")
+if(TARGET CURL::libcurl)
+    message(STATUS "CURL::libcurl target available")
+endif()
+if(TARGET PkgConfig::CURL)
+    message(STATUS "PkgConfig::CURL target available")
+endif()
+
 if(NOT CURL_FOUND AND NOT TARGET CURL::libcurl)
     message(FATAL_ERROR "CURL not found. Please install libcurl development files.")
 endif()
@@ -121,6 +133,7 @@ endif()
 # Ensure CURL include directories are available
 if(CURL_INCLUDE_DIRS)
     include_directories(${CURL_INCLUDE_DIRS})
+    message(STATUS "Added CURL include directories: ${CURL_INCLUDE_DIRS}")
 endif()
 
 # Function to add a new module easily
