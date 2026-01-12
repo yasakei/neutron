@@ -1,0 +1,285 @@
+// 🤖 ROBOT BATTLE - Simple Robot Fighting Game! 🤖
+// Fight against AI robots in turn-based combat
+
+use sys;
+
+// Simple random number generator
+var randomSeed = 12345;
+
+fun random() -> int {
+    randomSeed = (randomSeed * 1103515245 + 12345) % 2147483647;
+    if (randomSeed < 0) {
+        randomSeed = randomSeed * -1;
+    }
+    return randomSeed;
+}
+
+// Robot stats
+var playerName = "PLAYER";
+var playerHP = 100;
+var playerAttack = 25;
+var playerEnergy = 100;
+
+var enemyName = "ENEMY";
+var enemyHP = 80;
+var enemyAttack = 20;
+var enemyEnergy = 100;
+
+var round = 1;
+var wins = 0;
+
+fun showTitle() -> int {
+    say("╔══════════════════════════════════════════════════════════════╗");
+    say("║                    🤖 ROBOT BATTLE 🤖                       ║");
+    say("║                                                              ║");
+    say("║              Simple Turn-Based Robot Combat!                 ║");
+    say("║                                                              ║");
+    say("╚══════════════════════════════════════════════════════════════╝");
+    say("");
+    return 0;
+}
+
+fun showStatus() -> int {
+    say("═══════════════════════════════════════════════════════════════");
+    say("🏟️ ROUND " + round + " | Wins: " + wins);
+    say("═══════════════════════════════════════════════════════════════");
+    say("");
+    say("🤖 " + playerName + " | HP: " + playerHP + "/100 | Energy: " + playerEnergy + "/100");
+    say("🤖 " + enemyName + " | HP: " + enemyHP + "/100 | Energy: " + enemyEnergy + "/100");
+    say("");
+    return 0;
+}
+
+fun playerTurn() -> int {
+    say("💭 Your turn! Choose your action:");
+    say("1. ⚔️ Attack (Deal 20-30 damage)");
+    say("2. ⚡ Power Attack (Deal 35-45 damage, costs 30 energy)");
+    say("3. 🛡️ Defend (Reduce next damage by 50%)");
+    say("4. 🔋 Recharge (Restore 40 energy)");
+    say("");
+    say("Enter choice (1-4):");
+    
+    var choice = sys.input();
+    say("");
+    
+    if (choice == "1") {
+        // Basic attack
+        var damage = 20 + (random() % 11);
+        enemyHP = enemyHP - damage;
+        if (enemyHP < 0) enemyHP = 0;
+        say("⚔️ " + playerName + " attacks for " + damage + " damage!");
+        
+    } else if (choice == "2") {
+        // Power attack
+        if (playerEnergy >= 30) {
+            playerEnergy = playerEnergy - 30;
+            var damage = 35 + (random() % 11);
+            enemyHP = enemyHP - damage;
+            if (enemyHP < 0) enemyHP = 0;
+            say("⚡💥 " + playerName + " unleashes a POWER ATTACK for " + damage + " damage!");
+        } else {
+            say("❌ Not enough energy! Need 30 energy.");
+            say("You lose your turn!");
+        }
+        
+    } else if (choice == "3") {
+        // Defend
+        say("🛡️ " + playerName + " takes a defensive stance!");
+        say("Next incoming damage will be reduced by 50%!");
+        // We'll handle this in enemy turn
+        
+    } else if (choice == "4") {
+        // Recharge
+        playerEnergy = playerEnergy + 40;
+        if (playerEnergy > 100) playerEnergy = 100;
+        say("🔋 " + playerName + " recharges energy! (+40 energy)");
+        
+    } else {
+        say("❌ Invalid choice! You lose your turn!");
+    }
+    
+    return 0;
+}
+
+fun enemyTurn(defending) -> int {
+    var action = random() % 4;
+    
+    if (action == 0 && enemyEnergy >= 30) {
+        // Power attack
+        enemyEnergy = enemyEnergy - 30;
+        var baseDamage = 30 + (random() % 11);
+        var damage = baseDamage;
+        if (defending == 1) {
+            damage = baseDamage - (baseDamage / 2);  // Reduce damage by half
+            say("🛡️ Defense activated! Damage reduced!");
+        }
+        playerHP = playerHP - damage;
+        if (playerHP < 0) playerHP = 0;
+        say("⚡ " + enemyName + " uses POWER ATTACK for " + damage + " damage!");
+        
+    } else if (action == 1) {
+        // Recharge
+        enemyEnergy = enemyEnergy + 40;
+        if (enemyEnergy > 100) enemyEnergy = 100;
+        say("🔋 " + enemyName + " recharges energy!");
+        
+    } else if (action == 2 && enemyHP < 40) {
+        // Defend when low health
+        say("🛡️ " + enemyName + " takes a defensive stance!");
+        
+    } else {
+        // Basic attack
+        var baseDamage = 15 + (random() % 11);
+        var damage = baseDamage;
+        if (defending == 1) {
+            damage = baseDamage - (baseDamage / 2);  // Reduce damage by half
+            say("🛡️ Defense activated! Damage reduced!");
+        }
+        playerHP = playerHP - damage;
+        if (playerHP < 0) playerHP = 0;
+        say("⚔️ " + enemyName + " attacks for " + damage + " damage!");
+    }
+    
+    return 0;
+}
+
+fun createEnemy() -> int {
+    var enemies = [
+        "🔥 BLAZER",
+        "🛡️ GUARDIAN", 
+        "⚡ SPARKY",
+        "🧠 CORTEX",
+        "💀 REAPER",
+        "🚀 ROCKET"
+    ];
+    
+    enemyName = enemies[round % 6];
+    
+    // Scale enemy stats with round
+    var baseHP = 80;
+    var baseAttack = 20;
+    var bonus = round * 15;  // Simple integer scaling
+    enemyHP = baseHP + bonus;
+    enemyAttack = baseAttack + (bonus / 4);
+    enemyEnergy = 100;
+    
+    return 0;
+}
+
+fun battle() -> bool {
+    var defending = 0;
+    
+    while (playerHP > 0 && enemyHP > 0) {
+        showStatus();
+        
+        // Player turn
+        playerTurn();
+        
+        if (enemyHP <= 0) {
+            break;
+        }
+        
+        say("");
+        say("Press Enter to continue...");
+        sys.input();
+        
+        // Enemy turn
+        enemyTurn(defending);
+        defending = 0; // Reset defense
+        
+        say("");
+        say("Press Enter to continue...");
+        sys.input();
+        say("");
+    }
+    
+    // Battle result
+    if (playerHP > 0) {
+        say("🎉 VICTORY! 🎉");
+        say("You defeated " + enemyName + "!");
+        wins = wins + 1;
+        
+        // Heal player between battles
+        playerHP = playerHP + 20;
+        if (playerHP > 100) playerHP = 100;
+        playerEnergy = 100;
+        
+        return true;
+    } else {
+        say("💀 DEFEAT! 💀");
+        say(enemyName + " has destroyed you!");
+        return false;
+    }
+}
+
+fun showGameOver() -> int {
+    say("");
+    say("╔══════════════════════════════════════════════════════════════╗");
+    say("║                        GAME OVER                            ║");
+    say("╚══════════════════════════════════════════════════════════════╝");
+    say("");
+    say("🏆 Final Stats:");
+    say("Robot: " + playerName);
+    say("Rounds Won: " + wins);
+    say("Final Round: " + round);
+    say("");
+    
+    if (wins >= 5) {
+        say("🌟 ROBOT CHAMPION! You're a fighting legend!");
+    } else if (wins >= 3) {
+        say("🥇 SKILLED FIGHTER! Well done!");
+    } else if (wins >= 1) {
+        say("🥉 DECENT EFFORT! Keep training!");
+    } else {
+        say("🔧 NEEDS REPAIRS! Better luck next time!");
+    }
+    
+    say("");
+    say("Thanks for playing Robot Battle! 🤖");
+    return 0;
+}
+
+// Main game
+fun main() -> int {
+    showTitle();
+    
+    say("🔧 Enter your robot's name:");
+    playerName = sys.input();
+    if (playerName == "") {
+        playerName = "UNNAMED";
+    }
+    
+    say("");
+    say("🚀 " + playerName + " enters the arena!");
+    say("Press Enter to start your first battle...");
+    sys.input();
+    
+    // Game loop
+    while (playerHP > 0) {
+        say("");
+        createEnemy();
+        
+        say("🚨 ROUND " + round + " 🚨");
+        say("A new challenger approaches: " + enemyName);
+        say("Enemy HP: " + enemyHP + " | Attack: " + enemyAttack);
+        say("");
+        say("Press Enter to begin battle...");
+        sys.input();
+        
+        if (battle()) {
+            round = round + 1;
+            say("");
+            say("🎯 Preparing for next round...");
+            say("Press Enter to continue...");
+            sys.input();
+        } else {
+            break;
+        }
+    }
+    
+    showGameOver();
+    return 0;
+}
+
+// Start the game!
+main();

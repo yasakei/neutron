@@ -1,0 +1,189 @@
+// 🤖 SIMPLE ROBOT FIGHT 🤖
+// A basic robot fighting game that actually works!
+
+use sys;
+
+// Simple random number generator
+var randomSeed = 12345;
+
+fun random() -> int {
+    randomSeed = (randomSeed * 1103515245 + 12345) % 2147483647;
+    if (randomSeed < 0) {
+        randomSeed = randomSeed * -1;
+    }
+    return randomSeed;
+}
+
+// Game state
+var playerHP = 100;
+var enemyHP = 80;
+var round = 1;
+var wins = 0;
+
+fun showTitle() -> int {
+    say("╔══════════════════════════════════════════════════════════════╗");
+    say("║                🤖 SIMPLE ROBOT FIGHT 🤖                     ║");
+    say("║                                                              ║");
+    say("║            Fight robots with simple commands!                ║");
+    say("║                                                              ║");
+    say("╚══════════════════════════════════════════════════════════════╝");
+    say("");
+    return 0;
+}
+
+fun showStatus() -> int {
+    say("═══════════════════════════════════════════════════════════════");
+    say("🏟️ ROUND " + round + " | Wins: " + wins);
+    say("═══════════════════════════════════════════════════════════════");
+    say("🤖 PLAYER | HP: " + playerHP + "/100");
+    say("🤖 ENEMY  | HP: " + enemyHP + "/100");
+    say("═══════════════════════════════════════════════════════════════");
+    return 0;
+}
+
+fun playerAttack() -> int {
+    var damage = 20 + (random() % 16);  // 20-35 damage
+    enemyHP = enemyHP - damage;
+    if (enemyHP < 0) enemyHP = 0;
+    say("⚔️ You attack for " + damage + " damage!");
+    return 0;
+}
+
+fun enemyAttack() -> int {
+    var damage = 15 + (random() % 11);  // 15-25 damage
+    playerHP = playerHP - damage;
+    if (playerHP < 0) playerHP = 0;
+    say("💥 Enemy attacks for " + damage + " damage!");
+    return 0;
+}
+
+fun battle() -> bool {
+    say("");
+    say("🚨 BATTLE START! 🚨");
+    say("Enemy HP: " + enemyHP);
+    say("");
+    
+    while (playerHP > 0 && enemyHP > 0) {
+        showStatus();
+        say("");
+        say("Press Enter to attack!");
+        sys.input();
+        
+        // Player attacks
+        playerAttack();
+        
+        if (enemyHP <= 0) {
+            break;
+        }
+        
+        say("");
+        say("Press Enter for enemy turn...");
+        sys.input();
+        
+        // Enemy attacks
+        enemyAttack();
+        
+        say("");
+    }
+    
+    // Battle result
+    if (playerHP > 0) {
+        say("");
+        say("🎉 VICTORY! 🎉");
+        say("You defeated the enemy robot!");
+        wins = wins + 1;
+        
+        // Heal player
+        playerHP = playerHP + 30;
+        if (playerHP > 100) playerHP = 100;
+        
+        return true;
+    } else {
+        say("");
+        say("💀 DEFEAT! 💀");
+        say("The enemy robot destroyed you!");
+        return false;
+    }
+}
+
+fun createEnemy() -> int {
+    var enemies = [
+        "BLAZER",
+        "GUARDIAN", 
+        "SPARKY",
+        "CORTEX",
+        "REAPER"
+    ];
+    
+    var enemyName = enemies[round % 5];
+    
+    // Scale enemy with round
+    enemyHP = 80 + (round * 10);
+    
+    say("🤖 Enemy: " + enemyName + " (HP: " + enemyHP + ")");
+    
+    return 0;
+}
+
+fun showGameOver() -> int {
+    say("");
+    say("╔══════════════════════════════════════════════════════════════╗");
+    say("║                        GAME OVER                            ║");
+    say("╚══════════════════════════════════════════════════════════════╝");
+    say("");
+    say("🏆 Final Stats:");
+    say("Rounds Won: " + wins);
+    say("Final Round: " + round);
+    say("");
+    
+    if (wins >= 5) {
+        say("🌟 ROBOT CHAMPION!");
+    } else if (wins >= 3) {
+        say("🥇 SKILLED FIGHTER!");
+    } else if (wins >= 1) {
+        say("🥉 DECENT EFFORT!");
+    } else {
+        say("🔧 NEEDS REPAIRS!");
+    }
+    
+    say("");
+    say("Thanks for playing! 🤖");
+    return 0;
+}
+
+// Main game
+fun main() -> int {
+    showTitle();
+    
+    say("Welcome to Simple Robot Fight!");
+    say("Press Enter to attack, that's it!");
+    say("");
+    say("Press Enter to start...");
+    sys.input();
+    
+    // Game loop
+    while (playerHP > 0) {
+        say("");
+        say("🚨 ROUND " + round + " 🚨");
+        createEnemy();
+        say("");
+        say("Press Enter to begin battle...");
+        sys.input();
+        
+        if (battle()) {
+            round = round + 1;
+            say("");
+            say("🎯 Get ready for the next round!");
+            say("Press Enter to continue...");
+            sys.input();
+        } else {
+            break;
+        }
+    }
+    
+    showGameOver();
+    return 0;
+}
+
+// Start the game!
+main();

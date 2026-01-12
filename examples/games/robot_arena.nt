@@ -1,0 +1,493 @@
+// 🤖 ROBOT ARENA - Epic Robot Battle Game! 🤖
+// Fight against AI robots with different personalities and strategies
+
+use sys;
+
+// Simple random number generator
+var randomSeed = 12345;
+
+fun random() -> int {
+    randomSeed = (randomSeed * 1103515245 + 12345) % 2147483647;
+    if (randomSeed < 0) {
+        randomSeed = randomSeed * -1;
+    }
+    return randomSeed;
+}
+
+// Robot class with stats and abilities
+class Robot {
+    var name;
+    var health;
+    var maxHealth;
+    var attack;
+    var defense;
+    var energy;
+    var maxEnergy;
+    var personality;
+    var wins;
+    
+    fun init(robotName, hp, atk, def, personality) -> int {
+        this.name = robotName;
+        this.health = hp;
+        this.maxHealth = hp;
+        this.attack = atk;
+        this.defense = def;
+        this.energy = 100;
+        this.maxEnergy = 100;
+        this.personality = personality;
+        this.wins = 0;
+        return 0;
+    }
+    
+    fun isAlive() -> bool {
+        return this.health > 0;
+    }
+    
+    fun takeDamage(damage) -> int {
+        var actualDamage = damage - this.defense;
+        if (actualDamage < 1) {
+            actualDamage = 1;  // Minimum 1 damage
+        }
+        this.health = this.health - actualDamage;
+        if (this.health < 0) {
+            this.health = 0;
+        }
+        return actualDamage;
+    }
+    
+    fun heal(amount) -> int {
+        this.health = this.health + amount;
+        if (this.health > this.maxHealth) {
+            this.health = this.maxHealth;
+        }
+        return 0;
+    }
+    
+    fun useEnergy(amount) -> bool {
+        if (this.energy >= amount) {
+            this.energy = this.energy - amount;
+            return true;
+        }
+        return false;
+    }
+    
+    fun rechargeEnergy() -> int {
+        this.energy = this.energy + 20;
+        if (this.energy > this.maxEnergy) {
+            this.energy = this.maxEnergy;
+        }
+        return 0;
+    }
+    
+    fun getStatus() -> string {
+        var healthBar = "";
+        var healthPercent = (this.health * 10) / this.maxHealth;
+        var i = 0;
+        while (i < 10) {
+            if (i < healthPercent) {
+                healthBar = healthBar + "█";
+            } else {
+                healthBar = healthBar + "░";
+            }
+            i = i + 1;
+        }
+        
+        var energyBar = "";
+        var energyPercent = (this.energy * 10) / this.maxEnergy;
+        i = 0;
+        while (i < 10) {
+            if (i < energyPercent) {
+                energyBar = energyBar + "⚡";
+            } else {
+                energyBar = energyBar + "○";
+            }
+            i = i + 1;
+        }
+        
+        return this.name + " | HP: " + healthBar + " (" + this.health + "/" + this.maxHealth + ") | Energy: " + energyBar + " (" + this.energy + "/" + this.maxEnergy + ")";
+    }
+}
+
+// Game state
+var player;
+var currentEnemy;
+var round;
+var playerWins;
+
+// Robot personalities and their AI behavior
+var robotTemplates = [
+    ["🔥 BLAZER", 80, 25, 5, "aggressive"],
+    ["🛡️ GUARDIAN", 120, 15, 12, "defensive"], 
+    ["⚡ SPARKY", 70, 30, 3, "berserker"],
+    ["🧠 CORTEX", 90, 20, 8, "tactical"],
+    ["💀 REAPER", 100, 28, 6, "unpredictable"],
+    ["🚀 ROCKET", 75, 22, 4, "hit_and_run"],
+    ["⚙️ MECHANIC", 110, 18, 10, "support"],
+    ["🌪️ CYCLONE", 85, 24, 7, "combo"]
+];
+
+fun clearScreen() -> int {
+    var i = 0;
+    while (i < 50) {
+        say("");
+        i = i + 1;
+    }
+    return 0;
+}
+
+fun showTitle() -> int {
+    say("╔══════════════════════════════════════════════════════════════╗");
+    say("║                    🤖 ROBOT ARENA 🤖                        ║");
+    say("║                                                              ║");
+    say("║              Epic Turn-Based Robot Combat!                   ║");
+    say("║                                                              ║");
+    say("╚══════════════════════════════════════════════════════════════╝");
+    say("");
+    return 0;
+}
+
+fun createPlayer() -> object {
+    say("🔧 ROBOT CUSTOMIZATION 🔧");
+    say("");
+    say("Enter your robot's name:");
+    var name = sys.input();
+    
+    say("");
+    say("Choose your robot type:");
+    say("1. 🔥 ASSAULT   - High attack, low defense (HP: 80, ATK: 28, DEF: 4)");
+    say("2. 🛡️ TANK      - High defense, low attack (HP: 130, ATK: 18, DEF: 15)");
+    say("3. ⚖️ BALANCED  - Balanced stats (HP: 100, ATK: 22, DEF: 8)");
+    say("4. ⚡ SPEED     - Fast and agile (HP: 75, ATK: 26, DEF: 6)");
+    
+    var choice = sys.input();
+    var hp = 100;
+    var atk = 22;
+    var def = 8;
+    
+    if (choice == "1") {
+        hp = 80;
+        atk = 28;
+        def = 4;
+        say("🔥 Assault robot selected! High damage, glass cannon!");
+    } else if (choice == "2") {
+        hp = 130;
+        atk = 18;
+        def = 15;
+        say("🛡️ Tank robot selected! Tough and durable!");
+    } else if (choice == "3") {
+        hp = 100;
+        atk = 22;
+        def = 8;
+        say("⚖️ Balanced robot selected! Jack of all trades!");
+    } else if (choice == "4") {
+        hp = 75;
+        atk = 26;
+        def = 6;
+        say("⚡ Speed robot selected! Fast and deadly!");
+    } else {
+        say("⚖️ Invalid choice, defaulting to Balanced!");
+    }
+    
+    var robot = Robot();
+    robot.init(name, hp, atk, def, "player");
+    return robot;
+}
+
+fun createRandomEnemy() -> object {
+    var template = robotTemplates[round % 8];  // Use fixed size instead of .length
+    var name = template[0];
+    var hp = template[1];
+    var atk = template[2];
+    var def = template[3];
+    var personality = template[4];
+    
+    // Scale stats based on round
+    var scaling = 1.0 + (round * 0.15);
+    hp = hp * scaling;
+    atk = atk * scaling;
+    def = def * scaling;
+    
+    var robot = Robot();
+    robot.init(name, hp, atk, def, personality);
+    return robot;
+}
+
+fun showBattleStatus() -> int {
+    say("═══════════════════════════════════════════════════════════════");
+    say("🏟️ ROUND " + round + " | Player Wins: " + playerWins);
+    say("═══════════════════════════════════════════════════════════════");
+    say("");
+    say("🤖 " + player.getStatus());
+    say("🤖 " + currentEnemy.getStatus());
+    say("");
+    return 0;
+}
+
+fun playerTurn() -> int {
+    say("💭 Your turn! Choose your action:");
+    say("1. ⚔️ Attack - Deal damage to enemy");
+    say("2. 🛡️ Defend - Reduce incoming damage next turn");
+    say("3. ⚡ Power Attack - High damage, costs energy (30 energy)");
+    say("4. 🔋 Recharge - Restore energy");
+    say("5. 💊 Repair - Heal yourself (40 energy)");
+    
+    var choice = sys.input();
+    
+    if (choice == "1") {
+        // Basic attack
+        var damage = player.attack + (random() % 10) - 5;
+        var actualDamage = currentEnemy.takeDamage(damage);
+        say("⚔️ " + player.name + " attacks " + currentEnemy.name + " for " + actualDamage + " damage!");
+        
+    } else if (choice == "2") {
+        // Defend - increase defense temporarily
+        player.defense = player.defense + 5;
+        say("🛡️ " + player.name + " takes a defensive stance! (+5 defense next turn)");
+        
+    } else if (choice == "3") {
+        // Power attack
+        if (player.useEnergy(30)) {
+            var damage = (player.attack * 1.8) + (random() % 15);
+            var actualDamage = currentEnemy.takeDamage(damage);
+            say("⚡💥 " + player.name + " unleashes a POWER ATTACK for " + actualDamage + " damage!");
+        } else {
+            say("❌ Not enough energy! Need 30 energy.");
+            return playerTurn(); // Try again
+        }
+        
+    } else if (choice == "4") {
+        // Recharge
+        player.rechargeEnergy();
+        say("🔋 " + player.name + " recharges energy!");
+        
+    } else if (choice == "5") {
+        // Heal
+        if (player.useEnergy(40)) {
+            player.heal(25);
+            say("💊 " + player.name + " repairs for 25 HP!");
+        } else {
+            say("❌ Not enough energy! Need 40 energy.");
+            return playerTurn(); // Try again
+        }
+        
+    } else {
+        say("❌ Invalid choice! Try again.");
+        return playerTurn(); // Try again
+    }
+    
+    return 0;
+}
+
+fun enemyTurn() -> int {
+    var action = "";
+    var personality = currentEnemy.personality;
+    
+    // AI decision making based on personality
+    if (personality == "aggressive") {
+        // Always attacks, prefers power attacks
+        if (currentEnemy.energy >= 30 && random() % 100 < 70) {
+            if (currentEnemy.useEnergy(30)) {
+                var damage = (currentEnemy.attack * 1.8) + (random() % 15);
+                var actualDamage = player.takeDamage(damage);
+                action = "⚡💥 " + currentEnemy.name + " unleashes a POWER ATTACK for " + actualDamage + " damage!";
+            }
+        } else {
+            var damage = currentEnemy.attack + (random() % 10) - 5;
+            var actualDamage = player.takeDamage(damage);
+            action = "⚔️ " + currentEnemy.name + " attacks aggressively for " + actualDamage + " damage!";
+        }
+        
+    } else if (personality == "defensive") {
+        // Prefers to defend and heal
+        if (currentEnemy.health < currentEnemy.maxHealth * 0.4 && currentEnemy.energy >= 40) {
+            currentEnemy.useEnergy(40);
+            currentEnemy.heal(25);
+            action = "💊 " + currentEnemy.name + " repairs itself!";
+        } else if (random() % 100 < 40) {
+            currentEnemy.defense = currentEnemy.defense + 5;
+            action = "🛡️ " + currentEnemy.name + " takes a defensive stance!";
+        } else {
+            var damage = currentEnemy.attack + (random() % 10) - 5;
+            var actualDamage = player.takeDamage(damage);
+            action = "⚔️ " + currentEnemy.name + " attacks cautiously for " + actualDamage + " damage!";
+        }
+        
+    } else if (personality == "berserker") {
+        // High damage, ignores defense
+        var damage = (currentEnemy.attack * 1.3) + (random() % 12);
+        var actualDamage = player.takeDamage(damage);
+        action = "😤 " + currentEnemy.name + " goes BERSERK for " + actualDamage + " damage!";
+        // Berserker takes self damage
+        currentEnemy.takeDamage(5);
+        
+    } else if (personality == "tactical") {
+        // Smart AI - adapts to situation
+        if (currentEnemy.health < currentEnemy.maxHealth * 0.3 && currentEnemy.energy >= 40) {
+            currentEnemy.useEnergy(40);
+            currentEnemy.heal(25);
+            action = "🧠 " + currentEnemy.name + " tactically repairs itself!";
+        } else if (currentEnemy.energy < 30) {
+            currentEnemy.rechargeEnergy();
+            action = "🧠 " + currentEnemy.name + " strategically recharges!";
+        } else if (player.health < player.maxHealth * 0.4) {
+            // Go for the kill
+            if (currentEnemy.useEnergy(30)) {
+                var damage = (currentEnemy.attack * 1.8) + (random() % 15);
+                var actualDamage = player.takeDamage(damage);
+                action = "🧠⚡ " + currentEnemy.name + " calculates a FINISHING MOVE for " + actualDamage + " damage!";
+            }
+        } else {
+            var damage = currentEnemy.attack + (random() % 10) - 5;
+            var actualDamage = player.takeDamage(damage);
+            action = "🧠 " + currentEnemy.name + " attacks strategically for " + actualDamage + " damage!";
+        }
+        
+    } else {
+        // Default/unpredictable behavior
+        var randomAction = random() % 4;
+        if (randomAction == 0 && currentEnemy.energy >= 30) {
+            currentEnemy.useEnergy(30);
+            var damage = (currentEnemy.attack * 1.8) + (random() % 15);
+            var actualDamage = player.takeDamage(damage);
+            action = "🎲 " + currentEnemy.name + " randomly power attacks for " + actualDamage + " damage!";
+        } else if (randomAction == 1 && currentEnemy.energy >= 40) {
+            currentEnemy.useEnergy(40);
+            currentEnemy.heal(25);
+            action = "🎲 " + currentEnemy.name + " randomly repairs itself!";
+        } else {
+            var damage = currentEnemy.attack + (random() % 10) - 5;
+            var actualDamage = player.takeDamage(damage);
+            action = "🎲 " + currentEnemy.name + " attacks unpredictably for " + actualDamage + " damage!";
+        }
+    }
+    
+    say(action);
+    return 0;
+}
+
+fun battle() -> bool {
+    while (player.isAlive() && currentEnemy.isAlive()) {
+        showBattleStatus();
+        
+        // Player turn
+        playerTurn();
+        
+        if (!currentEnemy.isAlive()) {
+            break;
+        }
+        
+        say("");
+        say("Press Enter to continue...");
+        sys.input();
+        
+        // Enemy turn
+        enemyTurn();
+        
+        // Reset temporary defense bonuses
+        if (player.defense > 8) {
+            player.defense = player.defense - 5;
+        }
+        if (currentEnemy.defense > currentEnemy.maxHealth / 10) {
+            currentEnemy.defense = currentEnemy.defense - 5;
+        }
+        
+        say("");
+        say("Press Enter to continue...");
+        sys.input();
+        clearScreen();
+    }
+    
+    // Battle result
+    if (player.isAlive()) {
+        say("🎉 VICTORY! 🎉");
+        say("You defeated " + currentEnemy.name + "!");
+        playerWins = playerWins + 1;
+        player.wins = player.wins + 1;
+        
+        // Heal player slightly between battles
+        player.heal(15);
+        player.rechargeEnergy();
+        
+        return true;
+    } else {
+        say("💀 DEFEAT! 💀");
+        say(currentEnemy.name + " has destroyed you!");
+        return false;
+    }
+}
+
+fun showGameOver() -> int {
+    say("");
+    say("╔══════════════════════════════════════════════════════════════╗");
+    say("║                        GAME OVER                            ║");
+    say("╚══════════════════════════════════════════════════════════════╝");
+    say("");
+    say("🏆 Final Stats:");
+    say("Robot: " + player.name);
+    say("Rounds Survived: " + playerWins);
+    say("Final Level: " + round);
+    say("");
+    
+    if (playerWins >= 10) {
+        say("🌟 LEGENDARY CHAMPION! You're a robot fighting legend!");
+    } else if (playerWins >= 7) {
+        say("🥇 ARENA MASTER! Incredible fighting skills!");
+    } else if (playerWins >= 5) {
+        say("🥈 VETERAN FIGHTER! Well done!");
+    } else if (playerWins >= 3) {
+        say("🥉 PROMISING ROOKIE! Keep training!");
+    } else {
+        say("🔧 NEEDS REPAIRS! Better luck next time!");
+    }
+    
+    say("");
+    say("Thanks for playing Robot Arena! 🤖");
+    return 0;
+}
+
+// Main game loop
+fun main() -> int {
+    clearScreen();
+    showTitle();
+    
+    // Initialize game
+    player = createPlayer();
+    round = 1;
+    playerWins = 0;
+    
+    say("");
+    say("🚀 " + player.name + " enters the arena!");
+    say("Press Enter to start your first battle...");
+    sys.input();
+    
+    // Game loop
+    while (player.isAlive()) {
+        clearScreen();
+        currentEnemy = createRandomEnemy();
+        
+        say("🚨 ROUND " + round + " 🚨");
+        say("A new challenger approaches!");
+        say("");
+        say("Enemy: " + currentEnemy.name + " (" + currentEnemy.personality.upper() + " type)");
+        say("HP: " + currentEnemy.health + " | ATK: " + currentEnemy.attack + " | DEF: " + currentEnemy.defense);
+        say("");
+        say("Press Enter to begin battle...");
+        sys.input();
+        
+        if (battle()) {
+            round = round + 1;
+            say("");
+            say("🎯 Preparing for next round...");
+            say("Press Enter to continue...");
+            sys.input();
+        } else {
+            break;
+        }
+    }
+    
+    showGameOver();
+    return 0;
+}
+
+// Start the game!
+main();

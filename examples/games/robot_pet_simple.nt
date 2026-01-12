@@ -1,0 +1,326 @@
+// 🤖 ROBO-PET - Your Virtual Robot Companion! 🤖
+// Take care of your robot pet and watch it grow!
+
+use sys;
+
+// Simple random number generator
+var randomSeed = 54321;
+
+fun random() -> int {
+    randomSeed = (randomSeed * 1103515245 + 12345) % 2147483647;
+    if (randomSeed < 0) {
+        randomSeed = randomSeed * -1;
+    }
+    return randomSeed;
+}
+
+// Pet stats
+var petName = "RoboPet";
+var happiness = 50;
+var energy = 50;
+var intelligence = 10;
+var age = 0;
+var tricksKnown = 0;
+
+fun showTitle() -> int {
+    say("╔══════════════════════════════════════════════════════════════╗");
+    say("║                    🤖 ROBO-PET 🤖                           ║");
+    say("║                                                              ║");
+    say("║              Your Virtual Robot Companion!                   ║");
+    say("║                                                              ║");
+    say("╚══════════════════════════════════════════════════════════════╝");
+    say("");
+    return 0;
+}
+
+fun getMoodEmoji() -> string {
+    if (happiness > 80) return "😍";
+    if (happiness > 60) return "😊";
+    if (happiness > 40) return "😐";
+    if (happiness > 20) return "😢";
+    return "😭";
+}
+
+fun getBar(value) -> string {
+    var bar = "";
+    var filled = value / 10;
+    var i = 0;
+    while (i < 10) {
+        if (i < filled) {
+            bar = bar + "█";
+        } else {
+            bar = bar + "░";
+        }
+        i = i + 1;
+    }
+    return bar;
+}
+
+fun showStatus() -> int {
+    say("🤖 " + petName + " " + getMoodEmoji());
+    say("Age: " + age + " days | Tricks Known: " + tricksKnown);
+    say("Happiness: " + getBar(happiness) + " (" + happiness + "/100)");
+    say("Energy: " + getBar(energy) + " (" + energy + "/100)");
+    say("Intelligence: " + getBar(intelligence) + " (" + intelligence + "/100)");
+    return 0;
+}
+
+fun feedPet() -> string {
+    if (happiness >= 95) {
+        return "🤖 " + petName + " says: 'I'm not hungry right now!'";
+    }
+    
+    happiness = happiness + 15;
+    energy = energy + 10;
+    
+    if (happiness > 100) happiness = 100;
+    if (energy > 100) energy = 100;
+    
+    var responses = [
+        "🍔 *CHOMP CHOMP* Delicious oil and circuits!",
+        "⚡ *BEEP BEEP* Energy levels rising!",
+        "🔋 *WHIRR* Battery charging... Thank you!",
+        "🤖 *HAPPY BEEPS* That hit the spot!"
+    ];
+    
+    var responseIndex = random() % 4;
+    var response = "";
+    if (responseIndex == 0) response = responses[0];
+    else if (responseIndex == 1) response = responses[1];
+    else if (responseIndex == 2) response = responses[2];
+    else response = responses[3];
+    
+    return "🤖 " + petName + " says: '" + response + "'";
+}
+
+fun playWithPet() -> string {
+    if (energy < 20) {
+        return "🤖 " + petName + " says: 'I'm too tired to play... *yawn*'";
+    }
+    
+    happiness = happiness + 20;
+    energy = energy - 15;
+    intelligence = intelligence + 5;
+    
+    if (happiness > 100) happiness = 100;
+    if (energy < 0) energy = 0;
+    if (intelligence > 100) intelligence = 100;
+    
+    var games = [
+        "🎾 plays fetch with a metal ball",
+        "🎯 practices target shooting with laser eyes",
+        "🧩 solves a complex puzzle in 0.3 seconds",
+        "🎪 does backflips and spins around",
+        "🎮 plays a holographic video game"
+    ];
+    
+    var gameIndex = random() % 5;
+    var game = "";
+    if (gameIndex == 0) game = games[0];
+    else if (gameIndex == 1) game = games[1];
+    else if (gameIndex == 2) game = games[2];
+    else if (gameIndex == 3) game = games[3];
+    else game = games[4];
+    
+    // Chance to learn a new trick
+    if (random() % 100 < 20 && intelligence > 30 && tricksKnown < 5) {
+        tricksKnown = tricksKnown + 1;
+        return "🤖 " + petName + " " + game + " and learned a new trick! (Total: " + tricksKnown + ")";
+    }
+    
+    return "🤖 " + petName + " " + game + "! *HAPPY BEEPS*";
+}
+
+fun performTrick() -> string {
+    if (tricksKnown == 0) {
+        return "🤖 " + petName + " says: 'I don't know any tricks yet! Play with me more!'";
+    }
+    
+    if (energy < 10) {
+        return "🤖 " + petName + " says: 'I'm too tired for tricks right now...'";
+    }
+    
+    energy = energy - 10;
+    happiness = happiness + 5;
+    
+    if (happiness > 100) happiness = 100;
+    
+    var tricks = [
+        "🎪 Backflip",
+        "⚡ Lightning Dance", 
+        "🎯 Laser Show",
+        "🎵 Song Mode",
+        "🤹 Juggling"
+    ];
+    
+    var trickIndex = random() % tricksKnown;
+    if (trickIndex >= 5) trickIndex = 4;
+    
+    var trick = "";
+    if (trickIndex == 0) trick = tricks[0];
+    else if (trickIndex == 1) trick = tricks[1];
+    else if (trickIndex == 2) trick = tricks[2];
+    else if (trickIndex == 3) trick = tricks[3];
+    else trick = tricks[4];
+    
+    return "🤖 " + petName + " performs " + trick + " flawlessly! ✨";
+}
+
+fun talkToPet() -> string {
+    var responses = [
+        "Want to play a game? I know " + tricksKnown + " tricks!",
+        "Beep boop! I love spending time with you!",
+        "My circuits are buzzing with happiness!",
+        "Did you know robots can dream? I dreamed about flying!",
+        "I'm learning so much! My intelligence is " + intelligence + "/100!",
+        "Energy levels at " + energy + "%. Ready for action!",
+        "I wonder what's beyond the digital horizon...",
+        "You're the best human friend a robot could have!"
+    ];
+    
+    var responseIndex = random() % 8;
+    var response = "";
+    if (responseIndex == 0) response = responses[0];
+    else if (responseIndex == 1) response = responses[1];
+    else if (responseIndex == 2) response = responses[2];
+    else if (responseIndex == 3) response = responses[3];
+    else if (responseIndex == 4) response = responses[4];
+    else if (responseIndex == 5) response = responses[5];
+    else if (responseIndex == 6) response = responses[6];
+    else response = responses[7];
+    
+    return "🤖 " + petName + " says: '" + response + "'";
+}
+
+fun sleepPet() -> string {
+    if (energy > 80) {
+        return "🤖 " + petName + " says: 'I'm not sleepy yet! Let's play more!'";
+    }
+    
+    energy = 100;
+    happiness = happiness + 10;
+    age = age + 1;
+    
+    if (happiness > 100) happiness = 100;
+    
+    var sleepMessages = [
+        "💤 *POWER DOWN SEQUENCE INITIATED* Zzz... beep... zzz...",
+        "😴 *ENTERING SLEEP MODE* Sweet electric dreams!",
+        "🌙 *RECHARGING* Good night! See you tomorrow!",
+        "💤 *SLEEP.EXE RUNNING* Dreaming of electric sheep..."
+    ];
+    
+    var messageIndex = random() % 4;
+    var message = "";
+    if (messageIndex == 0) message = sleepMessages[0];
+    else if (messageIndex == 1) message = sleepMessages[1];
+    else if (messageIndex == 2) message = sleepMessages[2];
+    else message = sleepMessages[3];
+    
+    return "🤖 " + petName + " says: '" + message + "'";
+}
+
+fun showMenu() -> int {
+    say("");
+    say("═══════════════════════════════════════════════════════════════");
+    say("What would you like to do?");
+    say("1. 🍔 Feed " + petName);
+    say("2. 🎮 Play with " + petName);
+    say("3. 🎪 Ask " + petName + " to perform a trick");
+    say("4. 💬 Talk to " + petName);
+    say("5. 😴 Put " + petName + " to sleep");
+    say("6. 📊 Check detailed stats");
+    say("7. 🚪 Exit game");
+    say("═══════════════════════════════════════════════════════════════");
+    return 0;
+}
+
+fun passTime() -> int {
+    // Gradual stat decay
+    happiness = happiness - 2;
+    energy = energy - 1;
+    
+    if (happiness < 0) happiness = 0;
+    if (energy < 0) energy = 0;
+    
+    return 0;
+}
+
+fun handleChoice(choice) -> int {
+    say("");
+    
+    if (choice == "1") {
+        say(feedPet());
+    } else if (choice == "2") {
+        say(playWithPet());
+    } else if (choice == "3") {
+        say(performTrick());
+    } else if (choice == "4") {
+        say(talkToPet());
+    } else if (choice == "5") {
+        say(sleepPet());
+        say("");
+        say("🌅 A new day begins! " + petName + " is refreshed and ready!");
+    } else if (choice == "6") {
+        say("📊 DETAILED STATS FOR " + petName + ":");
+        say("Age: " + age + " days");
+        say("Happiness: " + happiness + "/100");
+        say("Energy: " + energy + "/100");
+        say("Intelligence: " + intelligence + "/100");
+        say("Tricks Known: " + tricksKnown + "/5");
+    } else if (choice == "7") {
+        say("👋 Goodbye! " + petName + " will miss you!");
+        say("🤖 " + petName + " says: 'Thanks for taking care of me! Come back soon!'");
+        return 1; // Exit game
+    } else {
+        say("❌ Invalid choice! Try again.");
+    }
+    
+    // Pass some time and update pet
+    passTime();
+    
+    return 0;
+}
+
+// Main game
+fun main() -> int {
+    showTitle();
+    
+    say("🔧 What would you like to name your robot pet?");
+    var name = sys.input();
+    if (name != "") {
+        petName = name;
+    }
+    
+    say("");
+    say("🎉 Congratulations! " + petName + " is now online!");
+    say("Take good care of your new robot companion!");
+    
+    say("");
+    say("Press Enter to start taking care of " + petName + "...");
+    sys.input();
+    
+    var gameRunning = 1;
+    while (gameRunning == 1) {
+        say("");
+        showStatus();
+        showMenu();
+        
+        var choice = sys.input();
+        var result = handleChoice(choice);
+        if (result == 1) {
+            gameRunning = 0;
+        }
+        
+        if (gameRunning == 1) {
+            say("");
+            say("Press Enter to continue...");
+            sys.input();
+        }
+    }
+    
+    return 0;
+}
+
+// Start the game!
+main();
