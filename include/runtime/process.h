@@ -23,10 +23,9 @@
     #endif
     #include <windows.h>
     // Undefine Windows macros that conflict with our code
+    // NOTE: Do NOT undefine FAR and NEAR as they are needed by some Windows headers
     #undef TRUE
     #undef FALSE
-    #undef NEAR
-    #undef FAR
     #undef DELETE
     #undef ERROR
     #undef IN
