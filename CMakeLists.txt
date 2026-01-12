@@ -438,6 +438,10 @@ target_compile_definitions(neutron PRIVATE BUILDING_NEUTRON)
 # Link executable against both static runtime and shared library
 if(UNIX AND NOT APPLE)
     target_link_libraries(neutron -Wl,--whole-archive neutron_runtime -Wl,--no-whole-archive neutron_shared)
+elseif(WIN32)
+    # On Windows, use MSVC-specific whole archive linking
+    target_link_libraries(neutron neutron_shared)
+    target_link_options(neutron PRIVATE "/WHOLEARCHIVE:neutron_runtime")
 else()
     target_link_libraries(neutron neutron_runtime neutron_shared)
 endif()
