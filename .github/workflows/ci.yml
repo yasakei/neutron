@@ -316,10 +316,16 @@ jobs:
       run: |
         vcpkg install jsoncpp:x64-windows curl:x64-windows
         vcpkg integrate install
+        echo "VCPKG_ROOT: $env:VCPKG_ROOT"
+        echo "Checking vcpkg paths:"
+        if (Test-Path "C:\vcpkg\scripts\buildsystems\vcpkg.cmake") { echo "Found at C:\vcpkg" }
+        if (Test-Path "$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake") { echo "Found at VCPKG_ROOT" }
       
     - name: Build Neutron Runtime
       run: |
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+        $vcpkgPath = if (Test-Path "C:\vcpkg\scripts\buildsystems\vcpkg.cmake") { "C:\vcpkg\scripts\buildsystems\vcpkg.cmake" } else { "$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" }
+        echo "Using vcpkg toolchain: $vcpkgPath"
+        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="$vcpkgPath"
         cmake --build build --config Release
       
     - name: Build Box Package Manager
