@@ -24,6 +24,20 @@
     #endif
     #include <windows.h>
     #include <process.h>
+    // Undefine Windows macros that conflict with C++ code
+    #undef TRUE
+    #undef FALSE
+    #undef NEAR
+    #undef FAR
+    #undef DELETE
+    #undef ERROR
+    #undef IN
+    #undef OUT
+    #undef OPTIONAL
+    #undef interface
+    #undef small
+    #undef max
+    #undef min
 #endif
 
 #include "native.h"
