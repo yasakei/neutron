@@ -126,15 +126,11 @@ Section "Neutron Core" SecNeutron
   SetOutPath "$INSTDIR"
   File /nonfatal "neutron_runtime.lib"
   File /nonfatal "neutron_shared.lib"
-  File /nonfatal "build\Release\neutron_runtime.lib"
-  File /nonfatal "build\Release\neutron_shared.lib"
   
   ; Also copy to lib directory for alternative search path
   SetOutPath "$INSTDIR\lib"
   File /nonfatal "..\neutron_runtime.lib"
   File /nonfatal "..\neutron_shared.lib"
-  File /nonfatal "..\build\Release\neutron_runtime.lib"
-  File /nonfatal "..\build\Release\neutron_shared.lib"
 
   ; Copy README/License to root
   SetOutPath "$INSTDIR"
