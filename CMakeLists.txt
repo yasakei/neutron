@@ -104,14 +104,23 @@ endif()
 # CURL
 find_package(CURL CONFIG QUIET)
 if(NOT CURL_FOUND)
-    # Use system CURL if CMake config not available
+    # Try module mode (works better with vcpkg on Windows)
+    find_package(CURL QUIET)
+endif()
+if(NOT CURL_FOUND)
+    # Use pkg-config on Unix systems
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND)
         pkg_check_modules(CURL libcurl IMPORTED_TARGET)
     endif()
-    if(NOT CURL_FOUND)
-        find_package(CURL REQUIRED)  # Fallback to basic find
-    endif()
+endif()
+if(NOT CURL_FOUND AND NOT TARGET CURL::libcurl)
+    message(FATAL_ERROR "CURL not found. Please install libcurl development files.")
+endif()
+
+# Ensure CURL include directories are available
+if(CURL_INCLUDE_DIRS)
+    include_directories(${CURL_INCLUDE_DIRS})
 endif()
 
 # Function to add a new module easily
@@ -331,6 +340,10 @@ if(TARGET CURL::libcurl)
 elseif(TARGET PkgConfig::CURL)
     target_link_libraries(neutron_runtime PkgConfig::CURL)
     target_compile_definitions(neutron_runtime PRIVATE HAVE_CURL)
+elseif(CURL_FOUND)
+    target_include_directories(neutron_runtime PRIVATE ${CURL_INCLUDE_DIRS})
+    target_link_libraries(neutron_runtime ${CURL_LIBRARIES})
+    target_compile_definitions(neutron_runtime PRIVATE HAVE_CURL)
 endif()
 
 # Set output names
@@ -364,6 +377,10 @@ if(TARGET CURL::libcurl)
     target_compile_definitions(neutron_shared PRIVATE HAVE_CURL)
 elseif(TARGET PkgConfig::CURL)
     target_link_libraries(neutron_shared PkgConfig::CURL)
+    target_compile_definitions(neutron_shared PRIVATE HAVE_CURL)
+elseif(CURL_FOUND)
+    target_include_directories(neutron_shared PRIVATE ${CURL_INCLUDE_DIRS})
+    target_link_libraries(neutron_shared ${CURL_LIBRARIES})
     target_compile_definitions(neutron_shared PRIVATE HAVE_CURL)
 endif()
 
