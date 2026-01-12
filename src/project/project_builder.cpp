@@ -520,10 +520,20 @@ bool ProjectBuilder::buildProjectExecutable(
         neutronSrcDir + "/build/libneutron_runtime.a"
     };
     
-    for (const auto& path : libCandidates) {
-        if (std::filesystem::exists(path)) {
-            runtimeLibPath = path;
-            break;
+    // On Windows with MSVC, always compile from source for better compatibility
+    bool useStaticLib = true;
+    if (isWindows && !isMingw) {
+        useStaticLib = false;  // Force source compilation on Windows MSVC
+    } else {
+        // On Unix, try to find static library first
+        for (const auto& path : libCandidates) {
+            if (std::filesystem::exists(path)) {
+                runtimeLibPath = path;
+                break;
+            }
+        }
+        if (runtimeLibPath.empty()) {
+            useStaticLib = false;  // Fallback to source compilation
         }
     }
 
@@ -548,8 +558,8 @@ bool ProjectBuilder::buildProjectExecutable(
         compileCommand = compiler + " -std=c++17 -Wall -Wextra -O2 " + includePaths + " \"" + tempSourcePath + "\" ";
     }
     
-    // If we found the runtime library, link it. Otherwise, compile sources (slow fallback).
-    if (!runtimeLibPath.empty()) {
+    // If we found the runtime library and not on Windows MSVC, link it. Otherwise, compile sources.
+    if (useStaticLib && !runtimeLibPath.empty()) {
         // Link static library
         // On Linux, wrap with --whole-archive to ensure all symbols are included (needed for dlopen)
         if (!isWindows && !isMacOS) {
@@ -580,7 +590,7 @@ bool ProjectBuilder::buildProjectExecutable(
     
     // Add builtin modules (only if compiling from source, otherwise they are in the lib)
     // Actually, builtin modules are part of the runtime lib, so we only need them if NOT linking lib
-    if (runtimeLibPath.empty()) {
+    if (!useStaticLib || runtimeLibPath.empty()) {
         auto builtinSources = getBuiltinModuleSources();
         for (const auto& src : builtinSources) {
             std::string fullPath = neutronSrcDir + "/" + src;
