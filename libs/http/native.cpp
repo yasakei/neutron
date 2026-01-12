@@ -1,3 +1,5 @@
+#ifdef HAVE_CURL
+
 #include "native.h"
 #include "vm.h"
 #include "types/obj_string.h"
@@ -887,3 +889,29 @@ extern "C" void neutron_init_http_module(neutron::VM* vm) {
     auto http_module = vm->allocate<neutron::Module>("http", http_env);
     vm->define_module("http", http_module);
 }
+
+#else // !HAVE_CURL
+
+// Stub implementation when CURL is not available
+#include "native.h"
+#include "vm.h"
+#include "runtime/environment.h"
+
+namespace neutron {
+
+void register_http_functions(VM& vm, std::shared_ptr<Environment> env) {
+    (void)vm;
+    (void)env;
+    // HTTP module not available without CURL - functions will throw runtime errors
+}
+
+} // namespace neutron
+
+extern "C" void neutron_init_http_module(neutron::VM* vm) {
+    auto http_env = std::make_shared<neutron::Environment>();
+    neutron::register_http_functions(*vm, http_env);
+    auto http_module = vm->allocate<neutron::Module>("http", http_env);
+    vm->define_module("http", http_module);
+}
+
+#endif // HAVE_CURL
