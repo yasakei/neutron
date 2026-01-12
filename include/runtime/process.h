@@ -9,12 +9,13 @@
 #include <vector>
 #include <queue>
 #include <memory>
+#include <functional>
+#include <unordered_map>
 #include <mutex>
 #include <condition_variable>
 #include <thread>
 #include <atomic>
-#include <functional>
-#include <unordered_map>
+
 #include "types/value.h"
 
 namespace neutron {
