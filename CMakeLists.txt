@@ -102,10 +102,10 @@ else()
 endif()
 
 # CURL (optional - HTTP module will be disabled if not found)
-find_package(CURL CONFIG QUIET)
+find_package(CURL QUIET)
 if(NOT CURL_FOUND)
-    # Try module mode (works better with vcpkg on Windows)
-    find_package(CURL QUIET)
+    # Try CONFIG mode (some vcpkg packages prefer this)
+    find_package(CURL CONFIG QUIET)
 endif()
 if(NOT CURL_FOUND)
     # Use pkg-config on Unix systems
