@@ -386,13 +386,10 @@ endif()
 # Create shared library for modules to link against
 # This library contains the C API functions that external modules need
 add_library(neutron_shared SHARED
-    src/core/capi.cpp
-    src/types/value.cpp
-    src/types/obj_string.cpp
+    ${NEUTRON_LIBRARY_SOURCES}
 )
 
 target_link_libraries(neutron_shared
-    neutron_runtime
     ${JSONCPP_LIBRARIES}
     ${DLFCN_WIN}
 )
@@ -435,16 +432,8 @@ add_executable(neutron src/core/main.cpp)
 # Define BUILDING_NEUTRON for the main executable so functions are exported
 target_compile_definitions(neutron PRIVATE BUILDING_NEUTRON)
 
-# Link executable against both static runtime and shared library
-if(UNIX AND NOT APPLE)
-    target_link_libraries(neutron -Wl,--whole-archive neutron_runtime -Wl,--no-whole-archive neutron_shared)
-elseif(WIN32)
-    # On Windows, use MSVC-specific whole archive linking
-    target_link_libraries(neutron neutron_shared)
-    target_link_options(neutron PRIVATE "/WHOLEARCHIVE:neutron_runtime")
-else()
-    target_link_libraries(neutron neutron_runtime neutron_shared)
-endif()
+# Link executable against shared library
+target_link_libraries(neutron neutron_shared)
 
 # Ensure threading support for main executable
 target_link_libraries(neutron Threads::Threads)
