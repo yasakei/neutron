@@ -39,7 +39,7 @@ if(MSVC)
     # /Gy: Enable function-level linking
     # /permissive-: Disable non-conforming code (helps with standard library)
     # Note: /Og is deprecated in newer MSVC versions, removed
-    # Suppress common warnings: C4267 (size_t conversion), C4244 (type conversion), C4100 (unreferenced parameter), C4458 (declaration hides member), C4273 (inconsistent dll linkage), C4101 (unreferenced local variable)
+    # Suppress common warnings: C4267 (size_t conversion), C4244 (type conversion), C4100 (unreferenced parameter), C4458 (declaration hides member), C4273 (inconsistent dll linkage), C4101 (unreferenced local variable)6)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" && cd C:\Users\yasakei\.temp\test && neutron build
     add_compile_options(/W4 /utf-8 /EHsc /Oi /Ot /fp:fast /GL /Gy /permissive- /wd4267 /wd4244 /wd4100 /wd4458 /wd4273 /wd4101)
     
     # Ensure threading support is enabled

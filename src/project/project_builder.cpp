@@ -535,32 +535,32 @@ bool ProjectBuilder::buildProjectExecutable(
     // Try to find a static runtime archive
     std::string runtimeLibPath;
     std::vector<std::string> libCandidates = {
-        // Windows paths
+        // Windows paths - check installation directory first
         neutronSrcDir + "/neutron_runtime.lib",
         neutronSrcDir + "/lib/neutron_runtime.lib",
         neutronSrcDir + "/build/Release/neutron_runtime.lib",
         neutronSrcDir + "/build/neutron_runtime.lib",
+        // Also check in the same directory as the neutron executable
+        executableDir + "/neutron_runtime.lib",
+        executableDir + "/lib/neutron_runtime.lib",
         // Unix paths
         neutronSrcDir + "/libneutron_runtime.a",
         neutronSrcDir + "/lib/libneutron_runtime.a",
         neutronSrcDir + "/build/libneutron_runtime.a"
     };
     
-    // On Windows with MSVC, always compile from source for better compatibility
+    // On Windows with MSVC, try to use static library first for better performance
     bool useStaticLib = true;
-    if (isWindows && !isMingw) {
-        useStaticLib = false;  // Force source compilation on Windows MSVC
-    } else {
-        // On Unix, try to find static library first
-        for (const auto& path : libCandidates) {
-            if (std::filesystem::exists(path)) {
-                runtimeLibPath = path;
-                break;
-            }
+    
+    // Try to find static library on all platforms
+    for (const auto& path : libCandidates) {
+        if (std::filesystem::exists(path)) {
+            runtimeLibPath = path;
+            break;
         }
-        if (runtimeLibPath.empty()) {
-            useStaticLib = false;  // Fallback to source compilation
-        }
+    }
+    if (runtimeLibPath.empty()) {
+        useStaticLib = false;  // Fallback to source compilation
     }
 
     // Build compile command

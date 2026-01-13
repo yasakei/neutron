@@ -123,13 +123,21 @@ Section "Neutron Core" SecNeutron
   
   ; Install runtime library (required for neutron build) - copy to root like Linux
   SetOutPath "$INSTDIR"
+  File /nonfatal "build\Release\neutron_runtime.lib"
+  File /nonfatal "build\Release\neutron_shared.lib"
+  File /nonfatal "build\Release\neutron_shared.dll"
   File /nonfatal "neutron_runtime.lib"
   File /nonfatal "neutron_shared.lib"
+  File /nonfatal "neutron_shared.dll"
   
   ; Also copy to lib directory for alternative search path
   SetOutPath "$INSTDIR\lib"
+  File /nonfatal "..\build\Release\neutron_runtime.lib"
+  File /nonfatal "..\build\Release\neutron_shared.lib"
+  File /nonfatal "..\build\Release\neutron_shared.dll"
   File /nonfatal "..\neutron_runtime.lib"
   File /nonfatal "..\neutron_shared.lib"
+  File /nonfatal "..\neutron_shared.dll"
 
   ; Copy README/License to root
   SetOutPath "$INSTDIR"
@@ -171,6 +179,36 @@ Section "Neutron Core" SecNeutron
   FileWrite $0 "echo MSVC environment is now active for this terminal session.$\r$\n"
   FileWrite $0 "echo You can now use 'neutron build' and 'box install' commands.$\r$\n"
   FileWrite $0 "echo.$\r$\n"
+  FileClose $0
+  
+  ; Create a wrapper script that automatically sets up MSVC environment
+  FileOpen $0 "$INSTDIR\neutron-with-msvc.bat" w
+  FileWrite $0 "@echo off$\r$\n"
+  FileWrite $0 "REM Neutron wrapper that automatically sets up MSVC environment$\r$\n"
+  FileWrite $0 "$\r$\n"
+  FileWrite $0 "REM Find and call MSVC setup$\r$\n"
+  FileWrite $0 "if exist $\"C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat$\" ($\r$\n"
+  FileWrite $0 "  call $\"C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat$\" >nul 2>&1$\r$\n"
+  FileWrite $0 "  goto :run_neutron$\r$\n"
+  FileWrite $0 ")$\r$\n"
+  FileWrite $0 "if exist $\"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat$\" ($\r$\n"
+  FileWrite $0 "  call $\"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat$\" >nul 2>&1$\r$\n"
+  FileWrite $0 "  goto :run_neutron$\r$\n"
+  FileWrite $0 ")$\r$\n"
+  FileWrite $0 "if exist $\"C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat$\" ($\r$\n"
+  FileWrite $0 "  call $\"C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat$\" >nul 2>&1$\r$\n"
+  FileWrite $0 "  goto :run_neutron$\r$\n"
+  FileWrite $0 ")$\r$\n"
+  FileWrite $0 "if exist $\"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat$\" ($\r$\n"
+  FileWrite $0 "  call $\"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat$\" >nul 2>&1$\r$\n"
+  FileWrite $0 "  goto :run_neutron$\r$\n"
+  FileWrite $0 ")$\r$\n"
+  FileWrite $0 "$\r$\n"
+  FileWrite $0 "echo Warning: MSVC not found. neutron build may fail.$\r$\n"
+  FileWrite $0 "echo Install Visual Studio Build Tools from: https://aka.ms/vs/17/release/vs_BuildTools.exe$\r$\n"
+  FileWrite $0 "$\r$\n"
+  FileWrite $0 ":run_neutron$\r$\n"
+  FileWrite $0 "$\"$INSTDIR\neutron.exe$\" %*$\r$\n"
   FileClose $0
 
   ;Store installation folder
@@ -269,6 +307,7 @@ Section "Uninstall"
   Delete "$INSTDIR\box.exe"
   Delete "$INSTDIR\neutron-lsp.exe"
   Delete "$INSTDIR\setup-msvc.bat"
+  Delete "$INSTDIR\neutron-with-msvc.bat"
   Delete "$INSTDIR\*.dll"
   Delete "$INSTDIR\*.lib"
   Delete "$INSTDIR\LICENSE"
