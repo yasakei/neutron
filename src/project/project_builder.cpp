@@ -553,14 +553,22 @@ bool ProjectBuilder::buildProjectExecutable(
     bool useStaticLib = true;
     
     // Try to find static library on all platforms
+    std::cout << "Debug: Searching for runtime library..." << std::endl;
     for (const auto& path : libCandidates) {
+        std::cout << "Debug: Checking " << path << std::endl;
         if (std::filesystem::exists(path)) {
             runtimeLibPath = path;
+            std::cout << "Debug: Found runtime library at " << path << std::endl;
             break;
+        } else {
+            std::cout << "Debug: Not found: " << path << std::endl;
         }
     }
     if (runtimeLibPath.empty()) {
+        std::cout << "Debug: No runtime library found, will compile from source" << std::endl;
         useStaticLib = false;  // Fallback to source compilation
+    } else {
+        std::cout << "Debug: Will use static library: " << runtimeLibPath << std::endl;
     }
 
     // Build compile command
@@ -595,7 +603,7 @@ bool ProjectBuilder::buildProjectExecutable(
                     std::string moduleName = src.substr(libsPos + 5, nextSlash - libsPos - 5);
                     std::string objFile = objDir + "/" + moduleName + "_module.obj";
                     
-                    std::string moduleCmd = compiler + " /c /std:c++17 /EHsc /W3 /O2 /MD /D_CRT_SECURE_NO_WARNINGS /nologo /wd4267 /wd4244 /wd4100 /wd4458 /wd4273 /wd4101 " + includePaths + " \"" + fullPath + "\" /Fo\"" + objFile + "\"";
+                    std::string moduleCmd = compiler + " /c /std:c++17 /EHsc /W3 /O2 /MT /D_CRT_SECURE_NO_WARNINGS /nologo /wd4267 /wd4244 /wd4100 /wd4458 /wd4273 /wd4101 " + includePaths + " \"" + fullPath + "\" /Fo\"" + objFile + "\"";
                     int result = system(moduleCmd.c_str());
                     if (result != 0) {
                         std::cerr << "Error compiling module: " << moduleName << std::endl;
@@ -607,13 +615,16 @@ bool ProjectBuilder::buildProjectExecutable(
         }
         
         // Now build the main compile command with runtime sources
-        compileCommand = compiler + " /std:c++17 /EHsc /W3 /O2 /MD /D_CRT_SECURE_NO_WARNINGS /nologo /wd4267 /wd4244 /wd4100 /wd4458 /wd4273 /wd4101 " + includePaths + " \"" + tempSourcePath + "\" ";
+        compileCommand = compiler + " /std:c++17 /EHsc /W3 /O2 /MT /D_CRT_SECURE_NO_WARNINGS /nologo /wd4267 /wd4244 /wd4100 /wd4458 /wd4273 /wd4101 " + includePaths + " \"" + tempSourcePath + "\" ";
     } else {
         includePaths = "-I\"" + includeDir + "\" -I\"" + includeDir + "/core\" -I\"" + includeDir + "/compiler\" -I\"" + includeDir + "/runtime\" -I\"" + includeDir + "/types\" -I\"" + includeDir + "/utils\" -I\"" + neutronSrcDir + "\" -I\"" + libsDir + "\"";
         compileCommand = compiler + " -std=c++17 -Wall -Wextra -O2 " + includePaths + " \"" + tempSourcePath + "\" ";
     }
     
     // If we found the runtime library and not on Windows MSVC, link it. Otherwise, compile sources.
+    std::cout << "Debug: useStaticLib = " << (useStaticLib ? "true" : "false") << std::endl;
+    std::cout << "Debug: runtimeLibPath = '" << runtimeLibPath << "'" << std::endl;
+    
     if (useStaticLib && !runtimeLibPath.empty()) {
         // Link static library
         // On Linux, wrap with --whole-archive to ensure all symbols are included (needed for dlopen)
