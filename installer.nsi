@@ -70,15 +70,14 @@ Section "Neutron Core" SecNeutron
   ; Shared runtime DLL (required for native modules)
   File "neutron_shared.dll"
   
-  ; Copy dependency DLLs
+  ; Copy all vcpkg DLLs (comprehensive approach like CI)
+  SetOutPath "$INSTDIR"
+  File /nonfatal /r "build\vcpkg_installed\x64-windows\bin\*.dll"
+  
+  ; Copy any additional dependency DLLs from root
   File /nonfatal "libcurl.dll"
   File /nonfatal "zlib1.dll"
   File /nonfatal "dl.dll"
-  
-  ; Copy vcpkg DLLs for neutron-lsp
-  File /nonfatal "build\vcpkg_installed\x64-windows\bin\jsoncpp.dll"
-  File /nonfatal "build\vcpkg_installed\x64-windows\bin\libcurl.dll"
-  File /nonfatal "build\vcpkg_installed\x64-windows\bin\zlib1.dll"
   
   ; Copy Visual C++ runtime DLLs if available
   File /nonfatal "vcruntime140.dll"

@@ -59,6 +59,9 @@ jobs:
     - name: Package
       run: python package.py --output neutron-linux-x64 --skip-build
       
+    - name: Remove VS Code extension from package
+      run: rm -f neutron-linux-x64/*.vsix
+      
     - name: Verify binaries
       run: |
         ls -lh build/neutron
@@ -180,6 +183,9 @@ jobs:
       
     - name: Package
       run: python package.py --output neutron-macos-arm64 --skip-build
+      
+    - name: Remove VS Code extension from package
+      run: rm -f neutron-macos-arm64/*.vsix
       
     - name: Verify binaries
       run: |
@@ -336,6 +342,9 @@ jobs:
       
     - name: Package
       run: python package.py --output neutron-windows-x64 --skip-build
+      
+    - name: Remove VS Code extension from package
+      run: Remove-Item -Path "neutron-windows-x64\*.vsix" -Force -ErrorAction SilentlyContinue
       
     - name: Verify binaries
       run: |
