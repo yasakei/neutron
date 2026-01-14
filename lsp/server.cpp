@@ -4,9 +4,30 @@
 #include <regex>
 #include <set>
 #include <sstream>
+#include <iomanip>
 
 namespace neutron {
 namespace lsp {
+
+// Helper to decode percent-encoded URI characters
+static std::string decodeURIComponent(const std::string& str) {
+  std::string result;
+  for (size_t i = 0; i < str.length(); ++i) {
+    if (str[i] == '%' && i + 2 < str.length()) {
+      std::string hex = str.substr(i + 1, 2);
+      try {
+        int value = std::stoi(hex, nullptr, 16);
+        result += static_cast<char>(value);
+        i += 2;
+      } catch (...) {
+        result += str[i];
+      }
+    } else {
+      result += str[i];
+    }
+  }
+  return result;
+}
 
 // Helper to safely access JSON values using string literals
 static inline bool has(const Json::Value &v, const char *key) {
@@ -22,6 +43,35 @@ static inline Json::Value &set(Json::Value &v, const char *key) {
 }
 
 LSPServer::LSPServer() : running(true) {}
+
+std::string LSPServer::uriToPath(const std::string& uri) {
+  // Convert file:// URI to filesystem path
+  // Examples:
+  //   file:///C:/path/file.nt -> C:/path/file.nt (Windows)
+  //   file:///home/user/file.nt -> /home/user/file.nt (Unix)
+  
+  std::string path = uri;
+  
+  // Check if it starts with file://
+  if (path.rfind("file://", 0) == 0) {
+    path = path.substr(7); // Remove "file://"
+    
+    // Decode percent-encoded characters
+    path = decodeURIComponent(path);
+    
+    // On Windows, remove leading slash if we have a drive letter
+    // file:///C:/path -> /C:/path -> C:/path
+    #ifdef _WIN32
+    if (path.length() >= 3 && path[0] == '/' && path[2] == ':') {
+      path = path.substr(1);
+    }
+    // Convert forward slashes to backslashes on Windows
+    std::replace(path.begin(), path.end(), '/', '\\');
+    #endif
+  }
+  
+  return path;
+}
 
 void LSPServer::run() {
   std::cerr << "[LSP] Server started. Waiting for input..." << std::endl;
@@ -241,7 +291,10 @@ void LSPServer::validateDocument(const std::string &uri,
     lines.push_back(line);
   }
   ErrorHandler::setSourceLines(lines);
-  ErrorHandler::setCurrentFile(uri);
+  
+  // Convert URI to filesystem path for error reporting
+  std::string filePath = uriToPath(uri);
+  ErrorHandler::setCurrentFile(filePath);
 
   // Set the error callback to capture diagnostics
   ErrorHandler::setErrorCallback([&](const ErrorInfo &error) {

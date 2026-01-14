@@ -38,6 +38,8 @@ private:
     void validateDocument(const std::string& uri, const std::string& text);
     void publishDiagnostics(const std::string& uri, const std::vector<Diagnostic>& diagnostics);
     void collectSymbols(const std::vector<std::unique_ptr<Stmt>>& statements, Json::Value& symbols);
+    
+    std::string uriToPath(const std::string& uri);
 
     void sendJson(const Json::Value& json);
 
