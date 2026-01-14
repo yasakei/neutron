@@ -41,7 +41,7 @@
   !insertmacro MUI_PAGE_INSTFILES
   
   !define MUI_FINISHPAGE_TITLE "Neutron Installation Complete"
-  !define MUI_FINISHPAGE_TEXT "Neutron has been installed successfully!$\r$\n$\r$\nQuick Start:$\r$\n  1. Open a new terminal (Command Prompt or PowerShell)$\r$\n  2. Run: neutron --version$\r$\n  3. Create a project: neutron init myproject$\r$\n$\r$\nIf you didn't install C++ Build Tools, you can:$\r$\n  - Download from: https://aka.ms/vs/17/release/vs_BuildTools.exe$\r$\n  - Or run the installer again and select the Build Tools option$\r$\n$\r$\nDocumentation: https://neutron.ct.ws/docs"
+  !define MUI_FINISHPAGE_TEXT "Neutron has been installed successfully!$\r$\n$\r$\nQuick Start:$\r$\n  1. Open a new terminal (Command Prompt or PowerShell)$\r$\n  2. Run: neutron --version$\r$\n  3. Create a project: neutron init myproject$\r$\n$\r$\nC++ Build Tools:$\r$\n  - If you selected Build Tools installation, it's running in a separate window$\r$\n  - Complete the installation there (takes 10-15 minutes)$\r$\n  - After completion, restart your terminal to use 'neutron build'$\r$\n$\r$\nIf you didn't install Build Tools, download from:$\r$\n  https://aka.ms/vs/17/release/vs_BuildTools.exe$\r$\n$\r$\nDocumentation: https://neutron.ct.ws/docs"
   !insertmacro MUI_PAGE_FINISH
 
   !insertmacro MUI_UNPAGE_WELCOME
@@ -70,14 +70,15 @@ Section "Neutron Core" SecNeutron
   ; Shared runtime DLL (required for native modules)
   File "neutron_shared.dll"
   
-  ; Copy all vcpkg DLLs (comprehensive approach like CI)
-  SetOutPath "$INSTDIR"
-  File /nonfatal /r "build\vcpkg_installed\x64-windows\bin\*.dll"
-  
-  ; Copy any additional dependency DLLs from root
+  ; Copy dependency DLLs
   File /nonfatal "libcurl.dll"
   File /nonfatal "zlib1.dll"
   File /nonfatal "dl.dll"
+  
+  ; Copy vcpkg DLLs for neutron-lsp
+  File /nonfatal "build\vcpkg_installed\x64-windows\bin\jsoncpp.dll"
+  File /nonfatal "build\vcpkg_installed\x64-windows\bin\libcurl.dll"
+  File /nonfatal "build\vcpkg_installed\x64-windows\bin\zlib1.dll"
   
   ; Copy Visual C++ runtime DLLs if available
   File /nonfatal "vcruntime140.dll"
@@ -123,21 +124,13 @@ Section "Neutron Core" SecNeutron
   
   ; Install runtime library (required for neutron build) - copy to root like Linux
   SetOutPath "$INSTDIR"
-  File /nonfatal "build\Release\neutron_runtime.lib"
-  File /nonfatal "build\Release\neutron_shared.lib"
-  File /nonfatal "build\Release\neutron_shared.dll"
   File /nonfatal "neutron_runtime.lib"
   File /nonfatal "neutron_shared.lib"
-  File /nonfatal "neutron_shared.dll"
   
   ; Also copy to lib directory for alternative search path
   SetOutPath "$INSTDIR\lib"
-  File /nonfatal "..\build\Release\neutron_runtime.lib"
-  File /nonfatal "..\build\Release\neutron_shared.lib"
-  File /nonfatal "..\build\Release\neutron_shared.dll"
   File /nonfatal "..\neutron_runtime.lib"
   File /nonfatal "..\neutron_shared.lib"
-  File /nonfatal "..\neutron_shared.dll"
 
   ; Copy README/License to root
   SetOutPath "$INSTDIR"
@@ -179,36 +172,6 @@ Section "Neutron Core" SecNeutron
   FileWrite $0 "echo MSVC environment is now active for this terminal session.$\r$\n"
   FileWrite $0 "echo You can now use 'neutron build' and 'box install' commands.$\r$\n"
   FileWrite $0 "echo.$\r$\n"
-  FileClose $0
-  
-  ; Create a wrapper script that automatically sets up MSVC environment
-  FileOpen $0 "$INSTDIR\neutron-with-msvc.bat" w
-  FileWrite $0 "@echo off$\r$\n"
-  FileWrite $0 "REM Neutron wrapper that automatically sets up MSVC environment$\r$\n"
-  FileWrite $0 "$\r$\n"
-  FileWrite $0 "REM Find and call MSVC setup$\r$\n"
-  FileWrite $0 "if exist $\"C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat$\" ($\r$\n"
-  FileWrite $0 "  call $\"C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat$\" >nul 2>&1$\r$\n"
-  FileWrite $0 "  goto :run_neutron$\r$\n"
-  FileWrite $0 ")$\r$\n"
-  FileWrite $0 "if exist $\"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat$\" ($\r$\n"
-  FileWrite $0 "  call $\"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat$\" >nul 2>&1$\r$\n"
-  FileWrite $0 "  goto :run_neutron$\r$\n"
-  FileWrite $0 ")$\r$\n"
-  FileWrite $0 "if exist $\"C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat$\" ($\r$\n"
-  FileWrite $0 "  call $\"C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat$\" >nul 2>&1$\r$\n"
-  FileWrite $0 "  goto :run_neutron$\r$\n"
-  FileWrite $0 ")$\r$\n"
-  FileWrite $0 "if exist $\"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat$\" ($\r$\n"
-  FileWrite $0 "  call $\"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat$\" >nul 2>&1$\r$\n"
-  FileWrite $0 "  goto :run_neutron$\r$\n"
-  FileWrite $0 ")$\r$\n"
-  FileWrite $0 "$\r$\n"
-  FileWrite $0 "echo Warning: MSVC not found. neutron build may fail.$\r$\n"
-  FileWrite $0 "echo Install Visual Studio Build Tools from: https://aka.ms/vs/17/release/vs_BuildTools.exe$\r$\n"
-  FileWrite $0 "$\r$\n"
-  FileWrite $0 ":run_neutron$\r$\n"
-  FileWrite $0 "$\"$INSTDIR\neutron.exe$\" %*$\r$\n"
   FileClose $0
 
   ;Store installation folder
@@ -252,22 +215,17 @@ Section /o "C++ Build Tools (Required for native modules)" SecBuildTools
   Pop $0
   
   ${If} $0 == "success"
-    DetailPrint "Download complete. Launching installer..."
+    DetailPrint "Download complete. Launching Build Tools installer..."
+    DetailPrint "The Visual Studio Build Tools installer will open in a separate window."
+    DetailPrint "Please complete the installation there (it may take 10-15 minutes)."
+    DetailPrint "You can close this installer once Neutron installation is complete."
     
-    ; Launch installer with C++ workload pre-selected (silent install)
-    DetailPrint "Installing C++ Build Tools (this may take several minutes)..."
-    DetailPrint "Note: This is a large download (~1-2GB). Please be patient..."
-    ExecWait '"$TEMP\vs_BuildTools.exe" --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --wait' $1
+    ; Launch installer asynchronously without blocking
+    ; User will see the VS installer UI and can monitor progress there
+    Exec '"$TEMP\vs_BuildTools.exe" --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended'
     
-    ${If} $1 == "0"
-      DetailPrint "Build Tools installed successfully."
-    ${Else}
-      DetailPrint "Build Tools installation returned code: $1"
-      DetailPrint "You may need to install manually from: https://aka.ms/vs/17/release/vs_BuildTools.exe"
-    ${EndIf}
-    
-    ; Clean up
-    Delete "$TEMP\vs_BuildTools.exe"
+    DetailPrint "Build Tools installer launched successfully."
+    DetailPrint "Note: The installer window may take a moment to appear."
     Goto done
   ${Else}
     DetailPrint "Failed to download Build Tools installer: $0"
@@ -307,7 +265,6 @@ Section "Uninstall"
   Delete "$INSTDIR\box.exe"
   Delete "$INSTDIR\neutron-lsp.exe"
   Delete "$INSTDIR\setup-msvc.bat"
-  Delete "$INSTDIR\neutron-with-msvc.bat"
   Delete "$INSTDIR\*.dll"
   Delete "$INSTDIR\*.lib"
   Delete "$INSTDIR\LICENSE"
