@@ -48,6 +48,7 @@ std::string LSPServer::uriToPath(const std::string& uri) {
   // Convert file:// URI to filesystem path
   // Examples:
   //   file:///C:/path/file.nt -> C:/path/file.nt (Windows)
+  //   file:///c%3A/path/file.nt -> c:\path\file.nt (Windows with encoded colon)
   //   file:///home/user/file.nt -> /home/user/file.nt (Unix)
   
   std::string path = uri;
@@ -56,13 +57,15 @@ std::string LSPServer::uriToPath(const std::string& uri) {
   if (path.rfind("file://", 0) == 0) {
     path = path.substr(7); // Remove "file://"
     
-    // Decode percent-encoded characters
+    // Decode percent-encoded characters FIRST
     path = decodeURIComponent(path);
     
     // On Windows, remove leading slash if we have a drive letter
-    // file:///C:/path -> /C:/path -> C:/path
+    // After decoding: /C:/path or /c:/path -> C:/path or c:/path
     #ifdef _WIN32
-    if (path.length() >= 3 && path[0] == '/' && path[2] == ':') {
+    if (path.length() >= 3 && path[0] == '/' && 
+        ((path[1] >= 'a' && path[1] <= 'z') || (path[1] >= 'A' && path[1] <= 'Z')) &&
+        path[2] == ':') {
       path = path.substr(1);
     }
     // Convert forward slashes to backslashes on Windows
