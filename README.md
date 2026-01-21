@@ -1,2 +1,2 @@
->[!info]
-> Not maintained anymore
+>[!important]
+> Not longer maintained
