@@ -6,8 +6,10 @@ Neutron is currently in **beta**, and only the **latest release** is actively su
 
 | Version     | Supported          |
 | ------------ | ------------------ |
+| 26.2.*+  | :white_check_mark: |
+| 26.0.1 | :x:           |
 | Latest Beta  | :white_check_mark: |
-| Older Builds | :x:                |
+| Older Beta Builds | :x:           |
 
 As Neutron evolves rapidly during beta, older builds may contain unresolved security issues. Please always update to the most recent version for the latest fixes and improvements.
 
