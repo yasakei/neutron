@@ -1,0 +1,83 @@
+// Basic crypto module tests
+use crypto;
+
+say("=== Crypto Module Basic Tests ===");
+
+// Test Base64 encoding/decoding
+say("\n--- Base64 Tests ---");
+var original = "Hello, World!";
+var encoded = crypto.base64_encode(original);
+var decoded = crypto.base64_decode(encoded);
+
+say("Original: " + original);
+say("Encoded:  " + encoded);
+say("Decoded:  " + decoded);
+
+if (original == decoded) {
+    say("✓ Base64 encode/decode test passed");
+} else {
+    say("✗ Base64 encode/decode test failed");
+}
+
+// Test empty string
+var empty_encoded = crypto.base64_encode("");
+var empty_decoded = crypto.base64_decode(empty_encoded);
+if (empty_decoded == "") {
+    say("✓ Base64 empty string test passed");
+} else {
+    say("✗ Base64 empty string test failed");
+}
+
+// Test SHA-256 hashing
+say("\n--- SHA-256 Tests ---");
+var test_string = "The quick brown fox jumps over the lazy dog";
+var hash = crypto.sha256(test_string);
+say("Input:  " + test_string);
+say("SHA256: " + hash);
+
+// Known SHA-256 hash for this string
+var expected_hash = "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592";
+if (hash == expected_hash) {
+    say("✓ SHA-256 hash test passed");
+} else {
+    say("✗ SHA-256 hash test failed");
+    say("Expected: " + expected_hash);
+    say("Got:      " + hash);
+}
+
+// Test empty string hash
+var empty_hash = crypto.sha256("");
+var expected_empty = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+if (empty_hash == expected_empty) {
+    say("✓ SHA-256 empty string test passed");
+} else {
+    say("✗ SHA-256 empty string test failed");
+}
+
+// Test hex encoding/decoding
+say("\n--- Hex Encoding Tests ---");
+var hex_input = "Hello";
+var hex_encoded = crypto.hex_encode(hex_input);
+var hex_decoded = crypto.hex_decode(hex_encoded);
+
+say("Input:    " + hex_input);
+say("Hex:      " + hex_encoded);
+say("Decoded:  " + hex_decoded);
+
+if (hex_input == hex_decoded) {
+    say("✓ Hex encode/decode test passed");
+} else {
+    say("✗ Hex encode/decode test failed");
+}
+
+// Test known hex values
+var hello_hex = crypto.hex_encode("Hello");
+if (hello_hex == "48656c6c6f") {
+    say("✓ Hex encoding correctness test passed");
+} else {
+    say("✗ Hex encoding correctness test failed");
+    say("Expected: 48656c6c6f");
+    say("Got:      " + hello_hex);
+}
+
+say("\n=== Basic Tests Complete ===");

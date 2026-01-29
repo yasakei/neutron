@@ -1,0 +1,81 @@
+// Crypto module XOR cipher tests
+use crypto;
+
+say("=== Crypto XOR Cipher Tests ===");
+
+// Test basic XOR encryption/decryption
+say("\n--- XOR Cipher Tests ---");
+var plaintext = "Hello, World!";
+var key = "secret";
+
+var encrypted = crypto.xor_cipher(plaintext, key);
+var decrypted = crypto.xor_cipher(encrypted, key);
+
+say("Plaintext:  " + plaintext);
+say("Key:        " + key);
+say("Encrypted:  " + crypto.hex_encode(encrypted));
+say("Decrypted:  " + decrypted);
+
+if (plaintext == decrypted) {
+    say("✓ XOR cipher encrypt/decrypt test passed");
+} else {
+    say("✗ XOR cipher encrypt/decrypt test failed");
+}
+
+// Test with different key lengths
+var short_key = "x";
+var long_key = "this_is_a_very_long_key_for_testing";
+
+var enc_short = crypto.xor_cipher(plaintext, short_key);
+var dec_short = crypto.xor_cipher(enc_short, short_key);
+
+var enc_long = crypto.xor_cipher(plaintext, long_key);
+var dec_long = crypto.xor_cipher(enc_long, long_key);
+
+if (plaintext == dec_short) {
+    say("✓ XOR cipher with short key test passed");
+} else {
+    say("✗ XOR cipher with short key test failed");
+}
+
+if (plaintext == dec_long) {
+    say("✓ XOR cipher with long key test passed");
+} else {
+    say("✗ XOR cipher with long key test failed");
+}
+
+// Test XOR properties (A XOR B XOR B = A)
+var test_data = "Test data for XOR properties";
+var test_key = "testkey";
+
+var step1 = crypto.xor_cipher(test_data, test_key);
+var step2 = crypto.xor_cipher(step1, test_key);
+
+if (test_data == step2) {
+    say("✓ XOR cipher mathematical property test passed");
+} else {
+    say("✗ XOR cipher mathematical property test failed");
+}
+
+// Test empty string
+var empty_enc = crypto.xor_cipher("", key);
+var empty_dec = crypto.xor_cipher(empty_enc, key);
+
+if (empty_dec == "") {
+    say("✓ XOR cipher empty string test passed");
+} else {
+    say("✗ XOR cipher empty string test failed");
+}
+
+// Test single character
+var single_char = "A";
+var single_enc = crypto.xor_cipher(single_char, key);
+var single_dec = crypto.xor_cipher(single_enc, key);
+
+if (single_char == single_dec) {
+    say("✓ XOR cipher single character test passed");
+} else {
+    say("✗ XOR cipher single character test failed");
+}
+
+say("\n=== XOR Cipher Tests Complete ===");

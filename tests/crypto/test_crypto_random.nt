@@ -1,0 +1,87 @@
+// Crypto module random generation tests
+use crypto;
+
+say("=== Crypto Random Generation Tests ===");
+
+// Test random bytes generation
+say("\n--- Random Bytes Tests ---");
+var random_bytes_8 = crypto.random_bytes(8);
+var random_bytes_16 = crypto.random_bytes(16);
+var random_bytes_32 = crypto.random_bytes(32);
+
+say("8 bytes:  " + random_bytes_8);
+say("16 bytes: " + random_bytes_16);
+say("32 bytes: " + random_bytes_32);
+
+// Check lengths (hex encoded, so 2 chars per byte)
+if (random_bytes_8.length == 16) {
+    say("✓ 8-byte random generation length correct");
+} else {
+    say("✗ 8-byte random generation length incorrect: " + random_bytes_8.length);
+}
+
+if (random_bytes_16.length == 32) {
+    say("✓ 16-byte random generation length correct");
+} else {
+    say("✗ 16-byte random generation length incorrect: " + random_bytes_16.length);
+}
+
+if (random_bytes_32.length == 64) {
+    say("✓ 32-byte random generation length correct");
+} else {
+    say("✗ 32-byte random generation length incorrect: " + random_bytes_32.length);
+}
+
+// Test that consecutive calls produce different results
+var rand1 = crypto.random_bytes(16);
+var rand2 = crypto.random_bytes(16);
+if (rand1 != rand2) {
+    say("✓ Random bytes are different between calls");
+} else {
+    say("✗ Random bytes are identical (very unlikely!)");
+}
+
+// Test random string generation
+say("\n--- Random String Tests ---");
+var random_str_10 = crypto.random_string(10);
+var random_str_20 = crypto.random_string(20);
+
+say("10 chars: " + random_str_10);
+say("20 chars: " + random_str_20);
+
+if (random_str_10.length == 10) {
+    say("✓ 10-character random string length correct");
+} else {
+    say("✗ 10-character random string length incorrect: " + random_str_10.length);
+}
+
+if (random_str_20.length == 20) {
+    say("✓ 20-character random string length correct");
+} else {
+    say("✗ 20-character random string length incorrect: " + random_str_20.length);
+}
+
+// Test custom charset
+var custom_str = crypto.random_string(10, "ABC123");
+say("Custom charset (ABC123): " + custom_str);
+
+// Verify all characters are from the custom charset
+var valid_chars = true;
+// For now, just check that we got a string of the right length
+// Character-by-character validation would need substring method
+if (custom_str.length == 10) {
+    say("✓ Custom charset random string test passed (length check)");
+} else {
+    say("✗ Custom charset random string test failed (wrong length)");
+}
+
+// Test that random strings are different
+var str1 = crypto.random_string(16);
+var str2 = crypto.random_string(16);
+if (str1 != str2) {
+    say("✓ Random strings are different between calls");
+} else {
+    say("✗ Random strings are identical (very unlikely!)");
+}
+
+say("\n=== Random Generation Tests Complete ===");
