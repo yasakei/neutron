@@ -715,7 +715,30 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
         {"receive", "Receive message"},
         {"self", "Get current process"},
         {"is_alive", "Check if process is alive"},
-        {"kill", "Kill process"}}}};
+        {"kill", "Kill process"}}},
+      {"crypto",
+       {{"base64_encode", "Encode string to Base64"},
+        {"base64_decode", "Decode Base64 string"},
+        {"sha256", "Calculate SHA-256 hash"},
+        {"hex_encode", "Encode string to hexadecimal"},
+        {"hex_decode", "Decode hexadecimal string"},
+        {"random_bytes", "Generate random bytes"},
+        {"random_string", "Generate random string"},
+        {"xor_cipher", "XOR cipher encryption/decryption"}}},
+      {"path",
+       {{"join", "Join path segments"},
+        {"split", "Split path into directory and filename"},
+        {"dirname", "Get directory portion of path"},
+        {"basename", "Get filename portion of path"},
+        {"extname", "Get file extension"},
+        {"isabs", "Check if path is absolute"},
+        {"normalize", "Normalize path"},
+        {"resolve", "Convert to absolute path"},
+        {"relative", "Get relative path between two paths"},
+        {"toUnix", "Convert to Unix-style path"},
+        {"toWindows", "Convert to Windows-style path"},
+        {"sep", "Platform path separator"},
+        {"delimiter", "Platform path delimiter"}}}};
 
   // Check if the dot context is a known imported module
   bool isModuleCompletion = false;
@@ -993,7 +1016,8 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
 
   // Built-in modules (always suggest for use statements)
   const char *modules[] = {"sys",  "json", "math",  "fmt",   "arrays",
-                           "time", "http", "regex", "async", "process"};
+                           "time", "http", "regex", "async", "process",
+                           "crypto", "path"};
   for (const char *m : modules) {
     Json::Value item;
     set(item, "label") = m;

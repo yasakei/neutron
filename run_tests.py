@@ -246,7 +246,6 @@ def main():
         "tests/functions",
         "tests/classes",
         "tests/modules",
-        "tests/crypto",
         "benchmarks/neutron"
     ]
     

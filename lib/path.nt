@@ -1,0 +1,5 @@
+// Path library implementation
+// This file defines the path functions that can be imported
+
+// The actual implementation is in the native C++ code
+// This is just a placeholder file to make the import work
