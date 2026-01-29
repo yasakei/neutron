@@ -23,7 +23,7 @@ def power(base, exp):
 
 # Run recursive benchmarks
 fact15 = factorial(15)
-ack = ackermann(3, 6)
+ack = ackermann(3, 4)
 pow_val = power(2, 10)
 
 print(f"Recursion: fact={fact15} ack={ack} pow={pow_val}")
