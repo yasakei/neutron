@@ -29,6 +29,7 @@
 #ifdef _WIN32
     #include <windows.h>
     #include <direct.h>
+    #include <io.h>
     #define PATH_MAX MAX_PATH
     #define getcwd _getcwd
 #else
@@ -80,11 +81,22 @@ bool is_absolute_path(const std::string& path) {
     if (path.empty()) return false;
     
 #ifdef _WIN32
-    // Windows: C:\ or \\server\share or \
-    if (path.length() >= 3 && path[1] == ':' && (path[2] == '\\' || path[2] == '/')) {
+    // Windows: C:\ or \\server\share or backslash paths
+    // Check for drive letter pattern: C:\ or C:/
+    if (path.length() >= 3 && 
+        ((path[1] == ':') && 
+         ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'))) &&
+        (path[2] == '\\' || path[2] == '/')) {
         return true;
     }
-    if (path.length() >= 2 && (path[0] == '\\' || path[0] == '/')) {
+    // Check for UNC paths: \\server or //server
+    if (path.length() >= 2 && 
+        ((path[0] == '\\' && path[1] == '\\') || 
+         (path[0] == '/' && path[1] == '/'))) {
+        return true;
+    }
+    // Check for root paths: \ or /
+    if (path[0] == '\\' || path[0] == '/') {
         return true;
     }
 #else
@@ -98,7 +110,7 @@ bool is_absolute_path(const std::string& path) {
 }
 
 // Helper function to get current working directory
-std::string get_current_directory() {
+std::string get_working_directory() {
     char buffer[PATH_MAX];
     if (getcwd(buffer, sizeof(buffer)) != nullptr) {
         return std::string(buffer);
@@ -264,6 +276,7 @@ Value path_extname(VM& vm, std::vector<Value> arguments) {
 
 // path.isabs(path) - Check if path is absolute
 Value path_isabs(VM& vm, std::vector<Value> arguments) {
+    (void)vm; // Unused parameter
     if (arguments.size() != 1) {
         throw std::runtime_error("Expected 1 argument for path.isabs().");
     }
@@ -358,7 +371,7 @@ Value path_resolve(VM& vm, std::vector<Value> arguments) {
     }
     
     // Make relative to current directory
-    std::string cwd = get_current_directory();
+    std::string cwd = get_working_directory();
     if (cwd.empty()) {
         throw std::runtime_error("Could not get current working directory.");
     }
