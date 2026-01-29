@@ -185,6 +185,7 @@ set(NEUTRON_BUILTIN_MODULE_SOURCES
     libs/async/native.cpp
     libs/regex/native.cpp
     libs/process/native.cpp
+    libs/crypto/native.cpp
 )
 
 # All module-related sources (internal and built-in)

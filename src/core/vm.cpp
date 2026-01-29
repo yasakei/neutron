@@ -44,15 +44,16 @@
 #include <algorithm>
 
 #include "capi.h"
-#include "json/native.h"
-#include "fmt/native.h"
-#include "time/native.h"
-#include "arrays/native.h"
-#include "math/native.h"
-#include "http/native.h"
-#include "async/native.h"
-#include "regex/native.h"
-#include "process/native.h"
+#include "../libs/json/native.h"
+#include "../libs/fmt/native.h"
+#include "../libs/time/native.h"
+#include "../libs/arrays/native.h"
+#include "../libs/crypto/native.h"
+#include "../libs/math/native.h"
+#include "../libs/http/native.h"
+#include "../libs/async/native.h"
+#include "../libs/regex/native.h"
+#include "../libs/process/native.h"
 #include "modules/module_registry.h"
 #include "utils/component_interface.h"
 
@@ -2446,6 +2447,10 @@ void VM::load_module(const std::string& name) {
         return;
     } else if (name == "process") {
         neutron_init_process_module(this);
+        loadedModuleCache[name] = true;
+        return;
+    } else if (name == "crypto") {
+        neutron_init_crypto_module(this);
         loadedModuleCache[name] = true;
         return;
     }
