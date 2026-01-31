@@ -104,29 +104,49 @@ bool isTruthy(const Value& value) {
 }
 
 /**
- * @brief Reports a runtime error, produces a stack trace, and either transfers control to an in-flight handler or terminates.
- *
- * If an active exception handler that covers the current instruction is found, the VM frames are unwound to that handler
- * and a VMException is thrown to resume execution in the VM's run loop. If no handler is found, the error and stack trace
- * are reported and the process is terminated.
- *
- * @param vm The VM instance where the error occurred.
- * @param message The error message to report.
- * @param line Optional source line number to use as the error location; if -1 the line is inferred from the stack trace.
- *
- * @throws VMException When a matching in-flight exception handler is located; used to transfer control back into the VM.
+ * Runtime Error Handler with Exception Frame Support
+ * 
+ * This function handles runtime errors in the Neutron VM with sophisticated
+ * exception handling capabilities similar to try-catch in other languages.
+ * 
+ * Error Handling Flow:
+ * 1. Search for active exception handlers covering the current instruction
+ * 2. If handler found: unwind call stack and transfer control to handler
+ * 3. If no handler found: print stack trace and terminate program
+ * 
+ * Exception Frame Search Algorithm:
+ * - Iterate through exception frames in reverse order (most recent first)
+ * - For each handler, locate its owning call frame via frameBase matching
+ * - Calculate current instruction position relative to handler's try block
+ * - If position falls within [tryStart, tryEnd], handler is applicable
+ * 
+ * Stack Unwinding Process:
+ * - Pop all frames above the handler's frame
+ * - Remove exception frames that are no longer active
+ * - Throw VMException to return control to VM run loop
+ * - Handler's catch block will execute at the specified IP
+ * 
+ * @param vm The VM instance where the error occurred
+ * @param message Error message describing what went wrong
+ * @param line Optional source line number for error location (defaults to -1)
+ * @throws VMException When a matching handler is found (for control flow)
+ * @note This function never returns normally; it either throws or exits
  */
 [[noreturn]] void runtimeError(VM* vm, const std::string& message, int line = -1) {
-    // Check if there is an active exception handler that covers the current instruction
-    // We need to search up the call stack
-    
-    // Iterate exception frames backwards (most recent first)
+    /*
+     * Phase 1: Search for applicable exception handlers
+     * Walk backwards through exception frames to find the most recent handler
+     * that covers the current instruction position.
+     */
     for (size_t idx = vm->exceptionFrames.size(); idx > 0; idx--) {
         size_t i = idx - 1;
         VM::ExceptionFrame& handler = vm->exceptionFrames[i];
         
-        // Find the call frame that owns this handler
-        // The handler belongs to the frame where frame->slot_offset == handler.frameBase
+        /*
+         * Phase 2: Locate the call frame owning this exception handler
+         * Each handler is associated with a specific call frame via frameBase.
+         * The frameBase identifies the stack slot offset of the owning frame.
+         */
         CallFrame* frame = nullptr;
         size_t frameIndex = 0;
         bool foundFrame = false;
@@ -142,19 +162,20 @@ bool isTruthy(const Value& value) {
         }
         
         if (foundFrame && frame) {
-            // Calculate current position in that frame
+            /*
+             * Phase 3: Calculate current instruction position
+             * For the current frame, IP points to the next instruction.
+             * For parent frames, IP points to the return address.
+             * Subtract 1 to get the actual instruction that caused the error.
+             */
             ptrdiff_t current_pos;
             if (frame == &vm->frames.back()) {
-                // Current frame: use current IP
                 if (frame->function && frame->function->chunk) {
                     current_pos = frame->ip - frame->function->chunk->code.data() - 1;
                 } else {
                     continue;
                 }
             } else {
-                // Parent frame: IP points to return address (instruction after call)
-                // The call instruction is what we are "in".
-                // We assume the call instruction is at least 1 byte.
                 if (frame->function && frame->function->chunk) {
                     current_pos = frame->ip - frame->function->chunk->code.data() - 1;
                 } else {
@@ -162,26 +183,48 @@ bool isTruthy(const Value& value) {
                 }
             }
             
+            /*
+             * Phase 4: Check if current position is within handler's try block
+             * The handler is applicable if current_pos falls in [tryStart, tryEnd].
+             */
             if (current_pos >= handler.tryStart && current_pos <= handler.tryEnd) {
-                // Found a handler!
-                
-                // Unwind stack to this frame
-                // We need to pop frames until this frame is the top one
+                /*
+                 * Phase 5: Unwind call stack to handler's frame
+                 * Remove all frames pushed after the handler's frame was created.
+                 * This simulates the stack unwinding that occurs during exception handling.
+                 */
                 while (vm->frames.size() > (size_t)frameIndex + 1) {
                     vm->frames.pop_back();
                 }
                 
-                // Unwind exception frames
-                // Keep handlers up to this one (inclusive)
+                /*
+                 * Phase 6: Clean up exception frames
+                 * Keep only the exception frames up to and including the handler we found.
+                 * This removes any nested exception handlers that are no longer active.
+                 */
                 vm->exceptionFrames.resize(i + 1);
                 
-                // Throw VMException to be caught in VM::run
+                /*
+                 * Phase 7: Transfer control to exception handler
+                 * Throw VMException to break out of current execution and return to VM::run.
+                 * The VM will catch this and jump to the handler's catch block IP.
+                 */
                 throw VMException(Value(message));
             }
         }
     }
 
-    // Build stack trace
+    /*
+     * No Exception Handler Found - Build Stack Trace for Error Report
+     * 
+     * When no handler is found, we generate a detailed stack trace showing:
+     * - Function names and their source locations
+     * - Call chain from innermost (most recent) to outermost frame
+     * - Line numbers where each call occurred
+     * 
+     * This information helps developers debug runtime errors by showing
+     * the exact execution path that led to the failure.
+     */
     std::vector<StackFrame> stackTrace;
     
     for (auto it = vm->frames.rbegin(); it != vm->frames.rend(); ++it) {
@@ -1735,6 +1778,28 @@ void VM::run(size_t minFrameDepth) {
                 value.as.number = -value.as.number;
                 DISPATCH();
             }
+            /*
+             * Bitwise Operations Suite:
+             * These operations treat doubles as int64_t for bitwise manipulation.
+             * All bitwise operations follow this pattern:
+             * 1. Extract operands from stack
+             * 2. Validate both are numbers
+             * 3. Convert double -> int64_t
+             * 4. Perform bitwise operation
+             * 5. Convert result back to double
+             * 6. Store in place of left operand, pop right operand
+             * 
+             * Supported operations:
+             * - AND (&): Bitwise conjunction
+             * - OR (|): Bitwise disjunction  
+             * - XOR (^): Bitwise exclusive or
+             * - NOT (~): Bitwise complement (unary)
+             * - LEFT_SHIFT (<<): Shift bits left
+             * - RIGHT_SHIFT (>>): Arithmetic right shift
+             * 
+             * Note: Neutron uses doubles for all numbers, so we cast to/from int64_t
+             * for bitwise operations, preserving integer semantics within floating point.
+             */
             CASE(OP_BITWISE_AND) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];

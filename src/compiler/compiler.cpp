@@ -214,56 +214,72 @@ void Compiler::visitUnaryExpr(const UnaryExpr* expr) {
 }
 
 void Compiler::visitBinaryExpr(const BinaryExpr* expr) {
-    // Update current line from operator token
     currentLine = expr->op.line;
     
-    // Handle logical operators separately (short-circuit evaluation)
+    /*
+     * Logical operators (AND, OR) require special handling for short-circuit evaluation.
+     * Unlike regular operators, these don't always evaluate both operands.
+     */
     if (expr->op.type == TokenType::AND) {
-        // Short-circuit AND: evaluate left, if falsy return left, else return right
+        /*
+         * Short-circuit AND semantics: (left AND right)
+         * - Evaluate left operand first
+         * - If left is falsy, return left immediately without evaluating right
+         * - If left is truthy, evaluate and return right
+         * 
+         * Stack manipulation strategy:
+         * 1. Evaluate left and duplicate it for testing
+         * 2. Jump if duplicate is falsy (preserves original left as result)
+         * 3. If truthy path: pop left, evaluate right (right becomes result)
+         * 4. Both paths converge with correct result on stack
+         */
         compileExpression(expr->left.get());
-        emitByte((uint8_t)OpCode::OP_DUP);  // Duplicate left to keep original as potential result
-        int jumpToRight = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE); // Jump if duplicate is falsy (original is falsy)
+        emitByte((uint8_t)OpCode::OP_DUP);
+        int jumpToRight = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE);
         
-        // If we reach here, original left was truthy (duplicate was truthy, so no jump)
-        // Stack has original left value since OP_JUMP_IF_FALSE popped the duplicate
-        emitByte((uint8_t)OpCode::OP_POP);  // Pop the original left value
-        compileExpression(expr->right.get());  // Evaluate right as result
+        emitByte((uint8_t)OpCode::OP_POP);
+        compileExpression(expr->right.get());
         
-        int skipFalsy = emitJump((uint8_t)OpCode::OP_JUMP);  // Skip the falsy case
+        int skipFalsy = emitJump((uint8_t)OpCode::OP_JUMP);
         
-        // When original left was falsy, we jump here
         patchJump(jumpToRight);
-        // Stack has original falsy left value (since OP_JUMP_IF_FALSE popped the duplicate)
-        // That's our result when left is falsy - no additional operation needed
-        
-        patchJump(skipFalsy);  // End of both paths
+        patchJump(skipFalsy);
         return;
     }
     
     if (expr->op.type == TokenType::OR) {
-        // Short-circuit OR: evaluate left, if truthy return left, else return right
+        /*
+         * Short-circuit OR semantics: (left OR right)
+         * - Evaluate left operand first
+         * - If left is truthy, return left immediately without evaluating right
+         * - If left is falsy, evaluate and return right
+         * 
+         * Stack manipulation strategy:
+         * 1. Evaluate left and duplicate it
+         * 2. NOT the duplicate to invert truthiness test
+         * 3. Jump if NOT(duplicate) is falsy, meaning original was truthy
+         * 4. If falsy path: pop left, evaluate right (right becomes result)
+         * 5. Both paths converge with correct result on stack
+         */
         compileExpression(expr->left.get());
-        emitByte((uint8_t)OpCode::OP_DUP);  // Duplicate to preserve original value
-        emitByte((uint8_t)OpCode::OP_NOT);  // NOT the duplicate
-        int jumpToRight = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE); // Jump if (NOT left) is falsy, i.e., if original left is truthy
+        emitByte((uint8_t)OpCode::OP_DUP);
+        emitByte((uint8_t)OpCode::OP_NOT);
+        int jumpToRight = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE);
         
-        // If we reach here, original left was falsy (so we continue execution)
-        // Stack has original falsy left value
-        emitByte((uint8_t)OpCode::OP_POP);  // Pop the original falsy left 
-        compileExpression(expr->right.get()); // Evaluate right as result
+        emitByte((uint8_t)OpCode::OP_POP);
+        compileExpression(expr->right.get());
         
-        int skipRight = emitJump((uint8_t)OpCode::OP_JUMP); // Skip to end
+        int skipRight = emitJump((uint8_t)OpCode::OP_JUMP);
         
-        // When the jump happens (original left was truthy)
         patchJump(jumpToRight);
-        // Stack has original truthy left value (since OP_JUMP_IF_FALSE popped the NOT'd duplicate)
-        // No additional operation needed, original truthy left is already result
-        
-        patchJump(skipRight); // End of both paths
+        patchJump(skipRight);
         return;
     }
     
-    // For non-logical operators, compile normally
+    /*
+     * For non-logical binary operators (arithmetic, comparison, bitwise):
+     * Always evaluate both operands in left-to-right order, then apply the operator.
+     */
     compileExpression(expr->left.get());
     compileExpression(expr->right.get());
 
@@ -302,36 +318,40 @@ void Compiler::visitVariableExpr(const VariableExpr* expr) {
 }
 
 void Compiler::visitAssignExpr(const AssignExpr* expr) {
-    // Check if trying to assign to a static variable (tracked in VM for REPL persistence)
+    /*
+     * Static variable immutability check:
+     * Static variables are declared once in REPL sessions and persist across runs.
+     * They cannot be reassigned to maintain REPL state consistency.
+     */
     if (vm.staticVariables.count(expr->name.lexeme)) {
         std::string errorMsg = "Cannot assign to static variable '" + expr->name.lexeme + "'. Static variables are immutable.";
         ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, expr->name.line);
         exit(1);
     }
     
-    // Check if the variable has a type annotation
+    /*
+     * Type-safe assignment implementation:
+     * For variables with type annotations, we use special typed assignment opcodes
+     * that perform runtime type checking to ensure type safety.
+     */
     int arg = resolveLocal(expr->name);
     if (arg != -1) {
-        // It's a local variable, check if it has a type annotation
         if (locals[arg].typeAnnotation.has_value()) {
             Token typeAnnotation = locals[arg].typeAnnotation.value();
-            // Emit the value first
             compileExpression(expr->value.get());
-            // Then emit the type-safe assignment instruction with the expected type
             emitBytes((uint8_t)OpCode::OP_SET_LOCAL_TYPED, arg);
             emitByte((uint8_t)typeAnnotation.type);
         } else {
-            // No type annotation, use regular assignment
             compileExpression(expr->value.get());
             emitBytes((uint8_t)OpCode::OP_SET_LOCAL, arg);
         }
     } else {
-        // For global variables, check if they have a type annotation stored in the VM
-        // The VM tracks global variable types in the globalTypes map
+        /*
+         * Global variables always use typed assignment for flexibility:
+         * The VM maintains a globalTypes map to track type annotations at runtime,
+         * allowing type checking even for globals declared in different compilation units.
+         */
         compileExpression(expr->value.get());
-        
-        // Always use the type-safe assignment for globals, which will check against
-        // stored type information at runtime (if any exists)
         emitBytes((uint8_t)OpCode::OP_SET_GLOBAL_TYPED, makeConstant(Value(vm.internString(expr->name.lexeme))));
     }
 }
@@ -347,11 +367,14 @@ void Compiler::visitSayStmt(const SayStmt* stmt) {
 }
 
 void Compiler::visitVarStmt(const VarStmt* stmt) {
-    // Update current line from variable name token
     currentLine = stmt->name.line;
     
     if (scopeDepth > 0) {
-        // Local variable
+        /*
+         * Local variable duplicate declaration check:
+         * Scan existing locals in the current scope to prevent shadowing.
+         * We iterate backwards and stop when we reach a deeper scope level.
+         */
         for (int i = locals.size() - 1; i >= 0; i--) {
             Local& local = locals[i];
             if (local.depth != -1 && local.depth < scopeDepth) {
@@ -365,9 +388,13 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
             }
         }
 
-        // Check if we're in a safe block and emit validation instruction
+        /*
+         * Safe block variable validation:
+         * In safe blocks (sandboxed code execution), untyped variables require
+         * runtime validation to prevent potential security issues.
+         * Safe files have stricter validation than inline safe blocks.
+         */
         if (inSafeBlock && !stmt->typeAnnotation.has_value()) {
-            // Emit validation instruction that will be executed at runtime
             if (isSafeFile) {
                 emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE, makeConstant(Value(vm.internString(stmt->name.lexeme))));
             } else {
@@ -375,17 +402,19 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
             }
         }
 
-        // Perform compile-time type checking if type annotation exists
+        /*
+         * Compile-time type checking:
+         * When a type annotation is present and there's an initializer,
+         * validate type compatibility at compile time to catch errors early.
+         * NIL values are treated as compatible with any type for initialization.
+         */
         if (stmt->typeAnnotation.has_value() && stmt->initializer) {
             ValueType exprType = getExpressionType(stmt->initializer.get());
-            // Debug: Print what we're checking
             std::string expectedType = tokenTypeToString(stmt->typeAnnotation.value().type);
             std::string actualType = valueTypeToString(exprType);
-            // For debugging, check if we have a type mismatch case
             if (exprType != ValueType::NIL) {
                 bool isValid = validateType(stmt->typeAnnotation, exprType);
                 if (!isValid) {
-                    // Type mismatch - throw an error to enforce type safety
                     throw std::runtime_error("Type mismatch on line " + std::to_string(stmt->name.line) + 
                                              ": Cannot assign value of type '" + actualType + 
                                              "' to variable of type '" + expectedType + "'");
@@ -583,40 +612,60 @@ void Compiler::visitWhileStmt(const WhileStmt* stmt) {
 void Compiler::visitDoWhileStmt(const DoWhileStmt* stmt) {
     int loopStart = chunk->code.size();
     
-    // Push loop info for break/continue tracking
+    /*
+     * Loop control flow infrastructure:
+     * Track loop start position and maintain stacks for break/continue jump points.
+     * This allows nested loops to correctly resolve their control flow statements.
+     */
     loopStarts.push_back(loopStart);
     breakJumps.push_back(std::vector<int>());
     continueJumps.push_back(std::vector<int>());
-    continueTargets.push_back(-1); // Will be set later
+    continueTargets.push_back(-1);
     
-    // Compile body
     compileStatement(stmt->body.get());
     
-    // Set continue target (before condition)
+    /*
+     * Continue target setup:
+     * In do-while loops, continue should jump to the condition check,
+     * not the start of the body (which would skip condition evaluation).
+     */
     int continueTarget = chunk->code.size();
     continueTargets.back() = continueTarget;
     
-    // Compile condition
     compileExpression(stmt->condition.get());
     
-    // If true, jump back to loopStart
-    // We use OP_JUMP_IF_FALSE to exit, and OP_LOOP to repeat
+    /*
+     * Loop continuation logic:
+     * OP_JUMP_IF_FALSE exits the loop when condition is falsy.
+     * OP_LOOP jumps back to loop start when condition is truthy.
+     * This implements do-while semantics: body always executes at least once.
+     */
     int exitJump = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE);
     emitLoop(loopStart);
     
     patchJump(exitJump);
     
-    // Patch break jumps (jump to end)
+    /*
+     * Break statement resolution:
+     * All break statements collected during body compilation now jump to
+     * the current position (immediately after the loop).
+     */
     for (int breakJump : breakJumps.back()) {
         patchJump(breakJump);
     }
     
-    // Patch continue jumps (jump to condition check)
+    /*
+     * Continue statement resolution with manual patching:
+     * Continue jumps go to continueTarget (the condition check).
+     * We manually patch these as forward jumps using 2-byte offset encoding:
+     * - High byte: (offset >> 8) & 0xff
+     * - Low byte: offset & 0xff
+     * The -2 adjustment accounts for the 2 bytes of the jump instruction itself.
+     */
     for (int jump : continueJumps.back()) {
         int target = continueTarget;
         int offset = target - jump - 2;
         
-        // Forward jump
         chunk->code[jump] = (offset >> 8) & 0xff;
         chunk->code[jump + 1] = offset & 0xff;
     }
