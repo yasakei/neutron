@@ -1,0 +1,212 @@
+// Comprehensive random module tests
+use random;
+use math;
+
+say("=== Random Module Tests ===");
+
+var test_count = 0;
+var pass_count = 0;
+
+// Helper function to run tests
+fun test(description, test_func) {
+    test_count = test_count + 1;
+    try {
+        var result = test_func();
+        if (result) {
+            say("✓ " + description);
+            pass_count = pass_count + 1;
+        } else {
+            say("✗ " + description + " (assertion failed)");
+        }
+    } catch (e) {
+        say("✗ " + description + " (error: " + e + ")");
+    }
+}
+
+// Test basic random() function
+test("random() returns value between 0.0 and 1.0", fun() {
+    var r1 = random.random();
+    var r2 = random.random();
+    return (r1 >= 0.0 && r1 < 1.0) && (r2 >= 0.0 && r2 < 1.0) && (r1 != r2);
+});
+
+// Test uniform(a, b)
+test("uniform() returns value in range", fun() {
+    var u1 = random.uniform(5.0, 10.0);
+    var u2 = random.uniform(10.0, 5.0); // Swapped arguments
+    return (u1 >= 5.0 && u1 <= 10.0) && (u2 >= 5.0 && u2 <= 10.0);
+});
+
+// Test randint(a, b)
+test("randint() returns integer in range", fun() {
+    var i1 = random.randint(1, 10);
+    var i2 = random.randint(10, 1); // Swapped arguments
+    return (i1 >= 1 && i1 <= 10) && (i2 >= 1 && i2 <= 10) && 
+           (i1 == math.floor(i1)) && (i2 == math.floor(i2));
+});
+
+// Test choice(array)
+test("choice() returns element from array", fun() {
+    var arr = [1, 2, 3, 4, 5];
+    var c1 = random.choice(arr);
+    var c2 = random.choice(arr);
+    
+    // Check if c1 and c2 are in the array
+    var c1_found = false;
+    var c2_found = false;
+    for (var i = 0; i < arr.length; i++) {
+        if (arr[i] == c1) c1_found = true;
+        if (arr[i] == c2) c2_found = true;
+    }
+    
+    return c1_found && c2_found;
+});
+
+// Test shuffle(array)
+test("shuffle() preserves all elements", fun() {
+    var original = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    var to_shuffle = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    random.shuffle(to_shuffle);
+    
+    // Check that all elements are still present
+    for (var i = 0; i < original.length; i++) {
+        var found = false;
+        for (var j = 0; j < to_shuffle.length; j++) {
+            if (to_shuffle[j] == original[i]) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            return false;
+        }
+    }
+    return to_shuffle.length == original.length;
+});
+
+// Test seed() function
+test("seed() produces reproducible results", fun() {
+    random.seed(12345);
+    var s1 = random.random();
+    var s2 = random.randint(1, 100);
+    
+    random.seed(12345); // Reset to same seed
+    var s3 = random.random();
+    var s4 = random.randint(1, 100);
+    
+    return (s1 == s3) && (s2 == s4);
+});
+
+// Test gauss(mu, sigma)
+test("gauss() returns numbers from normal distribution", fun() {
+    var g1 = random.gauss(0.0, 1.0);
+    var g2 = random.gauss(10.0, 2.0);
+    
+    // Test multiple values to check they're in reasonable range
+    var within_range = 0;
+    for (var i = 0; i < 50; i++) {
+        var val = random.gauss(0.0, 1.0);
+        if (val >= -3.0 && val <= 3.0) {
+            within_range++;
+        }
+    }
+    
+    return (g1 != nil) && (g2 != nil) && (within_range >= 45);
+});
+
+// Test expovariate(lambd)
+test("expovariate() returns non-negative values", fun() {
+    var e1 = random.expovariate(1.0);
+    var e2 = random.expovariate(2.0);
+    return (e1 != nil) && (e2 != nil) && 
+           (e1 >= 0.0) && (e2 >= 0.0);
+});
+
+// Test triangular(low, high, mode)
+test("triangular() returns value in range", fun() {
+    var t1 = random.triangular(0.0, 10.0, 5.0);
+    var t2 = random.triangular(1.0, 5.0, 2.0);
+    return (t1 != nil) && (t2 != nil) &&
+           (t1 >= 0.0 && t1 <= 10.0) && (t2 >= 1.0 && t2 <= 5.0);
+});
+
+// Test sample(array, k)
+test("sample() returns correct number of unique elements", fun() {
+    var sample_arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    var sample1 = random.sample(sample_arr, 3);
+    var sample2 = random.sample(sample_arr, 5);
+    
+    // Check correct lengths
+    if (sample1.length != 3 || sample2.length != 5) {
+        return false;
+    }
+    
+    // Check no duplicates in sample1 (simple check)
+    if (sample1[0] == sample1[1] || sample1[0] == sample1[2] || sample1[1] == sample1[2]) {
+        return false;
+    }
+    
+    return true;
+});
+
+// Test getrandbits(k)
+test("getrandbits() returns integers in correct range", fun() {
+    var bits1 = random.getrandbits(8);
+    var bits2 = random.getrandbits(16);
+    var bits3 = random.getrandbits(1);
+    
+    return (bits1 != nil) && (bits2 != nil) && 
+           (bits3 != nil) &&
+           (bits1 >= 0 && bits1 < 256) && 
+           (bits2 >= 0 && bits2 < 65536) &&
+           (bits3 >= 0 && bits3 < 2) &&
+           (bits1 == math.floor(bits1)) && 
+           (bits2 == math.floor(bits2)) && 
+           (bits3 == math.floor(bits3));
+});
+
+// Test error cases
+test("error handling for invalid arguments", fun() {
+    try {
+        random.uniform("invalid", 5.0);
+        return false; // Should have thrown error
+    } catch (e) {
+        // Expected
+    }
+    
+    try {
+        random.choice([]);
+        return false; // Should have thrown error
+    } catch (e) {
+        // Expected
+    }
+    
+    try {
+        random.gauss(0.0, -1.0);
+        return false; // Should have thrown error
+    } catch (e) {
+        // Expected
+    }
+    
+    try {
+        random.sample([1, 2, 3], 5);
+        return false; // Should have thrown error
+    } catch (e) {
+        // Expected
+    }
+    
+    return true;
+});
+
+// Print summary
+say("");
+say("Random Module Test Summary:");
+say("Tests run: " + test_count);
+say("Tests passed: " + pass_count);
+say("Tests failed: " + (test_count - pass_count));
+
+if (pass_count == test_count) {
+    say("✓ All random module tests passed! 🎲");
+} else {
+    say("✗ Some tests failed.");
+}

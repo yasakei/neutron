@@ -187,6 +187,7 @@ set(NEUTRON_BUILTIN_MODULE_SOURCES
     libs/process/native.cpp
     libs/crypto/native.cpp
     libs/path/native.cpp
+    libs/random/native.cpp
 )
 
 # All module-related sources (internal and built-in)

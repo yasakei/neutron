@@ -738,7 +738,19 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
         {"toUnix", "Convert to Unix-style path"},
         {"toWindows", "Convert to Windows-style path"},
         {"sep", "Platform path separator"},
-        {"delimiter", "Platform path delimiter"}}}};
+        {"delimiter", "Platform path delimiter"}}},
+      {"random",
+       {{"random", "Generate random float between 0.0 and 1.0"},
+        {"uniform", "Generate random float between a and b"},
+        {"randint", "Generate random integer between a and b (inclusive)"},
+        {"choice", "Choose random element from array"},
+        {"shuffle", "Shuffle array in-place"},
+        {"sample", "Get k random elements without replacement"},
+        {"seed", "Set random seed (optional argument)"},
+        {"gauss", "Generate random number from Gaussian distribution"},
+        {"expovariate", "Generate random number from exponential distribution"},
+        {"triangular", "Generate random number from triangular distribution"},
+        {"getrandbits", "Generate random integer with k random bits"}}}};
 
   // Check if the dot context is a known imported module
   bool isModuleCompletion = false;
@@ -1017,7 +1029,7 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
   // Built-in modules (always suggest for use statements)
   const char *modules[] = {"sys",  "json", "math",  "fmt",   "arrays",
                            "time", "http", "regex", "async", "process",
-                           "crypto", "path"};
+                           "crypto", "path", "random"};
   for (const char *m : modules) {
     Json::Value item;
     set(item, "label") = m;
