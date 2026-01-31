@@ -256,11 +256,27 @@ void Scanner::string(char quote) {
     while (peek() != quote && !isAtEnd()) {
         if (peek() == '\n') line++;
         
-        // Check for string interpolation ${...}
+        /*
+         * String Interpolation: ${expression}
+         * 
+         * Neutron supports inline expression evaluation within strings:
+         *   "Hello ${name}!"
+         *   "Sum: ${a + b}"
+         * 
+         * Implementation Strategy:
+         * 1. Split string into chunks at ${} boundaries
+         * 2. String chunks become STRING tokens
+         * 3. Expression chunks become token sequences wrapped in parentheses
+         * 4. Parser reconstructs interpolated strings from chunks
+         * 
+         * Brace Balancing:
+         * We track brace depth to handle nested braces in expressions:
+         *   "Result: ${obj.method({ a: 1 })}" 
+         * This ensures we don't prematurely close on inner braces.
+         */
         if (peek() == '$' && peekNext() == '{') {
             hasInterpolation = true;
             
-            // Add the string part before interpolation as a chunk
             if (!value.empty()) {
                 std::vector<Token> stringChunk;
                 stringChunk.push_back(Token(TokenType::STRING, value, line));
@@ -268,11 +284,9 @@ void Scanner::string(char quote) {
                 value.clear();
             }
             
-            // Skip ${
             advance();
             advance();
             
-            // Scan the expression inside ${}
             int braceDepth = 1;
             int exprStart = current;
             
@@ -291,19 +305,21 @@ void Scanner::string(char quote) {
                 exit(1);
             }
             
-            // Extract and scan the expression
             std::string expr = source.substr(exprStart, current - exprStart);
             
-            // Create a sub-scanner for the expression
+            /*
+             * Sub-scanner for interpolated expressions:
+             * We create a separate scanner instance to tokenize the expression.
+             * This allows complex expressions with operators, calls, etc.
+             * The tokens are wrapped in parentheses to maintain proper precedence.
+             */
             Scanner exprScanner(expr);
             std::vector<Token> exprTokens = exprScanner.scanTokens();
             
-            // Remove the EOF token from expression
             if (!exprTokens.empty() && exprTokens.back().type == TokenType::END_OF_FILE) {
                 exprTokens.pop_back();
             }
             
-            // Add expression tokens wrapped in parentheses as a chunk
             std::vector<Token> exprChunk;
             exprChunk.push_back(Token(TokenType::LEFT_PAREN, "(", line));
             for (const auto& token : exprTokens) {
@@ -312,12 +328,27 @@ void Scanner::string(char quote) {
             exprChunk.push_back(Token(TokenType::RIGHT_PAREN, ")", line));
             chunks.push_back(exprChunk);
             
-            // Skip the closing }
             advance();
             
         } else if (peek() == '\\') {
-            // Handle escape sequences
-            advance(); // Skip the backslash
+            /*
+             * Escape Sequence Processing:
+             * 
+             * Standard Escapes:
+             * \n, \t, \r, \\, \", \', \a, \b, \f, \v - Single character escapes
+             * 
+             * Unicode Escapes:
+             * \uXXXX - 4-digit hex for Basic Multilingual Plane (U+0000 to U+FFFF)
+             * \UXXXXXXXX - 8-digit hex for full Unicode range (U+00000000 to U+10FFFF)
+             * 
+             * UTF-8 Encoding:
+             * Unicode codepoints are encoded into UTF-8 byte sequences:
+             * - 1 byte: 0x00-0x7F (ASCII)
+             * - 2 bytes: 0x80-0x7FF
+             * - 3 bytes: 0x800-0xFFFF
+             * - 4 bytes: 0x10000-0x10FFFF
+             */
+            advance();
             if (!isAtEnd()) {
                 char escaped = advance();
                 switch (escaped) {

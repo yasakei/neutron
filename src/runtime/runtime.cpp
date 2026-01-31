@@ -43,12 +43,18 @@
 
 namespace neutron {
 
-// Helper to check if a value is "truthy"
-
-
-
-
-
+/*
+ * NativeFn - Native Function Wrapper
+ * 
+ * Provides a unified interface for calling C++ functions from Neutron code.
+ * Supports two modes:
+ * 1. Simple functions: Take only arguments, return a value
+ * 2. VM-aware functions: Also receive VM reference for advanced operations
+ * 
+ * This allows native extensions to interact with the VM state when needed
+ * (e.g., for memory allocation, accessing globals) while keeping simple
+ * functions lightweight and portable.
+ */
 
 NativeFn::NativeFn(NativeFnPtr function, int arity) : function(std::move(function)), _arity(arity), _needsVM(false) {}
 
@@ -70,6 +76,20 @@ std::string NativeFn::toString() const {
     return "<native fn>";
 }
 
+/*
+ * BoundMethod - Method-Receiver Binding
+ * 
+ * Represents a method bound to a specific instance (the receiver).
+ * When a method is accessed on an object, it becomes a bound method
+ * that remembers both the method implementation and the instance.
+ * 
+ * Example in Neutron:
+ *   obj.method()  // Creates BoundMethod(obj, method_function)
+ * 
+ * This ensures 'this' (or 'self') refers to the correct object when
+ * the method is called, even if passed around as a first-class value.
+ */
+
 BoundMethod::BoundMethod(Value receiver, Function* method) 
     : receiver(receiver), method(method) {}
 
@@ -78,14 +98,31 @@ int BoundMethod::arity() {
 }
 
 Value BoundMethod::call(VM& vm, std::vector<Value> arguments) {
-    // This shouldn't be called directly - the VM's callValue handles BoundMethod
-    // But if it is, just delegate to the underlying method
+    /*
+     * Delegation to underlying method:
+     * The VM's callValue handles BoundMethod specially by setting up
+     * the receiver in the call frame. This fallback exists for edge cases
+     * but shouldn't typically be reached during normal execution.
+     */
     return method->call(vm, arguments);
 }
 
 std::string BoundMethod::toString() const {
     return "<bound method>";
 }
+
+/*
+ * Class - Object-Oriented Programming Support
+ * 
+ * Represents a class definition in Neutron, serving as:
+ * 1. A blueprint for creating instances
+ * 2. A namespace for class-level methods and fields
+ * 3. A callable that constructs new instances
+ * 
+ * Classes can have an associated environment (class_env) that stores
+ * class-level variables and methods, supporting inheritance and
+ * method resolution.
+ */
 
 Class::Class(const std::string& name)
     : name(name), class_env(nullptr) {}
@@ -94,13 +131,21 @@ Class::Class(const std::string& name, std::shared_ptr<Environment> class_env)
     : name(name), class_env(class_env) {}
 
 int Class::arity() {
-    // For now, return 0 - the constructor implementation would define this properly
+    /*
+     * Default constructor arity:
+     * Currently returns 0 (no-arg constructor). In a full implementation,
+     * this would be determined by the constructor method's arity if defined.
+     */
     return 0;
 }
 
 Value Class::call(VM& vm, std::vector<Value> arguments) {
-    (void)arguments; // Unused parameter
-    // Create a new instance of this class
+    (void)arguments;
+    /*
+     * Instance creation:
+     * Calling a class constructs a new instance using the VM's allocator.
+     * The allocator ensures proper garbage collection tracking.
+     */
     Instance* instance = vm.allocate<Instance>(this);
     return Value(instance);
 }
@@ -109,9 +154,29 @@ std::string Class::toString() const {
     return name;
 }
 
+/*
+ * Instance - Object Instance with Optimized Field Storage
+ * 
+ * Implements a hybrid storage strategy for instance fields:
+ * 
+ * Inline Storage (Fast Path):
+ * - First 8 fields stored directly in the object
+ * - Zero overhead for field access
+ * - Cache-friendly memory layout
+ * - Ideal for small objects (most common case)
+ * 
+ * Overflow Storage (Flexible Path):
+ * - Additional fields stored in a hash map
+ * - Used when object has more than 8 fields
+ * - Trades some performance for unlimited fields
+ * - Allocated on-demand to save memory
+ * 
+ * This design optimizes for the common case (few fields) while
+ * gracefully handling objects with many fields.
+ */
+
 Instance::Instance(Class* klass)
     : klass(klass), inlineCount(0), overflowFields(nullptr) {
-    // Inline fields are already zero-initialized
 }
 
 Instance::~Instance() {
@@ -119,14 +184,28 @@ Instance::~Instance() {
 }
 
 Value* Instance::getField(ObjString* key) {
-    // Fast path: check inline fields first
+    /*
+     * Field Access - Two-tier Lookup Strategy
+     * 
+     * Fast Path (Inline Fields):
+     * - Linear search through first 8 fields
+     * - Very fast for small objects (common case)
+     * - O(n) but n ≤ 8, so effectively constant time
+     * - No memory allocations or hash computations
+     * 
+     * Slow Path (Overflow Map):
+     * - Hash table lookup for fields beyond the first 8
+     * - O(1) average case but with hash overhead
+     * - Only used when inline storage is full
+     * 
+     * Returns nullptr if field doesn't exist.
+     */
     for (uint8_t i = 0; i < inlineCount; ++i) {
         if (inlineFields[i].key == key) {
             return &inlineFields[i].value;
         }
     }
     
-    // Slow path: check overflow map
     if (overflowFields) {
         auto it = overflowFields->find(key);
         if (it != overflowFields->end()) {
@@ -138,7 +217,24 @@ Value* Instance::getField(ObjString* key) {
 }
 
 void Instance::setField(ObjString* key, const Value& value) {
-    // Fast path: check if key already exists in inline fields
+    /*
+     * Field Assignment - Optimized Storage Allocation
+     * 
+     * Update Strategy (Check existing fields first):
+     * 1. Search inline fields for existing key
+     * 2. Search overflow map if it exists
+     * 3. Update in-place if found (avoids allocation)
+     * 
+     * Insertion Strategy (For new fields):
+     * 1. Try inline storage if not full (< 8 fields)
+     * 2. Allocate overflow map if inline is full
+     * 3. Insert into overflow map
+     * 
+     * This ensures:
+     * - Existing fields are updated efficiently
+     * - New fields use inline storage when possible
+     * - Overflow is allocated lazily only when needed
+     */
     for (uint8_t i = 0; i < inlineCount; ++i) {
         if (inlineFields[i].key == key) {
             inlineFields[i].value = value;
@@ -146,7 +242,6 @@ void Instance::setField(ObjString* key, const Value& value) {
         }
     }
     
-    // Check overflow map if it exists
     if (overflowFields) {
         auto it = overflowFields->find(key);
         if (it != overflowFields->end()) {
@@ -155,7 +250,6 @@ void Instance::setField(ObjString* key, const Value& value) {
         }
     }
     
-    // New field - try inline first
     if (inlineCount < INLINE_FIELD_COUNT) {
         inlineFields[inlineCount].key = key;
         inlineFields[inlineCount].value = value;
@@ -163,7 +257,6 @@ void Instance::setField(ObjString* key, const Value& value) {
         return;
     }
     
-    // Overflow to hash map
     if (!overflowFields) {
         overflowFields = new std::unordered_map<ObjString*, Value, ObjStringHash, ObjStringPtrEqual>();
     }
