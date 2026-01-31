@@ -50,6 +50,7 @@
 #include "../libs/arrays/native.h"
 #include "../libs/crypto/native.h"
 #include "../libs/path/native.h"
+#include "../libs/random/native.h"
 #include "../libs/math/native.h"
 #include "../libs/http/native.h"
 #include "../libs/async/native.h"
@@ -2456,6 +2457,10 @@ void VM::load_module(const std::string& name) {
         return;
     } else if (name == "path") {
         neutron_init_path_module(this);
+        loadedModuleCache[name] = true;
+        return;
+    } else if (name == "random") {
+        neutron_init_random_module(this);
         loadedModuleCache[name] = true;
         return;
     }
