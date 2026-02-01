@@ -510,7 +510,7 @@ We welcome contributions from the community! Whether it's bug fixes, new feature
 
 ## License
 
-Neutron is distributed under the **Neutron Public License 1.0**.
+Neutron is distributed under the **Neutron Permissive License (NPL) 1.1**.
 
 See [LICENSE](LICENSE) for complete terms and conditions.
 

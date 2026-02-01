@@ -2,7 +2,7 @@
  * Neutron Programming Language - Project Configuration
  * Copyright (c) 2026 yasakei
  * 
- * This software is distributed under the Neutron Public License 1.0.
+ * This software is distributed under the Neutron Permissive License (NPL) 1.1.
  */
 
 #ifndef NEUTRON_PROJECT_CONFIG_H
