@@ -150,7 +150,15 @@ public:
 
     // JIT compilation
     jit::MultiTierJITManager jitManager;
+    // JIT is currently only stable on Linux with GCC.
+    // - macOS: Apple Silicon requires MAP_JIT + pthread_jit_write_protect_np
+    // - Windows: VirtualProtect timing/DEP issues cause ACCESS_VIOLATION
+    // TODO: Implement proper platform-specific JIT memory management
+#if defined(__linux__) && (defined(__GNUC__) && !defined(__clang__))
     bool jitEnabled = true;
+#else
+    bool jitEnabled = false;
+#endif
     uint32_t jitLoopCounter = 0;
     
     // Inline cache for JIT-compiled loop traces
