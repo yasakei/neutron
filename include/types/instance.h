@@ -7,6 +7,17 @@
 #include "types/value.h"
 #include "types/obj_string.h"
 
+// MSVC compatibility: __builtin_expect is a GCC/Clang extension
+#ifndef NEUTRON_LIKELY
+    #ifdef _MSC_VER
+        #define NEUTRON_LIKELY(x)   (x)
+        #define NEUTRON_UNLIKELY(x) (x)
+    #else
+        #define NEUTRON_LIKELY(x)   __builtin_expect(!!(x), 1)
+        #define NEUTRON_UNLIKELY(x) __builtin_expect(!!(x), 0)
+    #endif
+#endif
+
 namespace neutron {
 
 // Inline storage for small objects - avoids hash map overhead
@@ -32,7 +43,7 @@ public:
             }
         }
         // Slow path: check overflow map
-        if (__builtin_expect(overflowFields != nullptr, 0)) {
+        if (NEUTRON_UNLIKELY(overflowFields != nullptr)) {
             auto it = overflowFields->find(key);
             if (it != overflowFields->end()) {
                 return &it->second;

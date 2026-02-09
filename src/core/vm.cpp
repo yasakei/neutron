@@ -1115,7 +1115,7 @@ void VM::run(size_t minFrameDepth) {
                 bool was_initializer = frame->isInitializer;
                 
                 Value returnValue;
-                if (__builtin_expect(!was_initializer, 1)) {
+                if (NEUTRON_LIKELY(!was_initializer)) {
                     returnValue = result;
                 } else {
                     // For initializers, return 'this' instead of the function result
@@ -1128,9 +1128,9 @@ void VM::run(size_t minFrameDepth) {
 
                 frames.pop_back();
                 
-                if (__builtin_expect(!frames.empty() && frames.size() > minFrameDepth, 1)) {
+                if (NEUTRON_LIKELY(!frames.empty() && frames.size() > minFrameDepth)) {
                     frame = &frames.back();
-                    if (__builtin_expect(was_bound_method, 1)) {
+                    if (NEUTRON_LIKELY(was_bound_method)) {
                         // Combine resize + push into direct write
                         stk[return_slot_offset] = returnValue;
                         stk.resize(return_slot_offset + 1);
@@ -1217,7 +1217,7 @@ void VM::run(size_t minFrameDepth) {
                 ObjString* nameStr = frame->function->chunk->constants[idx].as.obj_string;
                 uint8_t slot = idx & 127;
                 GlobalCacheEntry& entry = global_cache[slot];
-                if (__builtin_expect(entry.key == nameStr, 1)) {
+                if (NEUTRON_LIKELY(entry.key == nameStr)) {
                     FAST_PUSH(*entry.value);
                 } else {
                     const std::string& name = nameStr->chars;
@@ -1326,11 +1326,11 @@ void VM::run(size_t minFrameDepth) {
                 ObjString* nameStr = frame->function->chunk->constants[idx].as.obj_string;
                 uint8_t slot = idx & 127;
                 GlobalCacheEntry& entry = global_cache[slot];
-                if (__builtin_expect(entry.key == nameStr, 1)) {
+                if (NEUTRON_LIKELY(entry.key == nameStr)) {
                     *entry.value = peek(0);
                 } else {
                     auto it = globals.find(nameStr->chars);
-                    if (__builtin_expect(it == globals.end(), 0)) {
+                    if (NEUTRON_UNLIKELY(it == globals.end())) {
                         runtimeError(this, "Undefined variable '" + nameStr->chars + "'.", 
                                     frames.empty() ? -1 : frames.back().currentLine);
                     }
@@ -1511,21 +1511,21 @@ void VM::run(size_t minFrameDepth) {
                 ObjString* propertyNameObj = READ_CONSTANT().as.obj_string;
                 Value object = peek(0);
                 
-                if (__builtin_expect(object.type == ValueType::INSTANCE, 1)) {
+                if (NEUTRON_LIKELY(object.type == ValueType::INSTANCE)) {
                     // Handle instance properties and methods (most common case)
                     Instance* inst = object.as.instance;
                     
                     // Per-callsite property inline cache: skip getField() linear scan
                     size_t pc_idx = (reinterpret_cast<uintptr_t>(prop_callsite) >> 1) & (PROP_CACHE_SIZE - 1);
                     PropCacheEntry& pc = prop_cache[pc_idx];
-                    if (__builtin_expect(pc.callsite_ip == prop_callsite && pc.klass == inst->klass, 1)) {
+                    if (NEUTRON_LIKELY(pc.callsite_ip == prop_callsite && pc.klass == inst->klass)) {
                         stack.back() = inst->inlineFields[pc.inline_index].value;
                         DISPATCH();
                     }
                     
                     // Check fields first using inline/overflow lookup
                     Value* fieldVal = inst->getField(propertyNameObj);
-                    if (__builtin_expect(fieldVal != nullptr, 1)) {
+                    if (NEUTRON_LIKELY(fieldVal != nullptr)) {
                         // Populate property cache if field is inline
                         for (uint8_t fi = 0; fi < inst->inlineCount; ++fi) {
                             if (inst->inlineFields[fi].key == propertyNameObj) {
@@ -1663,7 +1663,7 @@ void VM::run(size_t minFrameDepth) {
                 Value& a = peek(1);
                 
                 // Fast path for numbers (most common in loops)
-                if (__builtin_expect(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER, 1)) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
                     bool result = (a.as.number == b.as.number);
                     a.type = ValueType::BOOLEAN;
                     a.as.boolean = result;
@@ -1726,7 +1726,7 @@ void VM::run(size_t minFrameDepth) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (__builtin_expect(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER, 1)) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
                     bool result = a.as.number > b.as.number;
                     a.type = ValueType::BOOLEAN;
                     a.as.boolean = result;
@@ -1740,7 +1740,7 @@ void VM::run(size_t minFrameDepth) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (__builtin_expect(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER, 1)) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
                     bool result = a.as.number < b.as.number;
                     a.type = ValueType::BOOLEAN;
                     a.as.boolean = result;
@@ -1755,8 +1755,8 @@ void VM::run(size_t minFrameDepth) {
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
                 
-                if (__builtin_expect(a.type == ValueType::NUMBER, 1)) {
-                    if (__builtin_expect(b.type == ValueType::NUMBER, 1)) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER)) {
+                    if (NEUTRON_LIKELY(b.type == ValueType::NUMBER)) {
                         a.as.number += b.as.number;
                         stk.pop_back();
                         DISPATCH();
@@ -1837,7 +1837,7 @@ void VM::run(size_t minFrameDepth) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (__builtin_expect(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER, 1)) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
                     a.as.number -= b.as.number;
                     stk.pop_back();
                 } else {
@@ -1851,7 +1851,7 @@ void VM::run(size_t minFrameDepth) {
                 Value& a = stk[sz - 2];
                 
                 // Fast path: number * number (most common)
-                if (__builtin_expect(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER, 1)) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
                     a.as.number *= b.as.number;
                     stk.pop_back();
                     DISPATCH();
@@ -1904,9 +1904,9 @@ void VM::run(size_t minFrameDepth) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (__builtin_expect(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER, 1)) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
                     double val_b = b.as.number;
-                    if (__builtin_expect(val_b != 0, 1)) {
+                    if (NEUTRON_LIKELY(val_b != 0)) {
                         a.as.number /= val_b;
                         stk.pop_back();
                     } else {
@@ -1921,9 +1921,9 @@ void VM::run(size_t minFrameDepth) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (__builtin_expect(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER, 1)) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
                     double val_b = b.as.number;
-                    if (__builtin_expect(val_b != 0, 1)) {
+                    if (NEUTRON_LIKELY(val_b != 0)) {
                         a.as.number = fmod(a.as.number, val_b);
                         stk.pop_back();
                     } else {
@@ -1941,7 +1941,7 @@ void VM::run(size_t minFrameDepth) {
             }
             CASE(OP_NEGATE) {
                 Value& value = peek(0);
-                if (__builtin_expect(value.type == ValueType::NUMBER, 1)) {
+                if (NEUTRON_LIKELY(value.type == ValueType::NUMBER)) {
                     value.as.number = -value.as.number;
                 } else {
                     runtimeError(this, "Operand must be a number.", frames.empty() ? -1 : frames.back().currentLine);
@@ -1952,7 +1952,7 @@ void VM::run(size_t minFrameDepth) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (__builtin_expect(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER, 1)) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
                     int64_t ia = static_cast<int64_t>(a.as.number);
                     int64_t ib = static_cast<int64_t>(b.as.number);
                     a.as.number = static_cast<double>(ia & ib);
@@ -1966,7 +1966,7 @@ void VM::run(size_t minFrameDepth) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (__builtin_expect(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER, 1)) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
                     int64_t ia = static_cast<int64_t>(a.as.number);
                     int64_t ib = static_cast<int64_t>(b.as.number);
                     a.as.number = static_cast<double>(ia | ib);
@@ -1980,7 +1980,7 @@ void VM::run(size_t minFrameDepth) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (__builtin_expect(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER, 1)) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
                     int64_t ia = static_cast<int64_t>(a.as.number);
                     int64_t ib = static_cast<int64_t>(b.as.number);
                     a.as.number = static_cast<double>(ia ^ ib);
@@ -1992,7 +1992,7 @@ void VM::run(size_t minFrameDepth) {
             }
             CASE(OP_BITWISE_NOT) {
                 Value& value = stk.back();
-                if (__builtin_expect(value.type == ValueType::NUMBER, 1)) {
+                if (NEUTRON_LIKELY(value.type == ValueType::NUMBER)) {
                     value.as.number = static_cast<double>(~static_cast<int64_t>(value.as.number));
                 } else {
                     runtimeError(this, "Operand must be a number.", frames.empty() ? -1 : frames.back().currentLine);
@@ -2003,7 +2003,7 @@ void VM::run(size_t minFrameDepth) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (__builtin_expect(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER, 1)) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
                     a.as.number = static_cast<double>(static_cast<int64_t>(a.as.number) << static_cast<int64_t>(b.as.number));
                     stk.pop_back();
                 } else {
@@ -2015,7 +2015,7 @@ void VM::run(size_t minFrameDepth) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (__builtin_expect(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER, 1)) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
                     a.as.number = static_cast<double>(static_cast<int64_t>(a.as.number) >> static_cast<int64_t>(b.as.number));
                     stk.pop_back();
                 } else {
@@ -2040,15 +2040,15 @@ void VM::run(size_t minFrameDepth) {
                 
                 Value& receiver = stk[stk.size() - argCount - 1];
                 
-                if (__builtin_expect(receiver.type == ValueType::INSTANCE, 1)) {
+                if (NEUTRON_LIKELY(receiver.type == ValueType::INSTANCE)) {
                     Instance* inst = receiver.as.instance;
                     
                     // Per-callsite method cache lookup
                     size_t cache_idx = (reinterpret_cast<uintptr_t>(callsite_ip) >> 1) & (METHOD_CACHE_SIZE - 1);
                     MethodCacheEntry& mc = method_cache[cache_idx];
-                    if (__builtin_expect(mc.callsite_ip == callsite_ip && mc.klass == inst->klass, 1)) {
+                    if (NEUTRON_LIKELY(mc.callsite_ip == callsite_ip && mc.klass == inst->klass)) {
                         Function* method = mc.method;
-                        if (__builtin_expect(method->arity_val == argCount && frames.size() < 256, 1)) {
+                        if (NEUTRON_LIKELY(method->arity_val == argCount && frames.size() < 256)) {
                             CallFrame* newFrame = &frames.emplace_back();
                             newFrame->function = method;
                             newFrame->ip = method->chunk->code.data();
@@ -2063,9 +2063,9 @@ void VM::run(size_t minFrameDepth) {
                     
                     // Check methods (most common case for OP_INVOKE)
                     auto methIt = inst->klass->methods.find(methodNameObj);
-                    if (__builtin_expect(methIt != inst->klass->methods.end(), 1)) {
+                    if (NEUTRON_LIKELY(methIt != inst->klass->methods.end())) {
                         Value methodValue = methIt->second;
-                        if (__builtin_expect(methodValue.type == ValueType::CALLABLE, 1)) {
+                        if (NEUTRON_LIKELY(methodValue.type == ValueType::CALLABLE)) {
                             Function* method = static_cast<Function*>(methodValue.as.callable);
                             
                             // Update per-callsite method cache
@@ -2074,8 +2074,8 @@ void VM::run(size_t minFrameDepth) {
                             mc.method_name = methodNameObj;
                             mc.method = method;
                             
-                            if (__builtin_expect(method->arity_val == argCount, 1)) {
-                                if (__builtin_expect(frames.size() < 256, 1)) {
+                            if (NEUTRON_LIKELY(method->arity_val == argCount)) {
+                                if (NEUTRON_LIKELY(frames.size() < 256)) {
                                     CallFrame* newFrame = &frames.emplace_back();
                                     newFrame->function = method;
                                     newFrame->ip = method->chunk->code.data();
@@ -2160,6 +2160,9 @@ void VM::run(size_t minFrameDepth) {
                     Value callee = receiver;
                     if (callee.type == ValueType::MODULE) {
                         Module* module = callee.as.module;
+                        // Use raw pointers and manual control to avoid destructor issues with computed goto
+                        const char* error_msg_cstr = nullptr;
+                        bool module_call_success = false;
                         try {
                             Value property = module->get(methodNameObj->chars);
                             stk[stk.size() - argCount - 1] = property;
@@ -2167,10 +2170,20 @@ void VM::run(size_t minFrameDepth) {
                                 return;
                             }
                             frame = &frames.back();
-                            DISPATCH();
+                            module_call_success = true;
                         } catch (const std::runtime_error& e) {
-                            runtimeError(this, std::string(e.what()), frames.empty() ? -1 : frames.back().currentLine);
+                            // Copy to static storage to avoid std::string in scope
+                            static thread_local char error_buf[256];
+                            strncpy(error_buf, e.what(), sizeof(error_buf) - 1);
+                            error_buf[sizeof(error_buf) - 1] = '\0';
+                            error_msg_cstr = error_buf;
+                        }
+                        if (error_msg_cstr) {
+                            runtimeError(this, error_msg_cstr, frames.empty() ? -1 : frames.back().currentLine);
                             return;
+                        }
+                        if (module_call_success) {
+                            DISPATCH();
                         }
                     }
                     
@@ -2208,11 +2221,11 @@ void VM::run(size_t minFrameDepth) {
                 ObjString* nameStr = frame->function->chunk->constants[idx].as.obj_string;
                 uint8_t slot = idx & 127;
                 GlobalCacheEntry& entry = global_cache[slot];
-                if (__builtin_expect(entry.key == nameStr, 1)) {
+                if (NEUTRON_LIKELY(entry.key == nameStr)) {
                     entry.value->as.number += 1.0;
                 } else {
                     auto it = globals.find(nameStr->chars);
-                    if (__builtin_expect(it != globals.end(), 1)) {
+                    if (NEUTRON_LIKELY(it != globals.end())) {
                         entry.key = nameStr;
                         entry.value = &(it->second);
                         it->second.as.number += 1.0;
@@ -2227,11 +2240,11 @@ void VM::run(size_t minFrameDepth) {
                 ObjString* nameStr = frame->function->chunk->constants[idx].as.obj_string;
                 uint8_t slot = idx & 127;
                 GlobalCacheEntry& entry = global_cache[slot];
-                if (__builtin_expect(entry.key == nameStr, 1)) {
+                if (NEUTRON_LIKELY(entry.key == nameStr)) {
                     FAST_PUSH(*entry.value);
                 } else {
                     auto it = globals.find(nameStr->chars);
-                    if (__builtin_expect(it == globals.end(), 0)) {
+                    if (NEUTRON_UNLIKELY(it == globals.end())) {
                         runtimeError(this, "Undefined variable '" + nameStr->chars + "'.",
                                     frames.empty() ? -1 : frames.back().currentLine);
                     }
@@ -2247,11 +2260,11 @@ void VM::run(size_t minFrameDepth) {
                 ObjString* nameStr = frame->function->chunk->constants[idx].as.obj_string;
                 uint8_t slot = idx & 127;
                 GlobalCacheEntry& entry = global_cache[slot];
-                if (__builtin_expect(entry.key == nameStr, 1)) {
+                if (NEUTRON_LIKELY(entry.key == nameStr)) {
                     *entry.value = peek(0);
                 } else {
                     auto it = globals.find(nameStr->chars);
-                    if (__builtin_expect(it == globals.end(), 0)) {
+                    if (NEUTRON_UNLIKELY(it == globals.end())) {
                         runtimeError(this, "Undefined variable '" + nameStr->chars + "'.",
                                     frames.empty() ? -1 : frames.back().currentLine);
                     }
@@ -2405,7 +2418,7 @@ void VM::run(size_t minFrameDepth) {
             }
             CASE(OP_SAY) {
                 Value& v = stk.back();
-                if (__builtin_expect(v.type == ValueType::OBJ_STRING, 1)) {
+                if (NEUTRON_LIKELY(v.type == ValueType::OBJ_STRING)) {
                     std::cout << v.as.obj_string->chars << '\n';
                 } else {
                     std::cout << v.toString() << '\n';
@@ -2423,7 +2436,7 @@ void VM::run(size_t minFrameDepth) {
                 Value& condition = stk.back();
                 // Fast path: boolean is the most common condition type in loops
                 bool jump;
-                if (__builtin_expect(condition.type == ValueType::BOOLEAN, 1)) {
+                if (NEUTRON_LIKELY(condition.type == ValueType::BOOLEAN)) {
                     jump = !condition.as.boolean;
                 } else {
                     jump = (condition.type == ValueType::NIL);
@@ -2437,14 +2450,14 @@ void VM::run(size_t minFrameDepth) {
             CASE(OP_LOOP) {
                 uint16_t offset = READ_SHORT();
 
-                if (__builtin_expect(jitEnabled, 1)) {
+                if (NEUTRON_LIKELY(jitEnabled)) {
                     uint64_t loop_pc = static_cast<uint64_t>((frame->ip - offset) - frame->function->chunk->code.data());
                     uint64_t method_id = reinterpret_cast<uint64_t>(frame->function);
                     
                     // Fast path: check inline cache for compiled trace
                     size_t cache_slot = loop_pc & (JIT_LOOP_CACHE_SIZE - 1);
                     JITLoopCacheEntry& cached = jitLoopCache[cache_slot];
-                    if (__builtin_expect(cached.loop_pc == loop_pc && cached.method_id == method_id, 1)) {
+                    if (NEUTRON_LIKELY(cached.loop_pc == loop_pc && cached.method_id == method_id)) {
                         auto* tier2 = jitManager.getTier2Compiler();
                         if (tier2) {
                             jit::MultiTierJITManager::ExecutionFrame jitFrame;
@@ -2483,30 +2496,36 @@ void VM::run(size_t minFrameDepth) {
                                 }
                             } else if (!tier2->isTraceFailed(method_id, loop_pc)) {
                                 tier2->setGlobalsMap(&globals);
-                                jit::HotSpotProfiler dummyProfiler;
-                                auto trace = tier2->recordTrace(method_id, *frame->function->chunk, loop_pc, dummyProfiler);
-                                if (trace) {
-                                    auto optimized = tier2->optimizeTrace(*trace);
-                                    if (optimized) {
-                                        uint64_t compiled = tier2->compileTrace(*optimized);
-                                        if (compiled != 0) {
-                                            // Cache it
-                                            cached.loop_pc = loop_pc;
-                                            cached.method_id = method_id;
-                                            cached.trace_id = compiled;
-                                            
-                                            jit::MultiTierJITManager::ExecutionFrame jitFrame2;
-                                            jitFrame2.method_id = method_id;
-                                            jitFrame2.chunk = frame->function->chunk;
-                                            jitFrame2.bytecode_pc = loop_pc;
-                                            jitFrame2.stack_pointer = nullptr;
-                                            jitFrame2.local_variables = &stk[frame->slot_offset];
-                                            jitFrame2.current_tier = jit::CompilationTier::TIER2;
-                                            if (tier2->executeTrace(compiled, &jitFrame2)) {
-                                                DISPATCH();
+                                bool jit_compile_success = false;
+                                {
+                                    jit::HotSpotProfiler dummyProfiler;
+                                    auto trace = tier2->recordTrace(method_id, *frame->function->chunk, loop_pc, dummyProfiler);
+                                    if (trace) {
+                                        auto optimized = tier2->optimizeTrace(*trace);
+                                        if (optimized) {
+                                            uint64_t compiled = tier2->compileTrace(*optimized);
+                                            if (compiled != 0) {
+                                                // Cache it
+                                                cached.loop_pc = loop_pc;
+                                                cached.method_id = method_id;
+                                                cached.trace_id = compiled;
+                                                
+                                                jit::MultiTierJITManager::ExecutionFrame jitFrame2;
+                                                jitFrame2.method_id = method_id;
+                                                jitFrame2.chunk = frame->function->chunk;
+                                                jitFrame2.bytecode_pc = loop_pc;
+                                                jitFrame2.stack_pointer = nullptr;
+                                                jitFrame2.local_variables = &stk[frame->slot_offset];
+                                                jitFrame2.current_tier = jit::CompilationTier::TIER2;
+                                                if (tier2->executeTrace(compiled, &jitFrame2)) {
+                                                    jit_compile_success = true;
+                                                }
                                             }
                                         }
                                     }
+                                } // unique_ptrs destroyed here
+                                if (jit_compile_success) {
+                                    DISPATCH();
                                 }
                             }
                         }

@@ -585,7 +585,8 @@ uint64_t Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
         std::sort(sorted_globals.begin(), sorted_globals.end(),
             [](const auto& a, const auto& b) { return a.second > b.second; });
         constexpr uint8_t cache_regs[] = {12, 13, 14, 15}; // R12, R13, R14, R15
-        for (size_t i = 0; i < std::min(sorted_globals.size(), (size_t)4); i++) {
+        size_t cache_count = sorted_globals.size() < 4 ? sorted_globals.size() : 4;
+        for (size_t i = 0; i < cache_count; i++) {
             global_reg_cache[sorted_globals[i].first] = cache_regs[i];
         }
     }
