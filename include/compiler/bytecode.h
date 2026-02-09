@@ -69,7 +69,45 @@ enum class OpCode : uint8_t {
     OP_BITWISE_XOR,
     OP_BITWISE_NOT,
     OP_LEFT_SHIFT,
-    OP_RIGHT_SHIFT
+    OP_RIGHT_SHIFT,
+    OP_INVOKE,  // Optimized method call: GET_PROPERTY + CALL in one opcode
+    OP_INCREMENT_LOCAL,  // Increment local variable by 1 (replaces GET_LOCAL+CONST+ADD+SET_LOCAL+POP)
+    OP_DECREMENT_LOCAL,  // Decrement local variable by 1
+    OP_LOOP_IF_LESS_LOCAL,  // Fused: if (local[slot] < constant) continue, else jump
+    OP_INCREMENT_GLOBAL, // Increment global variable by 1 (replaces GET_GLOBAL+CONST+ADD+SET_GLOBAL+POP)
+
+    // === Bytecode optimizer extended opcodes ===
+    // These are emitted by BytecodeOptimizer post-compilation passes
+    OP_CALL_FAST,        // Fast function call (no closure check)
+    OP_TAIL_CALL,        // Tail-call optimized call
+    OP_GET_GLOBAL_FAST,  // Fast global read (cached slot)
+    OP_SET_GLOBAL_FAST,  // Fast global write (cached slot)
+    OP_LOAD_LOCAL_0,     // Shortcut: GET_LOCAL 0
+    OP_LOAD_LOCAL_1,     // Shortcut: GET_LOCAL 1
+    OP_LOAD_LOCAL_2,     // Shortcut: GET_LOCAL 2
+    OP_LOAD_LOCAL_3,     // Shortcut: GET_LOCAL 3
+    OP_CONST_ZERO,       // Push 0.0
+    OP_CONST_ONE,        // Push 1.0
+    OP_CONST_INT8,       // Push int8 constant (1-byte operand)
+    OP_ADD_INT,          // Integer-specialized add
+    OP_SUB_INT,          // Integer-specialized subtract
+    OP_MUL_INT,          // Integer-specialized multiply
+    OP_DIV_INT,          // Integer-specialized divide
+    OP_MOD_INT,          // Integer-specialized modulo
+    OP_NEGATE_INT,       // Integer-specialized negate
+    OP_LESS_INT,         // Integer-specialized less-than
+    OP_GREATER_INT,      // Integer-specialized greater-than
+    OP_EQUAL_INT,        // Integer-specialized equality
+    OP_INC_LOCAL_INT,    // Increment local by 1 (integer fast path)
+    OP_DEC_LOCAL_INT,    // Decrement local by 1 (integer fast path)
+    OP_LESS_JUMP,        // Fused: OP_LESS + OP_JUMP_IF_FALSE
+    OP_GREATER_JUMP,     // Fused: OP_GREATER + OP_JUMP_IF_FALSE
+    OP_EQUAL_JUMP,       // Fused: OP_EQUAL + OP_JUMP_IF_FALSE
+    OP_ADD_LOCAL_CONST,  // Fused: GET_LOCAL + CONSTANT + ADD
+    OP_TYPE_GUARD,       // Runtime type guard (for JIT)
+    OP_LOOP_HINT,        // JIT loop compilation hint
+
+    OP_COUNT             // Sentinel: total number of opcodes
 };
 
 class Chunk {

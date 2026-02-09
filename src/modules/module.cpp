@@ -4,7 +4,7 @@
 namespace neutron {
 
 Module::Module(const std::string& name, std::shared_ptr<Environment> env, void* handle)
-    : name(name), env(env), handle(handle) {}
+    : name(name), env(env), handle(handle) { obj_type = ObjType::OBJ_MODULE; }
 
 Module::~Module() {
     // NOTE: We intentionally do NOT call dlclose here.

@@ -303,6 +303,67 @@ void Compiler::visitAssignExpr(const AssignExpr* expr) {
 }
 
 void Compiler::visitExpressionStmt(const ExpressionStmt* stmt) {
+    // Peephole: detect `x = x + 1` or `x = x - 1` for locals → emit OP_INCREMENT/DECREMENT_LOCAL
+    if (stmt->expression->type == ExprType::ASSIGN) {
+        const AssignExpr* assign = static_cast<const AssignExpr*>(stmt->expression.get());
+        int slot = resolveLocal(assign->name);
+        if (assign->value->type == ExprType::BINARY) {
+            const BinaryExpr* bin = static_cast<const BinaryExpr*>(assign->value.get());
+            // Check pattern: x + 1, x - 1, 1 + x
+            if (bin->op.type == TokenType::PLUS || bin->op.type == TokenType::MINUS) {
+                // Check if left is the same variable and right is literal 1
+                bool leftIsVar = (bin->left->type == ExprType::VARIABLE &&
+                    static_cast<const VariableExpr*>(bin->left.get())->name.lexeme == assign->name.lexeme);
+                bool rightIsOne = false;
+                if (bin->right->type == ExprType::LITERAL) {
+                    const LiteralExpr* lit = static_cast<const LiteralExpr*>(bin->right.get());
+                    if (lit->valueType == LiteralValueType::NUMBER) {
+                        double val = *std::static_pointer_cast<double>(lit->value);
+                        rightIsOne = (val == 1.0);
+                    }
+                }
+                if (leftIsVar && rightIsOne && bin->op.type == TokenType::PLUS) {
+                    if (slot != -1) {
+                        emitBytes((uint8_t)OpCode::OP_INCREMENT_LOCAL, (uint8_t)slot);
+                        return;
+                    } else {
+                        // Global increment
+                        emitBytes((uint8_t)OpCode::OP_INCREMENT_GLOBAL, makeConstant(Value(vm.internString(assign->name.lexeme))));
+                        return;
+                    }
+                }
+                if (leftIsVar && rightIsOne && bin->op.type == TokenType::MINUS) {
+                    if (slot != -1) {
+                        emitBytes((uint8_t)OpCode::OP_DECREMENT_LOCAL, (uint8_t)slot);
+                        return;
+                    }
+                    // No global decrement opcode — fall through to normal compilation
+                }
+                // Also check: 1 + x pattern (commutative)
+                if (bin->op.type == TokenType::PLUS && !leftIsVar) {
+                    bool leftIsOne = false;
+                    if (bin->left->type == ExprType::LITERAL) {
+                        const LiteralExpr* lit = static_cast<const LiteralExpr*>(bin->left.get());
+                        if (lit->valueType == LiteralValueType::NUMBER) {
+                            double val = *std::static_pointer_cast<double>(lit->value);
+                            leftIsOne = (val == 1.0);
+                        }
+                    }
+                    bool rightIsVar = (bin->right->type == ExprType::VARIABLE &&
+                        static_cast<const VariableExpr*>(bin->right.get())->name.lexeme == assign->name.lexeme);
+                    if (leftIsOne && rightIsVar) {
+                        if (slot != -1) {
+                            emitBytes((uint8_t)OpCode::OP_INCREMENT_LOCAL, (uint8_t)slot);
+                            return;
+                        } else {
+                            emitBytes((uint8_t)OpCode::OP_INCREMENT_GLOBAL, makeConstant(Value(vm.internString(assign->name.lexeme))));
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    }
     compileExpression(stmt->expression.get());
     emitByte((uint8_t)OpCode::OP_POP);
 }
@@ -488,9 +549,34 @@ void Compiler::visitWhileStmt(const WhileStmt* stmt) {
     continueJumps.push_back(std::vector<int>());
     continueTargets.push_back(-1);  // Will be set later for for-loops
 
-    compileExpression(stmt->condition.get());
-
-    int exitJump = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE);
+    // Try to emit fused loop comparison for `local < constant` pattern
+    int exitJump = -1;
+    bool usedFusedCompare = false;
+    if (stmt->condition->type == ExprType::BINARY) {
+        const BinaryExpr* cond = static_cast<const BinaryExpr*>(stmt->condition.get());
+        if (cond->op.type == TokenType::LESS && cond->left->type == ExprType::VARIABLE && cond->right->type == ExprType::LITERAL) {
+            const VariableExpr* var = static_cast<const VariableExpr*>(cond->left.get());
+            const LiteralExpr* lit = static_cast<const LiteralExpr*>(cond->right.get());
+            int slot = resolveLocal(var->name);
+            if (slot != -1 && lit->valueType == LiteralValueType::NUMBER) {
+                // Emit OP_LOOP_IF_LESS_LOCAL: slot, const_idx, jump_offset(2)
+                uint8_t constIdx = makeConstant(Value(*std::static_pointer_cast<double>(lit->value)));
+                emitByte((uint8_t)OpCode::OP_LOOP_IF_LESS_LOCAL);
+                emitByte((uint8_t)slot);
+                emitByte(constIdx);
+                // Emit placeholder jump offset (2 bytes)
+                exitJump = chunk->code.size();
+                emitByte(0xff);
+                emitByte(0xff);
+                usedFusedCompare = true;
+            }
+        }
+    }
+    
+    if (!usedFusedCompare) {
+        compileExpression(stmt->condition.get());
+        exitJump = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE);
+    }
 
     if (isForLoop && blockBody) {
         // For for-loops, compile body and increment separately
@@ -833,6 +919,28 @@ void Compiler::visitMemberExpr(const MemberExpr* expr) {
 }
 
 void Compiler::visitCallExpr(const CallExpr* expr) {
+    // Check if this is a method call (callee is a MemberExpr like obj.method)
+    if (expr->callee->type == ExprType::MEMBER) {
+        const MemberExpr* member = static_cast<const MemberExpr*>(expr->callee.get());
+        
+        // Compile the receiver object
+        compileExpression(member->object.get());
+        
+        // Compile the arguments
+        for (const auto& argument : expr->arguments) {
+            compileExpression(argument.get());
+        }
+        
+        // Update current line
+        currentLine = expr->paren.line;
+        
+        // Emit OP_INVOKE with property name and arg count
+        emitBytes((uint8_t)OpCode::OP_INVOKE, makeConstant(Value(vm.internString(member->property.lexeme))));
+        emitByte(expr->arguments.size());
+        return;
+    }
+    
+    // Regular function call
     // Compile the callee
     compileExpression(expr->callee.get());
     

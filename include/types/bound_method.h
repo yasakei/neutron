@@ -14,6 +14,9 @@ public:
     
     Value receiver;
     Function* method;
+
+protected:
+    // obj_type set in constructor to OBJ_BOUND_METHOD
 };
 
 }

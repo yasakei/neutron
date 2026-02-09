@@ -4,7 +4,7 @@
 
 namespace neutron {
 
-Buffer::Buffer(size_t size) : data(size, 0) {}
+Buffer::Buffer(size_t size) : data(size, 0) { obj_type = ObjType::OBJ_BUFFER; }
 
 std::string Buffer::toString() const {
     std::stringstream ss;

@@ -10,6 +10,7 @@ namespace neutron {
 
 class JsonObject : public Object {
 public:
+    JsonObject() { obj_type = ObjType::OBJ_JSON_OBJECT; }
     std::unordered_map<ObjString*, Value> properties;
     std::string toString() const override;
 };

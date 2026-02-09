@@ -201,6 +201,12 @@ set(NEUTRON_COMPILER_SOURCES
     src/compiler/parser.cpp
     src/compiler/compiler.cpp
     src/compiler/bytecode.cpp
+    src/compiler/bytecode_optimizer.cpp
+    src/jit/jit_codegen.cpp
+    src/jit/jit_manager.cpp
+    src/jit/jit_profiler.cpp
+    src/jit/jit_tier1.cpp
+    src/jit/jit_tier2.cpp
 )
 
 # Type system source files
