@@ -986,11 +986,19 @@ void VM::run(size_t minFrameDepth) {
 #define READ_CONSTANT() (frame->function->chunk->constants[READ_BYTE()])
 #define READ_STRING() (READ_CONSTANT().as.obj_string->chars)
 
-// Computed goto optimization (disabled by default due to C++ scope rules)
-// Only enable on GCC/Clang - MSVC doesn't support computed goto
-#if defined(__GNUC__) || defined(__clang__)
+// Computed goto optimization
+// - GCC: Supported
+// - Clang (non-Apple): Supported  
+// - AppleClang: DISABLED - strict about computed goto in try blocks (causes SIGBUS)
+// - MSVC: Not supported (doesn't have computed goto)
+#if defined(__GNUC__) && !defined(__clang__)
+    // GCC - safe to use computed goto
+    #define COMPUTED_GOTO 1
+#elif defined(__clang__) && !defined(__APPLE__)
+    // Non-Apple Clang - safe to use computed goto
     #define COMPUTED_GOTO 1
 #else
+    // MSVC or AppleClang - don't use computed goto
     #define COMPUTED_GOTO 0
 #endif
 

@@ -1353,8 +1353,9 @@ uint64_t Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
                     }
                     // If no JUMP found, use bytecode offset as rough estimate
                     if (depth != 0) {
-                        target_ir = std::min((uint32_t)(ir_idx + bytecodes_to_skip),
-                                            (uint32_t)(trace.ir_instructions.size()));
+                        uint32_t max_target = (uint32_t)(trace.ir_instructions.size());
+                        uint32_t calc_target = (uint32_t)(ir_idx + bytecodes_to_skip);
+                        target_ir = calc_target < max_target ? calc_target : max_target;
                     }
                     forward_jumps.push_back({code.size(), target_ir});
                     code.push_back(0); code.push_back(0);
@@ -1381,8 +1382,11 @@ uint64_t Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
                 // For simple if: operand1 skips to after the if-body POP
                 // Approximate: target_ir ≈ ir_idx + operand1
                 // More precise: just use operand1 as an IR offset estimate
-                target_ir = std::min((uint32_t)(ir_idx + bytecodes_to_skip + 1),
-                                    (uint32_t)(trace.ir_instructions.size()));
+                {
+                    uint32_t max_target = (uint32_t)(trace.ir_instructions.size());
+                    uint32_t calc_target = (uint32_t)(ir_idx + bytecodes_to_skip + 1);
+                    target_ir = calc_target < max_target ? calc_target : max_target;
+                }
                 
                 forward_jumps.push_back({code.size() - 4, target_ir});
                 break;
