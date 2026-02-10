@@ -11,6 +11,7 @@ public:
     std::string chars;
     mutable uint32_t hash;
     mutable bool hashComputed;
+    bool isInterned = false;  // True if this string is in the intern table
 
     ObjString(const std::string& chars);
     ObjString(std::string&& chars);

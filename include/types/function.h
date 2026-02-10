@@ -43,6 +43,7 @@ public:
     // Constructor for deserialization
     Function(std::string name, int arity) : name(name), arity_val(arity), declaration(nullptr), closure(nullptr) {
         chunk = new Chunk();
+        obj_type = ObjType::OBJ_FUNCTION;
     }
 
     ~Function();

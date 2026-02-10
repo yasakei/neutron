@@ -39,13 +39,14 @@
  
  ## Overview
  
- **Neutron** is a high-performance scripting language with a C++ runtime. It combines Python's simplicity with significantly better performance for computational tasks.
+ **Neutron** is a high-performance scripting language with a C++ runtime, designed for speed and simplicity.
  
  **Key Features:**
- - **Fast:** C++ bytecode VM (2-10x faster than Python)
+ - **Fast:** C++ bytecode VM with multi-tier tracing JIT (x86-64 & ARM64)
+ - **JIT Compiled:** Tracing JIT compiles hot loops to native x86-64 and ARM64 machine code
  - **Native:** Compiles to standalone executables
  - **Battery-Included:** Standard library with HTTP, JSON, RegEx, and more
- - **Cross-Platform:** Runs on Linux, macOS, Windows
+ - **Cross-Platform:** Runs on Linux, macOS (Apple Silicon & Intel), Windows
  
  > [!NOTE]
  > **New?** Check the **[Quick Start Guide](docs/guides/quickstart.md)** to get running in 5 minutes.
@@ -54,10 +55,11 @@
 
 ## Architecture
  
- Neutron uses a modern three-stage pipeline: **Scanner/Parser** → **Bytecode Compiler** → **Stack-based VM**.
+ Neutron uses a modern multi-stage pipeline: **Scanner/Parser** → **Bytecode Compiler** → **Stack-based VM** → **[Multi-Tier JIT](docs/implementation/jit.md)**.
  
  - **Zero Dependencies:** Written in C++17 with minimal external reliance.
  - **Smart Memory:** Deterministic RC/GC memory management.
+ - **JIT Compilation:** Three-tier execution (interpreter → threaded code → tracing JIT) with native codegen for **x86-64** and **ARM64**.
  - **Native Modules:** Direct C++ integration for max performance.
 
 ## Core Features

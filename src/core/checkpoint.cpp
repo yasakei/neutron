@@ -235,7 +235,7 @@ void CheckpointManager::saveCheckpoint(VM& vm, const std::string& path, Value re
         ser.writeLong(ser.getObjectId(f.function));
         ser.writeLong(f.ip - f.function->chunk->code.data());
         ser.writeLong(f.slot_offset);
-        ser.writeString(f.fileName);
+        ser.writeString(f.getFileName());
         ser.writeInt(f.currentLine);
     }
     
@@ -385,7 +385,8 @@ void CheckpointManager::loadCheckpoint(VM& vm, const std::string& path) {
         uint64_t ipOffset = readLong();
         frame.ip = frame.function->chunk->code.data() + ipOffset;
         frame.slot_offset = readLong();
-        frame.fileName = readString();
+        vm.currentFileName = readString();
+        frame.fileName = &vm.currentFileName;
         frame.currentLine = readInt();
         vm.frames.push_back(frame);
     }

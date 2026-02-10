@@ -16,10 +16,10 @@ namespace neutron {
 
 
 
-NativeFn::NativeFn(NativeFnPtr function, int arity) : function(std::move(function)), _arity(arity), _needsVM(false) {}
+NativeFn::NativeFn(NativeFnPtr function, int arity) : function(std::move(function)), _arity(arity), _needsVM(false) { obj_type = ObjType::OBJ_NATIVE_FN; }
 
 NativeFn::NativeFn(NativeFnPtrWithVM function, int arity, bool needsVM) 
-    : functionWithVM(std::move(function)), _arity(arity), _needsVM(needsVM) {}
+    : functionWithVM(std::move(function)), _arity(arity), _needsVM(needsVM) { obj_type = ObjType::OBJ_NATIVE_FN; }
 
 int NativeFn::arity() {
     return _arity;
@@ -37,7 +37,7 @@ std::string NativeFn::toString() const {
 }
 
 BoundMethod::BoundMethod(Value receiver, Function* method) 
-    : receiver(receiver), method(method) {}
+    : receiver(receiver), method(method) { obj_type = ObjType::OBJ_BOUND_METHOD; }
 
 int BoundMethod::arity() {
     return method->arity();
@@ -54,10 +54,10 @@ std::string BoundMethod::toString() const {
 }
 
 Class::Class(const std::string& name)
-    : name(name), class_env(nullptr) {}
+    : name(name), class_env(nullptr) { obj_type = ObjType::OBJ_CLASS; }
 
 Class::Class(const std::string& name, std::shared_ptr<Environment> class_env)
-    : name(name), class_env(class_env) {}
+    : name(name), class_env(class_env) { obj_type = ObjType::OBJ_CLASS; }
 
 int Class::arity() {
     // For now, return 0 - the constructor implementation would define this properly
@@ -77,41 +77,30 @@ std::string Class::toString() const {
 
 Instance::Instance(Class* klass)
     : klass(klass), inlineCount(0), overflowFields(nullptr) {
-    // Inline fields are already zero-initialized
+    obj_type = ObjType::OBJ_INSTANCE;
 }
 
 Instance::~Instance() {
     delete overflowFields;
 }
 
-Value* Instance::getField(ObjString* key) {
-    // Fast path: check inline fields first
+void Instance::reset(Class* newKlass) {
+    klass = newKlass;
+    // Clear inline fields
     for (uint8_t i = 0; i < inlineCount; ++i) {
-        if (inlineFields[i].key == key) {
-            return &inlineFields[i].value;
-        }
+        inlineFields[i].key = nullptr;
     }
-    
-    // Slow path: check overflow map
+    inlineCount = 0;
+    // Clear overflow if present
     if (overflowFields) {
-        auto it = overflowFields->find(key);
-        if (it != overflowFields->end()) {
-            return &it->second;
-        }
+        delete overflowFields;
+        overflowFields = nullptr;
     }
-    
-    return nullptr;
 }
 
-void Instance::setField(ObjString* key, const Value& value) {
-    // Fast path: check if key already exists in inline fields
-    for (uint8_t i = 0; i < inlineCount; ++i) {
-        if (inlineFields[i].key == key) {
-            inlineFields[i].value = value;
-            return;
-        }
-    }
-    
+// getField and setField fast paths are inlined in instance.h
+// This is the slow path for setField: handles new fields, overflow map, etc.
+void Instance::setFieldSlow(ObjString* key, const Value& value) {
     // Check overflow map if it exists
     if (overflowFields) {
         auto it = overflowFields->find(key);

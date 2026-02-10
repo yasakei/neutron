@@ -67,8 +67,8 @@ if(MSVC)
     add_link_options(/LTCG /OPT:REF /OPT:ICF)
 else()
     add_compile_options(-Wall -Wextra -O3 -flto)
-    # Only use -march=native for single-architecture builds (not universal binaries)
-    if(NOT CMAKE_OSX_ARCHITECTURES OR CMAKE_OSX_ARCHITECTURES STREQUAL "")
+    # Only use -march=native for native builds (not cross-compilation or universal binaries)
+    if((NOT CMAKE_OSX_ARCHITECTURES OR CMAKE_OSX_ARCHITECTURES STREQUAL "") AND NOT CMAKE_CROSSCOMPILING)
         add_compile_options(-march=native)
     endif()
 endif()
@@ -102,10 +102,23 @@ if(NOT jsoncpp_FOUND)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(JSONCPP jsoncpp IMPORTED_TARGET)
     if(NOT JSONCPP_FOUND)
-        message(FATAL_ERROR "Could not find jsoncpp library via CMake or pkg-config")
+        # Fall back to FetchContent (for cross-compilation or missing system package)
+        message(STATUS "jsoncpp not found locally, fetching from source...")
+        FetchContent_Declare(
+            jsoncpp
+            GIT_REPOSITORY https://github.com/open-source-parsers/jsoncpp.git
+            GIT_TAG 1.9.6
+        )
+        set(JSONCPP_WITH_TESTS OFF CACHE BOOL "" FORCE)
+        set(JSONCPP_WITH_POST_BUILD_UNITTEST OFF CACHE BOOL "" FORCE)
+        set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+        set(BUILD_OBJECT_LIBS OFF CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(jsoncpp)
+        set(JSONCPP_LIBRARIES jsoncpp_static)
+    else()
+        # Use the imported target
+        set(JSONCPP_LIBRARIES PkgConfig::JSONCPP)
     endif()
-    # Use the imported target
-    set(JSONCPP_LIBRARIES PkgConfig::JSONCPP)
 else()
     set(JSONCPP_LIBRARIES JsonCpp::JsonCpp)
 endif()
@@ -201,6 +214,14 @@ set(NEUTRON_COMPILER_SOURCES
     src/compiler/parser.cpp
     src/compiler/compiler.cpp
     src/compiler/bytecode.cpp
+    src/compiler/bytecode_optimizer.cpp
+    src/jit/jit_codegen.cpp
+    src/jit/jit_manager.cpp
+    src/jit/jit_memory.cpp
+    src/jit/jit_profiler.cpp
+    src/jit/jit_tier1.cpp
+    src/jit/jit_tier2.cpp
+    src/jit/jit_tier2_arm64.cpp
 )
 
 # Type system source files

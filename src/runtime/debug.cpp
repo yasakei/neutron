@@ -109,6 +109,16 @@ size_t disassembleInstruction(const Chunk* chunk, size_t offset) {
             return constantInstruction("OP_GET_LOCAL", chunk, offset);
         case OpCode::OP_SET_LOCAL:
             return constantInstruction("OP_SET_LOCAL", chunk, offset);
+        case OpCode::OP_INCREMENT_LOCAL:
+            return constantInstruction("OP_INCREMENT_LOCAL", chunk, offset);
+        case OpCode::OP_DECREMENT_LOCAL:
+            return constantInstruction("OP_DECREMENT_LOCAL", chunk, offset);
+        case OpCode::OP_LOOP_IF_LESS_LOCAL:
+            // 4 operand bytes: slot, const_idx, offset_hi, offset_lo
+            printf("%-28s %4d %4d %4d\n", "OP_LOOP_IF_LESS_LOCAL", chunk->code[offset + 1], chunk->code[offset + 2], (chunk->code[offset + 3] << 8) | chunk->code[offset + 4]);
+            return offset + 5;
+        case OpCode::OP_INCREMENT_GLOBAL:
+            return constantInstruction("OP_INCREMENT_GLOBAL", chunk, offset);
         case OpCode::OP_GET_GLOBAL:
             return constantInstruction("OP_GET_GLOBAL", chunk, offset);
         case OpCode::OP_DEFINE_GLOBAL:

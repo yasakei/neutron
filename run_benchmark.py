@@ -36,7 +36,7 @@ class Colors:
             ascii_text = text.encode('ascii', 'replace').decode('ascii')
             print(ascii_text, end=end)
 
-def run_benchmark(name, neutron_bin, neutron_file, python_file, js_file=None):
+def run_benchmark(name, neutron_bin, neutron_file, python_file, js_file=None, neutron_extra_args=None):
     results = {}
     
     # Run Python version
@@ -77,8 +77,11 @@ def run_benchmark(name, neutron_bin, neutron_file, python_file, js_file=None):
     # Run Neutron version
     neutron_start = time.time()
     try:
+        neutron_cmd = [neutron_bin, neutron_file]
+        if neutron_extra_args:
+            neutron_cmd.extend(neutron_extra_args)
         neutron_result = subprocess.run(
-            [neutron_bin, neutron_file],
+            neutron_cmd,
             capture_output=True,
             text=True,
             encoding='utf-8',
@@ -254,6 +257,11 @@ js_faster = 0
 failed_benchmarks = 0
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Neutron Benchmark Suite")
+    parser.add_argument('--no-jit', action='store_true', help='Disable JIT compilation for Neutron benchmarks')
+    args = parser.parse_args()
+
     root_dir = os.path.dirname(os.path.abspath(__file__))
     bench_dir = os.path.join(root_dir, "benchmarks")
 
@@ -283,7 +291,15 @@ def main():
     Colors.print("│" + " " * 25 + "Neutron Benchmark Suite v3.0" + " " * 24 + "│", Colors.CYAN)
     Colors.print("└" + "─" * 78 + "┘", Colors.CYAN)
     print()
-    Colors.print(f"🚀 Neutron: {neutron_bin}", Colors.BLUE)
+    import re
+    try:
+        ver_out = subprocess.run([neutron_bin, '--version'], capture_output=True, text=True)
+        match = re.search(r'Neutron\s+([\d.\-\w]+)', ver_out.stdout)
+        neutron_ver = match.group(1) if match else "unknown"
+    except:
+        neutron_ver = "unknown"
+    jit_label = " (JIT disabled)" if args.no_jit else ""
+    Colors.print(f"🚀 Neutron: {neutron_ver}{jit_label}", Colors.BLUE)
     Colors.print(f"🐍 Python:  {sys.version.split()[0]}", Colors.BLUE)
     if bun_available:
         try:
@@ -345,12 +361,14 @@ def main():
         
         for name, n_file, p_file, js_file in benches:
              js_path = os.path.join(bench_dir, js_file) if js_file else None
+             extra_args = ['--no-jit'] if args.no_jit else None
              run_benchmark(
                  name, 
                  neutron_bin, 
                  os.path.join(bench_dir, n_file), 
                  os.path.join(bench_dir, p_file),
-                 js_path
+                 js_path,
+                 neutron_extra_args=extra_args
              )
              total_benchmarks += 1
 

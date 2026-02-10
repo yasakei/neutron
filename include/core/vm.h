@@ -46,6 +46,7 @@
 #include "utils/component_interface.h"
 #include "runtime/environment.h"
 #include "compiler/bytecode.h"
+#include "jit/jit_manager.h"
 
 #include <vector>
 #include <unordered_map>
@@ -81,12 +82,18 @@ struct CallFrame {
     Function* function;
     uint8_t* ip;
     size_t slot_offset;
-    std::string fileName;  // Source file name for error reporting
+    const std::string* fileName;  // Pointer to source file name (avoids string copy per call)
     int currentLine;       // Current line number for error reporting
     bool isBoundMethod;    // True if this is a method call (receiver at slot 0)
     bool isInitializer;    // True if this is a class initializer call
     
-    CallFrame() : function(nullptr), ip(nullptr), slot_offset(0), fileName(""), currentLine(-1), isBoundMethod(false), isInitializer(false) {}
+    CallFrame() : function(nullptr), ip(nullptr), slot_offset(0), fileName(nullptr), currentLine(-1), isBoundMethod(false), isInitializer(false) {}
+    
+    // Helper to get filename string safely
+    const std::string& getFileName() const {
+        static const std::string empty;
+        return fileName ? *fileName : empty;
+    }
 };
 
 class Return {
@@ -134,6 +141,32 @@ public:
         
         return obj;
     }
+
+    // Fast Instance allocation with free-list pool
+    Instance* allocateInstance(Class* klass);
+    void freeInstance(Instance* inst);
+    static constexpr size_t INSTANCE_POOL_MAX = 1024;
+    std::vector<Instance*> instancePool;
+
+    // JIT compilation
+    jit::MultiTierJITManager jitManager;
+    // JIT enabled on x86_64 and ARM64 platforms.
+#if defined(__x86_64__) || defined(_M_X64) || defined(__amd64__) || defined(__aarch64__) || defined(__arm64__)
+    bool jitEnabled = true;
+#else
+    bool jitEnabled = false;
+#endif
+    uint32_t jitLoopCounter = 0;
+    
+    // Inline cache for JIT-compiled loop traces
+    // Maps loop_pc to trace function pointer for O(1) dispatch
+    struct JITLoopCacheEntry {
+        uint64_t loop_pc = 0;
+        uint64_t method_id = 0;
+        uint64_t trace_id = 0;
+    };
+    static constexpr size_t JIT_LOOP_CACHE_SIZE = 32;
+    JITLoopCacheEntry jitLoopCache[JIT_LOOP_CACHE_SIZE] = {};
 
     // Public data members (for access from other components)
     std::vector<CallFrame> frames;

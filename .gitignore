@@ -135,4 +135,5 @@ test_*.py
 
 # CMake generated files
 CTestTestfile.cmake
-Testing/
+Testing/build-arm64/
+build-arm64/

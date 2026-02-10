@@ -3,11 +3,13 @@
 namespace neutron {
 
 ObjString::ObjString(const std::string& chars) : chars(chars), hash(0), hashComputed(false) {
+    obj_type = ObjType::OBJ_STRING;
     hash = hashString(chars);
     hashComputed = true;
 }
 
 ObjString::ObjString(std::string&& chars) : chars(std::move(chars)), hash(0), hashComputed(false) {
+    obj_type = ObjType::OBJ_STRING;
     hash = hashString(this->chars);
     hashComputed = true;
 }
@@ -15,6 +17,7 @@ ObjString::ObjString(std::string&& chars) : chars(std::move(chars)), hash(0), ha
 // Constructors for data strings - skip hash computation
 ObjString::ObjString(const std::string& chars, bool computeHash) 
     : chars(chars), hash(0), hashComputed(false) {
+    obj_type = ObjType::OBJ_STRING;
     if (computeHash) {
         hash = hashString(this->chars);
         hashComputed = true;
@@ -23,6 +26,7 @@ ObjString::ObjString(const std::string& chars, bool computeHash)
 
 ObjString::ObjString(std::string&& chars, bool computeHash) 
     : chars(std::move(chars)), hash(0), hashComputed(false) {
+    obj_type = ObjType::OBJ_STRING;
     if (computeHash) {
         hash = hashString(this->chars);
         hashComputed = true;

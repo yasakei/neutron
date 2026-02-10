@@ -41,6 +41,7 @@
 #include <dlfcn.h>
 #endif
 #include <cmath>
+#include <cstring>
 #include <algorithm>
 
 #include "capi.h"
@@ -188,7 +189,7 @@ bool isTruthy(const Value& value) {
         
         if (frameLine == -1) frameLine = it->currentLine > 0 ? it->currentLine : line;
         
-        stackTrace.emplace_back(funcName, it->fileName.empty() ? vm->currentFileName : it->fileName, frameLine);
+        stackTrace.emplace_back(funcName, (it->fileName == nullptr || it->fileName->empty()) ? vm->currentFileName : *it->fileName, frameLine);
     }
     
     int errorLine = line;
@@ -201,11 +202,12 @@ bool isTruthy(const Value& value) {
     exit(1);
 }
 
-VM::VM() : ip(nullptr), nextGC(8192), currentFileName("<stdin>"), hasException(false), pendingException(Value()), isSafeFile(false) {  // Start GC at 8192 objects
-    // Reserve a large stack to prevent reallocation and enable pointer optimizations
-    stack.reserve(1024 * 1024);
-    frames.reserve(256); // Reserve frames to avoid reallocation
-    heap.reserve(16384); // Pre-allocate heap space
+VM::VM() : ip(nullptr), nextGC(32768), currentFileName("<stdin>"), hasException(false), pendingException(Value()), isSafeFile(false) {  // Start GC at 32768 objects
+    // Reserve moderate stack - benchmarks rarely exceed a few hundred slots.
+    // Grows automatically if needed. Big reserve (1M) wastes 16MB at startup.
+    stack.reserve(8192);
+    frames.reserve(64);
+    heap.reserve(16384);
     
     // Initialize error handler
     ErrorHandler::setColorEnabled(true);
@@ -231,6 +233,33 @@ VM::~VM() {
     // Don't manually delete objects - they should be managed by GC
     // Just clear the heap vector
     heap.clear();
+    // Free pooled instances
+    for (Instance* inst : instancePool) {
+        delete inst;
+    }
+    instancePool.clear();
+}
+
+Instance* VM::allocateInstance(Class* klass) {
+    Instance* inst;
+    if (!instancePool.empty()) {
+        // Reuse from pool
+        inst = instancePool.back();
+        instancePool.pop_back();
+        inst->reset(klass);
+    } else {
+        inst = new Instance(klass);
+    }
+    heap.push_back(inst);
+    
+    if (heap.size() >= nextGC) {
+        tempRoots.push_back(inst);
+        collectGarbage();
+        if (!tempRoots.empty() && tempRoots.back() == inst) {
+            tempRoots.pop_back();
+        }
+    }
+    return inst;
 }
 
 // Thread safety implementation
@@ -275,6 +304,7 @@ void VM::relock(int count) {
 
 Function::Function(const FunctionStmt* declaration, std::shared_ptr<Environment> closure) 
     : name(), arity_val(0), chunk(new Chunk()), declaration(declaration), closure(closure) {
+    obj_type = ObjType::OBJ_FUNCTION;
     
     // Extract parameter types from declaration
     if (declaration) {
@@ -348,7 +378,8 @@ bool VM::call(Function* function, int argCount) {
     }
 
     // Check parameter types if function has type annotations
-    if (function->paramTypes.size() == static_cast<size_t>(argCount)) {
+    // Skip entirely if no type annotations (common case for benchmarks)
+    if (!function->paramTypes.empty() && function->paramTypes.size() == static_cast<size_t>(argCount)) {
         for (int i = 0; i < argCount; i++) {
             if (function->paramTypes[i].has_value()) {
                 Value arg = stack[stack.size() - argCount + i];
@@ -436,105 +467,19 @@ bool VM::call(Function* function, int argCount) {
         frame->ip = function->chunk->code.data();
     }
     frame->slot_offset = stack.size() - argCount;  // Point to first argument position
-    frame->fileName = currentFileName;
+    frame->fileName = &currentFileName;
     frame->currentLine = -1;
 
     return true;
 }
 
 bool VM::callValue(Value callee, int argCount) {
-    // Handle BoundArrayMethod and BoundStringMethod
-    if (callee.type == ValueType::OBJECT) {
-        Object* obj = callee.as.object;
-        if (BoundArrayMethod* arrayMethod = dynamic_cast<BoundArrayMethod*>(obj)) {
-            return callArrayMethod(arrayMethod, argCount);
-        } else if (BoundStringMethod* stringMethod = dynamic_cast<BoundStringMethod*>(obj)) {
-            return callStringMethod(stringMethod, argCount);
-        }
-    }
-    
-    if (callee.type == ValueType::CALLABLE) {
-        Callable* callable = callee.as.callable;
-        
-        // Check for BoundMethod first
-        if (BoundMethod* boundMethod = dynamic_cast<BoundMethod*>(callable)) {
-            // For bound methods, replace the method on the stack with the receiver
-            // Stack before: [... | boundMethod | arg1 | arg2]
-            // Stack after:  [... | receiver | arg1 | arg2]
-            // The receiver becomes an implicit first argument
-            size_t methodPos = stack.size() - argCount - 1;
-            stack[methodPos] = boundMethod->receiver;
-            // Call with argCount+1 to include the receiver as first argument (slot 0)
-            // But we need to adjust the method's arity check
-            if (boundMethod->method->arity_val != argCount) {
-                std::string funcName = boundMethod->method->declaration ? 
-                                     boundMethod->method->declaration->name.lexeme : "<method>";
-                runtimeError(this, "Expected " + std::to_string(boundMethod->method->arity_val) + " arguments but got " + std::to_string(argCount) + " for method '" + funcName + "'.", frames.empty() ? -1 : frames.back().currentLine);
-                return false;
-            }
-            // Manually set up the call frame to include receiver at slot 0
-            if (frames.size() == 256) {
-                runtimeError(this, "Stack overflow.", frames.empty() ? -1 : frames.back().currentLine);
-                return false;
-            }
-            CallFrame* frame = &frames.emplace_back();
-            frame->function = boundMethod->method;
-            if (boundMethod->method->chunk->code.empty()) {
-                frame->ip = nullptr;
-            } else {
-                frame->ip = boundMethod->method->chunk->code.data();
-            }
-            // slot_offset points to the receiver (one position before args)
-            frame->slot_offset = stack.size() - argCount - 1;
-            frame->fileName = currentFileName;
-            frame->currentLine = -1;
-            frame->isBoundMethod = true;  // Mark as bound method call
-            return true;
-        } else if (Function* function = dynamic_cast<Function*>(callable)) {
-            return call(function, argCount);
-        } else if (NativeFn* native = dynamic_cast<NativeFn*>(callable)) {
-            if (native->arity() != -1 && native->arity() != argCount) {
-                runtimeError(this, "Expected " + std::to_string(native->arity()) + " arguments but got " + std::to_string(argCount) + " for native function.", frames.empty() ? -1 : frames.back().currentLine);
-                return false;
-            }
-            std::vector<Value> args;
-            for (int i = 0; i < argCount; i++) {
-                args.push_back(stack[stack.size() - argCount + i]);
-            }
-            try {
-                Value result = native->call(*this, args);
-                stack.resize(stack.size() - argCount - 1);
-                push(result);
-            } catch (const std::exception& e) {
-                runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
-            }
-            return true;
-        } else if (callable->isCNativeFn()) {
-            if (callable->arity() != -1 && callable->arity() != argCount) {
-                runtimeError(this, "Expected " + std::to_string(callable->arity()) + " arguments but got " + std::to_string(argCount) + " for native function.", frames.empty() ? -1 : frames.back().currentLine);
-                return false;
-            }
-            std::vector<Value> args;
-            for (int i = 0; i < argCount; i++) {
-                args.push_back(stack[stack.size() - argCount + i]);
-            }
-            try {
-                Value result = callable->call(*this, args);
-                stack.resize(stack.size() - argCount - 1);
-                push(result);
-            } catch (const std::exception& e) {
-                runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
-            }
-            return true;
-        }
-    }
-
-    // Handle CLASS type
+    // Handle CLASS type first (common in OOP-heavy code)
     if (callee.type == ValueType::CLASS) {
         Class* klass = callee.as.klass;
         
         // Create instance
-        Instance* instance = allocate<Instance>(klass);
+        Instance* instance = allocateInstance(klass);
         Value instanceVal(instance);
         
         // Check for initializer
@@ -563,7 +508,7 @@ bool VM::callValue(Value callee, int argCount) {
                 frame->ip = initializer->chunk->code.data();
             }
             frame->slot_offset = stack.size() - argCount - 1; // Include receiver
-            frame->fileName = currentFileName;
+            frame->fileName = &currentFileName;
             frame->currentLine = -1;
             frame->isBoundMethod = true;
             frame->isInitializer = true;
@@ -579,6 +524,95 @@ bool VM::callValue(Value callee, int argCount) {
         stack[stack.size() - argCount - 1] = instanceVal;
         stack.resize(stack.size() - argCount);
         return true;
+    }
+
+    // Handle BoundArrayMethod and BoundStringMethod via obj_type tag (no RTTI)
+    if (callee.type == ValueType::OBJECT) {
+        Object* obj = callee.as.object;
+        if (obj->obj_type == ObjType::OBJ_BOUND_ARRAY_METHOD) {
+            return callArrayMethod(static_cast<BoundArrayMethod*>(obj), argCount);
+        } else if (obj->obj_type == ObjType::OBJ_BOUND_STRING_METHOD) {
+            return callStringMethod(static_cast<BoundStringMethod*>(obj), argCount);
+        }
+    }
+    
+    if (callee.type == ValueType::CALLABLE) {
+        Callable* callable = callee.as.callable;
+        
+        // Use obj_type tag instead of dynamic_cast chain for fast dispatch
+        switch (callable->obj_type) {
+        case ObjType::OBJ_BOUND_METHOD: {
+            BoundMethod* boundMethod = static_cast<BoundMethod*>(callable);
+            size_t methodPos = stack.size() - argCount - 1;
+            stack[methodPos] = boundMethod->receiver;
+            if (boundMethod->method->arity_val != argCount) {
+                std::string funcName = boundMethod->method->declaration ? 
+                                     boundMethod->method->declaration->name.lexeme : "<method>";
+                runtimeError(this, "Expected " + std::to_string(boundMethod->method->arity_val) + " arguments but got " + std::to_string(argCount) + " for method '" + funcName + "'.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
+            }
+            if (frames.size() == 256) {
+                runtimeError(this, "Stack overflow.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
+            }
+            CallFrame* frame = &frames.emplace_back();
+            frame->function = boundMethod->method;
+            if (boundMethod->method->chunk->code.empty()) {
+                frame->ip = nullptr;
+            } else {
+                frame->ip = boundMethod->method->chunk->code.data();
+            }
+            frame->slot_offset = stack.size() - argCount - 1;
+            frame->fileName = &currentFileName;
+            frame->currentLine = -1;
+            frame->isBoundMethod = true;
+            return true;
+        }
+        case ObjType::OBJ_FUNCTION: {
+            Function* function = static_cast<Function*>(callable);
+            return call(function, argCount);
+        }
+        case ObjType::OBJ_NATIVE_FN: {
+            NativeFn* native = static_cast<NativeFn*>(callable);
+            if (native->arity() != -1 && native->arity() != argCount) {
+                runtimeError(this, "Expected " + std::to_string(native->arity()) + " arguments but got " + std::to_string(argCount) + " for native function.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
+            }
+            std::vector<Value> args;
+            for (int i = 0; i < argCount; i++) {
+                args.push_back(stack[stack.size() - argCount + i]);
+            }
+            try {
+                Value result = native->call(*this, args);
+                stack.resize(stack.size() - argCount - 1);
+                push(result);
+            } catch (const std::exception& e) {
+                runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
+            }
+            return true;
+        }
+        default: {
+            if (callable->isCNativeFn()) {
+                if (callable->arity() != -1 && callable->arity() != argCount) {
+                    runtimeError(this, "Expected " + std::to_string(callable->arity()) + " arguments but got " + std::to_string(argCount) + " for native function.", frames.empty() ? -1 : frames.back().currentLine);
+                    return false;
+                }
+                std::vector<Value> args;
+                for (int i = 0; i < argCount; i++) {
+                    args.push_back(stack[stack.size() - argCount + i]);
+                }
+                try {
+                    Value result = callable->call(*this, args);
+                    stack.resize(stack.size() - argCount - 1);
+                    push(result);
+                } catch (const std::exception& e) {
+                    runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
+                }
+                return true;
+            }
+            break;
+        }
+        } // end switch
     }
 
     runtimeError(this, "Can only call functions and classes.", frames.empty() ? -1 : frames.back().currentLine);
@@ -898,6 +932,52 @@ void VM::run(size_t minFrameDepth) {
         return stk[stk.size() - 1 - distance];
     };
 
+    // =====================================================================
+    // GLOBAL VARIABLE CACHE: Avoids hash map lookup on every OP_GET_GLOBAL.
+    // Uses ObjString* as key (interned strings have unique addresses).
+    // Cache is indexed by (constant_idx & 127) for fast lookup.
+    // =====================================================================
+    struct GlobalCacheEntry {
+        ObjString* key;    // Interned string name (nullptr = empty slot)
+        Value* value;      // Direct pointer into globals map
+    };
+    GlobalCacheEntry global_cache[128];
+    std::memset(global_cache, 0, sizeof(global_cache));
+
+    // Per-callsite method cache for OP_INVOKE: 8 entries indexed by bytecode IP hash.
+    // Each OP_INVOKE callsite maps to its own cache slot, avoiding thrashing when
+    // multiple methods are called in a loop (e.g., initialize + dist).
+    struct MethodCacheEntry {
+        Class* klass;
+        ObjString* method_name;
+        Function* method;
+        const uint8_t* callsite_ip; // bytecode IP at the OP_INVOKE site
+    };
+    static constexpr size_t METHOD_CACHE_SIZE = 8;
+    MethodCacheEntry method_cache[METHOD_CACHE_SIZE] = {};
+
+    // Per-callsite property inline cache for OP_GET_PROPERTY on instances.
+    // Caches the inline field index so we skip the linear scan in getField().
+    struct PropCacheEntry {
+        const uint8_t* callsite_ip;
+        Class* klass;
+        uint8_t inline_index;  // cached index into inlineFields[]
+    };
+    static constexpr size_t PROP_CACHE_SIZE = 8;
+    PropCacheEntry prop_cache[PROP_CACHE_SIZE] = {};
+
+    // Pre-computed small integer Values for OP_CONST_INT8 fast path.
+    // Indexed by unsigned byte value (0-255). int8_t reinterpretation
+    // gives the actual constant value.
+    static Value small_int_table[256];
+    static bool small_int_initialized = false;
+    if (!small_int_initialized) {
+        for (int i = 0; i < 256; i++) {
+            small_int_table[i] = Value(static_cast<double>(static_cast<int8_t>(i)));
+        }
+        small_int_initialized = true;
+    }
+
     CallFrame* frame = &frames.back();
 
 #define READ_BYTE() (*frame->ip++)
@@ -906,11 +986,19 @@ void VM::run(size_t minFrameDepth) {
 #define READ_CONSTANT() (frame->function->chunk->constants[READ_BYTE()])
 #define READ_STRING() (READ_CONSTANT().as.obj_string->chars)
 
-// Computed goto optimization (disabled by default due to C++ scope rules)
-// Only enable on GCC/Clang - MSVC doesn't support computed goto
-#if defined(__GNUC__) || defined(__clang__)
+// Computed goto optimization
+// - GCC: Supported
+// - Clang (non-Apple): Supported  
+// - AppleClang: DISABLED - strict about computed goto in try blocks (causes SIGBUS)
+// - MSVC: Not supported (doesn't have computed goto)
+#if defined(__GNUC__) && !defined(__clang__)
+    // GCC - safe to use computed goto
+    #define COMPUTED_GOTO 1
+#elif defined(__clang__) && !defined(__APPLE__)
+    // Non-Apple Clang - safe to use computed goto
     #define COMPUTED_GOTO 1
 #else
+    // MSVC or AppleClang - don't use computed goto
     #define COMPUTED_GOTO 0
 #endif
 
@@ -975,7 +1063,41 @@ void VM::run(size_t minFrameDepth) {
         &&CASE_OP_BITWISE_XOR,
         &&CASE_OP_BITWISE_NOT,
         &&CASE_OP_LEFT_SHIFT,
-        &&CASE_OP_RIGHT_SHIFT
+        &&CASE_OP_RIGHT_SHIFT,
+        &&CASE_OP_INVOKE,
+        &&CASE_OP_INCREMENT_LOCAL,
+        &&CASE_OP_DECREMENT_LOCAL,
+        &&CASE_OP_LOOP_IF_LESS_LOCAL,
+        &&CASE_OP_INCREMENT_GLOBAL,
+        // Extended opcodes (bytecode optimizer)
+        &&CASE_OP_CALL,              // OP_CALL_FAST → same as OP_CALL
+        &&CASE_OP_CALL,              // OP_TAIL_CALL → same as OP_CALL (for now)
+        &&CASE_OP_GET_GLOBAL_FAST,
+        &&CASE_OP_SET_GLOBAL_FAST,
+        &&CASE_OP_LOAD_LOCAL_0,
+        &&CASE_OP_LOAD_LOCAL_1,
+        &&CASE_OP_LOAD_LOCAL_2,
+        &&CASE_OP_LOAD_LOCAL_3,
+        &&CASE_OP_CONST_ZERO,
+        &&CASE_OP_CONST_ONE,
+        &&CASE_OP_CONST_INT8,
+        &&CASE_OP_ADD_INT,
+        &&CASE_OP_SUB_INT,
+        &&CASE_OP_MUL_INT,
+        &&CASE_OP_DIV_INT,
+        &&CASE_OP_MOD_INT,
+        &&CASE_OP_NEGATE_INT,
+        &&CASE_OP_LESS_INT,
+        &&CASE_OP_GREATER_INT,
+        &&CASE_OP_EQUAL_INT,
+        &&CASE_OP_INC_LOCAL_INT,
+        &&CASE_OP_DEC_LOCAL_INT,
+        &&CASE_OP_LESS_JUMP,
+        &&CASE_OP_GREATER_JUMP,
+        &&CASE_OP_EQUAL_JUMP,
+        &&CASE_OP_ADD_LOCAL_CONST,
+        &&CASE_DEFAULT,              // OP_TYPE_GUARD → nop
+        &&CASE_DEFAULT,              // OP_LOOP_HINT → nop
     };
     #define DISPATCH() goto *dispatch_table[READ_BYTE()]
     #define CASE(op) CASE_##op:
@@ -994,56 +1116,55 @@ void VM::run(size_t minFrameDepth) {
         switch (instruction) {
 #endif
             CASE(OP_RETURN) {
-                Value result = pop();
-                size_t return_slot_offset = frame->slot_offset;  // Points to first argument
+                Value result = stk.back();
+                stk.pop_back();
+                size_t return_slot_offset = frame->slot_offset;
                 bool was_bound_method = frame->isBoundMethod;
                 bool was_initializer = frame->isInitializer;
                 
-                Value returnValue = result;
-                if (was_initializer) {
+                Value returnValue;
+                if (NEUTRON_LIKELY(!was_initializer)) {
+                    returnValue = result;
+                } else {
                     // For initializers, return 'this' instead of the function result
-                    if (return_slot_offset < (size_t)(stack.size())) {
-                        returnValue = *(stack.data() + return_slot_offset);
+                    if (return_slot_offset < stk.size()) {
+                        returnValue = stk[return_slot_offset];
+                    } else {
+                        returnValue = result;
                     }
                 }
 
                 frames.pop_back();
                 
-                if (frames.empty() || frames.size() <= minFrameDepth) {
-                    // We are done executing - either the main script or we've returned to target depth
-                    
-                    // Clean up stack frame (arguments and callee)
-                    if (was_bound_method) {
-                        stack.resize(return_slot_offset);
+                if (NEUTRON_LIKELY(!frames.empty() && frames.size() > minFrameDepth)) {
+                    frame = &frames.back();
+                    if (NEUTRON_LIKELY(was_bound_method)) {
+                        // Combine resize + push into direct write
+                        stk[return_slot_offset] = returnValue;
+                        stk.resize(return_slot_offset + 1);
                     } else if (return_slot_offset > 0) {
-                        // If it was a function call, clean up stack
-                        // Ensure we don't underflow if stack is somehow smaller (shouldn't happen)
-                        if ((size_t)(stack.size()) >= return_slot_offset - 1) {
-                            stack.resize(return_slot_offset - 1);
-                        }
+                        stk[return_slot_offset - 1] = returnValue;
+                        stk.resize(return_slot_offset);
                     } else {
-                        // Top level script or no arguments/callee on stack
-                        stack.clear();
+                        stk.clear();
+                        stk.push_back(returnValue);
                     }
-                    
-                    push(returnValue);
-                    syncStack();
-                    return;
+                    DISPATCH();
                 }
 
-                frame = &frames.back();
-                // For bound methods, receiver is at slot_offset, so resize to slot_offset
-                // For regular functions, callee is at slot_offset-1, so resize to slot_offset-1
+                // Slow path: returning from top-level or target depth
                 if (was_bound_method) {
                     stack.resize(return_slot_offset);
                 } else if (return_slot_offset > 0) {
-                    stack.resize(return_slot_offset - 1);
+                    if (stack.size() >= return_slot_offset - 1) {
+                        stack.resize(return_slot_offset - 1);
+                    }
                 } else {
-                    // Edge case: top-level script or no arguments
                     stack.clear();
                 }
                 push(returnValue);
-                DISPATCH();
+                syncStack();
+                return;
             }
             CASE(OP_CONSTANT) {
                 Value constant = READ_CONSTANT();
@@ -1100,25 +1221,37 @@ void VM::run(size_t minFrameDepth) {
                 DISPATCH();
             }
             CASE(OP_GET_GLOBAL) {
-                const std::string& name = READ_STRING();
-                auto it = globals.find(name);
-                if (it == globals.end()) {
-                    if (name == "json" || name == "math" || name == "sys" || name == "http" || 
-                        name == "time" || name == "fmt" || name == "arrays") {
-                        runtimeError(this, "Undefined variable '" + name + "'. Did you forget to import it? Use 'use " + name + ";' at the top of your file.", 
-                                    frames.empty() ? -1 : frames.back().currentLine);
-                    } else {
-                        runtimeError(this, "Undefined variable '" + name + "'.", 
-                                    frames.empty() ? -1 : frames.back().currentLine);
+                uint8_t idx = READ_BYTE();
+                ObjString* nameStr = frame->function->chunk->constants[idx].as.obj_string;
+                uint8_t slot = idx & 127;
+                GlobalCacheEntry& entry = global_cache[slot];
+                if (NEUTRON_LIKELY(entry.key == nameStr)) {
+                    FAST_PUSH(*entry.value);
+                } else {
+                    const std::string& name = nameStr->chars;
+                    auto it = globals.find(name);
+                    if (it == globals.end()) {
+                        if (name == "json" || name == "math" || name == "sys" || name == "http" || 
+                            name == "time" || name == "fmt" || name == "arrays") {
+                            runtimeError(this, "Undefined variable '" + name + "'. Did you forget to import it? Use 'use " + name + ";' at the top of your file.", 
+                                        frames.empty() ? -1 : frames.back().currentLine);
+                        } else {
+                            runtimeError(this, "Undefined variable '" + name + "'.", 
+                                        frames.empty() ? -1 : frames.back().currentLine);
+                        }
                     }
+                    entry.key = nameStr;
+                    entry.value = &(it->second);
+                    FAST_PUSH(it->second);
                 }
-                FAST_PUSH(it->second);  // Use iterator directly instead of second lookup
                 DISPATCH();
             }
             CASE(OP_DEFINE_GLOBAL) {
                 const std::string& name = READ_STRING();
                 globals[name] = peek(0);
                 pop();
+                // Invalidate global cache — map may have rehashed
+                std::memset(global_cache, 0, sizeof(global_cache));
                 DISPATCH();
             }
             CASE(OP_DEFINE_TYPED_GLOBAL) {
@@ -1128,6 +1261,8 @@ void VM::run(size_t minFrameDepth) {
                 globals[name] = peek(0);
                 globalTypes[name] = type;  // Store the type information
                 pop();
+                // Invalidate global cache — map may have rehashed
+                std::memset(global_cache, 0, sizeof(global_cache));
                 DISPATCH();
             }
             CASE(OP_VALIDATE_SAFE_FUNCTION) {
@@ -1195,13 +1330,22 @@ void VM::run(size_t minFrameDepth) {
                 DISPATCH();
             }
             CASE(OP_SET_GLOBAL) {
-                const std::string& name = READ_STRING();
-                auto it = globals.find(name);
-                if (it == globals.end()) {
-                    runtimeError(this, "Undefined variable '" + name + "'.", 
-                                frames.empty() ? -1 : frames.back().currentLine);
+                uint8_t idx = READ_BYTE();
+                ObjString* nameStr = frame->function->chunk->constants[idx].as.obj_string;
+                uint8_t slot = idx & 127;
+                GlobalCacheEntry& entry = global_cache[slot];
+                if (NEUTRON_LIKELY(entry.key == nameStr)) {
+                    *entry.value = peek(0);
+                } else {
+                    auto it = globals.find(nameStr->chars);
+                    if (NEUTRON_UNLIKELY(it == globals.end())) {
+                        runtimeError(this, "Undefined variable '" + nameStr->chars + "'.", 
+                                    frames.empty() ? -1 : frames.back().currentLine);
+                    }
+                    entry.key = nameStr;
+                    entry.value = &(it->second);
+                    it->second = peek(0);
                 }
-                globals[name] = peek(0);
                 DISPATCH();
             }
             CASE(OP_SET_GLOBAL_TYPED) {
@@ -1371,11 +1515,59 @@ void VM::run(size_t minFrameDepth) {
                 DISPATCH();
             }
             CASE(OP_GET_PROPERTY) {
+                const uint8_t* prop_callsite = frame->ip;
                 ObjString* propertyNameObj = READ_CONSTANT().as.obj_string;
-                const std::string& propertyName = propertyNameObj->chars;
                 Value object = peek(0);
                 
-                if (object.type == ValueType::MODULE) {
+                if (NEUTRON_LIKELY(object.type == ValueType::INSTANCE)) {
+                    // Handle instance properties and methods (most common case)
+                    Instance* inst = object.as.instance;
+                    
+                    // Per-callsite property inline cache: skip getField() linear scan
+                    size_t pc_idx = (reinterpret_cast<uintptr_t>(prop_callsite) >> 1) & (PROP_CACHE_SIZE - 1);
+                    PropCacheEntry& pc = prop_cache[pc_idx];
+                    if (NEUTRON_LIKELY(pc.callsite_ip == prop_callsite && pc.klass == inst->klass)) {
+                        stack.back() = inst->inlineFields[pc.inline_index].value;
+                        DISPATCH();
+                    }
+                    
+                    // Check fields first using inline/overflow lookup
+                    Value* fieldVal = inst->getField(propertyNameObj);
+                    if (NEUTRON_LIKELY(fieldVal != nullptr)) {
+                        // Populate property cache if field is inline
+                        for (uint8_t fi = 0; fi < inst->inlineCount; ++fi) {
+                            if (inst->inlineFields[fi].key == propertyNameObj) {
+                                pc.callsite_ip = prop_callsite;
+                                pc.klass = inst->klass;
+                                pc.inline_index = fi;
+                                break;
+                            }
+                        }
+                        stack.back() = *fieldVal;
+                    } else {
+                        // Check methods in the class
+                        auto methIt = inst->klass->methods.find(propertyNameObj);
+                        if (methIt != inst->klass->methods.end()) {
+                            // Create a bound method that captures the instance
+                            Value methodValue = methIt->second;
+                            if (methodValue.type == ValueType::CALLABLE) {
+                                Callable* c = methodValue.as.callable;
+                                if (c->obj_type == ObjType::OBJ_FUNCTION) {
+                                    stack.back() = Value(allocate<BoundMethod>(object, static_cast<Function*>(c)));
+                                } else {
+                                    stack.back() = methodValue;
+                                }
+                            } else {
+                                stack.back() = methodValue;
+                            }
+                        } else {
+                            const std::string& propertyName = propertyNameObj->chars;
+                            runtimeError(this, "Property '" + propertyName + "' not found on instance.",
+                                        frames.empty() ? -1 : frames.back().currentLine);
+                        }
+                    }
+                } else if (object.type == ValueType::MODULE) {
+                    const std::string& propertyName = propertyNameObj->chars;
                     Module* module = object.as.module;
                     try {
                         Value property = module->get(propertyName);
@@ -1386,6 +1578,7 @@ void VM::run(size_t minFrameDepth) {
                                     frames.empty() ? -1 : frames.back().currentLine);
                     }
                 } else if (object.type == ValueType::ARRAY) {
+                    const std::string& propertyName = propertyNameObj->chars;
                     Array* arr = object.as.array;
                     
                     if (propertyName == "length") {
@@ -1396,7 +1589,6 @@ void VM::run(size_t minFrameDepth) {
                                propertyName == "filter" || propertyName == "find" ||
                                propertyName == "indexOf" || propertyName == "join" ||
                                propertyName == "reverse" || propertyName == "sort") {
-                        // Return a bound method that captures the array
                         stack.pop_back();
                         push(Value(allocate<BoundArrayMethod>(arr, propertyName)));
                     } else {
@@ -1404,66 +1596,31 @@ void VM::run(size_t minFrameDepth) {
                                     frames.empty() ? -1 : frames.back().currentLine);
                     }
                 } else if (object.type == ValueType::OBJ_STRING) {
-                    // Handle string properties and methods
-                    {
-                        std::string str = object.asString()->chars;
-                        
-                        if (propertyName == "length") {
-                            stack.pop_back();
-                            push(Value(static_cast<double>(str.length())));
-                        } else if (propertyName == "chars") {
-                            // Return an array of individual characters
-                            Array* charArray = allocate<Array>();
-                            for (char c : str) {
-                                charArray->push(Value(internString(std::string(1, c))));
-                            }
-                            stack.pop_back();
-                            push(Value(charArray));
-                        } else if (StringMethodRegistry::getInstance().hasMethod(propertyName)) {
-                            // Return a bound method that captures the string
-                            stack.pop_back();
-                            push(Value(allocate<BoundStringMethod>(str, propertyName)));
-                        } else {
-                            runtimeError(this, "String does not have property '" + propertyName + "'.",
-                                        frames.empty() ? -1 : frames.back().currentLine);
-                        }
-                    }
-                } else if (object.type == ValueType::INSTANCE) {
-                    // Handle instance properties and methods
-                    Instance* inst = object.as.instance;
+                    const std::string& propertyName = propertyNameObj->chars;
+                    ObjString* strObj = object.as.obj_string;
                     
-                    // Check fields first using inline/overflow lookup
-                    Value* fieldVal = inst->getField(propertyNameObj);
-                    if (fieldVal != nullptr) {
-                        stack.back() = *fieldVal;
-                    } else {
-                        // Check methods in the class
-                        auto methIt = inst->klass->methods.find(propertyNameObj);
-                        if (methIt != inst->klass->methods.end()) {
-                            // Create a bound method that captures the instance
-                            Value methodValue = methIt->second;
-                            if (methodValue.type == ValueType::CALLABLE) {
-                                Function* func = dynamic_cast<Function*>(methodValue.as.callable);
-                                if (func != nullptr) {
-                                    stack.back() = Value(allocate<BoundMethod>(object, func));
-                                } else {
-                                    // Not a Function, but still a callable - use as-is
-                                    stack.back() = methodValue;
-                                }
-                            } else {
-                                stack.back() = methodValue;
-                            }
-                        } else {
-                            runtimeError(this, "Property '" + propertyName + "' not found on instance.",
-                                        frames.empty() ? -1 : frames.back().currentLine);
+                    if (propertyName == "length") {
+                        stk.back() = Value(static_cast<double>(strObj->chars.length()));
+                    } else if (propertyName == "chars") {
+                        Array* charArray = allocate<Array>();
+                        for (char c : strObj->chars) {
+                            charArray->push(Value(internString(std::string(1, c))));
                         }
+                        stack.pop_back();
+                        push(Value(charArray));
+                    } else if (StringMethodRegistry::getInstance().hasMethod(propertyName)) {
+                        stack.pop_back();
+                        push(Value(allocate<BoundStringMethod>(strObj->chars, propertyName)));
+                    } else {
+                        runtimeError(this, "String does not have property '" + propertyName + "'.",
+                                    frames.empty() ? -1 : frames.back().currentLine);
                     }
                 } else if (object.type == ValueType::OBJECT) {
+                    const std::string& propertyName = propertyNameObj->chars;
                     Object* objPtr = object.as.object;
                     
-                    // Check if it's a JsonObject
-                    JsonObject* obj = dynamic_cast<JsonObject*>(objPtr);
-                    if (obj != nullptr) {
+                    if (objPtr->obj_type == ObjType::OBJ_JSON_OBJECT) {
+                        JsonObject* obj = static_cast<JsonObject*>(objPtr);
                         auto it = obj->properties.find(propertyNameObj);
                         if (it != obj->properties.end()) {
                             stack.pop_back();
@@ -1491,8 +1648,8 @@ void VM::run(size_t minFrameDepth) {
                     stk.pop_back();
                 } else if (object.type == ValueType::OBJECT) {
                     Object* objPtr = object.as.object;
-                    JsonObject* jsonObj = dynamic_cast<JsonObject*>(objPtr);
-                    if (jsonObj != nullptr) {
+                    if (objPtr->obj_type == ObjType::OBJ_JSON_OBJECT) {
+                        JsonObject* jsonObj = static_cast<JsonObject*>(objPtr);
                         jsonObj->properties[propertyNameObj] = value;
                         stk[stk.size() - 2] = value;
                         stk.pop_back();
@@ -1513,6 +1670,15 @@ void VM::run(size_t minFrameDepth) {
                 Value& b = peek(0);
                 Value& a = peek(1);
                 
+                // Fast path for numbers (most common in loops)
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
+                    bool result = (a.as.number == b.as.number);
+                    a.type = ValueType::BOOLEAN;
+                    a.as.boolean = result;
+                    stack.pop_back();
+                    DISPATCH();
+                }
+                
                 bool result = false;
                 if (a.type != b.type) {
                     result = false;
@@ -1523,7 +1689,10 @@ void VM::run(size_t minFrameDepth) {
                 } else if (a.type == ValueType::NUMBER) {
                     result = (a.as.number == b.as.number);
                 } else if (a.type == ValueType::OBJ_STRING) {
-                    result = (a.asString()->chars == b.asString()->chars);
+                    // Fast pointer equality for interned strings
+                    ObjString* sa = a.as.obj_string;
+                    ObjString* sb = b.as.obj_string;
+                    result = (sa == sb) || (sa->chars == sb->chars);
                 } else {
                     // For complex types (OBJECT, ARRAY, etc.), fall back to string comparison
                     result = (a.toString() == b.toString());
@@ -1548,7 +1717,9 @@ void VM::run(size_t minFrameDepth) {
                 } else if (a.type == ValueType::NUMBER) {
                     result = (a.as.number != b.as.number);
                 } else if (a.type == ValueType::OBJ_STRING) {
-                    result = (a.asString()->chars != b.asString()->chars);
+                    ObjString* sa = a.as.obj_string;
+                    ObjString* sb = b.as.obj_string;
+                    result = (sa != sb) && (sa->chars != sb->chars);
                 } else {
                     // For complex types (OBJECT, ARRAY, etc.), fall back to string comparison
                     result = (a.toString() != b.toString());
@@ -1563,22 +1734,28 @@ void VM::run(size_t minFrameDepth) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
+                    bool result = a.as.number > b.as.number;
+                    a.type = ValueType::BOOLEAN;
+                    a.as.boolean = result;
+                    stk.pop_back();
+                } else {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a = Value(a.as.number > b.as.number);
-                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_LESS) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
+                    bool result = a.as.number < b.as.number;
+                    a.type = ValueType::BOOLEAN;
+                    a.as.boolean = result;
+                    stk.pop_back();
+                } else {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a = Value(a.as.number < b.as.number);
-                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_ADD) {
@@ -1586,26 +1763,81 @@ void VM::run(size_t minFrameDepth) {
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
                 
-                if (a.type == ValueType::NUMBER && b.type == ValueType::NUMBER) {
-                    a.as.number += b.as.number;
-                    stk.pop_back();
-                } else if (a.type == ValueType::OBJ_STRING && b.type == ValueType::OBJ_STRING) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER)) {
+                    if (NEUTRON_LIKELY(b.type == ValueType::NUMBER)) {
+                        a.as.number += b.as.number;
+                        stk.pop_back();
+                        DISPATCH();
+                    }
+                }
+                if (a.type == ValueType::OBJ_STRING && b.type == ValueType::OBJ_STRING) {
                     ObjString* strA = a.as.obj_string;
                     ObjString* strB = b.as.obj_string;
-                    
-                    std::string result;
-                    result.reserve(strA->chars.length() + strB->chars.length());
-                    result.append(strA->chars);
-                    result.append(strB->chars);
-                    
-                    a = Value(makeString(std::move(result)));
-                    stk.pop_back();
+                    if (!strA->isInterned) {
+                        // Safe in-place append: strA is a unique data string (from makeString),
+                        // not shared through the intern table.
+                        strA->chars.append(strB->chars);
+                        strA->hashComputed = false;
+                        stk.pop_back();
+                    } else {
+                        // strA is interned (shared), must allocate a new string
+                        std::string result;
+                        result.reserve(strA->chars.size() + strB->chars.size());
+                        result.append(strA->chars);
+                        result.append(strB->chars);
+                        a = Value(makeString(std::move(result)));
+                        stk.pop_back();
+                    }
                 } else {
-                    Value val_b = pop();
-                    Value val_a = pop();
-                    std::string str_a = val_a.toString();
-                    std::string str_b = val_b.toString();
-                    push(Value(makeString(str_a + str_b)));
+                    // Fast path for string + number (very common in formatting)
+                    if (a.type == ValueType::OBJ_STRING && b.type == ValueType::NUMBER) {
+                        ObjString* strA = a.as.obj_string;
+                        char buf[32];
+                        double num = b.as.number;
+                        int len;
+                        // Format integer values without decimal point
+                        if (num == static_cast<double>(static_cast<int64_t>(num)) && 
+                            num >= -999999999999999LL && num <= 999999999999999LL) {
+                            len = snprintf(buf, sizeof(buf), "%lld", (long long)static_cast<int64_t>(num));
+                        } else {
+                            len = snprintf(buf, sizeof(buf), "%.15g", num);
+                        }
+                        if (!strA->isInterned) {
+                            strA->chars.append(buf, len);
+                            strA->hashComputed = false;
+                            stk.pop_back();
+                        } else {
+                            std::string result;
+                            result.reserve(strA->chars.size() + len);
+                            result.append(strA->chars);
+                            result.append(buf, len);
+                            a = Value(makeString(std::move(result)));
+                            stk.pop_back();
+                        }
+                    } else if (a.type == ValueType::NUMBER && b.type == ValueType::OBJ_STRING) {
+                        ObjString* strB = b.as.obj_string;
+                        char buf[32];
+                        double num = a.as.number;
+                        int len;
+                        if (num == static_cast<double>(static_cast<int64_t>(num)) && 
+                            num >= -999999999999999LL && num <= 999999999999999LL) {
+                            len = snprintf(buf, sizeof(buf), "%lld", (long long)static_cast<int64_t>(num));
+                        } else {
+                            len = snprintf(buf, sizeof(buf), "%.15g", num);
+                        }
+                        std::string result;
+                        result.reserve(len + strB->chars.size());
+                        result.append(buf, len);
+                        result.append(strB->chars);
+                        a = Value(makeString(std::move(result)));
+                        stk.pop_back();
+                    } else {
+                        Value val_b = pop();
+                        Value val_a = pop();
+                        std::string str_a = val_a.toString();
+                        std::string str_b = val_b.toString();
+                        push(Value(makeString(str_a + str_b)));
+                    }
                 }
                 DISPATCH();
             }
@@ -1613,17 +1845,25 @@ void VM::run(size_t minFrameDepth) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
+                    a.as.number -= b.as.number;
+                    stk.pop_back();
+                } else {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as.number -= b.as.number;
-                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_MULTIPLY) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
+                
+                // Fast path: number * number (most common)
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
+                    a.as.number *= b.as.number;
+                    stk.pop_back();
+                    DISPATCH();
+                }
                 
                 // Handle string * int and int * string
                 if (a.type == ValueType::OBJ_STRING && b.type == ValueType::NUMBER) {
@@ -1632,10 +1872,10 @@ void VM::run(size_t minFrameDepth) {
                         std::string str = a.asString()->chars;
                         int count = static_cast<int>(b.as.number);
                         
-                        if (count < 0) count = 0; // Negative count results in empty string
+                        if (count < 0) count = 0;
                         
                         std::string result;
-                        result.reserve(str.length() * count); // Optimize for large repetitions
+                        result.reserve(str.length() * count);
                         
                         for (int i = 0; i < count; i++) {
                             result += str;
@@ -1651,10 +1891,10 @@ void VM::run(size_t minFrameDepth) {
                         int count = static_cast<int>(a.as.number);
                         std::string str = b.asString()->chars;
                         
-                        if (count < 0) count = 0; // Negative count results in empty string
+                        if (count < 0) count = 0;
                         
                         std::string result;
-                        result.reserve(str.length() * count); // Optimize for large repetitions
+                        result.reserve(str.length() * count);
                         
                         for (int i = 0; i < count; i++) {
                             result += str;
@@ -1662,11 +1902,6 @@ void VM::run(size_t minFrameDepth) {
                         
                         a = Value(internString(result));
                     }
-                    stk.pop_back();
-                    DISPATCH();
-                } else if (a.type == ValueType::NUMBER && b.type == ValueType::NUMBER) {
-                    // number * number (existing functionality)
-                    a.as.number *= b.as.number;
                     stk.pop_back();
                     DISPATCH();
                 } else {
@@ -1677,30 +1912,34 @@ void VM::run(size_t minFrameDepth) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
+                    double val_b = b.as.number;
+                    if (NEUTRON_LIKELY(val_b != 0)) {
+                        a.as.number /= val_b;
+                        stk.pop_back();
+                    } else {
+                        runtimeError(this, "Division by zero.", frames.empty() ? -1 : frames.back().currentLine);
+                    }
+                } else {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double val_b = b.as.number;
-                if (val_b == 0) {
-                    runtimeError(this, "Division by zero.", frames.empty() ? -1 : frames.back().currentLine);
-                }
-                a.as.number /= val_b;
-                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_MODULO) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
+                    double val_b = b.as.number;
+                    if (NEUTRON_LIKELY(val_b != 0)) {
+                        a.as.number = fmod(a.as.number, val_b);
+                        stk.pop_back();
+                    } else {
+                        runtimeError(this, "Modulo by zero.", frames.empty() ? -1 : frames.back().currentLine);
+                    }
+                } else {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                double val_b = b.as.number;
-                if (val_b == 0) {
-                    runtimeError(this, "Modulo by zero.", frames.empty() ? -1 : frames.back().currentLine);
-                }
-                a.as.number = fmod(a.as.number, val_b);
-                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_NOT) {
@@ -1710,73 +1949,86 @@ void VM::run(size_t minFrameDepth) {
             }
             CASE(OP_NEGATE) {
                 Value& value = peek(0);
-                if (value.type != ValueType::NUMBER) {
+                if (NEUTRON_LIKELY(value.type == ValueType::NUMBER)) {
+                    value.as.number = -value.as.number;
+                } else {
                     runtimeError(this, "Operand must be a number.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                value.as.number = -value.as.number;
                 DISPATCH();
             }
             CASE(OP_BITWISE_AND) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
+                    int64_t ia = static_cast<int64_t>(a.as.number);
+                    int64_t ib = static_cast<int64_t>(b.as.number);
+                    a.as.number = static_cast<double>(ia & ib);
+                    stk.pop_back();
+                } else {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as.number = static_cast<double>(static_cast<int64_t>(a.as.number) & static_cast<int64_t>(b.as.number));
-                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_BITWISE_OR) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
+                    int64_t ia = static_cast<int64_t>(a.as.number);
+                    int64_t ib = static_cast<int64_t>(b.as.number);
+                    a.as.number = static_cast<double>(ia | ib);
+                    stk.pop_back();
+                } else {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as.number = static_cast<double>(static_cast<int64_t>(a.as.number) | static_cast<int64_t>(b.as.number));
-                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_BITWISE_XOR) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
+                    int64_t ia = static_cast<int64_t>(a.as.number);
+                    int64_t ib = static_cast<int64_t>(b.as.number);
+                    a.as.number = static_cast<double>(ia ^ ib);
+                    stk.pop_back();
+                } else {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as.number = static_cast<double>(static_cast<int64_t>(a.as.number) ^ static_cast<int64_t>(b.as.number));
-                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_BITWISE_NOT) {
                 Value& value = stk.back();
-                if (value.type != ValueType::NUMBER) {
+                if (NEUTRON_LIKELY(value.type == ValueType::NUMBER)) {
+                    value.as.number = static_cast<double>(~static_cast<int64_t>(value.as.number));
+                } else {
                     runtimeError(this, "Operand must be a number.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                value.as.number = static_cast<double>(~static_cast<int64_t>(value.as.number));
                 DISPATCH();
             }
             CASE(OP_LEFT_SHIFT) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
+                    a.as.number = static_cast<double>(static_cast<int64_t>(a.as.number) << static_cast<int64_t>(b.as.number));
+                    stk.pop_back();
+                } else {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as.number = static_cast<double>(static_cast<int64_t>(a.as.number) << static_cast<int64_t>(b.as.number));
-                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_RIGHT_SHIFT) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
                 Value& a = stk[sz - 2];
-                if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) {
+                if (NEUTRON_LIKELY(a.type == ValueType::NUMBER && b.type == ValueType::NUMBER)) {
+                    a.as.number = static_cast<double>(static_cast<int64_t>(a.as.number) >> static_cast<int64_t>(b.as.number));
+                    stk.pop_back();
+                } else {
                     runtimeError(this, "Operands must be numbers.", frames.empty() ? -1 : frames.back().currentLine);
                 }
-                a.as.number = static_cast<double>(static_cast<int64_t>(a.as.number) >> static_cast<int64_t>(b.as.number));
-                stk.pop_back();
                 DISPATCH();
             }
 #if !COMPUTED_GOTO
@@ -1786,8 +2038,400 @@ void VM::run(size_t minFrameDepth) {
             CASE_DEFAULT:
                 runtimeError(this, "Unknown opcode.", frames.empty() ? -1 : frames.back().currentLine);
 #endif
+            CASE(OP_INVOKE) {
+                // Optimized method call: combines GET_PROPERTY + CALL
+                // Encoding: OP_INVOKE <property_name_constant> <arg_count>
+                // Capture callsite IP before reading operands for per-callsite caching
+                const uint8_t* callsite_ip = frame->ip;
+                ObjString* methodNameObj = READ_CONSTANT().as.obj_string;
+                uint8_t argCount = READ_BYTE();
+                
+                Value& receiver = stk[stk.size() - argCount - 1];
+                
+                if (NEUTRON_LIKELY(receiver.type == ValueType::INSTANCE)) {
+                    Instance* inst = receiver.as.instance;
+                    
+                    // Per-callsite method cache lookup
+                    size_t cache_idx = (reinterpret_cast<uintptr_t>(callsite_ip) >> 1) & (METHOD_CACHE_SIZE - 1);
+                    MethodCacheEntry& mc = method_cache[cache_idx];
+                    if (NEUTRON_LIKELY(mc.callsite_ip == callsite_ip && mc.klass == inst->klass)) {
+                        Function* method = mc.method;
+                        if (NEUTRON_LIKELY(method->arity_val == argCount && frames.size() < 256)) {
+                            CallFrame* newFrame = &frames.emplace_back();
+                            newFrame->function = method;
+                            newFrame->ip = method->chunk->code.data();
+                            newFrame->slot_offset = stk.size() - argCount - 1;
+                            newFrame->fileName = &currentFileName;
+                            newFrame->currentLine = -1;
+                            newFrame->isBoundMethod = true;
+                            frame = newFrame;
+                            DISPATCH();
+                        }
+                    }
+                    
+                    // Check methods (most common case for OP_INVOKE)
+                    auto methIt = inst->klass->methods.find(methodNameObj);
+                    if (NEUTRON_LIKELY(methIt != inst->klass->methods.end())) {
+                        Value methodValue = methIt->second;
+                        if (NEUTRON_LIKELY(methodValue.type == ValueType::CALLABLE)) {
+                            Function* method = static_cast<Function*>(methodValue.as.callable);
+                            
+                            // Update per-callsite method cache
+                            mc.callsite_ip = callsite_ip;
+                            mc.klass = inst->klass;
+                            mc.method_name = methodNameObj;
+                            mc.method = method;
+                            
+                            if (NEUTRON_LIKELY(method->arity_val == argCount)) {
+                                if (NEUTRON_LIKELY(frames.size() < 256)) {
+                                    CallFrame* newFrame = &frames.emplace_back();
+                                    newFrame->function = method;
+                                    newFrame->ip = method->chunk->code.data();
+                                    newFrame->slot_offset = stk.size() - argCount - 1;
+                                    newFrame->fileName = &currentFileName;
+                                    newFrame->currentLine = -1;
+                                    newFrame->isBoundMethod = true;
+                                    frame = newFrame;
+                                    DISPATCH();
+                                }
+                                runtimeError(this, "Stack overflow.", frames.empty() ? -1 : frames.back().currentLine);
+                                return;
+                            }
+                            
+                            std::string funcName = method->declaration ? 
+                                method->declaration->name.lexeme : "<method>";
+                            runtimeError(this, "Expected " + std::to_string(method->arity_val) + 
+                                " arguments but got " + std::to_string(argCount) + 
+                                " for method '" + funcName + "'.", 
+                                frames.empty() ? -1 : frames.back().currentLine);
+                            return;
+                        }
+                    }
+                    
+                    // Fallback: check for field (could be a closure stored in a field)
+                    Value* fieldVal = inst->getField(methodNameObj);
+                    if (fieldVal != nullptr) {
+                        stk[stk.size() - argCount - 1] = *fieldVal;
+                        if (!callValue(*fieldVal, argCount)) {
+                            return;
+                        }
+                        frame = &frames.back();
+                        DISPATCH();
+                    }
+                    
+                    runtimeError(this, "Method '" + methodNameObj->chars + "' not found on instance.",
+                        frames.empty() ? -1 : frames.back().currentLine);
+                    return;
+                } else if (receiver.type == ValueType::ARRAY) {
+                    // Array methods
+                    Array* arr = receiver.as.array;
+                    const std::string& methodName = methodNameObj->chars;
+                    
+                    if (methodName == "push" || methodName == "pop" || 
+                        methodName == "slice" || methodName == "map" ||
+                        methodName == "filter" || methodName == "find" ||
+                        methodName == "indexOf" || methodName == "join" ||
+                        methodName == "reverse" || methodName == "sort") {
+                        BoundArrayMethod* bam = allocate<BoundArrayMethod>(arr, methodName);
+                        stk[stk.size() - argCount - 1] = Value(static_cast<Object*>(bam));
+                        if (!callArrayMethod(bam, argCount)) {
+                            return;
+                        }
+                        frame = &frames.back();
+                        DISPATCH();
+                    }
+                    runtimeError(this, "Array does not have method '" + methodName + "'.",
+                        frames.empty() ? -1 : frames.back().currentLine);
+                    return;
+                } else if (receiver.type == ValueType::OBJ_STRING) {
+                    // String methods
+                    ObjString* strObj = receiver.as.obj_string;
+                    const std::string& methodName = methodNameObj->chars;
+                    
+                    if (StringMethodRegistry::getInstance().hasMethod(methodName)) {
+                        BoundStringMethod* bsm = allocate<BoundStringMethod>(strObj->chars, methodName);
+                        stk[stk.size() - argCount - 1] = Value(static_cast<Object*>(bsm));
+                        if (!callStringMethod(bsm, argCount)) {
+                            return;
+                        }
+                        frame = &frames.back();
+                        DISPATCH();
+                    }
+                    runtimeError(this, "String does not have method '" + methodName + "'.",
+                        frames.empty() ? -1 : frames.back().currentLine);
+                    return;
+                } else {
+                    // Fallback: do GET_PROPERTY + CALL the slow way
+                    // This handles modules, JSON objects, etc.
+                    
+                    // First simulate GET_PROPERTY
+                    Value callee = receiver;
+                    if (callee.type == ValueType::MODULE) {
+                        Module* module = callee.as.module;
+                        // Use raw pointers and manual control to avoid destructor issues with computed goto
+                        const char* error_msg_cstr = nullptr;
+                        bool module_call_success = false;
+                        try {
+                            Value property = module->get(methodNameObj->chars);
+                            stk[stk.size() - argCount - 1] = property;
+                            if (!callValue(property, argCount)) {
+                                return;
+                            }
+                            frame = &frames.back();
+                            module_call_success = true;
+                        } catch (const std::runtime_error& e) {
+                            // Copy to static storage to avoid std::string in scope
+                            static thread_local char error_buf[256];
+                            strncpy(error_buf, e.what(), sizeof(error_buf) - 1);
+                            error_buf[sizeof(error_buf) - 1] = '\0';
+                            error_msg_cstr = error_buf;
+                        }
+                        if (error_msg_cstr) {
+                            runtimeError(this, error_msg_cstr, frames.empty() ? -1 : frames.back().currentLine);
+                            return;
+                        }
+                        if (module_call_success) {
+                            DISPATCH();
+                        }
+                    }
+                    
+                    runtimeError(this, "Cannot invoke method on this value type.", 
+                        frames.empty() ? -1 : frames.back().currentLine);
+                    return;
+                }
+            }
+            CASE(OP_INCREMENT_LOCAL) {
+                uint8_t slot = READ_BYTE();
+                stk[frame->slot_offset + slot].as.number += 1.0;
+                DISPATCH();
+            }
+            CASE(OP_DECREMENT_LOCAL) {
+                uint8_t slot = READ_BYTE();
+                stk[frame->slot_offset + slot].as.number -= 1.0;
+                DISPATCH();
+            }
+            CASE(OP_LOOP_IF_LESS_LOCAL) {
+                // Fused: if (local[slot] < constant) don't jump, else jump
+                // Encoding: slot(1) + constant_idx(1) + jump_offset(2)
+                uint8_t slot = READ_BYTE();
+                uint8_t constIdx = READ_BYTE();
+                uint16_t offset = READ_SHORT();
+                double localVal = stk[frame->slot_offset + slot].as.number;
+                double limit = frame->function->chunk->constants[constIdx].as.number;
+                if (!(localVal < limit)) {
+                    frame->ip += offset; // exit loop
+                }
+                DISPATCH();
+            }
+            CASE(OP_INCREMENT_GLOBAL) {
+                // Fused: globals[name] += 1.0 (no stack operations)
+                uint8_t idx = READ_BYTE();
+                ObjString* nameStr = frame->function->chunk->constants[idx].as.obj_string;
+                uint8_t slot = idx & 127;
+                GlobalCacheEntry& entry = global_cache[slot];
+                if (NEUTRON_LIKELY(entry.key == nameStr)) {
+                    entry.value->as.number += 1.0;
+                } else {
+                    auto it = globals.find(nameStr->chars);
+                    if (NEUTRON_LIKELY(it != globals.end())) {
+                        entry.key = nameStr;
+                        entry.value = &(it->second);
+                        it->second.as.number += 1.0;
+                    }
+                }
+                DISPATCH();
+            }
+            CASE(OP_GET_GLOBAL_FAST) {
+                // Cached global variable read: uses ObjString* identity check
+                // instead of hash map lookup on every iteration.
+                uint8_t idx = READ_BYTE();
+                ObjString* nameStr = frame->function->chunk->constants[idx].as.obj_string;
+                uint8_t slot = idx & 127;
+                GlobalCacheEntry& entry = global_cache[slot];
+                if (NEUTRON_LIKELY(entry.key == nameStr)) {
+                    FAST_PUSH(*entry.value);
+                } else {
+                    auto it = globals.find(nameStr->chars);
+                    if (NEUTRON_UNLIKELY(it == globals.end())) {
+                        runtimeError(this, "Undefined variable '" + nameStr->chars + "'.",
+                                    frames.empty() ? -1 : frames.back().currentLine);
+                    }
+                    entry.key = nameStr;
+                    entry.value = &(it->second);
+                    FAST_PUSH(it->second);
+                }
+                DISPATCH();
+            }
+            CASE(OP_SET_GLOBAL_FAST) {
+                // Cached global variable write
+                uint8_t idx = READ_BYTE();
+                ObjString* nameStr = frame->function->chunk->constants[idx].as.obj_string;
+                uint8_t slot = idx & 127;
+                GlobalCacheEntry& entry = global_cache[slot];
+                if (NEUTRON_LIKELY(entry.key == nameStr)) {
+                    *entry.value = peek(0);
+                } else {
+                    auto it = globals.find(nameStr->chars);
+                    if (NEUTRON_UNLIKELY(it == globals.end())) {
+                        runtimeError(this, "Undefined variable '" + nameStr->chars + "'.",
+                                    frames.empty() ? -1 : frames.back().currentLine);
+                    }
+                    entry.key = nameStr;
+                    entry.value = &(it->second);
+                    it->second = peek(0);
+                }
+                DISPATCH();
+            }
+            // ============================================================
+            // Extended opcodes emitted by BytecodeOptimizer
+            // ============================================================
+            CASE(OP_LOAD_LOCAL_0) {
+                FAST_PUSH(stk[frame->slot_offset]);
+                DISPATCH();
+            }
+            CASE(OP_LOAD_LOCAL_1) {
+                FAST_PUSH(stk[frame->slot_offset + 1]);
+                DISPATCH();
+            }
+            CASE(OP_LOAD_LOCAL_2) {
+                FAST_PUSH(stk[frame->slot_offset + 2]);
+                DISPATCH();
+            }
+            CASE(OP_LOAD_LOCAL_3) {
+                FAST_PUSH(stk[frame->slot_offset + 3]);
+                DISPATCH();
+            }
+            CASE(OP_CONST_ZERO) {
+                FAST_PUSH(Value(0.0));
+                DISPATCH();
+            }
+            CASE(OP_CONST_ONE) {
+                FAST_PUSH(Value(1.0));
+                DISPATCH();
+            }
+            CASE(OP_CONST_INT8) {
+                uint8_t raw = READ_BYTE();
+                FAST_PUSH(small_int_table[raw]);
+                DISPATCH();
+            }
+            CASE(OP_ADD_INT) {
+                size_t sz = stk.size();
+                stk[sz - 2].as.number += stk[sz - 1].as.number;
+                stk.pop_back();
+                DISPATCH();
+            }
+            CASE(OP_SUB_INT) {
+                size_t sz = stk.size();
+                stk[sz - 2].as.number -= stk[sz - 1].as.number;
+                stk.pop_back();
+                DISPATCH();
+            }
+            CASE(OP_MUL_INT) {
+                size_t sz = stk.size();
+                stk[sz - 2].as.number *= stk[sz - 1].as.number;
+                stk.pop_back();
+                DISPATCH();
+            }
+            CASE(OP_DIV_INT) {
+                size_t sz = stk.size();
+                stk[sz - 2].as.number /= stk[sz - 1].as.number;
+                stk.pop_back();
+                DISPATCH();
+            }
+            CASE(OP_MOD_INT) {
+                size_t sz = stk.size();
+                stk[sz - 2].as.number = std::fmod(stk[sz - 2].as.number, stk[sz - 1].as.number);
+                stk.pop_back();
+                DISPATCH();
+            }
+            CASE(OP_NEGATE_INT) {
+                stk.back().as.number = -stk.back().as.number;
+                DISPATCH();
+            }
+            CASE(OP_LESS_INT) {
+                size_t sz = stk.size();
+                bool result = stk[sz - 2].as.number < stk[sz - 1].as.number;
+                stk.pop_back();
+                stk.back() = Value(result);
+                DISPATCH();
+            }
+            CASE(OP_GREATER_INT) {
+                size_t sz = stk.size();
+                bool result = stk[sz - 2].as.number > stk[sz - 1].as.number;
+                stk.pop_back();
+                stk.back() = Value(result);
+                DISPATCH();
+            }
+            CASE(OP_EQUAL_INT) {
+                size_t sz = stk.size();
+                bool result = stk[sz - 2].as.number == stk[sz - 1].as.number;
+                stk.pop_back();
+                stk.back() = Value(result);
+                DISPATCH();
+            }
+            CASE(OP_INC_LOCAL_INT) {
+                uint8_t slot = READ_BYTE();
+                stk[frame->slot_offset + slot].as.number += 1.0;
+                DISPATCH();
+            }
+            CASE(OP_DEC_LOCAL_INT) {
+                uint8_t slot = READ_BYTE();
+                stk[frame->slot_offset + slot].as.number -= 1.0;
+                DISPATCH();
+            }
+            CASE(OP_LESS_JUMP) {
+                // Fused: LESS + JUMP_IF_FALSE
+                uint16_t offset = READ_SHORT();
+                size_t sz = stk.size();
+                bool cond = stk[sz - 2].as.number < stk[sz - 1].as.number;
+                stk.pop_back();
+                stk.pop_back();
+                if (!cond) {
+                    frame->ip += offset;
+                }
+                DISPATCH();
+            }
+            CASE(OP_GREATER_JUMP) {
+                // Fused: GREATER + JUMP_IF_FALSE
+                uint16_t offset = READ_SHORT();
+                size_t sz = stk.size();
+                bool cond = stk[sz - 2].as.number > stk[sz - 1].as.number;
+                stk.pop_back();
+                stk.pop_back();
+                if (!cond) {
+                    frame->ip += offset;
+                }
+                DISPATCH();
+            }
+            CASE(OP_EQUAL_JUMP) {
+                // Fused: EQUAL + JUMP_IF_FALSE
+                uint16_t offset = READ_SHORT();
+                size_t sz = stk.size();
+                bool cond = stk[sz - 2].as.number == stk[sz - 1].as.number;
+                stk.pop_back();
+                stk.pop_back();
+                if (!cond) {
+                    frame->ip += offset;
+                }
+                DISPATCH();
+            }
+            CASE(OP_ADD_LOCAL_CONST) {
+                // Fused: GET_LOCAL + CONSTANT + ADD
+                uint8_t slot = READ_BYTE();
+                uint8_t constIdx = READ_BYTE();
+                double result = stk[frame->slot_offset + slot].as.number +
+                                frame->function->chunk->constants[constIdx].as.number;
+                FAST_PUSH(Value(result));
+                DISPATCH();
+            }
             CASE(OP_SAY) {
-                std::cout << pop().toString() << std::endl;
+                Value& v = stk.back();
+                if (NEUTRON_LIKELY(v.type == ValueType::OBJ_STRING)) {
+                    std::cout << v.as.obj_string->chars << '\n';
+                } else {
+                    std::cout << v.toString() << '\n';
+                }
+                stk.pop_back();
                 DISPATCH();
             }
             CASE(OP_JUMP) {
@@ -1798,8 +2442,13 @@ void VM::run(size_t minFrameDepth) {
             CASE(OP_JUMP_IF_FALSE) {
                 uint16_t offset = READ_SHORT();
                 Value& condition = stk.back();
-                bool jump = (condition.type == ValueType::NIL) || 
-                           (condition.type == ValueType::BOOLEAN && !condition.as.boolean);
+                // Fast path: boolean is the most common condition type in loops
+                bool jump;
+                if (NEUTRON_LIKELY(condition.type == ValueType::BOOLEAN)) {
+                    jump = !condition.as.boolean;
+                } else {
+                    jump = (condition.type == ValueType::NIL);
+                }
                 stk.pop_back();
                 if (jump) {
                     frame->ip += offset;
@@ -1808,6 +2457,89 @@ void VM::run(size_t minFrameDepth) {
             }
             CASE(OP_LOOP) {
                 uint16_t offset = READ_SHORT();
+
+                if (NEUTRON_LIKELY(jitEnabled)) {
+                    uint64_t loop_pc = static_cast<uint64_t>((frame->ip - offset) - frame->function->chunk->code.data());
+                    uint64_t method_id = reinterpret_cast<uint64_t>(frame->function);
+                    
+                    // Fast path: check inline cache for compiled trace
+                    size_t cache_slot = loop_pc & (JIT_LOOP_CACHE_SIZE - 1);
+                    JITLoopCacheEntry& cached = jitLoopCache[cache_slot];
+                    if (NEUTRON_LIKELY(cached.loop_pc == loop_pc && cached.method_id == method_id)) {
+                        auto* tier2 = jitManager.getTier2Compiler();
+                        if (tier2) {
+                            jit::MultiTierJITManager::ExecutionFrame jitFrame;
+                            jitFrame.method_id = method_id;
+                            jitFrame.chunk = frame->function->chunk;
+                            jitFrame.bytecode_pc = loop_pc;
+                            jitFrame.stack_pointer = nullptr;
+                            jitFrame.local_variables = &stk[frame->slot_offset];
+                            jitFrame.current_tier = jit::CompilationTier::TIER2;
+                            if (tier2->executeTrace(cached.trace_id, &jitFrame)) {
+                                DISPATCH();
+                            }
+                        }
+                    }
+
+                    // Slow path: periodic check for compilation
+                    if ((++jitLoopCounter & 15) == 0) {
+                        auto* tier2 = jitManager.getTier2Compiler();
+                        if (tier2) {
+                            uint64_t trace_id = tier2->findTrace(method_id, loop_pc);
+                            if (trace_id != 0) {
+                                // Cache for future O(1) lookups
+                                cached.loop_pc = loop_pc;
+                                cached.method_id = method_id;
+                                cached.trace_id = trace_id;
+                                
+                                jit::MultiTierJITManager::ExecutionFrame jitFrame;
+                                jitFrame.method_id = method_id;
+                                jitFrame.chunk = frame->function->chunk;
+                                jitFrame.bytecode_pc = loop_pc;
+                                jitFrame.stack_pointer = nullptr;
+                                jitFrame.local_variables = &stk[frame->slot_offset];
+                                jitFrame.current_tier = jit::CompilationTier::TIER2;
+                                if (tier2->executeTrace(trace_id, &jitFrame)) {
+                                    DISPATCH();
+                                }
+                            } else if (!tier2->isTraceFailed(method_id, loop_pc)) {
+                                tier2->setGlobalsMap(&globals);
+                                bool jit_compile_success = false;
+                                {
+                                    jit::HotSpotProfiler dummyProfiler;
+                                    auto trace = tier2->recordTrace(method_id, *frame->function->chunk, loop_pc, dummyProfiler);
+                                    if (trace) {
+                                        auto optimized = tier2->optimizeTrace(*trace);
+                                        if (optimized) {
+                                            uint64_t compiled = tier2->compileTrace(*optimized);
+                                            if (compiled != 0) {
+                                                // Cache it
+                                                cached.loop_pc = loop_pc;
+                                                cached.method_id = method_id;
+                                                cached.trace_id = compiled;
+                                                
+                                                jit::MultiTierJITManager::ExecutionFrame jitFrame2;
+                                                jitFrame2.method_id = method_id;
+                                                jitFrame2.chunk = frame->function->chunk;
+                                                jitFrame2.bytecode_pc = loop_pc;
+                                                jitFrame2.stack_pointer = nullptr;
+                                                jitFrame2.local_variables = &stk[frame->slot_offset];
+                                                jitFrame2.current_tier = jit::CompilationTier::TIER2;
+                                                if (tier2->executeTrace(compiled, &jitFrame2)) {
+                                                    jit_compile_success = true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                } // unique_ptrs destroyed here
+                                if (jit_compile_success) {
+                                    DISPATCH();
+                                }
+                            }
+                        }
+                    }
+                }
+
                 frame->ip -= offset;
                 DISPATCH();
             }
@@ -1815,6 +2547,32 @@ void VM::run(size_t minFrameDepth) {
                                 uint8_t argCount = READ_BYTE();
                                 syncStack();
                                 Value callee = peek(argCount);
+                                
+                                // Fast path for class instantiation (most common in OOP loops)
+                                if (callee.type == ValueType::CLASS) {
+                                    Class* klass = callee.as.klass;
+                                    Instance* instance = allocateInstance(klass);
+                                    if (klass->initializer != nullptr) {
+                                        Function* initializer = klass->initializer;
+                                        stk[stk.size() - argCount - 1] = Value(instance);
+                                        CallFrame* newFrame = &frames.emplace_back();
+                                        newFrame->function = initializer;
+                                        newFrame->ip = initializer->chunk->code.data();
+                                        newFrame->slot_offset = stk.size() - argCount - 1;
+                                        newFrame->fileName = &currentFileName;
+                                        newFrame->currentLine = -1;
+                                        newFrame->isBoundMethod = true;
+                                        newFrame->isInitializer = true;
+                                        frame = newFrame;
+                                        DISPATCH();
+                                    }
+                                    stk[stk.size() - argCount - 1] = Value(instance);
+                                    stk.resize(stk.size() - argCount);
+                                    reloadStack();
+                                    frame = &frames.back();
+                                    DISPATCH();
+                                }
+                                
                                 if (!callValue(callee, argCount)) {
                                         return;
                                 }
@@ -2047,7 +2805,7 @@ void VM::run(size_t minFrameDepth) {
                     catchStart == 0xFFFF ? -1 : static_cast<int>(catchStart),  // 0xFFFF represents -1 (no handler)
                     finallyStart == 0xFFFF ? -1 : static_cast<int>(finallyStart), // 0xFFFF represents -1 (no handler)
                     currentFrameBase,
-                    frame->fileName,
+                    frame->getFileName(),
                     frame->currentLine
                 );
                 DISPATCH();
@@ -2269,7 +3027,7 @@ Value VM::call(const Value& callee, const std::vector<Value>& arguments) {
              }
              // slot_offset points to the receiver (one position before args)
              frame->slot_offset = stack.size() - arguments.size() - 1;
-             frame->fileName = currentFileName;
+             frame->fileName = &currentFileName;
              frame->currentLine = -1;
              frame->isBoundMethod = true;
 
@@ -2845,6 +3603,7 @@ ObjString* VM::internString(const std::string& str) {
     }
     
     ObjString* newString = allocate<ObjString>(str);
+    newString->isInterned = true;
     internedStrings[str] = newString;
     return newString;
 }
@@ -2868,8 +3627,8 @@ void VM::collectGarbage() {
     // Sweep all unreachable objects
     sweep();
     
-    // Set next collection threshold (double the current live size)
-    nextGC = heap.size() * 2;
+    // Set next collection threshold (double the current live size, but at least 8192)
+    nextGC = std::max(heap.size() * 2, (size_t)32768);
 }
 
 void VM::markRoots() {
@@ -2917,60 +3676,92 @@ void VM::traceReferences() {
 }
 
 void VM::blackenObject(Object* obj) {
-    if (auto* arr = dynamic_cast<Array*>(obj)) {
-        for (const auto& element : arr->elements) markValue(element);
-    } else if (auto* bam = dynamic_cast<BoundArrayMethod*>(obj)) {
-        markObject(bam->array);
-    } else if (auto* json_obj = dynamic_cast<JsonObject*>(obj)) {
-        for (const auto& prop : json_obj->properties) {
-            markObject(prop.first);
-            markValue(prop.second);
+    // Use obj_type tag + static_cast instead of dynamic_cast chain.
+    // dynamic_cast involves expensive RTTI lookups; this is a simple switch.
+    switch (obj->obj_type) {
+        case ObjType::OBJ_ARRAY: {
+            auto* arr = static_cast<Array*>(obj);
+            for (const auto& element : arr->elements) markValue(element);
+            break;
         }
-    } else if (auto* json_arr = dynamic_cast<JsonArray*>(obj)) {
-        for (const auto& element : json_arr->elements) markValue(element);
-    } else if (auto* inst = dynamic_cast<Instance*>(obj)) {
-        // Mark inline fields
-        for (uint8_t i = 0; i < inst->inlineCount; ++i) {
-            markObject(inst->inlineFields[i].key);
-            markValue(inst->inlineFields[i].value);
-        }
-        // Mark overflow fields if present
-        if (inst->overflowFields) {
-            for (const auto& entry : *inst->overflowFields) {
-                markObject(entry.first);
-                markValue(entry.second);
+        case ObjType::OBJ_INSTANCE: {
+            auto* inst = static_cast<Instance*>(obj);
+            for (uint8_t i = 0; i < inst->inlineCount; ++i) {
+                markObject(inst->inlineFields[i].key);
+                markValue(inst->inlineFields[i].value);
             }
-        }
-        markObject(inst->klass);
-    } else if (dynamic_cast<Buffer*>(obj)) {
-        // Buffer has no references to other objects
-    } else if (auto* module = dynamic_cast<Module*>(obj)) {
-        if (module->env) {
-            for (const auto& pair : module->env->values) markValue(pair.second);
-        }
-    } else if (auto* bm = dynamic_cast<BoundMethod*>(obj)) {
-        markValue(bm->receiver);
-        markObject(bm->method);
-    } else if (auto* func = dynamic_cast<Function*>(obj)) {
-        if (func->closure) {
-            // Mark all values in the closure environment chain
-            auto env = func->closure;
-            while (env) {
-                for (const auto& pair : env->values) markValue(pair.second);
-                env = env->enclosing;
+            if (inst->overflowFields) {
+                for (const auto& entry : *inst->overflowFields) {
+                    markObject(entry.first);
+                    markValue(entry.second);
+                }
             }
+            markObject(inst->klass);
+            break;
         }
-        if (func->chunk) {
-            for (const auto& constant : func->chunk->constants) markValue(constant);
+        case ObjType::OBJ_FUNCTION: {
+            auto* func = static_cast<Function*>(obj);
+            if (func->closure) {
+                auto env = func->closure;
+                while (env) {
+                    for (const auto& pair : env->values) markValue(pair.second);
+                    env = env->enclosing;
+                }
+            }
+            if (func->chunk) {
+                for (const auto& constant : func->chunk->constants) markValue(constant);
+            }
+            break;
         }
-    } else if (auto* klass = dynamic_cast<Class*>(obj)) {
-        if (klass->class_env) {
-            for (const auto& pair : klass->class_env->values) markValue(pair.second);
+        case ObjType::OBJ_CLASS: {
+            auto* klass = static_cast<Class*>(obj);
+            if (klass->class_env) {
+                for (const auto& pair : klass->class_env->values) markValue(pair.second);
+            }
+            for (const auto& pair : klass->methods) {
+                markObject(pair.first);
+                markValue(pair.second);
+            }
+            break;
         }
-        for (const auto& pair : klass->methods) {
-            markObject(pair.first);
-            markValue(pair.second);
+        case ObjType::OBJ_BOUND_METHOD: {
+            auto* bm = static_cast<BoundMethod*>(obj);
+            markValue(bm->receiver);
+            markObject(bm->method);
+            break;
         }
+        case ObjType::OBJ_BOUND_ARRAY_METHOD: {
+            auto* bam = static_cast<BoundArrayMethod*>(obj);
+            markObject(bam->array);
+            break;
+        }
+        case ObjType::OBJ_JSON_OBJECT: {
+            auto* json_obj = static_cast<JsonObject*>(obj);
+            for (const auto& prop : json_obj->properties) {
+                markObject(prop.first);
+                markValue(prop.second);
+            }
+            break;
+        }
+        case ObjType::OBJ_JSON_ARRAY: {
+            auto* json_arr = static_cast<JsonArray*>(obj);
+            for (const auto& element : json_arr->elements) markValue(element);
+            break;
+        }
+        case ObjType::OBJ_MODULE: {
+            auto* module = static_cast<Module*>(obj);
+            if (module->env) {
+                for (const auto& pair : module->env->values) markValue(pair.second);
+            }
+            break;
+        }
+        case ObjType::OBJ_BUFFER:
+        case ObjType::OBJ_STRING:
+        case ObjType::OBJ_NATIVE_FN:
+        case ObjType::OBJ_BOUND_STRING_METHOD:
+        case ObjType::OBJ_GENERIC:
+            // No references to trace
+            break;
     }
 }
 
@@ -2990,19 +3781,23 @@ void VM::markValue(const Value& value) {
 }
 
 void VM::sweep() {
-    auto it = heap.begin();
-    while (it != heap.end()) {
-        if (!(*it)->is_marked) {
-            // Object is not marked, so delete it
-            Object* obj = *it;
-            delete obj;
-            it = heap.erase(it);
+    // Use swap-and-pop (partition) to avoid O(n²) vector erasure
+    size_t write = 0;
+    for (size_t read = 0; read < heap.size(); ++read) {
+        Object* obj = heap[read];
+        if (!obj->is_marked) {
+            // Pool instances for reuse instead of deleting
+            if (obj->obj_type == ObjType::OBJ_INSTANCE && instancePool.size() < INSTANCE_POOL_MAX) {
+                instancePool.push_back(static_cast<Instance*>(obj));
+            } else {
+                delete obj;
+            }
         } else {
-            // Object is marked, unmark it and keep it
-            (*it)->is_marked = false;
-            ++it;
+            obj->is_marked = false;
+            heap[write++] = obj;
         }
     }
+    heap.resize(write);
 }
 
 bool VM::handleException(const Value& exception) {
