@@ -594,13 +594,51 @@ uint64_t Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
     // =====================================================================
     // PROLOGUE: Save callee-saved registers, set up base pointers
     // =====================================================================
-    // System V AMD64 ABI: RDI = first argument = ExecutionFrame*
-    codegen.emitPushReg64(code, 3);  // RBX (callee-saved)
-    codegen.emitPushReg64(code, 5);  // RBP (callee-saved)
-    codegen.emitPushReg64(code, 12); // R12 (callee-saved)
-    codegen.emitPushReg64(code, 13); // R13 (callee-saved)
-    codegen.emitPushReg64(code, 14); // R14 (callee-saved)
-    codegen.emitPushReg64(code, 15); // R15 (callee-saved)
+    // Common callee-saved GPRs (both Windows x64 and System V AMD64)
+    codegen.emitPushReg64(code, 3);  // RBX (callee-saved on both)
+    codegen.emitPushReg64(code, 5);  // RBP (callee-saved on both)
+    codegen.emitPushReg64(code, 12); // R12 (callee-saved on both)
+    codegen.emitPushReg64(code, 13); // R13 (callee-saved on both)
+    codegen.emitPushReg64(code, 14); // R14 (callee-saved on both)
+    codegen.emitPushReg64(code, 15); // R15 (callee-saved on both)
+    
+#ifdef _WIN32
+    // Windows x64: RDI and RSI are callee-saved (not on System V)
+    codegen.emitPushReg64(code, 6);  // RSI
+    codegen.emitPushReg64(code, 7);  // RDI
+    
+    // Windows x64: XMM6-XMM14 are callee-saved (9 regs × 16 bytes = 144 bytes)
+    // Allocate stack space: SUB RSP, 144
+    code.push_back(0x48); code.push_back(0x81); code.push_back(0xEC);
+    code.push_back(0x90); code.push_back(0x00); code.push_back(0x00); code.push_back(0x00);
+    // Save XMM6-XMM14 to [RSP + i*16]
+    for (int i = 0; i <= 8; i++) {
+        uint8_t xmm = 6 + i; // XMM6..XMM14
+        // MOVDQU [RSP + i*16], xmm  =>  F3 (REX) 0F 7F ModRM [SIB disp]
+        code.push_back(0xF3);
+        if (xmm >= 8) {
+            code.push_back(0x44); // REX.R
+        }
+        code.push_back(0x0F);
+        code.push_back(0x7F);
+        int32_t offset = i * 16;
+        if (offset == 0) {
+            code.push_back(X86_64CodeGen::encodeModRM(0, xmm & 7, 4)); // [RSP]
+            code.push_back(0x24); // SIB: RSP base, no index
+        } else if (offset <= 127) {
+            code.push_back(X86_64CodeGen::encodeModRM(1, xmm & 7, 4)); // [RSP+disp8]
+            code.push_back(0x24); // SIB
+            code.push_back(static_cast<uint8_t>(offset));
+        } else {
+            code.push_back(X86_64CodeGen::encodeModRM(2, xmm & 7, 4)); // [RSP+disp32]
+            code.push_back(0x24); // SIB
+            code.push_back(offset & 0xFF);
+            code.push_back((offset >> 8) & 0xFF);
+            code.push_back((offset >> 16) & 0xFF);
+            code.push_back((offset >> 24) & 0xFF);
+        }
+    }
+#endif
     
     // ExecutionFrame layout:
     //   offset  0: uint64_t method_id
@@ -609,7 +647,12 @@ uint64_t Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
     //   offset 24: void* stack_pointer
     //   offset 32: void* local_variables (Value* pointing into VM stack)
     
+    // First argument: RDI on System V, RCX on Windows x64
+#ifdef _WIN32
+    codegen.emitMovReg64Reg64(code, 5, 1);    // RBP = RCX (save ExecutionFrame*)
+#else
     codegen.emitMovReg64Reg64(code, 5, 7);    // RBP = RDI (save ExecutionFrame*)
+#endif
     codegen.emitMovReg64Mem(code, 3, 5, 32);  // RBX = [RBP+32] = local_variables ptr
     
     // Load cached global addresses into R12-R15
@@ -1439,6 +1482,41 @@ uint64_t Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
     // =====================================================================
     // EPILOGUE: Restore callee-saved registers, return
     // =====================================================================
+#ifdef _WIN32
+    // Restore XMM6-XMM14 from [RSP + i*16]
+    for (int i = 0; i <= 8; i++) {
+        uint8_t xmm = 6 + i;
+        // MOVDQU xmm, [RSP + i*16]  =>  F3 (REX) 0F 6F ModRM [SIB disp]
+        code.push_back(0xF3);
+        if (xmm >= 8) {
+            code.push_back(0x44); // REX.R
+        }
+        code.push_back(0x0F);
+        code.push_back(0x6F);
+        int32_t offset = i * 16;
+        if (offset == 0) {
+            code.push_back(X86_64CodeGen::encodeModRM(0, xmm & 7, 4));
+            code.push_back(0x24);
+        } else if (offset <= 127) {
+            code.push_back(X86_64CodeGen::encodeModRM(1, xmm & 7, 4));
+            code.push_back(0x24);
+            code.push_back(static_cast<uint8_t>(offset));
+        } else {
+            code.push_back(X86_64CodeGen::encodeModRM(2, xmm & 7, 4));
+            code.push_back(0x24);
+            code.push_back(offset & 0xFF);
+            code.push_back((offset >> 8) & 0xFF);
+            code.push_back((offset >> 16) & 0xFF);
+            code.push_back((offset >> 24) & 0xFF);
+        }
+    }
+    // Deallocate XMM save area: ADD RSP, 144
+    code.push_back(0x48); code.push_back(0x81); code.push_back(0xC4);
+    code.push_back(0x90); code.push_back(0x00); code.push_back(0x00); code.push_back(0x00);
+    
+    codegen.emitPopReg64(code, 7);  // RDI
+    codegen.emitPopReg64(code, 6);  // RSI
+#endif
     codegen.emitPopReg64(code, 15); // R15
     codegen.emitPopReg64(code, 14); // R14
     codegen.emitPopReg64(code, 13); // R13
