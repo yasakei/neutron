@@ -554,17 +554,17 @@ uint64_t Tier2Compiler::compileTraceARM64(const ExecutionTrace& trace) {
                 int_cached_dreg = -1;
                 
                 // For FCMP, the "false" condition (i.e., jump when condition is NOT true):
-                // LESS:      jump if NOT less      => B.HS (>=)
-                // GREATER:   jump if NOT greater   => B.LS (<=)
+                // LESS:      jump if NOT less      => B.GE (N=V, signed >=)
+                // GREATER:   jump if NOT greater   => B.LE (Z=1 OR N≠V)
                 // EQUAL:     jump if NOT equal     => B.NE
                 // NOT_EQUAL: jump if NOT not-equal => B.EQ
                 uint8_t cond;
                 switch (last_comparison) {
-                    case 0: cond = CG::COND_HS; break; // not less => >=
-                    case 1: cond = CG::COND_LS; break; // not greater => <=
+                    case 0: cond = CG::COND_GE; break; // not less => >=
+                    case 1: cond = CG::COND_LE; break; // not greater => <=
                     case 2: cond = CG::COND_NE; break; // not equal
                     case 3: cond = CG::COND_EQ; break; // not not-equal => equal
-                    default: cond = CG::COND_HS; break;
+                    default: cond = CG::COND_GE; break;
                 }
                 
                 if (!seen_first_jif) {

@@ -268,14 +268,14 @@ public:
     // Condition code constants for FP comparisons
     static constexpr uint8_t COND_EQ = 0x0;   // Equal
     static constexpr uint8_t COND_NE = 0x1;   // Not equal
-    static constexpr uint8_t COND_HS = 0x2;   // Unsigned >= (after FCMP: >=)
-    static constexpr uint8_t COND_LO = 0x3;   // Unsigned <  (after FCMP: <)
-    static constexpr uint8_t COND_HI = 0x8;   // Unsigned >  (after FCMP: >)
-    static constexpr uint8_t COND_LS = 0x9;   // Unsigned <= (after FCMP: <=)
-    static constexpr uint8_t COND_GE = 0xA;   // Signed >=
-    static constexpr uint8_t COND_LT = 0xB;   // Signed <
-    static constexpr uint8_t COND_GT = 0xC;   // Signed >
-    static constexpr uint8_t COND_LE = 0xD;   // Signed <=
+    static constexpr uint8_t COND_HS = 0x2;   // Unsigned >= (carry set) — DO NOT use for FP comparisons
+    static constexpr uint8_t COND_LO = 0x3;   // Unsigned <  (carry clear) — DO NOT use for FP comparisons
+    static constexpr uint8_t COND_HI = 0x8;   // Unsigned >  — DO NOT use for FP comparisons
+    static constexpr uint8_t COND_LS = 0x9;   // Unsigned <= — DO NOT use for FP comparisons
+    static constexpr uint8_t COND_GE = 0xA;   // Signed >= (use for FP: not less)
+    static constexpr uint8_t COND_LT = 0xB;   // Signed <  (use for FP: less)
+    static constexpr uint8_t COND_GT = 0xC;   // Signed >  (use for FP: greater)
+    static constexpr uint8_t COND_LE = 0xD;   // Signed <= (use for FP: not greater)
 
     // NOP
     static void emitNop(std::vector<uint8_t>& code) {
