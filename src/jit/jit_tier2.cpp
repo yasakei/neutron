@@ -547,6 +547,10 @@ uint64_t Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
     // after this JUMP_IF_FALSE? If this is the "outermost" one that guards
     // the whole loop body, it's the exit. Others are internal.
 
+#if defined(__aarch64__) || defined(__arm64__)
+    // ARM64: delegate to architecture-specific codegen
+    return compileTraceARM64(trace);
+#else
     X86_64CodeGen codegen;
     std::vector<uint8_t> code;
 
@@ -1562,6 +1566,7 @@ uint64_t Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
     
     // If trace not found in map (shouldn't happen), return 0
     return 0;
+#endif // x86_64 vs ARM64
 }
 
 bool Tier2Compiler::executeTrace(uint64_t trace_id, void* context) {

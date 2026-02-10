@@ -208,6 +208,7 @@ set(NEUTRON_COMPILER_SOURCES
     src/jit/jit_profiler.cpp
     src/jit/jit_tier1.cpp
     src/jit/jit_tier2.cpp
+    src/jit/jit_tier2_arm64.cpp
 )
 
 # Type system source files

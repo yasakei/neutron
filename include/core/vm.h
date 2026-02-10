@@ -150,9 +150,8 @@ public:
 
     // JIT compilation
     jit::MultiTierJITManager jitManager;
-    // JIT enabled on x86_64 platforms (Linux, macOS Intel, Windows).
-    // Disabled on ARM/Apple Silicon until ARM codegen is implemented.
-#if defined(__x86_64__) || defined(_M_X64) || defined(__amd64__)
+    // JIT enabled on x86_64 and ARM64 platforms.
+#if defined(__x86_64__) || defined(_M_X64) || defined(__amd64__) || defined(__aarch64__) || defined(__arm64__)
     bool jitEnabled = true;
 #else
     bool jitEnabled = false;

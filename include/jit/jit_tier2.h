@@ -259,6 +259,15 @@ private:
      * Generate native code from IR instructions
      */
     uint64_t generateNativeCode(const std::vector<IRInstruction>& ir);
+
+#if defined(__aarch64__) || defined(__arm64__)
+    /**
+     * Compile optimized trace to native ARM64/AArch64 code
+     * @param trace The optimized trace
+     * @return trace_id on success, 0 on failure
+     */
+    uint64_t compileTraceARM64(const ExecutionTrace& trace);
+#endif
 };
 
 } // namespace neutron::jit
