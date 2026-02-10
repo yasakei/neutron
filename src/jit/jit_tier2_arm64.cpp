@@ -643,7 +643,10 @@ uint64_t Tier2Compiler::compileTraceARM64(const ExecutionTrace& trace) {
     }
 
     // =====================================================================
-    // EXIT STUB: Patch exit jumps to point here
+    // EXIT STUB: Patch exit jumps AND unresolved forward jumps to point here.
+    // On ARM64, B with offset 0 = branch-to-self (infinite loop), so any
+    // unresolved forward jump (e.g. from a "break" statement) MUST be
+    // patched to jump to the epilogue.
     // =====================================================================
     for (size_t offset : exit_jumps) {
         // Read original instruction to get condition code
@@ -652,6 +655,16 @@ uint64_t Tier2Compiler::compileTraceARM64(const ExecutionTrace& trace) {
         uint8_t cond = orig & 0xF;
         int32_t diff = (int32_t)(code.size() - offset);
         CG::patchBCond(code, offset, cond, diff);
+    }
+    
+    // Patch any remaining unresolved forward jumps (e.g. break → exit)
+    for (const auto& fj : forward_jumps) {
+        int32_t diff = (int32_t)(code.size() - fj.patch_offset);
+        if (fj.cond == 0xFF) {
+            CG::patchB(code, fj.patch_offset, diff);
+        } else {
+            CG::patchBCond(code, fj.patch_offset, fj.cond, diff);
+        }
     }
 
     // =====================================================================
