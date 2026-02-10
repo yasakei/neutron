@@ -8,7 +8,7 @@
 namespace neutron::jit {
 
 Tier1Compiler::Tier1Compiler() 
-    : code_cache_offset_(0), next_cache_id_(1), 
+    : next_cache_id_(1), 
       total_compilations_(0), total_compilation_time_us_(0) {
     // Lazy init: don't allocate code cache until needed
 }
@@ -84,7 +84,7 @@ std::unique_ptr<Tier1Compiler::ThreadedCode> Tier1Compiler::compile(
     code->code_size = native_code.size();
     
     // Check code cache space
-    if (code->code_size > TIER1_CODE_CACHE_SIZE - code_cache_offset_) {
+    if (code->code_size > TIER1_CODE_CACHE_SIZE - code_cache_.offset()) {
         return nullptr;  // Code cache full
     }
 
@@ -94,11 +94,12 @@ std::unique_ptr<Tier1Compiler::ThreadedCode> Tier1Compiler::compile(
     }
 
     // Copy native code to code cache
+    code_cache_.makeWritable();
     std::memcpy(code_space, native_code.data(), code->code_size);
     code->code_address = reinterpret_cast<uint64_t>(code_space);
 
     // Make code executable
-    if (!codegen.makeExecutable(code_space, code->code_size)) {
+    if (!code_cache_.makeExecutable()) {
         return nullptr;
     }
 
@@ -232,12 +233,12 @@ bool Tier1Compiler::validateInlineCache(uint32_t cache_id, uint64_t method_id) {
 }
 
 bool Tier1Compiler::isCodeCacheFull() const {
-    return code_cache_offset_ >= TIER1_CODE_CACHE_SIZE * 0.9;  // 90% full
+    return code_cache_.offset() >= TIER1_CODE_CACHE_SIZE * 0.9;  // 90% full
 }
 
 Tier1Compiler::CacheStats Tier1Compiler::getCacheStats() const {
     CacheStats stats;
-    stats.total_code_size = code_cache_offset_;
+    stats.total_code_size = code_cache_.offset();
     stats.max_code_size = TIER1_CODE_CACHE_SIZE;
     stats.num_compiled_methods = compiled_methods_.size();
     stats.num_inline_caches = inline_caches_.size();
@@ -257,11 +258,8 @@ Tier1Compiler::CacheStats Tier1Compiler::getCacheStats() const {
 
 void Tier1Compiler::clearCodeCache() {
     // Clear all caches and reset state
-    code_cache_.clear();
-    code_cache_.resize(TIER1_CODE_CACHE_SIZE);
-    std::fill(code_cache_.begin(), code_cache_.end(), 0);
+    code_cache_.reset();
     
-    code_cache_offset_ = 0;
     compiled_methods_.clear();
     inline_caches_.clear();
     next_cache_id_ = 1;
@@ -310,17 +308,13 @@ std::vector<uint8_t> Tier1Compiler::emitHandlerCall(uint64_t handler_address) {
 }
 
 uint8_t* Tier1Compiler::allocateCodeSpace(size_t size) {
-    if (code_cache_offset_ + size > TIER1_CODE_CACHE_SIZE) {
-        return nullptr;
+    // Lazy-init code cache on first allocation
+    if (!code_cache_.isInitialized()) {
+        if (!code_cache_.initialize(TIER1_CODE_CACHE_SIZE)) {
+            return nullptr;
+        }
     }
-
-    uint8_t* ptr = code_cache_.data() + code_cache_offset_;
-    code_cache_offset_ += size;
-    
-    // Zero-initialize allocated space
-    std::fill(ptr, ptr + size, 0);
-
-    return ptr;
+    return code_cache_.allocate(size);
 }
 
 } // namespace neutron::jit

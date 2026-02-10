@@ -17,10 +17,10 @@
 namespace neutron::jit {
 
 Tier2Compiler::Tier2Compiler()
-    : code_cache_offset_(0), next_trace_id_(1),
+    : next_trace_id_(1),
       total_traces_(0), total_optimization_time_us_(0),
       code_cache_initialized_(false) {
-    // Lazy init: don't allocate 50MB code cache until first trace compilation
+    // Lazy init: don't allocate code cache until first trace compilation
 }
 
 Tier2Compiler::~Tier2Compiler() = default;
@@ -1455,10 +1455,13 @@ uint64_t Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
         return 0;
     }
     
+    // Make code cache writable before copying (needed for Apple Silicon W^X)
+    code_cache_.makeWritable();
+    
     std::memcpy(code_space, code.data(), code.size());
     
-    // Make the code cache executable using the codegen helper
-    codegen.makeExecutable(code_cache_.data(), code_cache_.size());
+    // Make the code cache executable using platform-specific API
+    code_cache_.makeExecutable();
     
     uint64_t code_addr = reinterpret_cast<uint64_t>(code_space);
     
@@ -1654,7 +1657,7 @@ Tier2Compiler::TraceStats Tier2Compiler::getTraceStats() const {
     TraceStats stats;
     stats.total_traces = traces_.size();
     stats.active_traces = traces_.size();
-    stats.total_compiled_code_size = code_cache_offset_;
+    stats.total_compiled_code_size = code_cache_.offset();
     stats.max_code_cache_size = TIER2_CODE_CACHE_SIZE;
 
     // Calculate average trace length
@@ -1681,9 +1684,8 @@ Tier2Compiler::TraceStats Tier2Compiler::getTraceStats() const {
 
 void Tier2Compiler::clearTraceCache() {
     traces_.clear();
-    code_cache_.clear();
+    code_cache_.reset();
     code_cache_initialized_ = false;
-    code_cache_offset_ = 0;
     trace_queue_.clear();
     compiled_trace_lookup_.clear();
     failed_traces_.clear();
@@ -2265,17 +2267,12 @@ void Tier2Compiler::addTypeGuard(ExecutionTrace& trace, uint64_t value_id,
 uint8_t* Tier2Compiler::allocateCodeSpace(size_t size) {
     // Lazy-init code cache on first allocation
     if (!code_cache_initialized_) {
-        code_cache_.resize(TIER2_CODE_CACHE_SIZE);
+        if (!code_cache_.initialize(TIER2_CODE_CACHE_SIZE)) {
+            return nullptr;
+        }
         code_cache_initialized_ = true;
     }
-    if (code_cache_offset_ + size > TIER2_CODE_CACHE_SIZE) {
-        return nullptr;
-    }
-
-    uint8_t* ptr = code_cache_.data() + code_cache_offset_;
-    code_cache_offset_ += size;
-
-    return ptr;
+    return code_cache_.allocate(size);
 }
 
 uint64_t Tier2Compiler::generateNativeCode(const std::vector<IRInstruction>& ir) {

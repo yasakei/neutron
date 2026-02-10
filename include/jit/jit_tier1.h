@@ -3,6 +3,7 @@
 
 #include "jit_config.h"
 #include "jit_profiler.h"
+#include "jit_memory.h"
 #include "compiler/bytecode.h"
 #include <vector>
 #include <unordered_map>
@@ -129,9 +130,8 @@ public:
     void clearCodeCache();
 
 private:
-    /// Code cache for compiled threaded code
-    std::vector<uint8_t> code_cache_;
-    size_t code_cache_offset_;
+    /// Code cache for compiled threaded code (platform-specific executable memory)
+    JITMemory code_cache_;
 
     /// Map from method_id to compiled threaded code
     std::unordered_map<uint64_t, std::unique_ptr<ThreadedCode>> compiled_methods_;

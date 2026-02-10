@@ -150,11 +150,9 @@ public:
 
     // JIT compilation
     jit::MultiTierJITManager jitManager;
-    // JIT is currently only stable on Linux with GCC.
-    // - macOS: Apple Silicon requires MAP_JIT + pthread_jit_write_protect_np
-    // - Windows: VirtualProtect timing/DEP issues cause ACCESS_VIOLATION
-    // TODO: Implement proper platform-specific JIT memory management
-#if defined(__linux__) && (defined(__GNUC__) && !defined(__clang__))
+    // JIT enabled on x86_64 platforms (Linux, macOS Intel, Windows).
+    // Disabled on ARM/Apple Silicon until ARM codegen is implemented.
+#if defined(__x86_64__) || defined(_M_X64) || defined(__amd64__)
     bool jitEnabled = true;
 #else
     bool jitEnabled = false;

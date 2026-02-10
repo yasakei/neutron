@@ -3,6 +3,7 @@
 
 #include "jit_config.h"
 #include "jit_profiler.h"
+#include "jit_memory.h"
 #include "compiler/bytecode.h"
 #include <vector>
 #include <unordered_map>
@@ -223,9 +224,8 @@ private:
     /// O(1) lookup: hash(method_id, loop_pc) → trace_id
     std::unordered_map<uint64_t, uint64_t> compiled_trace_lookup_;
     
-    /// Code cache for compiled traces
-    std::vector<uint8_t> code_cache_;
-    size_t code_cache_offset_;
+    /// Code cache for compiled traces (platform-specific executable memory)
+    JITMemory code_cache_;
     bool code_cache_initialized_;
 
     /// Next trace ID
