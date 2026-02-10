@@ -370,19 +370,27 @@ uint64_t Tier2Compiler::compileTraceARM64(const ExecutionTrace& trace) {
                         }
                     }
                     
-                    // Convert A to int in X9 (skip if cached)
-                    if (int_cached_dreg == a_reg) {
-                        // X9 already holds the value
-                    } else {
-                        CG::emitFcvtzsXD(code, 9, a_reg);
-                    }
-                    
-                    // Convert/load B into X1
+                    // Convert A to int in X9 and B to int in X1.
+                    // IMPORTANT: If B is cached in X9 (int_cached_dreg == b_reg)
+                    // but A is NOT cached, we must save B to X1 BEFORE
+                    // overwriting X9 with A's conversion.
                     if (b_is_const) {
+                        // A → X9
+                        if (int_cached_dreg != a_reg) {
+                            CG::emitFcvtzsXD(code, 9, a_reg);
+                        }
+                        // B → X1 (immediate)
                         CG::emitMovImm64(code, 1, static_cast<uint64_t>(b_const_int));
+                    } else if (int_cached_dreg == a_reg) {
+                        // X9 already holds A — just convert B
+                        CG::emitFcvtzsXD(code, 1, b_reg);
                     } else if (int_cached_dreg == b_reg) {
+                        // X9 holds B — save it to X1 FIRST, then convert A
                         CG::emitMovReg64(code, 1, 9);
+                        CG::emitFcvtzsXD(code, 9, a_reg);
                     } else {
+                        // Neither cached — convert both
+                        CG::emitFcvtzsXD(code, 9, a_reg);
                         CG::emitFcvtzsXD(code, 1, b_reg);
                     }
                     
