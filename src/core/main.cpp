@@ -409,11 +409,21 @@ int main(int argc, char* argv[]) {
     neutron::VM vm;
     
     if (argc >= 2) {
-        std::string filePath = argv[1];
-        
-        // Store all command line arguments in VM (script name and any additional args)
+        // Parse runtime flags before running the file
+        std::string filePath;
         for (int i = 1; i < argc; i++) {
-            vm.commandLineArgs.push_back(std::string(argv[i]));
+            std::string a = argv[i];
+            if (a == "--no-jit") {
+                vm.jitEnabled = false;
+            } else if (filePath.empty() && a[0] != '-') {
+                filePath = a;
+            }
+            vm.commandLineArgs.push_back(a);
+        }
+        
+        if (filePath.empty()) {
+            std::cerr << "Error: No source file specified." << std::endl;
+            return 1;
         }
         
         runFile(filePath, vm);
