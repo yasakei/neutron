@@ -4,6 +4,12 @@
  */
 
 #include "project/project_builder.h"
+#include "compiler/scanner.h"
+#include "compiler/parser.h"
+#include "compiler/compiler.h"
+#include "aot/aot_compiler.h"
+#include "core/vm.h"
+#include "types/value.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -166,23 +172,43 @@ bool ProjectBuilder::buildProjectExecutable(
     const std::string& /*sourcePath*/,
     const std::string& outputPath,
     const std::string& neutronExecutablePath,
-    bool bundleLibs
+    bool bundleLibs,
+    bool aotCompile
 ) {
     std::cout << "\n[1/4] Preparing build..." << std::endl;
-    
+
     // Platform detection
     bool isWindows = false;
     bool isMacOS = false;
     bool isMingw = false;
-    
+    bool isARM = false;
+    bool isX64 = false;
+
 #ifdef _WIN32
     isWindows = true;
     #ifdef __MINGW32__
     isMingw = true;
     #endif
+    #ifdef _M_ARM64
+    isARM = true;
+    #else
+    isX64 = true;
+    #endif
 #elif __APPLE__
     isMacOS = true;
+    #if defined(__arm64__) || defined(__aarch64__)
+    isARM = true;
+    #else
+    isX64 = true;
+    #endif
+#elif defined(__aarch64__) || defined(__arm64__) || defined(__ARM_ARCH_ISA_A64)
+    isARM = true;
+#else
+    isX64 = true;
 #endif
+
+    std::string archName = isARM ? "ARM64" : "x86-64";
+    std::cout << "      Target architecture: " << archName << std::endl;
 
     std::string executableDir = std::filesystem::path(neutronExecutablePath).parent_path().string();
     if (executableDir.empty()) {
@@ -214,9 +240,82 @@ bool ProjectBuilder::buildProjectExecutable(
     srcFile << "#include \"vm.h\"\n";
     srcFile << "#include \"compiler/compiler.h\"\n";
     srcFile << "#include \"modules/module_loader.h\"\n\n";
+
+    // Find box modules
+    auto boxModules = findBoxModules(projectRoot);
+
+    // AOT compilation: only for pure Neutron code (no external/native modules)
+    // OR when all external modules have static libraries (.a)
+    bool aotSuccess = false;
+    if (aotCompile) {
+        std::cout << "[2/4] Analyzing dependencies..." << std::endl;
+        
+        std::vector<std::string> aotUsedModules = getUsedModules(sourceCode);
+        auto boxModules = findBoxModules(projectRoot);
+        
+        // Modules that require interpreter (native code or external)
+        std::set<std::string> nonAotModules = {
+            "http", "json", "sys", "time", "crypto", "process",
+            "arrays", "async", "regex", "path", "math", "fmt", "random"
+        };
+        
+        bool canAot = true;
+        bool hasStaticLibs = true;
+        for (const auto& mod : aotUsedModules) {
+            // Check if it's a built-in native module
+            if (nonAotModules.count(mod) > 0) {
+                canAot = false;
+                std::cout << "      Module '" << mod << "' requires interpreter" << std::endl;
+            }
+            // Check if it's an external box module
+            else if (std::find(boxModules.begin(), boxModules.end(), mod) != boxModules.end()) {
+                // Check if static library exists
+                std::string libA = projectRoot + "/.box/modules/" + mod + "/lib" + mod + ".a";
+                if (!fileExists(libA)) {
+                    hasStaticLibs = false;
+                    std::cout << "      Module '" << mod << "' requires interpreter (no static library)" << std::endl;
+                }
+            }
+        }
+        
+        // Can use AOT if no non-AOT modules AND all box modules have static libs
+        canAot = canAot && hasStaticLibs;
+        
+        if (canAot && aotUsedModules.empty()) {
+            std::cout << "      No external dependencies found" << std::endl;
+        }
+        
+        if (canAot) {
+            std::cout << "      Compiling to native code..." << std::endl;
+            
+            neutron::VM aotVm;
+            neutron::Scanner aotScanner(sourceCode);
+            auto aotTokens = aotScanner.scanTokens();
+            neutron::Parser aotParser(aotTokens);
+            auto aotStatements = aotParser.parse();
+            neutron::Compiler aotCompiler(aotVm);
+            neutron::Function* mainFunc = aotCompiler.compile(aotStatements);
+            
+            if (mainFunc && mainFunc->chunk) {
+                std::cout << "      Generated " << mainFunc->chunk->code.size() << " native instructions" << std::endl;
+                
+                srcFile << "// Auto-generated native code - no VM needed\n\n";
+                neutron::aot::AotCompiler aotGen(mainFunc->chunk);
+                srcFile << aotGen.generateCode("neutron_main");
+                srcFile << "\nint main() { return neutron_main(); }\n";
+                srcFile.close();
+                aotSuccess = true;
+            }
+        }
+    }
     
-    // Get used modules
-    std::vector<std::string> usedModules = getUsedModules(sourceCode);
+    // If AOT didn't succeed, embed source for interpreter mode
+    if (!aotSuccess) {
+        std::cout << "[2/4] Embedding source files..." << std::endl;
+        std::vector<std::string> usedModules = getUsedModules(sourceCode);
+        if (!usedModules.empty()) {
+            std::cout << "      Found " << usedModules.size() << " module(s) to embed" << std::endl;
+        }
     
     // Embed .nt module sources from project
     for (const auto& moduleName : usedModules) {
@@ -250,14 +349,20 @@ bool ProjectBuilder::buildProjectExecutable(
     srcFile << "\n)neutron_source\";\n\n";
 
     // Embed native modules if bundling is enabled
-    auto boxModules = findBoxModules(projectRoot);
     std::vector<std::string> bundledModules;
-    
+
     if (bundleLibs && !boxModules.empty()) {
+        std::cout << "      Bundling " << boxModules.size() << " native module(s): ";
+        for (size_t i = 0; i < boxModules.size(); i++) {
+            std::cout << boxModules[i];
+            if (i < boxModules.size() - 1) std::cout << ", ";
+        }
+        std::cout << std::endl;
+        
         srcFile << "#include <filesystem>\n";
         srcFile << "#include <fstream>\n";
         srcFile << "#include <cstdlib>\n\n";
-        
+
         for (const auto& moduleName : boxModules) {
             std::string moduleDir = projectRoot + "/.box/modules/" + moduleName;
             std::string libFile;
@@ -266,26 +371,31 @@ bool ProjectBuilder::buildProjectExecutable(
             std::string libDylib = moduleDir + "/lib" + moduleName + ".dylib";
             std::string libDylibNoPrefix = moduleDir + "/" + moduleName + ".dylib";
             std::string libDll = moduleDir + "/" + moduleName + ".dll";
-            
-            if (fileExists(libSo)) libFile = libSo;
+            std::string libA = moduleDir + "/lib" + moduleName + ".a";  // Static library for AOT
+
+            // Prefer static library for AOT builds
+            if (aotCompile && fileExists(libA)) {
+                libFile = libA;
+                std::cout << "        - " << moduleName << " (static)" << std::endl;
+            } else if (fileExists(libSo)) libFile = libSo;
             else if (fileExists(libSoNoPrefix)) libFile = libSoNoPrefix;
             else if (fileExists(libDylib)) libFile = libDylib;
             else if (fileExists(libDylibNoPrefix)) libFile = libDylibNoPrefix;
             else if (fileExists(libDll)) libFile = libDll;
-            
+
             if (!libFile.empty()) {
                 std::ifstream binFile(libFile, std::ios::binary);
                 if (binFile) {
                     std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(binFile), {});
-                    
+
                     srcFile << "// Embedded native module: " << moduleName << "\n";
                     srcFile << "const unsigned char lib_" << moduleName << "_data[] = {";
-                    
+
                     for (size_t i = 0; i < buffer.size(); ++i) {
                         if (i % 16 == 0) srcFile << "\n    ";
                         srcFile << "0x" << std::hex << (int)buffer[i] << ", ";
                     }
-                    
+
                     srcFile << "\n};\n";
                     srcFile << "const size_t lib_" << moduleName << "_size = " << std::dec << buffer.size() << ";\n\n";
                     bundledModules.push_back(moduleName);
@@ -430,8 +540,9 @@ bool ProjectBuilder::buildProjectExecutable(
     srcFile << "    vm.interpret(function);\n";
     srcFile << "    return 0;\n";
     srcFile << "}\n";
-    
+
     srcFile.close();
+    } // end if (!aotSuccess)
     
     // Determine compiler
     std::string compiler, linkFlags;
@@ -553,24 +664,36 @@ bool ProjectBuilder::buildProjectExecutable(
     
     // On Windows with MSVC, try to use static library first for better performance
     bool useStaticLib = true;
+
+    // Try to find shared library first (faster linking)
+    std::vector<std::string> sharedLibCandidates = {
+        executableDir + "/libneutron_shared.so",
+        neutronSrcDir + "/build/libneutron_shared.so",
+        neutronSrcDir + "/libneutron_shared.so"
+    };
     
-    // Try to find static library on all platforms
-    std::cout << "Debug: Searching for runtime library..." << std::endl;
-    for (const auto& path : libCandidates) {
-        std::cout << "Debug: Checking " << path << std::endl;
+    std::string sharedLibPath;
+    for (const auto& path : sharedLibCandidates) {
         if (std::filesystem::exists(path)) {
-            runtimeLibPath = path;
-            std::cout << "Debug: Found runtime library at " << path << std::endl;
+            sharedLibPath = path;
             break;
-        } else {
-            std::cout << "Debug: Not found: " << path << std::endl;
         }
     }
-    if (runtimeLibPath.empty()) {
-        std::cout << "Debug: No runtime library found, will compile from source" << std::endl;
-        useStaticLib = false;  // Fallback to source compilation
-    } else {
-        std::cout << "Debug: Will use static library: " << runtimeLibPath << std::endl;
+    
+    // Try to find static library on all platforms
+    for (const auto& path : libCandidates) {
+        if (std::filesystem::exists(path)) {
+            runtimeLibPath = path;
+            break;
+        }
+    }
+    
+    // Prefer shared library for faster builds (unless static is specifically needed)
+    if (!sharedLibPath.empty()) {
+        runtimeLibPath = sharedLibPath;
+        useStaticLib = false;
+    } else if (runtimeLibPath.empty()) {
+        useStaticLib = false;
     }
 
     // Build compile command
@@ -617,23 +740,48 @@ bool ProjectBuilder::buildProjectExecutable(
         }
         
         // Now build the main compile command with runtime sources
-        compileCommand = compiler + " /std:c++17 /EHsc /W3 /O2 /MT /D_CRT_SECURE_NO_WARNINGS /nologo /wd4267 /wd4244 /wd4100 /wd4458 /wd4273 /wd4101 " + includePaths + " \"" + tempSourcePath + "\" ";
+        std::string archFlags = isARM ? " -march=armv8-a" : " -march=x86-64";
+        compileCommand = compiler + " /std:c++17 /EHsc /W3 /O2 /MT /D_CRT_SECURE_NO_WARNINGS /nologo /wd4267 /wd4244 /wd4100 /wd4458 /wd4273 /wd4101" + archFlags + " " + includePaths + " \"" + tempSourcePath + "\" ";
     } else {
         includePaths = "-I\"" + includeDir + "\" -I\"" + includeDir + "/core\" -I\"" + includeDir + "/compiler\" -I\"" + includeDir + "/runtime\" -I\"" + includeDir + "/types\" -I\"" + includeDir + "/utils\" -I\"" + neutronSrcDir + "\" -I\"" + libsDir + "\"";
-        compileCommand = compiler + " -std=c++17 -Wall -Wextra -O2 " + includePaths + " \"" + tempSourcePath + "\" ";
+        std::string archFlags = isARM ? " -march=armv8-a" : " -march=x86-64";
+        compileCommand = compiler + " -std=c++17 -Wall -Wextra -O2" + archFlags + " " + includePaths + " \"" + tempSourcePath + "\" ";
     }
     
     // If we found the runtime library and not on Windows MSVC, link it. Otherwise, compile sources.
-    std::cout << "Debug: useStaticLib = " << (useStaticLib ? "true" : "false") << std::endl;
-    std::cout << "Debug: runtimeLibPath = '" << runtimeLibPath << "'" << std::endl;
-    
-    if (useStaticLib && !runtimeLibPath.empty()) {
-        // Link static library
-        // On Linux, wrap with --whole-archive to ensure all symbols are included (needed for dlopen)
-        if (!isWindows && !isMacOS) {
-            compileCommand += "-Wl,--whole-archive \"" + runtimeLibPath + "\" -Wl,--no-whole-archive ";
+    // Skip runtime linking for pure AOT builds (no external modules)
+    if (aotSuccess) {
+        std::cout << "      Linking standalone executable (no runtime)" << std::endl;
+    } else if (!runtimeLibPath.empty()) {
+        std::cout << "      Linking runtime library" << std::endl;
+        
+        // Check if it's a shared library
+        bool isShared = (runtimeLibPath.find(".so") != std::string::npos || 
+                        runtimeLibPath.find(".dylib") != std::string::npos ||
+                        runtimeLibPath.find(".dll") != std::string::npos);
+        
+        if (isShared) {
+            // Link shared library
+            std::string libDir = std::filesystem::path(runtimeLibPath).parent_path().string();
+            std::string libName = std::filesystem::path(runtimeLibPath).stem().string();
+            if (libName.find("lib") == 0) {
+                libName = libName.substr(3);
+            }
+            compileCommand += "-L\"" + libDir + "\" -l" + libName + " -Wl,-rpath,\"" + libDir + "\" ";
+        } else if (useStaticLib) {
+            // Link static library
+            if (!isWindows && !isMacOS) {
+                compileCommand += "-Wl,--whole-archive \"" + runtimeLibPath + "\" -Wl,--no-whole-archive ";
+            } else {
+                compileCommand += "\"" + runtimeLibPath + "\" ";
+            }
         } else {
-            compileCommand += "\"" + runtimeLibPath + "\" ";
+            // Fallback to static library linking
+            if (!isWindows && !isMacOS) {
+                compileCommand += "-Wl,--whole-archive \"" + runtimeLibPath + "\" -Wl,--no-whole-archive ";
+            } else {
+                compileCommand += "\"" + runtimeLibPath + "\" ";
+            }
         }
         
         // On Windows, we need to compile dlfcn_compat_win.cpp to provide dlopen/dlsym/dlclose
@@ -663,10 +811,10 @@ bool ProjectBuilder::buildProjectExecutable(
             }
         }
     }
-    
-    // Add builtin modules (only if compiling from source, otherwise they are in the lib)
-    // On Windows MSVC, modules are already compiled separately above
-    if ((!useStaticLib || runtimeLibPath.empty()) && !(isWindows && !isMingw)) {
+
+    // Add builtin modules (only if compiling from source, not when linking a library)
+    // Skip this when we're linking either static or shared library
+    if (runtimeLibPath.empty() && !(isWindows && !isMingw)) {
         auto builtinSources = getBuiltinModuleSources();
         for (const auto& src : builtinSources) {
             std::string fullPath = neutronSrcDir + "/" + src;
@@ -792,7 +940,6 @@ bool ProjectBuilder::buildProjectExecutable(
     
     if (result == 0) {
         std::cout << "[4/4] Build complete!" << std::endl;
-        std::cout << "\nOutput: " << finalOutputPath << std::endl;
         
         // Make executable on Unix
 #ifndef _WIN32

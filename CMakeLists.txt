@@ -86,6 +86,7 @@ endif()
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/include/core
+    ${CMAKE_SOURCE_DIR}/include/aot
     ${CMAKE_SOURCE_DIR}/libs
 )
 
@@ -222,6 +223,7 @@ set(NEUTRON_COMPILER_SOURCES
     src/jit/jit_tier1.cpp
     src/jit/jit_tier2.cpp
     src/jit/jit_tier2_arm64.cpp
+    src/aot/aot_compiler.cpp
 )
 
 # Type system source files
@@ -492,9 +494,11 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(neutron_runtime dl)
     # Export symbols from the executable so modules can access C API functions
     target_link_options(neutron PRIVATE "-Wl,--export-dynamic")
+    # Set RPATH to find shared library in build directory and project root
     set_target_properties(neutron PROPERTIES
-        BUILD_RPATH "$ORIGIN:$ORIGIN/../lib:/usr/local/lib"
+        BUILD_RPATH "$ORIGIN:$ORIGIN/build:$ORIGIN/../lib:/usr/local/lib"
         INSTALL_RPATH "$ORIGIN:$ORIGIN/../lib:/usr/local/lib"
+        BUILD_RPATH_USE_ORIGIN ON
         ENABLE_EXPORTS ON
     )
 elseif(APPLE)
@@ -556,6 +560,36 @@ elseif(WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neutron_runtime> ${CMAKE_SOURCE_DIR}/neutron_runtime.lib
         COMMENT "Copying binaries to project root"
     )
+endif()
+
+# --------------------------------------------------------
+# Installation
+# --------------------------------------------------------
+# Install headers
+install(DIRECTORY include/ DESTINATION include/neutron
+    FILES_MATCHING PATTERN "*.h"
+)
+
+# Install libraries
+install(TARGETS neutron_runtime neutron_shared
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+# Install main executable
+install(TARGETS neutron
+    RUNTIME DESTINATION bin
+)
+
+# Install Neutron standard library (.nt files)
+install(DIRECTORY libs/ DESTINATION share/neutron/libs
+    FILES_MATCHING PATTERN "*.nt"
+)
+
+# Install main.nt and other core .nt files if they exist
+if(EXISTS "${CMAKE_SOURCE_DIR}/main.nt")
+    install(FILES ${CMAKE_SOURCE_DIR}/main.nt DESTINATION share/neutron)
 endif()
 
 # Optional: Add tests

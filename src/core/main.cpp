@@ -203,11 +203,9 @@ int main(int argc, char* argv[]) {
                 std::cerr << "Error: Failed to load project configuration" << std::endl;
                 return 1;
             }
-            
+
             std::string entryFile = projectRoot + "/" + config->entry;
-            std::cout << "Running: " << config->name << " v" << config->version << std::endl;
-            std::cout << "Entry: " << config->entry << "\n" << std::endl;
-            
+
             neutron::VM vm;
             vm.commandLineArgs.push_back(entryFile);
             runFile(entryFile, vm);
@@ -215,10 +213,18 @@ int main(int argc, char* argv[]) {
         }
         
         else if (arg == "build") {
-            // Check for --no-bundle flag (bundling is now default)
             bool bundleLibs = true;
-            if (argc > 2 && std::string(argv[2]) == "--no-bundle") {
-                bundleLibs = false;
+            bool aotCompile = true;  // AOT is now the default
+
+            for (int i = 2; i < argc; i++) {
+                std::string flag = argv[i];
+                if (flag == "--no-bundle") {
+                    bundleLibs = false;
+                } else if (flag == "--aot" || flag == "-c") {
+                    aotCompile = true;
+                } else if (flag == "--no-aot" || flag == "--interpret") {
+                    aotCompile = false;  // Allow fallback to interpreter mode
+                }
             }
             
             // Check if we're in a Neutron project
@@ -236,25 +242,23 @@ int main(int argc, char* argv[]) {
             }
             
             std::string entryFile = projectRoot + "/" + config->entry;
-            
-            std::cout << "Building: " << config->name << " v" << config->version << std::endl;
-            std::cout << "Entry: " << config->entry << std::endl;
-            if (bundleLibs) {
-                std::cout << "Mode: Bundle shared libraries" << std::endl;
-            }
-            
+
+            std::cout << "Building: " << config->name << std::endl;
+            std::cout << "  Mode: " << (aotCompile ? "AOT (native)" : "Interpreter") << std::endl;
+
             // Create build directory
             std::string buildDir = projectRoot + "/build";
             std::filesystem::create_directories(buildDir);
-            
+
             // Output executable name
             std::string outputName = config->name;
 #ifdef _WIN32
             outputName += ".exe";
 #endif
             std::string outputPath = buildDir + "/" + outputName;
-            
-            std::cout << "Output: " << outputPath << "\n" << std::endl;
+
+            std::cout << "  Output: " << outputPath << std::endl;
+            std::cout << std::endl;
             
             // Read the entry file
             std::ifstream file(entryFile);
@@ -277,27 +281,117 @@ int main(int argc, char* argv[]) {
                 entryFile,
                 outputPath,
                 neutron::platform::getExecutablePath(),
-                bundleLibs
+                bundleLibs,
+                aotCompile
             );
             
             return success ? 0 : 1;
         }
         
         else if (arg == "install") {
+            // If no arguments, install all dependencies from .quark
             if (argc < 3) {
-                std::cerr << "Usage: neutron install <package>" << std::endl;
-                std::cerr << "Available packages: box" << std::endl;
-                return 1;
+                std::string projectRoot = neutron::ProjectManager::findProjectRoot(".");
+                if (projectRoot.empty()) {
+                    std::cerr << "Error: Not in a Neutron project" << std::endl;
+                    return 1;
+                }
+
+                std::string quarkPath = projectRoot + "/.quark";
+                std::ifstream quarkFile(quarkPath);
+                if (!quarkFile.is_open()) {
+                    std::cerr << "Error: No .quark file found" << std::endl;
+                    return 1;
+                }
+
+                std::cout << "Reading dependencies from .quark..." << std::endl;
+                std::cout << std::endl;
+
+                std::string line;
+                bool inDeps = false;
+                std::vector<std::string> deps;
+
+                while (std::getline(quarkFile, line)) {
+                    if (line == "[dependencies]") {
+                        inDeps = true;
+                        continue;
+                    }
+                    if (inDeps && line[0] != '[' && !line.empty() && line[0] != '#') {
+                        size_t eq = line.find('=');
+                        if (eq != std::string::npos) {
+                            std::string name = line.substr(0, eq);
+                            std::string version = line.substr(eq + 1);
+                            // Trim whitespace
+                            name.erase(0, name.find_first_not_of(" \t\r\n"));
+                            name.erase(name.find_last_not_of(" \t\r\n") + 1);
+                            version.erase(0, version.find_first_not_of(" \t\r\n"));
+                            version.erase(version.find_last_not_of(" \t\r\n") + 1);
+                            // Remove quotes if present
+                            if (version.size() >= 2) {
+                                if ((version.front() == '"' && version.back() == '"') ||
+                                    (version.front() == '\'' && version.back() == '\'')) {
+                                    version = version.substr(1, version.size() - 2);
+                                }
+                            }
+                            if (!name.empty() && !version.empty()) {
+                                deps.push_back(name + "@" + version);
+                            }
+                        }
+                    }
+                }
+                quarkFile.close();
+
+                if (deps.empty()) {
+                    std::cout << "No dependencies found in .quark" << std::endl;
+                    return 0;
+                }
+
+                std::cout << "Found " << deps.size() << " dependenc" << (deps.size() == 1 ? "y" : "ies") << ":" << std::endl;
+                for (const auto& dep : deps) {
+                    std::cout << "  - " << dep << std::endl;
+                }
+                std::cout << std::endl;
+
+                // Find box executable
+                std::string boxExe = neutron::platform::getExecutablePath();
+                size_t lastSlash = boxExe.find_last_of("/\\");
+                if (lastSlash != std::string::npos) {
+                    boxExe = boxExe.substr(0, lastSlash) + "/box";
+                } else {
+                    boxExe = "./box";
+                }
+
+                // Install each dependency
+                int installed = 0;
+                for (const auto& dep : deps) {
+                    std::string cmd = boxExe + " install \"" + dep + "\"";
+                    int result = system(cmd.c_str());
+                    if (result == 0) {
+                        installed++;
+                    }
+                }
+
+                std::cout << std::endl;
+                std::cout << "Installed " << installed << "/" << deps.size() << " packages" << std::endl;
+                return (installed == deps.size()) ? 0 : 1;
             }
-            
+
+            // Install specific package
             std::string package = argv[2];
-            if (package == "box") {
-                return neutron::ProjectManager::installBox() ? 0 : 1;
+            std::string boxPath = neutron::platform::getExecutablePath();
+            size_t lastSlash = boxPath.find_last_of("/\\");
+            if (lastSlash != std::string::npos) {
+                boxPath = boxPath.substr(0, lastSlash) + "/box";
             } else {
-                std::cerr << "Error: Unknown package: " << package << std::endl;
-                std::cerr << "Available packages: box" << std::endl;
-                return 1;
+                boxPath = "./box";
             }
+
+            std::string cmd = "\"" + boxPath + "\" install " + package;
+            for (int i = 3; i < argc; i++) {
+                cmd += " " + std::string(argv[i]);
+            }
+
+            return system(cmd.c_str());
         }
         
         // Format command
