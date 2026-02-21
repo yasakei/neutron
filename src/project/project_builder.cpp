@@ -173,7 +173,8 @@ bool ProjectBuilder::buildProjectExecutable(
     const std::string& outputPath,
     const std::string& neutronExecutablePath,
     bool bundleLibs,
-    bool aotCompile
+    bool aotCompile,
+    const std::string& targetArch
 ) {
     std::cout << "\n[1/4] Preparing build..." << std::endl;
 
@@ -183,6 +184,52 @@ bool ProjectBuilder::buildProjectExecutable(
     bool isMingw = false;
     bool isARM = false;
     bool isX64 = false;
+
+    // If cross-compilation target specified, override auto-detection
+    bool crossCompile = !targetArch.empty();
+    std::string crossCompiler;
+    std::string crossSysroot;
+    
+    if (crossCompile) {
+        // Determine target platform and compiler from target triple
+        if (targetArch.find("aarch64") != std::string::npos || targetArch.find("arm64") != std::string::npos || targetArch.find("armv8") != std::string::npos) {
+            isARM = true;
+            isX64 = false;
+        } else if (targetArch.find("x86_64") != std::string::npos || targetArch.find("x64") != std::string::npos) {
+            isARM = false;
+            isX64 = true;
+        }
+        
+        // Find cross-compiler
+        std::vector<std::string> compilerCandidates = {
+            targetArch + "-g++",
+            targetArch + "-gcc"
+        };
+        
+        for (const auto& cc : compilerCandidates) {
+            std::string checkCmd = "which " + cc + " > /dev/null 2>&1";
+            if (system(checkCmd.c_str()) == 0) {
+                crossCompiler = cc;
+                std::cout << "      Cross-compiler: " << crossCompiler << std::endl;
+                break;
+            }
+        }
+        
+        if (crossCompiler.empty()) {
+            std::cerr << "Warning: Cross-compiler not found for " << targetArch << std::endl;
+            std::cerr << "         Install: sudo apt install " << targetArch << "-gcc" << std::endl;
+        }
+        
+        // Check for sysroot
+        std::string sysrootPath = "/usr/" + targetArch;
+        if (targetArch.find("aarch64") != std::string::npos) {
+            sysrootPath = "/usr/aarch64-linux-gnu";
+        }
+        if (std::filesystem::exists(sysrootPath)) {
+            crossSysroot = sysrootPath;
+            std::cout << "      Sysroot: " << crossSysroot << std::endl;
+        }
+    }
 
 #ifdef _WIN32
     isWindows = true;
@@ -547,8 +594,21 @@ bool ProjectBuilder::buildProjectExecutable(
     // Determine compiler
     std::string compiler, linkFlags;
     std::string vcvarsPath; // Store vcvars path if found
-    
-    if (isWindows && !isMingw) {
+
+    // Use cross-compiler if specified
+    if (crossCompile && !crossCompiler.empty()) {
+        compiler = crossCompiler;
+        if (isARM) {
+            linkFlags = "-lcurl -ljsoncpp -ldl -rdynamic";
+        } else {
+            linkFlags = "-lcurl -ljsoncpp -ldl -rdynamic";
+        }
+        
+        // Add sysroot if available
+        if (!crossSysroot.empty()) {
+            linkFlags += " -Wl,--sysroot=" + crossSysroot;
+        }
+    } else if (isWindows && !isMingw) {
         compiler = "cl";
         // Add both executable dir and vcpkg lib path for linking
         std::string vcpkgLibPath = executableDir + "/vcpkg_installed/x64-windows/lib";
@@ -741,11 +801,13 @@ bool ProjectBuilder::buildProjectExecutable(
         
         // Now build the main compile command with runtime sources
         std::string archFlags = isARM ? " -march=armv8-a" : " -march=x86-64";
-        compileCommand = compiler + " /std:c++17 /EHsc /W3 /O2 /MT /D_CRT_SECURE_NO_WARNINGS /nologo /wd4267 /wd4244 /wd4100 /wd4458 /wd4273 /wd4101" + archFlags + " " + includePaths + " \"" + tempSourcePath + "\" ";
+        std::string sysrootFlag = (!crossSysroot.empty()) ? " --sysroot=" + crossSysroot : "";
+        compileCommand = compiler + " /std:c++17 /EHsc /W3 /O2 /MT /D_CRT_SECURE_NO_WARNINGS /nologo /wd4267 /wd4244 /wd4100 /wd4458 /wd4273 /wd4101" + archFlags + sysrootFlag + " " + includePaths + " \"" + tempSourcePath + "\" ";
     } else {
         includePaths = "-I\"" + includeDir + "\" -I\"" + includeDir + "/core\" -I\"" + includeDir + "/compiler\" -I\"" + includeDir + "/runtime\" -I\"" + includeDir + "/types\" -I\"" + includeDir + "/utils\" -I\"" + neutronSrcDir + "\" -I\"" + libsDir + "\"";
         std::string archFlags = isARM ? " -march=armv8-a" : " -march=x86-64";
-        compileCommand = compiler + " -std=c++17 -Wall -Wextra -O2" + archFlags + " " + includePaths + " \"" + tempSourcePath + "\" ";
+        std::string sysrootFlag = (!crossSysroot.empty()) ? " --sysroot=" + crossSysroot : "";
+        compileCommand = compiler + " -std=c++17 -Wall -Wextra -O2" + archFlags + sysrootFlag + " " + includePaths + " \"" + tempSourcePath + "\" ";
     }
     
     // If we found the runtime library and not on Windows MSVC, link it. Otherwise, compile sources.

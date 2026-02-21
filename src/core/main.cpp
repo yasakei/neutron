@@ -215,6 +215,7 @@ int main(int argc, char* argv[]) {
         else if (arg == "build") {
             bool bundleLibs = true;
             bool aotCompile = true;  // AOT is now the default
+            std::string targetArch = "";  // Cross-compilation target
 
             for (int i = 2; i < argc; i++) {
                 std::string flag = argv[i];
@@ -224,27 +225,34 @@ int main(int argc, char* argv[]) {
                     aotCompile = true;
                 } else if (flag == "--no-aot" || flag == "--interpret") {
                     aotCompile = false;  // Allow fallback to interpreter mode
+                } else if (flag == "--target" && i + 1 < argc) {
+                    targetArch = argv[++i];  // Cross-compilation target
+                } else if (flag.find("--target=") == 0) {
+                    targetArch = flag.substr(9);  // --target=xxx format
                 }
             }
-            
+
             // Check if we're in a Neutron project
             std::string projectRoot = neutron::ProjectManager::findProjectRoot(".");
             if (projectRoot.empty()) {
                 std::cerr << "Error: Not in a Neutron project. Run './neutron init' to create one." << std::endl;
                 return 1;
             }
-            
+
             // Load config
             auto config = neutron::ProjectManager::loadConfig(projectRoot);
             if (!config) {
                 std::cerr << "Error: Failed to load project configuration" << std::endl;
                 return 1;
             }
-            
+
             std::string entryFile = projectRoot + "/" + config->entry;
 
             std::cout << "Building: " << config->name << std::endl;
             std::cout << "  Mode: " << (aotCompile ? "AOT (native)" : "Interpreter") << std::endl;
+            if (!targetArch.empty()) {
+                std::cout << "  Target: " << targetArch << " (cross-compilation)" << std::endl;
+            }
 
             // Create build directory
             std::string buildDir = projectRoot + "/build";
@@ -282,7 +290,8 @@ int main(int argc, char* argv[]) {
                 outputPath,
                 neutron::platform::getExecutablePath(),
                 bundleLibs,
-                aotCompile
+                aotCompile,
+                targetArch
             );
             
             return success ? 0 : 1;

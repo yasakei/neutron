@@ -21,7 +21,8 @@ public:
         const std::string& outputPath,
         const std::string& neutronExecutablePath,
         bool bundleLibs = false,
-        bool aotCompile = false
+        bool aotCompile = false,
+        const std::string& targetArch = ""  // Cross-compilation target (e.g., "aarch64-linux-gnu")
     );
     
 private:
