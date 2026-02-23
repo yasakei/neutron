@@ -171,13 +171,12 @@ jobs:
       
     - name: Install dependencies
       run: |
-        brew install cmake jsoncpp gcc
+        brew install cmake jsoncpp
         
-        # Verify GCC/Clang version
-        echo "Using GCC version:"
-        gcc --version || echo "GCC not available"
-        echo "Using Clang version:"
-        clang --version || echo "Clang not available"
+        # macOS comes with clang by default (Xcode Command Line Tools)
+        # Verify compiler availability
+        echo "Checking for C++ compiler..."
+        clang --version || echo "clang not available"
         
     - name: Build Neutron Runtime
       run: |
@@ -210,9 +209,9 @@ jobs:
 
     - name: Run AOT compilation tests (macOS)
       run: |
-        # AOT requires C++ compiler
+        # AOT uses clang on macOS (included with Xcode Command Line Tools)
         echo "Checking for C++ compiler..."
-        gcc --version || clang --version || echo "No C++ compiler found"
+        which clang && clang --version || echo "clang not available"
         python3 run_tests.py --aot
 
     - name: Install Neutron globally
