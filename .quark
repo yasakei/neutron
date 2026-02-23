@@ -1,0 +1,7 @@
+[project]
+name = "test"
+version = "1.0.0"
+entry = "test.nt"
+
+[dependencies]
+base64=1.0.1

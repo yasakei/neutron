@@ -208,11 +208,14 @@ VM::VM() : ip(nullptr), nextGC(32768), currentFileName("<stdin>"), hasException(
     stack.reserve(8192);
     frames.reserve(64);
     heap.reserve(16384);
-    
+
     // Initialize error handler
     ErrorHandler::setColorEnabled(true);
     ErrorHandler::setStackTraceEnabled(true);
-    
+
+    // Initialize JIT manager
+    jitManager.initialize(false);  // Monitoring disabled by default
+
     globals["say"] = Value(allocate<NativeFn>(std::function<Value(std::vector<Value>)>(native_say), 1));
     
     // Register array functions
@@ -1231,12 +1234,12 @@ void VM::run(size_t minFrameDepth) {
                     const std::string& name = nameStr->chars;
                     auto it = globals.find(name);
                     if (it == globals.end()) {
-                        if (name == "json" || name == "math" || name == "sys" || name == "http" || 
+                        if (name == "json" || name == "math" || name == "sys" || name == "http" ||
                             name == "time" || name == "fmt" || name == "arrays") {
-                            runtimeError(this, "Undefined variable '" + name + "'. Did you forget to import it? Use 'use " + name + ";' at the top of your file.", 
+                            runtimeError(this, "Undefined variable '" + name + "'. Did you forget to import it? Use 'use " + name + ";' at the top of your file.",
                                         frames.empty() ? -1 : frames.back().currentLine);
                         } else {
-                            runtimeError(this, "Undefined variable '" + name + "'.", 
+                            runtimeError(this, "Undefined variable '" + name + "'.",
                                         frames.empty() ? -1 : frames.back().currentLine);
                         }
                     }
@@ -1339,7 +1342,7 @@ void VM::run(size_t minFrameDepth) {
                 } else {
                     auto it = globals.find(nameStr->chars);
                     if (NEUTRON_UNLIKELY(it == globals.end())) {
-                        runtimeError(this, "Undefined variable '" + nameStr->chars + "'.", 
+                        runtimeError(this, "Undefined variable '" + nameStr->chars + "'.",
                                     frames.empty() ? -1 : frames.back().currentLine);
                     }
                     entry.key = nameStr;
@@ -3936,4 +3939,79 @@ void VM::interpret_module(const std::vector<std::unique_ptr<Stmt>>& statements, 
     // Restore original globals
     globals = saved_globals;
 }
+
+// JIT control methods implementation
+void VM::setJITEnabled(bool enabled) {
+    jitEnabled = enabled;
 }
+
+void VM::setJITMonitoring(bool enabled) {
+    jitManager.initialize(enabled);
+}
+
+void VM::registerOSREntry(uint64_t method_id, uint64_t trace_id, uint64_t bytecode_pc) {
+    OSREntry entry;
+    entry.trace_id = trace_id;
+    entry.bytecode_pc = bytecode_pc;
+    entry.frame_size = static_cast<uint32_t>(stack.size());
+    entry.locals_count = frames.back().slot_offset;
+    
+    // Record which local slots are live at this OSR point
+    for (size_t i = frames.back().slot_offset; i < stack.size(); i++) {
+        entry.local_slots.push_back(static_cast<uint32_t>(i));
+    }
+    
+    osrEntries[method_id].push_back(entry);
+}
+
+void VM::triggerDeoptimization(uint64_t trace_id) {
+    hasPendingDeoptimization = true;
+    deoptTraceId = trace_id;
+    jitGuardFailures++;
+}
+
+bool VM::performDeoptimization(CallFrame* frame) {
+    if (!hasPendingDeoptimization) {
+        return false;
+    }
+    
+    // Find the OSR entry for this trace
+    uint64_t method_id = reinterpret_cast<uint64_t>(frame->function);
+    auto it = osrEntries.find(method_id);
+    if (it == osrEntries.end()) {
+        hasPendingDeoptimization = false;
+        return false;
+    }
+    
+    // Find matching trace
+    for (const auto& entry : it->second) {
+        if (entry.trace_id == deoptTraceId) {
+            // Restore interpreter state from JIT state
+            // The JIT should have already synced locals back to the stack/memory
+            // Just need to reset the IP to the bytecode position
+            
+            // Reset IP to the OSR point
+            frame->ip = frame->function->chunk->code.data() + entry.bytecode_pc;
+            
+            osrTransitions++;
+            hasPendingDeoptimization = false;
+            return true;
+        }
+    }
+    
+    hasPendingDeoptimization = false;
+    return false;
+}
+
+void VM::printJITStatistics() const {
+    std::cout << "\n=== JIT Statistics ===" << std::endl;
+    std::cout << "JIT Enabled: " << (jitEnabled ? "Yes" : "No") << std::endl;
+    std::cout << "Traces Compiled: " << jitTracesCompiled << std::endl;
+    std::cout << "Traces Executed: " << jitTracesExecuted << std::endl;
+    std::cout << "Guard Failures: " << jitGuardFailures << std::endl;
+    std::cout << "OSR Transitions: " << osrTransitions << std::endl;
+    std::cout << "Loop Counter: " << jitLoopCounter << std::endl;
+    std::cout << "========================\n" << std::endl;
+}
+
+} // namespace neutron

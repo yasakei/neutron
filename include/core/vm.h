@@ -157,7 +157,7 @@ public:
     bool jitEnabled = false;
 #endif
     uint32_t jitLoopCounter = 0;
-    
+
     // Inline cache for JIT-compiled loop traces
     // Maps loop_pc to trace function pointer for O(1) dispatch
     struct JITLoopCacheEntry {
@@ -167,6 +167,35 @@ public:
     };
     static constexpr size_t JIT_LOOP_CACHE_SIZE = 32;
     JITLoopCacheEntry jitLoopCache[JIT_LOOP_CACHE_SIZE] = {};
+    
+    // OSR (On-Stack Replacement) support
+    // Stores deoptimization information for transitioning from JIT to interpreter
+    struct OSREntry {
+        uint64_t trace_id;           // JIT trace ID
+        uint64_t bytecode_pc;        // Bytecode offset where OSR can occur
+        uint32_t frame_size;         // Stack frame size at OSR point
+        uint32_t locals_count;       // Number of live locals at OSR point
+        std::vector<uint32_t> local_slots;  // Local variable slots to restore
+    };
+    std::unordered_map<uint64_t, std::vector<OSREntry>> osrEntries;  // method_id -> OSR entries
+    
+    // Deoptimization support
+    // Guard information for type specialization
+    struct JITGuard {
+        uint64_t trace_id;
+        uint32_t slot_index;
+        uint8_t expected_type;  // ValueType enum
+        bool is_active;
+    };
+    std::vector<JITGuard> jitGuards;
+    bool hasPendingDeoptimization = false;
+    uint64_t deoptTraceId = 0;
+    
+    // JIT statistics
+    uint64_t jitTracesCompiled = 0;
+    uint64_t jitTracesExecuted = 0;
+    uint64_t jitGuardFailures = 0;
+    uint64_t osrTransitions = 0;
 
     // Public data members (for access from other components)
     std::vector<CallFrame> frames;
@@ -198,6 +227,22 @@ public:
     // Embedded files support (for standalone executables)
     std::unordered_map<std::string, std::string> embeddedFiles;
     void addEmbeddedFile(const std::string& path, const std::string& content);
+    
+    // JIT control methods
+    void setJITEnabled(bool enabled);
+    bool isJITEnabled() const { return jitEnabled; }
+    void setJITMonitoring(bool enabled);
+    
+    // OSR and deoptimization support
+    void registerOSREntry(uint64_t method_id, uint64_t trace_id, uint64_t bytecode_pc);
+    void triggerDeoptimization(uint64_t trace_id);
+    bool performDeoptimization(CallFrame* frame);
+    
+    // JIT statistics
+    uint64_t getJITTracesCompiled() const { return jitTracesCompiled; }
+    uint64_t getJITTracesExecuted() const { return jitTracesExecuted; }
+    uint64_t getJITGuardFailures() const { return jitGuardFailures; }
+    void printJITStatistics() const;
     
     // Exception handling support
     struct ExceptionFrame {

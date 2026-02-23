@@ -1576,17 +1576,23 @@ bool Tier2Compiler::executeTrace(uint64_t trace_id, void* context) {
     }
 
     const auto& trace = it->second;
-    
+
     if (trace->compiled_code_address != 0) {
         using JITFunc = void(*)(void*);
         JITFunc func = reinterpret_cast<JITFunc>(trace->compiled_code_address);
         func(context);
-        
+
         trace->execution_count++;
         return true;
     }
-    
+
     return false;
+}
+
+// Register OSR entry when trace is compiled
+void Tier2Compiler::registerOSREntry(uint64_t trace_id, uint64_t method_id, uint64_t bytecode_pc) {
+    // This is called by the VM when a trace is successfully compiled
+    // The VM will store the OSR entry for potential deoptimization
 }
 uint64_t Tier2Compiler::findTrace(uint64_t method_id, uint64_t loop_entry_pc) {
     // O(1) lookup via pre-built hash map

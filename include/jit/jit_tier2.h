@@ -143,6 +143,11 @@ public:
      * Find a compiled trace
      */
     uint64_t findTrace(uint64_t method_id, uint64_t loop_entry_pc);
+    
+    /**
+     * Register OSR entry for deoptimization support
+     */
+    void registerOSREntry(uint64_t trace_id, uint64_t method_id, uint64_t bytecode_pc);
 
     /**
      * Check if a trace has already failed compilation (avoid retrying)

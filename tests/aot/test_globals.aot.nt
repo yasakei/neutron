@@ -1,0 +1,16 @@
+// AOT Test 1: Global Variables
+// Tests AOT compilation with global variable support
+
+var counter = 0;
+var message = "AOT globals test";
+
+// Test global access
+counter = counter + 1;
+counter = counter + 1;
+counter = counter + 1;
+
+if (counter == 3) {
+    say(message + " PASSED (counter=" + counter + ")");
+} else {
+    say(message + " FAILED (expected=3, got=" + counter + ")");
+}

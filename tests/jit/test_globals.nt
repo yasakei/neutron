@@ -1,0 +1,22 @@
+// JIT Test 6: Global variables with hot loop
+// Tests JIT handling of global variable access
+
+var globalCounter = 0;
+var globalSum = 0;
+
+fun updateGlobals() {
+    for (var i = 0; i < 100; i = i + 1) {
+        globalCounter = globalCounter + 1;
+        globalSum = globalSum + i;
+    }
+}
+
+updateGlobals();
+
+if (globalCounter == 100 && globalSum == 4950) {
+    say("JIT globals test PASSED (counter=" + globalCounter + ", sum=" + globalSum + ")");
+} else {
+    say("JIT globals test FAILED");
+    say("  counter: expected=100, got=" + globalCounter);
+    say("  sum: expected=4950, got=" + globalSum);
+}

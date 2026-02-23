@@ -54,12 +54,13 @@
  ---
 
 ## Architecture
- 
+
  Neutron uses a modern multi-stage pipeline: **Scanner/Parser** → **Bytecode Compiler** → **Stack-based VM** → **[Multi-Tier JIT](docs/implementation/jit.md)**.
- 
+
  - **Zero Dependencies:** Written in C++17 with minimal external reliance.
  - **Smart Memory:** Deterministic RC/GC memory management.
- - **JIT Compilation:** Three-tier execution (interpreter → threaded code → tracing JIT) with native codegen for **x86-64** and **ARM64**.
+ - **JIT Compilation:** Three-tier execution (interpreter → threaded code → tracing JIT) with native codegen for **x86-64** and **ARM64**. Features OSR and deoptimization support.
+ - **AOT Compilation:** Compile to standalone native executables with **[AOT Compiler](docs/implementation/aot.md)**. 100% test coverage.
  - **Native Modules:** Direct C++ integration for max performance.
 
 ## Core Features

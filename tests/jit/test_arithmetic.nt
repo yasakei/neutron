@@ -1,0 +1,24 @@
+// JIT Test 4: Arithmetic operations in hot loop
+// Tests JIT compilation with various arithmetic operations
+
+fun arithmeticLoop() {
+    var sum = 0;
+    var product = 1;
+    for (var i = 1; i < 100; i = i + 1) {
+        sum = sum + i;
+        product = product * 2;
+        if (product > 1000000) {
+            product = product / 2;
+        }
+    }
+    return sum;
+}
+
+var result = arithmeticLoop();
+var expected = 4950;  // Sum of 1 to 99
+
+if (result == expected) {
+    say("JIT arithmetic test PASSED (sum=" + result + ")");
+} else {
+    say("JIT arithmetic test FAILED (expected=" + expected + ", got=" + result + ")");
+}

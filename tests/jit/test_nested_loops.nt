@@ -1,0 +1,21 @@
+// JIT Test 2: Nested loops
+// Tests JIT compilation with nested loop structures
+
+fun nestedLoops() {
+    var sum = 0;
+    for (var i = 0; i < 50; i = i + 1) {
+        for (var j = 0; j < 50; j = j + 1) {
+            sum = sum + 1;
+        }
+    }
+    return sum;
+}
+
+var result = nestedLoops();
+var expected = 2500;  // 50 * 50
+
+if (result == expected) {
+    say("JIT nested loops test PASSED (sum=" + result + ")");
+} else {
+    say("JIT nested loops test FAILED (expected=" + expected + ", got=" + result + ")");
+}

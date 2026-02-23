@@ -1,0 +1,23 @@
+// AOT Test 9: Function Calls
+// Tests AOT function call support with local variables only
+
+fun add(a, b) {
+    var sum = a + b;
+    return sum;
+}
+
+fun multiply(a, b) {
+    var product = a * b;
+    return product;
+}
+
+// Call functions with local variables only
+var result1 = add(5, 10);
+var result2 = multiply(result1, 2);
+var final = add(result2, 100);
+
+if (final == 130) {
+    say("AOT functions test PASSED (result=" + final + ")");
+} else {
+    say("AOT functions test FAILED (expected=130, got=" + final + ")");
+}

@@ -996,10 +996,10 @@ bool ProjectBuilder::buildProjectExecutable(
     #else
     result = system(compileCommand.c_str());
     #endif
-    
+
     // Clean up temp file
     std::filesystem::remove(tempSourcePath);
-    
+
     if (result == 0) {
         std::cout << "[4/4] Build complete!" << std::endl;
         

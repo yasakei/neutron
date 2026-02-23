@@ -1,0 +1,15 @@
+// AOT Test 5: Loop Optimization
+// Tests AOT loop handling and optimization
+
+var sum = 0;
+for (var i = 0; i <= 100; i = i + 1) {
+    sum = sum + i;
+}
+
+var expected = 5050;  // Sum of 0 to 100
+
+if (sum == expected) {
+    say("AOT loop test PASSED (sum=" + sum + ")");
+} else {
+    say("AOT loop test FAILED (expected=" + expected + ", got=" + sum + ")");
+}

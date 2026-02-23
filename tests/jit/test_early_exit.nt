@@ -1,0 +1,22 @@
+// JIT Test 10: Loop with early exit
+// Tests JIT handling of break-like patterns
+
+fun earlyExit() {
+    var sum = 0;
+    for (var i = 0; i < 1000; i = i + 1) {
+        if (i >= 100) {
+            return sum;
+        }
+        sum = sum + i;
+    }
+    return sum;
+}
+
+var result = earlyExit();
+var expected = 4950;  // Sum of 0 to 99
+
+if (result == expected) {
+    say("JIT early exit test PASSED (sum=" + result + ")");
+} else {
+    say("JIT early exit test FAILED (expected=" + expected + ", got=" + result + ")");
+}

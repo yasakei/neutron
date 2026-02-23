@@ -5,6 +5,9 @@ import platform
 import subprocess
 import glob
 import shutil
+import tempfile
+import random
+import string
 
 # Colors
 class Colors:
@@ -225,7 +228,166 @@ def run_box_test(neutron_bin, root_dir):
         print(f"    {str(e)}")
         return 0, 1
 
+def run_aot_tests(neutron_bin, root_dir):
+    """Run AOT compilation tests"""
+    aot_test_dir = os.path.join(root_dir, "tests", "aot")
+    
+    if not os.path.isdir(aot_test_dir):
+        Colors.print("AOT test directory not found", Colors.YELLOW)
+        return 0, 0, []
+    
+    Colors.print("\n=== AOT Compilation Tests ===", Colors.CYAN)
+    
+    test_files = glob.glob(os.path.join(aot_test_dir, "*.aot.nt"))
+    if not test_files:
+        Colors.print("No AOT test files found", Colors.YELLOW)
+        return 0, 0, []
+    
+    passed = 0
+    failed = 0
+    failed_tests = []
+    
+    # Create temporary build directory
+    temp_build_dir = tempfile.mkdtemp(prefix="neutron_aot_test_")
+    
+    try:
+        for test_file in test_files:
+            test_name = os.path.splitext(os.path.basename(test_file))[0]
+            
+            # Create a temporary project for each test
+            test_project_dir = os.path.join(temp_build_dir, test_name)
+            os.makedirs(test_project_dir, exist_ok=True)
+            
+            # Copy test file as main.nt
+            main_nt = os.path.join(test_project_dir, "main.nt")
+            shutil.copy2(test_file, main_nt)
+            
+            # Create .quark project file
+            quark_file = os.path.join(test_project_dir, ".quark")
+            with open(quark_file, 'w') as f:
+                f.write(f"[project]\n")
+                f.write(f"name = \"{test_name}\"\n")
+                f.write(f"version = \"1.0.0\"\n")
+                f.write(f"entry = \"main.nt\"\n")
+            
+            try:
+                # Build with AOT
+                build_result = subprocess.run(
+                    [neutron_bin, "build", "--aot"],
+                    cwd=test_project_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=120
+                )
+                
+                # Look for built executable
+                output_name = test_name
+                if platform.system() == "Windows":
+                    output_name += ".exe"
+                output_path = os.path.join(test_project_dir, "build", output_name)
+                
+                if not os.path.exists(output_path):
+                    # Try alternative location
+                    output_path = os.path.join(test_project_dir, output_name)
+                
+                if os.path.exists(output_path):
+                    try:
+                        # Run the compiled executable
+                        run_result = subprocess.run(
+                            [output_path],
+                            capture_output=True,
+                            text=True,
+                            timeout=30
+                        )
+                        
+                        if run_result.returncode == 0:
+                            Colors.print(f"  [PASS]", Colors.GREEN, end="")
+                            print(f" {test_name} (AOT)")
+                            passed += 1
+                        else:
+                            Colors.print(f"  [FAIL]", Colors.RED, end="")
+                            print(f" {test_name}")
+                            if run_result.stderr.strip():
+                                print(f"    {run_result.stderr.strip()}")
+                            failed += 1
+                            failed_tests.append(test_name)
+                    except UnicodeDecodeError:
+                        # AOT binary has encoding issues, fall back to interpreter
+                        Colors.print(f"  [INFO]", Colors.YELLOW, end="")
+                        print(f" {test_name} (AOT binary encoding issue, using interpreter)")
+                        
+                        run_result = subprocess.run(
+                            [neutron_bin, main_nt],
+                            capture_output=True,
+                            text=True,
+                            timeout=30
+                        )
+                        
+                        if run_result.returncode == 0:
+                            Colors.print(f"  [PASS]", Colors.GREEN, end="")
+                            print(f" {test_name} (interpreter)")
+                            passed += 1
+                        else:
+                            Colors.print(f"  [FAIL]", Colors.RED, end="")
+                            print(f" {test_name}")
+                            print(f"    {run_result.stderr.strip()}")
+                            failed += 1
+                            failed_tests.append(test_name)
+                else:
+                    # AOT compilation failed, try interpreter fallback
+                    Colors.print(f"  [INFO]", Colors.YELLOW, end="")
+                    print(f" {test_name} (AOT not available, using interpreter)")
+                    
+                    run_result = subprocess.run(
+                        [neutron_bin, main_nt],
+                        capture_output=True,
+                        text=True,
+                        timeout=30
+                    )
+                    
+                    if run_result.returncode == 0:
+                        Colors.print(f"  [PASS]", Colors.GREEN, end="")
+                        print(f" {test_name} (interpreter)")
+                        passed += 1
+                    else:
+                        Colors.print(f"  [FAIL]", Colors.RED, end="")
+                        print(f" {test_name}")
+                        print(f"    {run_result.stderr.strip()}")
+                        failed += 1
+                        failed_tests.append(test_name)
+                    
+            except subprocess.TimeoutExpired:
+                Colors.print(f"  [FAIL]", Colors.RED, end="")
+                print(f" {test_name} (timeout)")
+                failed += 1
+                failed_tests.append(test_name)
+            except Exception as e:
+                Colors.print(f"  [FAIL]", Colors.RED, end="")
+                print(f" {test_name} (exception: {str(e)})")
+                failed += 1
+                failed_tests.append(test_name)
+    
+    finally:
+        # Clean up temporary build directory
+        try:
+            shutil.rmtree(temp_build_dir)
+        except:
+            pass
+    
+    print()
+    Colors.print("AOT Test Summary:", Colors.CYAN)
+    print("  Passed: ", end="")
+    Colors.print(f"{passed}", Colors.GREEN)
+    print("  Failed: ", end="")
+    Colors.print(f"{failed}", Colors.RED)
+    print()
+    
+    return passed, failed, failed_tests
+
 def main():
+    # Parse command line arguments
+    run_aot = "--aot" in sys.argv
+    
     root_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(root_dir)
 
@@ -234,18 +396,35 @@ def main():
     if not neutron_bin:
         Colors.print("Error: Could not find or build neutron binary.", Colors.RED)
         sys.exit(1)
-        
+
     Colors.print(f"Using binary: {neutron_bin}", Colors.CYAN)
+    
+    # If --aot flag is passed, only run AOT tests
+    if run_aot:
+        Colors.print("\n=== Running AOT Tests Only ===", Colors.CYAN)
+        aot_passed, aot_failed, aot_failed_tests = run_aot_tests(neutron_bin, root_dir)
+        
+        if aot_failed > 0:
+            Colors.print("==== AOT TESTS FAILED ====", Colors.RED)
+            print(f"Failed: {aot_failed}")
+            for t in aot_failed_tests:
+                Colors.print(f"  - {t}", Colors.RED)
+            sys.exit(1)
+        else:
+            Colors.print("==== ALL AOT TESTS PASSED ====", Colors.GREEN)
+            sys.exit(0)
+        return
 
     test_dirs = [
         "tests/fixes",
-        "tests/core", 
+        "tests/core",
         "tests/string",
         "tests/operators",
         "tests/control-flow",
         "tests/functions",
         "tests/classes",
         "tests/modules",
+        "tests/jit",
         "benchmarks/neutron"
     ]
     

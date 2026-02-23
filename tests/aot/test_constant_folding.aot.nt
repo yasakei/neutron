@@ -1,0 +1,23 @@
+// AOT Test 4: Constant Folding
+// Tests AOT constant folding optimization
+
+fun testConstants() {
+    var x = 0;
+    x = x + 1;
+    x = x + 1;
+    x = x + 1;
+    
+    var y = x * 2;
+    var z = y + 10;
+    
+    return z;
+}
+
+var result = testConstants();
+var expected = 16;  // ((0+1+1+1) * 2) + 10 = 16
+
+if (result == expected) {
+    say("AOT constant folding test PASSED (result=" + result + ")");
+} else {
+    say("AOT constant folding test FAILED (expected=" + expected + ", got=" + result + ")");
+}

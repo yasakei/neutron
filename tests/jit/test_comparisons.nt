@@ -1,0 +1,30 @@
+// JIT Test 7: Comparison operations
+// Tests JIT compilation with comparison operations
+
+fun comparisonLoop() {
+    var count = 0;
+    for (var i = 0; i < 100; i = i + 1) {
+        if (i < 50) {
+            count = count + 1;
+        }
+        if (i > 25 && i < 75) {
+            count = count + 1;
+        }
+        if (i == 50) {
+            count = count + 100;
+        }
+    }
+    return count;
+}
+
+var result = comparisonLoop();
+// i < 50: 50 iterations (0-49)
+// i > 25 && i < 75: 49 iterations (26-74)
+// i == 50: 1 iteration (50)
+var expected = 50 + 49 + 100;
+
+if (result == expected) {
+    say("JIT comparison test PASSED (count=" + result + ")");
+} else {
+    say("JIT comparison test FAILED (expected=" + expected + ", got=" + result + ")");
+}

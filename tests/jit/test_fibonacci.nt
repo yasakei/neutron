@@ -1,0 +1,21 @@
+// JIT Test 3: Fibonacci with hot recursion
+// Tests JIT behavior with recursive functions
+
+fun fibonacci(n) {
+    if (n <= 1) return n;
+    return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+// Test multiple Fibonacci calculations
+var fib10 = fibonacci(10);
+var fib15 = fibonacci(15);
+var fib20 = fibonacci(20);
+
+if (fib10 == 55 && fib15 == 610 && fib20 == 6765) {
+    say("JIT fibonacci test PASSED (fib10=" + fib10 + ", fib15=" + fib15 + ", fib20=" + fib20 + ")");
+} else {
+    say("JIT fibonacci test FAILED");
+    say("  fib10: expected=55, got=" + fib10);
+    say("  fib15: expected=610, got=" + fib15);
+    say("  fib20: expected=6765, got=" + fib20);
+}

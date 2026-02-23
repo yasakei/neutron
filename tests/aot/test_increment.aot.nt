@@ -1,0 +1,19 @@
+// AOT Test 3: Increment/Decrement Operations
+// Tests AOT optimization of increment/decrement
+
+var value = 10;
+
+// Inline increment (no function call)
+value = value + 1;
+value = value + 1;
+value = value + 1;
+
+// Inline decrement
+value = value - 1;
+value = value - 1;
+
+if (value == 11) {
+    say("AOT increment/decrement test PASSED");
+} else {
+    say("AOT increment/decrement test FAILED (value=" + value + ")");
+}

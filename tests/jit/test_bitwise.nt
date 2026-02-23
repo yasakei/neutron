@@ -1,0 +1,19 @@
+// JIT Test 8: Bitwise operations
+// Tests JIT compilation with bitwise operations
+
+fun bitwiseLoop() {
+    var result = 0;
+    for (var i = 0; i < 100; i = i + 1) {
+        result = result | i;  // OR
+        result = result & 255;  // AND with mask
+    }
+    return result;
+}
+
+var result = bitwiseLoop();
+
+if (result >= 0 && result <= 255) {
+    say("JIT bitwise test PASSED (result=" + result + ")");
+} else {
+    say("JIT bitwise test FAILED (result=" + result + ", expected 0-255)");
+}

@@ -1,0 +1,28 @@
+// JIT Test 9: Multiple hot functions
+// Tests JIT compilation with multiple hot functions
+
+fun add(a, b) {
+    return a + b;
+}
+
+fun multiply(a, b) {
+    return a * b;
+}
+
+fun compute() {
+    var sum = 0;
+    for (var i = 0; i < 100; i = i + 1) {
+        sum = add(sum, i);
+        sum = multiply(sum, 1);  // Identity multiply to trigger JIT
+    }
+    return sum;
+}
+
+var result = compute();
+var expected = 4950;  // Sum of 0 to 99
+
+if (result == expected) {
+    say("JIT multi-function test PASSED (result=" + result + ")");
+} else {
+    say("JIT multi-function test FAILED (expected=" + expected + ", got=" + result + ")");
+}

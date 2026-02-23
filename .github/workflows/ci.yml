@@ -71,7 +71,10 @@ jobs:
         
     - name: Run tests
       run: python3 run_tests.py
-      
+
+    - name: Run AOT compilation tests
+      run: python3 run_tests.py --aot
+
     - name: Install Neutron globally
       run: |
         # Dependencies are already installed from the build step
@@ -198,6 +201,9 @@ jobs:
         
     - name: Run tests
       run: python3 run_tests.py
+
+    - name: Run AOT compilation tests
+      run: python3 run_tests.py --aot
 
     - name: Install Neutron globally
       run: |
@@ -355,6 +361,9 @@ jobs:
         
     - name: Run tests
       run: python run_tests.py
+
+    - name: Run AOT compilation tests
+      run: python run_tests.py --aot
 
     - name: Install Neutron globally (Windows)
       run: |

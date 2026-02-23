@@ -1,0 +1,20 @@
+// AOT Test 8: Comparison Operations
+// Tests AOT comparison operation support
+
+fun testComparisons() {
+    var a = 10;
+    var b = 20;
+    
+    var less = a < b;      // true
+    var greater = a > b;   // false
+    var equal = a == b;    // false
+    var notEqual = a != b; // true
+    
+    if (less && !greater && !equal && notEqual) {
+        say("AOT comparisons test PASSED");
+    } else {
+        say("AOT comparisons test FAILED");
+    }
+}
+
+testComparisons();

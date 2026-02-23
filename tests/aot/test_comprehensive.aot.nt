@@ -1,0 +1,17 @@
+// AOT Test 10: Comprehensive Test
+// Tests multiple AOT features together
+
+var globalSum = 0;
+var i = 1;
+while (i <= 100) {
+    globalSum = globalSum + i;
+    i = i + 1;
+}
+
+var expected = 5050;  // Sum of 1 to 100
+
+if (globalSum == expected) {
+    say("AOT comprehensive test PASSED (sum=" + globalSum + ")");
+} else {
+    say("AOT comprehensive test FAILED (expected=" + expected + ", got=" + globalSum + ")");
+}

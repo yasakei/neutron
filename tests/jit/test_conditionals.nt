@@ -1,0 +1,24 @@
+// JIT Test 5: Conditional branches in hot loop
+// Tests JIT handling of conditionals
+
+fun conditionalLoop() {
+    var evenSum = 0;
+    var oddSum = 0;
+    for (var i = 0; i < 200; i = i + 1) {
+        if (i % 2 == 0) {
+            evenSum = evenSum + i;
+        } else {
+            oddSum = oddSum + i;
+        }
+    }
+    return evenSum + oddSum;
+}
+
+var result = conditionalLoop();
+var expected = 19900;  // Sum of 0 to 199
+
+if (result == expected) {
+    say("JIT conditional test PASSED (sum=" + result + ")");
+} else {
+    say("JIT conditional test FAILED (expected=" + expected + ", got=" + result + ")");
+}
