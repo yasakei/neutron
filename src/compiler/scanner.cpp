@@ -63,7 +63,8 @@ Scanner::Scanner(const std::string& source)
     keywords["use"] = TokenType::USE;
     keywords["using"] = TokenType::USING;
     keywords["from"] = TokenType::FROM;
-    
+    keywords["as"] = TokenType::AS;
+
     // Type annotations (optional type safety)
     keywords["int"] = TokenType::TYPE_INT;
     keywords["float"] = TokenType::TYPE_FLOAT;

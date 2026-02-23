@@ -592,11 +592,13 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
 
   // Check which modules are imported
   std::set<std::string> importedModules;
-  std::regex useRegex(R"(use\s+(\w+))");
+  std::regex useRegex(R"(use\s+(\w+)(?:\s+as\s+(\w+))?)");
   std::smatch match;
   std::string::const_iterator searchStart(documentText.cbegin());
   while (std::regex_search(searchStart, documentText.cend(), match, useRegex)) {
-    importedModules.insert(match[1].str());
+    // Use alias if provided, otherwise use module name
+    std::string moduleName = match[2].matched ? match[2].str() : match[1].str();
+    importedModules.insert(moduleName);
     searchStart = match.suffix().first;
   }
 

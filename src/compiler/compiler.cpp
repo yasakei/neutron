@@ -767,14 +767,25 @@ void Compiler::visitClassStmt(const ClassStmt* stmt) {
 }
 
 void Compiler::visitUseStmt(const UseStmt* stmt) {
+    // Determine the name to use for the module (alias or original name)
+    std::string moduleName = stmt->alias.has_value() ? stmt->alias->lexeme : stmt->library.lexeme;
+    
     if (stmt->importedSymbols.empty()) {
         // Standard import (import everything)
         if (stmt->isFilePath) {
             // Import a .nt file
             vm.load_file(stmt->library.lexeme);
         } else {
-            // Import a module
+            // Import a module - use alias if provided
             vm.load_module(stmt->library.lexeme);
+            // If alias is different from module name, rename the global
+            if (stmt->alias.has_value() && moduleName != stmt->library.lexeme) {
+                auto it = vm.globals.find(stmt->library.lexeme);
+                if (it != vm.globals.end()) {
+                    vm.globals[moduleName] = it->second;
+                    vm.globals.erase(stmt->library.lexeme);
+                }
+            }
         }
     } else {
         // Selective import
@@ -812,28 +823,9 @@ void Compiler::visitUseStmt(const UseStmt* stmt) {
             // CRITICAL FIX: If this was a module import (not file), load_module() defined the module
             // in globals. We must remove it to ensure selective import doesn't leak the module itself.
             if (!stmt->isFilePath) {
-                // We can't easily remove from globals at compile time because globals are runtime state.
-                // But we can emit code to undefine it!
-                // Wait, VM::load_module runs at COMPILE TIME for the compiler to see it?
-                // No, vm.load_module is called here in the compiler, which runs during compilation.
-                // So the module IS in vm.globals right now.
-                
-                // We should remove it from vm.globals so subsequent compilation doesn't see it.
+                // Remove from globals (use original module name, not alias)
                 vm.globals.erase(stmt->library.lexeme);
-                vm.loadedModuleCache.erase(stmt->library.lexeme); // Also remove from cache so it can be re-imported if needed
-                
-                // However, load_module ALSO emits code or defines it in the runtime environment?
-                // Let's check vm.load_module again. It calls neutron_init_X_module(this).
-                // Those functions usually do vm->define_module("name", module).
-                // vm->define_module does globals["name"] = module.
-                
-                // So removing it from vm.globals here affects the COMPILER's view of the VM.
-                // But does it affect the RUNTIME?
-                // The compiler is running on the SAME VM instance that will execute the code (in REPL)
-                // or a VM that is being prepared.
-                
-                // If we are compiling a script, we are populating the VM's globals.
-                // So erasing it here is exactly what we want!
+                vm.loadedModuleCache.erase(stmt->library.lexeme);
             }
         }
     }

@@ -175,10 +175,11 @@ public:
     Token library;
     bool isFilePath;  // true if importing a .nt file, false if importing a module
     std::vector<Token> importedSymbols; // Symbols to import (empty = import all/standard behavior)
-    
-    UseStmt(Token library, bool isFilePath = false, std::vector<Token> importedSymbols = {}) 
-        : Stmt(StmtType::USE), library(library), isFilePath(isFilePath), importedSymbols(std::move(importedSymbols)) {}
-        
+    std::optional<Token> alias;  // Optional alias (e.g., "use base64 as bs;")
+
+    UseStmt(Token library, bool isFilePath = false, std::vector<Token> importedSymbols = {}, std::optional<Token> alias = std::nullopt)
+        : Stmt(StmtType::USE), library(library), isFilePath(isFilePath), importedSymbols(std::move(importedSymbols)), alias(alias) {}
+
     void accept(Compiler* compiler) const override;
 };
 

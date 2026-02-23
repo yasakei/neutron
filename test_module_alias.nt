@@ -1,0 +1,11 @@
+// Test module alias feature
+use base64 as bs;
+
+var encoded = bs.encode("Hello World");
+var decoded = bs.decode(encoded);
+
+if (decoded == "Hello World") {
+    say("Module alias test PASSED");
+} else {
+    say("Module alias test FAILED");
+}

@@ -390,7 +390,8 @@ std::unique_ptr<Stmt> Parser::classDeclaration() {
 std::unique_ptr<Stmt> Parser::useStatement() {
     bool isUsing = previous().type == TokenType::USING;
     std::vector<Token> importedSymbols;
-    
+    std::optional<Token> alias;
+
     // Check for selective import: use (a, b) = from ...
     if (match({TokenType::LEFT_PAREN})) {
         if (!check(TokenType::RIGHT_PAREN)) {
@@ -406,11 +407,17 @@ std::unique_ptr<Stmt> Parser::useStatement() {
     if (isUsing) {
         Token filePath = consume(TokenType::STRING, "Expect file path after 'using'.");
         consume(TokenType::SEMICOLON, "Expect ';' after using statement.");
-        return std::make_unique<UseStmt>(filePath, true, importedSymbols);
+        return std::make_unique<UseStmt>(filePath, true, importedSymbols, alias);
     } else {
         Token moduleName = consume(TokenType::IDENTIFIER, "Expect module name.");
+        
+        // Check for alias: use base64 as bs;
+        if (match({TokenType::AS})) {
+            alias = consume(TokenType::IDENTIFIER, "Expect alias after 'as'.");
+        }
+        
         consume(TokenType::SEMICOLON, "Expect ';' after use statement.");
-        return std::make_unique<UseStmt>(moduleName, false, importedSymbols);
+        return std::make_unique<UseStmt>(moduleName, false, importedSymbols, alias);
     }
 }
 

@@ -34,7 +34,7 @@ enum class TokenType {
     SAFE,  // Safe block - enforces type annotations
     
     // Library features
-    USE, USING, FROM,
+    USE, USING, FROM, AS,
 
     // Type annotations (optional type safety)
     TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_BOOL, 
