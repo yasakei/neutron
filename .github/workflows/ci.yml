@@ -171,7 +171,13 @@ jobs:
       
     - name: Install dependencies
       run: |
-        brew install cmake jsoncpp
+        brew install cmake jsoncpp gcc
+        
+        # Verify GCC/Clang version
+        echo "Using GCC version:"
+        gcc --version || echo "GCC not available"
+        echo "Using Clang version:"
+        clang --version || echo "Clang not available"
         
     - name: Build Neutron Runtime
       run: |
@@ -198,12 +204,16 @@ jobs:
         file box
         ./build/neutron --version
         ./box --version
-        
+
     - name: Run tests
       run: python3 run_tests.py
 
-    - name: Run AOT compilation tests
-      run: python3 run_tests.py --aot
+    - name: Run AOT compilation tests (macOS)
+      run: |
+        # AOT requires C++ compiler
+        echo "Checking for C++ compiler..."
+        gcc --version || clang --version || echo "No C++ compiler found"
+        python3 run_tests.py --aot
 
     - name: Install Neutron globally
       run: |
@@ -213,17 +223,17 @@ jobs:
         sudo cp box /usr/local/bin/
         sudo chmod +x /usr/local/bin/neutron
         sudo chmod +x /usr/local/bin/box
-        
+
         # Install include files needed for neutron build
         sudo cp -r include /usr/local/
-        
-        # Install source files needed for runtime compilation  
+
+        # Install source files needed for runtime compilation
         sudo cp -r src /usr/local/
         sudo cp -r libs /usr/local/
-        
+
         # Create lib directory if it doesn't exist
         sudo mkdir -p /usr/local/lib
-        
+
         # Install runtime libraries (essential for linking)
         if [ -f "build/libneutron_runtime.a" ]; then
           sudo cp build/libneutron_runtime.a /usr/local/lib/
@@ -234,7 +244,7 @@ jobs:
         if [ -f "build/libneutron_shared.dylib" ]; then
           sudo cp build/libneutron_shared.dylib /usr/local/lib/
         fi
-        
+
         # On macOS, create symlinks to Homebrew libraries so neutron build can find them
         if [[ "$OSTYPE" == "darwin"* ]]; then
           # Find Homebrew prefix (Apple Silicon vs Intel)
@@ -243,7 +253,7 @@ jobs:
           else
             BREW_PREFIX="/usr/local"
           fi
-          
+
           # Create symlinks for jsoncpp and curl libraries
           if [ -f "$BREW_PREFIX/lib/libjsoncpp.dylib" ]; then
             sudo ln -sf "$BREW_PREFIX/lib/libjsoncpp.dylib" /usr/local/lib/libjsoncpp.dylib
@@ -251,36 +261,36 @@ jobs:
           if [ -f "$BREW_PREFIX/lib/libcurl.dylib" ]; then
             sudo ln -sf "$BREW_PREFIX/lib/libcurl.dylib" /usr/local/lib/libcurl.dylib
           fi
-          
+
           echo "Created symlinks for Homebrew libraries"
         fi
-        
+
         # Update library cache on Linux
         if [[ "$OSTYPE" == "linux-gnu"* ]]; then
           sudo ldconfig
         fi
-        
+
         # Verify global installation
         which neutron
         which box
         neutron --version
         box --version
-        
+
     - name: Test Neutron Integration
       run: |
         # Create a temporary test directory
         mkdir -p /tmp/neutron-integration-test/test-project
         cd /tmp/neutron-integration-test/test-project
-        
+
         echo "Testing neutron init..."
         neutron init test
-        
+
         echo "Testing box install base64..."
         box install base64
-        
+
         echo "Testing neutron build..."
         neutron build
-        
+
         echo "Integration tests completed successfully!"
 
     - name: Run Performance Benchmarks
@@ -291,7 +301,7 @@ jobs:
         python3 run_benchmark.py | tee benchmark-macos-arm64.txt
         echo ""
         echo "==========================================================="
-      
+
     - name: Upload Benchmark Results
       uses: actions/upload-artifact@v4
       with:
@@ -301,7 +311,7 @@ jobs:
 
     - name: Create Archive
       run: tar -czf neutron-macos-arm64.tar.gz neutron-macos-arm64
-      
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -363,7 +373,11 @@ jobs:
       run: python run_tests.py
 
     - name: Run AOT compilation tests
-      run: python run_tests.py --aot
+      run: |
+        # AOT requires C++ compiler - MSVC is already set up
+        Write-Host "Checking for C++ compiler..."
+        cl.exe || echo "MSVC compiler not found"
+        python run_tests.py --aot
 
     - name: Install Neutron globally (Windows)
       run: |
