@@ -276,17 +276,14 @@ bool ProjectBuilder::buildProjectExecutable(
         std::cerr << "Error: Could not create temporary source file" << std::endl;
         return false;
     }
-    
+
     // Write includes
     srcFile << "// Auto-generated executable for project\n";
     srcFile << "#include <iostream>\n";
     srcFile << "#include <string>\n";
     srcFile << "#include <vector>\n";
-    srcFile << "#include \"compiler/scanner.h\"\n";
-    srcFile << "#include \"compiler/parser.h\"\n";
-    srcFile << "#include \"vm.h\"\n";
-    srcFile << "#include \"compiler/compiler.h\"\n";
-    srcFile << "#include \"modules/module_loader.h\"\n\n";
+    srcFile << "#include <cstdint>\n";
+    srcFile << "#include <cmath>\n\n";
 
     // Find box modules
     auto boxModules = findBoxModules(projectRoot);
