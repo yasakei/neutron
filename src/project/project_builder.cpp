@@ -299,11 +299,12 @@ bool ProjectBuilder::buildProjectExecutable(
         
         std::vector<std::string> aotUsedModules = getUsedModules(sourceCode);
         auto boxModules = findBoxModules(projectRoot);
-        
-        // Modules that require interpreter (native code or external)
+
+        // Modules that require interpreter (native code or external dependencies)
+        // Note: math, random, fmt, path have AOT-compatible implementations in aot_module.h
         std::set<std::string> nonAotModules = {
             "http", "json", "sys", "time", "crypto", "process",
-            "arrays", "async", "regex", "path", "math", "fmt", "random"
+            "arrays", "async", "regex"
         };
         
         bool canAot = true;
@@ -643,10 +644,18 @@ bool ProjectBuilder::buildProjectExecutable(
         compiler = "g++";
         linkFlags = "-lcurl -ljsoncpp -lws2_32";
     } else {
-        compiler = "g++";
+        // Default to clang++ on macOS, g++ on Linux
         if (isMacOS) {
+            // Check if clang++ is available (default on macOS)
+            if (system("which clang++ > /dev/null 2>&1") == 0) {
+                compiler = "clang++";
+            } else {
+                compiler = "g++";  // Fallback if gcc is installed via Homebrew
+            }
             linkFlags = "-lcurl -ljsoncpp -framework CoreFoundation";
         } else {
+            // Linux: default to g++
+            compiler = "g++";
             // Linux: Add -rdynamic to export symbols for dlopen
             linkFlags = "-lcurl -ljsoncpp -ldl -rdynamic";
         }
