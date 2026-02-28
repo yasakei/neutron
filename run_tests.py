@@ -296,6 +296,11 @@ def run_aot_tests(neutron_bin, root_dir):
                 if build_result.returncode != 0:
                     # AOT compilation failed, fall back to interpreter
                     # This is expected on platforms without C++ compiler or for complex code
+                    # Print build error for debugging
+                    print(f"\n  [BUILD ERROR] AOT compilation failed:")
+                    print(f"    stdout: {build_result.stdout.strip()[:3000]}")
+                    print(f"    stderr: {build_result.stderr.strip()[:3000]}")
+                    
                     Colors.print(f"  [INFO]", Colors.YELLOW, end="")
                     print(f" {test_name} (AOT -> interpreter)")
 
