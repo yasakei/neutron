@@ -793,7 +793,8 @@ bool ProjectBuilder::buildProjectExecutable(
         if (objDir.empty()) objDir = ".";
         
         // First, compile each builtin module separately with unique object names
-        if (!useStaticLib || runtimeLibPath.empty()) {
+        // Skip this for AOT builds which are self-contained
+        if ((!useStaticLib || runtimeLibPath.empty()) && !aotSuccess) {
             std::cout << "[2/4] Compiling modules..." << std::endl;
             auto builtinSources = getBuiltinModuleSources();
             for (const auto& src : builtinSources) {
@@ -804,7 +805,7 @@ bool ProjectBuilder::buildProjectExecutable(
                     size_t nextSlash = src.find('/', libsPos + 5);
                     std::string moduleName = src.substr(libsPos + 5, nextSlash - libsPos - 5);
                     std::string objFile = objDir + "/" + moduleName + "_module.obj";
-                    
+
                     std::string moduleCmd = compiler + " /c /std:c++17 /EHsc /W3 /O2 /MT /D_CRT_SECURE_NO_WARNINGS /nologo /wd4267 /wd4244 /wd4100 /wd4458 /wd4273 /wd4101 " + includePaths + " \"" + fullPath + "\" /Fo\"" + objFile + "\"";
                     int result = system(moduleCmd.c_str());
                     if (result != 0) {
@@ -892,8 +893,8 @@ bool ProjectBuilder::buildProjectExecutable(
     }
 
     // Add builtin modules (only if compiling from source, not when linking a library)
-    // Skip this when we're linking either static or shared library
-    if (runtimeLibPath.empty() && !(isWindows && !isMingw)) {
+    // Skip this when we're linking either static or shared library, or for AOT builds
+    if (runtimeLibPath.empty() && !(isWindows && !isMingw) && !aotSuccess) {
         auto builtinSources = getBuiltinModuleSources();
         for (const auto& src : builtinSources) {
             std::string fullPath = neutronSrcDir + "/" + src;
