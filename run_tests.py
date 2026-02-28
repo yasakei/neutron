@@ -9,6 +9,17 @@ import tempfile
 import random
 import string
 
+# Set UTF-8 encoding for Windows console compatibility
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        # Python < 3.7 fallback
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 # Colors
 class Colors:
     RED = '\033[0;31m'
@@ -277,6 +288,7 @@ def run_aot_tests(neutron_bin, root_dir):
                     cwd=test_project_dir,
                     capture_output=True,
                     text=True,
+                    encoding='utf-8',
                     timeout=120
                 )
 
@@ -285,12 +297,13 @@ def run_aot_tests(neutron_bin, root_dir):
                     # AOT compilation failed, fall back to interpreter
                     # This is expected on platforms without C++ compiler or for complex code
                     Colors.print(f"  [INFO]", Colors.YELLOW, end="")
-                    print(f" {test_name} (AOT → interpreter)")
-                    
+                    print(f" {test_name} (AOT -> interpreter)")
+
                     run_result = subprocess.run(
                         [neutron_bin, main_nt],
                         capture_output=True,
                         text=True,
+                        encoding='utf-8',
                         timeout=30
                     )
                     
@@ -323,9 +336,10 @@ def run_aot_tests(neutron_bin, root_dir):
                             [output_path],
                             capture_output=True,
                             text=True,
+                            encoding='utf-8',
                             timeout=30
                         )
-                        
+
                         if run_result.returncode == 0:
                             Colors.print(f"  [PASS]", Colors.GREEN, end="")
                             print(f" {test_name} (AOT)")
@@ -341,14 +355,15 @@ def run_aot_tests(neutron_bin, root_dir):
                         # AOT binary has encoding issues, fall back to interpreter
                         Colors.print(f"  [INFO]", Colors.YELLOW, end="")
                         print(f" {test_name} (AOT binary encoding issue, using interpreter)")
-                        
+
                         run_result = subprocess.run(
                             [neutron_bin, main_nt],
                             capture_output=True,
                             text=True,
+                            encoding='utf-8',
                             timeout=30
                         )
-                        
+
                         if run_result.returncode == 0:
                             Colors.print(f"  [PASS]", Colors.GREEN, end="")
                             print(f" {test_name} (interpreter)")
@@ -363,11 +378,12 @@ def run_aot_tests(neutron_bin, root_dir):
                     # AOT compilation failed, try interpreter fallback
                     Colors.print(f"  [INFO]", Colors.YELLOW, end="")
                     print(f" {test_name} (AOT not available, using interpreter)")
-                    
+
                     run_result = subprocess.run(
                         [neutron_bin, main_nt],
                         capture_output=True,
                         text=True,
+                        encoding='utf-8',
                         timeout=30
                     )
                     
