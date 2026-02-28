@@ -663,13 +663,13 @@ bool ProjectBuilder::buildProjectExecutable(
     
     // Determine Neutron source directory
     std::string neutronSrcDir;
-    
+
     // 1. Check NEUTRON_HOME environment variable
     const char* neutronHomeEnv = std::getenv("NEUTRON_HOME");
     if (neutronHomeEnv) {
         neutronSrcDir = neutronHomeEnv;
     }
-    
+
     // 2. Check if we are running from the root (dev mode)
     if (neutronSrcDir.empty()) {
         std::string checkPath = executableDir + "/include";
@@ -677,7 +677,7 @@ bool ProjectBuilder::buildProjectExecutable(
             neutronSrcDir = executableDir;
         }
     }
-    
+
     // 3. Check if we are running from bin/ (installed mode)
     if (neutronSrcDir.empty()) {
         std::string checkPath = executableDir + "/../include";
@@ -685,8 +685,16 @@ bool ProjectBuilder::buildProjectExecutable(
             neutronSrcDir = (std::filesystem::path(executableDir) / "..").string();
         }
     }
-    
-    // 4. Fallback to current directory
+
+    // 4. Check current working directory (for CI/test scenarios)
+    if (neutronSrcDir.empty()) {
+        std::string cwdCheck = "./include";
+        if (std::filesystem::exists(cwdCheck)) {
+            neutronSrcDir = ".";
+        }
+    }
+
+    // 5. Fallback to current directory
     if (neutronSrcDir.empty()) {
         neutronSrcDir = ".";
     }

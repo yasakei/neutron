@@ -429,6 +429,7 @@ void AotCompiler::generateBytecodeBody() {
             }
             case OpCode::OP_LOOP_IF_LESS_LOCAL: {
                 scanIp++; // slot
+                scanIp++; // constant index
                 uint16_t offset = (chunk->code[scanIp] << 8) | chunk->code[scanIp + 1];
                 scanIp += 2;
                 // Forward jump to exit loop (when condition is false)
@@ -812,9 +813,10 @@ void AotCompiler::generateBytecodeBody() {
             
             case OpCode::OP_LOOP_IF_LESS_LOCAL: {
                 uint8_t slot = readByte();
+                uint8_t constIdx = readByte();  // Constant index (was missing!)
                 uint16_t offset = readShort();
-                code << "    // LOOP_IF_LESS_LOCAL slot=" << static_cast<int>(slot) << " offset=" << offset << "\n";
-                code << "    if (!(locals[" << static_cast<int>(slot) << "].as.number < constants[" << (ip - 3) << "].as.number)) goto instr_" << (ip + offset) << ";\n\n";
+                code << "    // LOOP_IF_LESS_LOCAL slot=" << static_cast<int>(slot) << " const=" << static_cast<int>(constIdx) << " offset=" << offset << "\n";
+                code << "    if (!(locals[" << static_cast<int>(slot) << "].as.number < constants[" << static_cast<int>(constIdx) << "].as.number)) goto instr_" << (ip + offset) << ";\n\n";
                 break;
             }
             
@@ -1252,7 +1254,8 @@ std::string AotCompiler::generateFunctionCode(const Chunk* funcChunk, const std:
                 break;
             }
             case OpCode::OP_LOOP_IF_LESS_LOCAL: {
-                scanIp++;
+                scanIp++; // slot
+                scanIp++; // constant index
                 uint16_t offset = (funcChunk->code[scanIp] << 8) | funcChunk->code[scanIp + 1];
                 scanIp += 2;
                 // Forward jump to exit loop (when condition is false)
@@ -1294,7 +1297,6 @@ std::string AotCompiler::generateFunctionCode(const Chunk* funcChunk, const std:
     funcCode << "    (void)stack; (void)sp;\n\n";
     
     funcCompiler.ip = 0;
-    std::cerr << "DEBUG: Second pass - starting\n";
     while (funcCompiler.ip < codeSize) {
         if (isJumpTarget[funcCompiler.ip] && funcCompiler.ip != 0) {
             funcCode << "    instr_" << funcCompiler.ip << ":;\n";
@@ -1302,8 +1304,7 @@ std::string AotCompiler::generateFunctionCode(const Chunk* funcChunk, const std:
         
         uint8_t instruction = funcCompiler.readByte();
         OpCode op = static_cast<OpCode>(instruction);
-        std::cerr << "DEBUG: Second pass ip=" << (funcCompiler.ip - 1) << ", op=" << (int)op << "\n";
-        
+
         switch (op) {
             case OpCode::OP_RETURN:
                 funcCode << "    return locals[0];\n\n";
@@ -1367,8 +1368,9 @@ std::string AotCompiler::generateFunctionCode(const Chunk* funcChunk, const std:
             }
             case OpCode::OP_LOOP_IF_LESS_LOCAL: {
                 uint8_t slot = funcCompiler.readByte();
+                uint8_t constIdx = funcCompiler.readByte();  // Constant index (was missing!)
                 uint16_t offset = funcCompiler.readShort();
-                funcCode << "    if (!(locals[" << static_cast<int>(slot) << "].as.number < constants[" << (funcCompiler.ip - 3) << "].as.number)) goto instr_" << (funcCompiler.ip + offset) << ";\n";
+                funcCode << "    if (!(locals[" << static_cast<int>(slot) << "].as.number < constants[" << static_cast<int>(constIdx) << "].as.number)) goto instr_" << (funcCompiler.ip + offset) << ";\n";
                 break;
             }
             case OpCode::OP_CALL: {
