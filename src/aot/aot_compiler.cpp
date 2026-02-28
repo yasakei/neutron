@@ -431,7 +431,8 @@ void AotCompiler::generateBytecodeBody() {
                 scanIp++; // slot
                 uint16_t offset = (chunk->code[scanIp] << 8) | chunk->code[scanIp + 1];
                 scanIp += 2;
-                size_t target = instrStart - offset;
+                // Forward jump to exit loop (when condition is false)
+                size_t target = scanIp + offset;
                 if (target <= codeSize) isJumpTarget[target] = true;
                 break;
             }
@@ -451,9 +452,12 @@ void AotCompiler::generateBytecodeBody() {
                     scanIp++;
                 }
                 // 2-byte operands (constant index or global name index)
-                else if (op == OpCode::OP_SET_GLOBAL_TYPED || op == OpCode::OP_SET_LOCAL_TYPED ||
-                         op == OpCode::OP_CONSTANT_LONG || op == OpCode::OP_ADD_LOCAL_CONST) {
+                else if (op == OpCode::OP_CONSTANT_LONG || op == OpCode::OP_ADD_LOCAL_CONST) {
                     scanIp += 2;
+                }
+                // 1-byte operands for typed global/local ops
+                else if (op == OpCode::OP_SET_GLOBAL_TYPED || op == OpCode::OP_SET_LOCAL_TYPED) {
+                    scanIp++;
                 }
                 // 1-byte operands for global ops (compiler uses 1-byte when possible)
                 else if (op == OpCode::OP_GET_GLOBAL || op == OpCode::OP_SET_GLOBAL || op == OpCode::OP_DEFINE_GLOBAL || op == OpCode::OP_INCREMENT_GLOBAL) {
@@ -660,7 +664,7 @@ void AotCompiler::generateBytecodeBody() {
             case OpCode::OP_NOT:
                 code << "    // NOT\n";
                 code << "    { Value a = stack[--sp];\n";
-                code << "      bool truthy = (a.type == ValueType::BOOLEAN && a.as.boolean) || a.type == ValueType::NUMBER;\n";
+                code << "      bool truthy = (a.type == ValueType::BOOLEAN && a.as.boolean) || (a.type == ValueType::NUMBER && a.as.number != 0.0);\n";
                 code << "      stack[sp++] = Value(!truthy); }\n\n";
                 break;
                 
@@ -810,7 +814,7 @@ void AotCompiler::generateBytecodeBody() {
                 uint8_t slot = readByte();
                 uint16_t offset = readShort();
                 code << "    // LOOP_IF_LESS_LOCAL slot=" << static_cast<int>(slot) << " offset=" << offset << "\n";
-                code << "    if (locals[" << static_cast<int>(slot) << "].as.number < constants[" << (ip - 3) << "].as.number) goto instr_" << (ip - offset) << ";\n\n";
+                code << "    if (!(locals[" << static_cast<int>(slot) << "].as.number < constants[" << (ip - 3) << "].as.number)) goto instr_" << (ip + offset) << ";\n\n";
                 break;
             }
             
@@ -925,10 +929,78 @@ void AotCompiler::generateBytecodeBody() {
                 break;
             }
 
-            case OpCode::OP_SET_GLOBAL_TYPED:
-            case OpCode::OP_SET_LOCAL_TYPED:
-            case OpCode::OP_GET_GLOBAL_FAST:
-            case OpCode::OP_SET_GLOBAL_FAST:
+            case OpCode::OP_SET_GLOBAL_TYPED: {
+                uint8_t nameIndex = readByte();
+                if (nameIndex >= chunk->constants.size()) {
+                    code << "    // SET_GLOBAL_TYPED: invalid constant index\n";
+                    code << "    sp--;\n\n";
+                } else {
+                    Value nameValue = chunk->constants[nameIndex];
+                    if (nameValue.type == ValueType::OBJ_STRING) {
+                        std::string name = nameValue.as.obj_string->chars;
+                        auto it = globalSlotMap.find(name);
+                        if (it != globalSlotMap.end()) {
+                            code << "    // SET_GLOBAL_TYPED " << name << "\n";
+                            code << "    global_" << name << " = stack[--sp];\n\n";
+                        } else {
+                            code << "    // SET_GLOBAL_TYPED: undefined variable " << name << "\n";
+                            code << "    sp--;\n\n";
+                        }
+                    } else {
+                        code << "    // SET_GLOBAL_TYPED: invalid name type\n";
+                        code << "    sp--;\n\n";
+                    }
+                }
+                break;
+            }
+
+            case OpCode::OP_SET_LOCAL_TYPED: {
+                uint8_t slot = readByte();
+                code << "    // SET_LOCAL_TYPED " << static_cast<int>(slot) << "\n";
+                code << "    locals[" << slot << "] = stack[--sp];\n\n";
+                break;
+            }
+
+            case OpCode::OP_GET_GLOBAL_FAST: {
+                uint8_t slot = readByte();
+                // Find global name by slot
+                std::string name;
+                for (const auto& pair : globalSlotMap) {
+                    if (pair.second == (int)slot) {
+                        name = pair.first;
+                        break;
+                    }
+                }
+                if (!name.empty()) {
+                    code << "    // GET_GLOBAL_FAST " << name << "\n";
+                    code << "    stack[sp++] = global_" << name << ";\n\n";
+                } else {
+                    code << "    // GET_GLOBAL_FAST: unknown slot " << static_cast<int>(slot) << "\n";
+                    code << "    stack[sp++] = Value();\n\n";
+                }
+                break;
+            }
+
+            case OpCode::OP_SET_GLOBAL_FAST: {
+                uint8_t slot = readByte();
+                // Find global name by slot
+                std::string name;
+                for (const auto& pair : globalSlotMap) {
+                    if (pair.second == (int)slot) {
+                        name = pair.first;
+                        break;
+                    }
+                }
+                if (!name.empty()) {
+                    code << "    // SET_GLOBAL_FAST " << name << "\n";
+                    code << "    global_" << name << " = stack[--sp];\n\n";
+                } else {
+                    code << "    // SET_GLOBAL_FAST: unknown slot " << static_cast<int>(slot) << "\n";
+                    code << "    sp--;\n\n";
+                }
+                break;
+            }
+
             case OpCode::OP_LOAD_LOCAL_0: {
                 code << "    // LOAD_LOCAL_0\n";
                 code << "    stack[sp++] = locals[0];\n\n";
@@ -1183,7 +1255,8 @@ std::string AotCompiler::generateFunctionCode(const Chunk* funcChunk, const std:
                 scanIp++;
                 uint16_t offset = (funcChunk->code[scanIp] << 8) | funcChunk->code[scanIp + 1];
                 scanIp += 2;
-                size_t target = instrStart - offset;
+                // Forward jump to exit loop (when condition is false)
+                size_t target = scanIp + offset;
                 if (target <= codeSize) isJumpTarget[target] = true;
                 break;
             }
@@ -1290,6 +1363,12 @@ std::string AotCompiler::generateFunctionCode(const Chunk* funcChunk, const std:
             case OpCode::OP_LOOP: {
                 uint16_t offset = funcCompiler.readShort();
                 funcCode << "    goto instr_" << (funcCompiler.ip - offset) << ";\n";
+                break;
+            }
+            case OpCode::OP_LOOP_IF_LESS_LOCAL: {
+                uint8_t slot = funcCompiler.readByte();
+                uint16_t offset = funcCompiler.readShort();
+                funcCode << "    if (!(locals[" << static_cast<int>(slot) << "].as.number < constants[" << (funcCompiler.ip - 3) << "].as.number)) goto instr_" << (funcCompiler.ip + offset) << ";\n";
                 break;
             }
             case OpCode::OP_CALL: {
