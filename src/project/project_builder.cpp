@@ -816,8 +816,8 @@ bool ProjectBuilder::buildProjectExecutable(
                 }
             }
         }
-        
-        // Now build the main compile command with runtime sources
+
+        // Build the main compile command for Windows
         std::string archFlags = isARM ? " -march=armv8-a" : " -march=x86-64";
         std::string sysrootFlag = (!crossSysroot.empty()) ? " --sysroot=" + crossSysroot : "";
         compileCommand = compiler + " /std:c++17 /EHsc /W3 /O2 /MT /D_CRT_SECURE_NO_WARNINGS /nologo /wd4267 /wd4244 /wd4100 /wd4458 /wd4273 /wd4101" + archFlags + sysrootFlag + " " + includePaths + " \"" + tempSourcePath + "\" ";
