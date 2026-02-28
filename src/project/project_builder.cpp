@@ -939,7 +939,15 @@ bool ProjectBuilder::buildProjectExecutable(
     }
     
     // Add output and link flags
-    if (isWindows && !isMingw) {
+    // For AOT builds with no external modules, skip unnecessary library links
+    if (aotSuccess) {
+        // Pure AOT build - no external libraries needed
+        if (isWindows && !isMingw) {
+            compileCommand += "/Fe:\"" + finalOutputPath + "\"";
+        } else {
+            compileCommand += "-o \"" + finalOutputPath + "\"";
+        }
+    } else if (isWindows && !isMingw) {
         compileCommand += "/Fe:\"" + finalOutputPath + "\" " + linkFlags;
     } else {
         compileCommand += linkFlags + " -o \"" + finalOutputPath + "\"";
