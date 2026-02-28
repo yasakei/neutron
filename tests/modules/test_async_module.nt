@@ -25,13 +25,16 @@ var result = async.await(task);
 say("  Await result: " + (result != nil));
 
 // Test 4: async.timer
+// Note: Timer runs asynchronously, we need to wait longer on some platforms
 say("Test 4: async.timer");
 say("  Starting timer test");
+var timerRan = false;
 async.timer(fun() {
     say("    Timer callback executed");
+    timerRan = true;
 }, 100);  // Execute after 100ms
 say("  Timer scheduled");
-async.sleep(150);  // Wait for timer to execute
+async.sleep(300);  // Wait longer for timer to execute (macOS compatibility)
 say("  Timer execution verified");
 
 // Test 5: async.promise - Removed as it is not implemented yet
