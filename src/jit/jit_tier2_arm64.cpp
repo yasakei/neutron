@@ -578,7 +578,12 @@ uint64_t Tier2Compiler::compileTraceARM64(const ExecutionTrace& trace) {
                 if (!seen_first_jif) {
                     seen_first_jif = true;
                     exit_jumps.push_back(code.size());
-                    CG::emitBCond(code, cond, 0); // placeholder
+                    // Two-pass assembly: emit placeholder with offset 0, patch later
+                    // Forward jumps can't be resolved in single pass, so we:
+                    // 1. Emit branch with offset 0 (will be patched)
+                    // 2. Record the offset in exit_jumps/forward_jumps
+                    // 3. After code generation, patch all jumps to correct offsets
+                    CG::emitBCond(code, cond, 0); // placeholder - will be patched
                 } else {
                     uint32_t bytecodes_to_skip = instr.operand1;
                     uint32_t target_ir = ir_idx + 1;
@@ -601,17 +606,20 @@ uint64_t Tier2Compiler::compileTraceARM64(const ExecutionTrace& trace) {
                         target_ir = calc_target < max_target ? calc_target : max_target;
                     }
                     forward_jumps.push_back({code.size(), target_ir, cond});
-                    CG::emitBCond(code, cond, 0); // placeholder
+                    CG::emitBCond(code, cond, 0); // placeholder - will be patched
                 }
                 break;
             }
-            
+
             case IRInstruction::Opcode::JUMP:
             {
                 int_cached_dreg = -1;
-                
+
                 size_t jump_offset = code.size();
-                CG::emitB(code, 0); // placeholder
+                // Two-pass assembly: unconditional jump placeholder
+                // Offset 0 = branch-to-self (infinite loop) if not patched
+                // All forward jumps MUST be patched before execution
+                CG::emitB(code, 0); // placeholder - will be patched
                 
                 uint32_t bytecodes_to_skip = instr.operand1;
                 uint32_t target_ir = ir_idx + 1;

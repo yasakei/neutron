@@ -127,23 +127,22 @@ bool isTruthy(const Value& value) {
             // Calculate current position in that frame
             ptrdiff_t current_pos;
             if (frame == &vm->frames.back()) {
-                // Current frame: use current IP
+                // Current frame: use current IP directly (points to current instruction)
                 if (frame->function && frame->function->chunk) {
-                    current_pos = frame->ip - frame->function->chunk->code.data() - 1;
+                    current_pos = frame->ip - frame->function->chunk->code.data();
                 } else {
                     continue;
                 }
             } else {
                 // Parent frame: IP points to return address (instruction after call)
-                // The call instruction is what we are "in".
-                // We assume the call instruction is at least 1 byte.
+                // Subtract 1 to get the call instruction position
                 if (frame->function && frame->function->chunk) {
                     current_pos = frame->ip - frame->function->chunk->code.data() - 1;
                 } else {
                     continue;
                 }
             }
-            
+
             if (current_pos >= handler.tryStart && current_pos <= handler.tryEnd) {
                 // Found a handler!
                 
@@ -532,20 +531,33 @@ bool VM::callValue(Value callee, int argCount) {
     // Handle BoundArrayMethod and BoundStringMethod via obj_type tag (no RTTI)
     if (callee.type == ValueType::OBJECT) {
         Object* obj = callee.as.object;
+        if (obj == nullptr) {
+            runtimeError(this, "Cannot call null object.", frames.empty() ? -1 : frames.back().currentLine);
+            return false;
+        }
         if (obj->obj_type == ObjType::OBJ_BOUND_ARRAY_METHOD) {
             return callArrayMethod(static_cast<BoundArrayMethod*>(obj), argCount);
         } else if (obj->obj_type == ObjType::OBJ_BOUND_STRING_METHOD) {
             return callStringMethod(static_cast<BoundStringMethod*>(obj), argCount);
         }
     }
-    
+
     if (callee.type == ValueType::CALLABLE) {
         Callable* callable = callee.as.callable;
-        
+
+        if (callable == nullptr) {
+            runtimeError(this, "Cannot call null callable.", frames.empty() ? -1 : frames.back().currentLine);
+            return false;
+        }
+
         // Use obj_type tag instead of dynamic_cast chain for fast dispatch
         switch (callable->obj_type) {
         case ObjType::OBJ_BOUND_METHOD: {
             BoundMethod* boundMethod = static_cast<BoundMethod*>(callable);
+            if (boundMethod == nullptr || boundMethod->method == nullptr) {
+                runtimeError(this, "Invalid bound method.", frames.empty() ? -1 : frames.back().currentLine);
+                return false;
+            }
             size_t methodPos = stack.size() - argCount - 1;
             stack[methodPos] = boundMethod->receiver;
             if (boundMethod->method->arity_val != argCount) {
@@ -3639,12 +3651,12 @@ void VM::markRoots() {
     for (const auto& value : stack) {
         markValue(value);
     }
-    
+
     // Mark all global objects
     for (const auto& pair : globals) {
         markValue(pair.second);
     }
-    
+
     // Mark objects in call frame functions (only functions since closures are part of them)
     for (const auto& frame : frames) {
         if (frame.function) {
@@ -3661,6 +3673,11 @@ void VM::markRoots() {
     // Mark interned strings
     for (const auto& pair : internedStrings) {
         markObject(pair.second);
+    }
+
+    // Mark pending exception to prevent GC during exception handling
+    if (hasException) {
+        markValue(pendingException);
     }
 }
 

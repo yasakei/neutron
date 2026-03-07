@@ -635,7 +635,8 @@ Value http_listen(VM& vm, std::vector<Value> arguments) {
         std::string responseBody;
         int status = 200;
         std::string contentType = "text/html";
-        
+        std::unordered_map<std::string, std::string> responseHeaders;
+
         // Check if stack is empty
         if (vm.stack.empty()) {
             // Handler didn't return anything or stack issue
@@ -643,30 +644,65 @@ Value http_listen(VM& vm, std::vector<Value> arguments) {
             status = 500;
         } else {
             Value responseVal = vm.pop();
-            
+
             if (responseVal.type == ValueType::OBJ_STRING) {
                 responseBody = responseVal.as.obj_string->chars;
             } else if (responseVal.type == ValueType::OBJECT) {
                 JsonObject* resObj = dynamic_cast<JsonObject*>(responseVal.as.object);
                 if (resObj) {
-                    if (resObj->properties.count(vm.internString("body")) && resObj->properties[vm.internString("body")].type == ValueType::OBJ_STRING) {
+                    // Extract body
+                    if (resObj->properties.count(vm.internString("body")) && 
+                        resObj->properties[vm.internString("body")].type == ValueType::OBJ_STRING) {
                         responseBody = resObj->properties[vm.internString("body")].as.obj_string->chars;
                     }
-                    if (resObj->properties.count(vm.internString("status")) && resObj->properties[vm.internString("status")].type == ValueType::NUMBER) {
+                    
+                    // Extract status code
+                    if (resObj->properties.count(vm.internString("status")) && 
+                        resObj->properties[vm.internString("status")].type == ValueType::NUMBER) {
                         status = static_cast<int>(resObj->properties[vm.internString("status")].as.number);
                     }
-                    // TODO: Handle headers
+                    
+                    // Extract content type
+                    if (resObj->properties.count(vm.internString("contentType")) && 
+                        resObj->properties[vm.internString("contentType")].type == ValueType::OBJ_STRING) {
+                        contentType = resObj->properties[vm.internString("contentType")].as.obj_string->chars;
+                    }
+                    
+                    // Extract custom headers (from 'headers' object)
+                    if (resObj->properties.count(vm.internString("headers")) && 
+                        resObj->properties[vm.internString("headers")].type == ValueType::OBJECT) {
+                        JsonObject* headersObj = dynamic_cast<JsonObject*>(
+                            resObj->properties[vm.internString("headers")].as.object);
+                        if (headersObj) {
+                            for (const auto& [key, value] : headersObj->properties) {
+                                if (value.type == ValueType::OBJ_STRING) {
+                                    std::string headerName = key->chars;
+                                    std::string headerValue = value.as.obj_string->chars;
+                                    responseHeaders[headerName] = headerValue;
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
+
+        // Build HTTP response with headers
+        std::ostringstream httpResponseStream;
+        httpResponseStream << "HTTP/1.1 " << status << " OK\r\n";
+        httpResponseStream << "Content-Type: " << contentType << "\r\n";
+        httpResponseStream << "Content-Length: " << responseBody.length() << "\r\n";
         
-        std::string httpResponse = 
-            "HTTP/1.1 " + std::to_string(status) + " OK\r\n"
-            "Content-Type: " + contentType + "\r\n"
-            "Content-Length: " + std::to_string(responseBody.length()) + "\r\n"
-            "Connection: close\r\n"
-            "\r\n" + responseBody;
+        // Add custom headers
+        for (const auto& [header, value] : responseHeaders) {
+            httpResponseStream << header << ": " << value << "\r\n";
+        }
         
+        httpResponseStream << "Connection: close\r\n";
+        httpResponseStream << "\r\n" << responseBody;
+        
+        std::string httpResponse = httpResponseStream.str();
+
         send(clientSocket, httpResponse.c_str(), httpResponse.length(), 0);
         close(clientSocket);
     }
@@ -915,16 +951,45 @@ extern "C" void neutron_init_http_module(neutron::VM* vm) {
 #else // !HAVE_CURL
 
 // Stub implementation when CURL is not available
+// Provides helpful error messages instead of silent failures
 #include "native.h"
 #include "vm.h"
 #include "runtime/environment.h"
+#include <stdexcept>
 
 namespace neutron {
 
+/**
+ * @brief HTTP module stub - throws runtime error when CURL is unavailable.
+ * 
+ * This stub ensures users get a clear error message when trying to use
+ * HTTP functionality without CURL support, rather than confusing failures.
+ */
 void register_http_functions(VM& vm, std::shared_ptr<Environment> env) {
-    (void)vm;
-    (void)env;
-    // HTTP module not available without CURL - functions will throw runtime errors
+    // Create the http module namespace
+    Value httpModule = Value(vm.allocate<neutron::Module>("http", env));
+    
+    // Helper to create error-throwing native functions
+    auto makeErrorFn = [](const std::string& fnName) -> Callable* {
+        return new NativeFn([fnName](VM& vm, const std::vector<Value>& args) -> Value {
+            throw std::runtime_error(
+                "HTTP module not available: " + fnName + "() requires CURL support. "
+                "Please rebuild Neutron with CURL installed (libcurl4-openssl-dev on Ubuntu/Debian, "
+                "curl-devel on RHEL/CentOS, or enable HAVE_CURL in CMake)."
+            );
+        });
+    };
+    
+    // Register all HTTP functions as error-throwing stubs
+    env->define("get", Value(makeErrorFn("http.get")));
+    env->define("post", Value(makeErrorFn("http.post")));
+    env->define("put", Value(makeErrorFn("http.put")));
+    env->define("delete", Value(makeErrorFn("http.delete")));
+    env->define("request", Value(makeErrorFn("http.request")));
+    env->define("createServer", Value(makeErrorFn("http.createServer")));
+    
+    // Define the module
+    vm.define_module("http", vm.allocate<neutron::Module>("http", env));
 }
 
 } // namespace neutron

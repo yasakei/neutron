@@ -513,10 +513,26 @@ Value sys_exec(VM& vm, std::vector<Value> args) {
     if (args[0].type != ValueType::OBJ_STRING) {
         throw std::runtime_error("sys.exec() expects a string command");
     }
-    
+
     std::string command = args[0].asString()->chars;
-    int exitCode = platform::execute(command);
     
+    // Validate command string - reject empty or potentially dangerous commands
+    if (command.empty()) {
+        throw std::runtime_error("sys.exec() command cannot be empty");
+    }
+    
+    // Check for shell injection patterns
+    if (command.find("&&") != std::string::npos ||
+        command.find("||") != std::string::npos ||
+        command.find(";") != std::string::npos ||
+        command.find("|") != std::string::npos ||
+        command.find("`") != std::string::npos ||
+        command.find("$(") != std::string::npos) {
+        throw std::runtime_error("sys.exec() command contains invalid shell operators");
+    }
+
+    int exitCode = platform::execute(command);
+
     return Value(static_cast<double>(exitCode));
 }
 

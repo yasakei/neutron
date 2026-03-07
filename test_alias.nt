@@ -1,7 +1,0 @@
-use base64 as bs;
-
-var encoded = bs.encode("Hello World");
-say(encoded);
-
-var decoded = bs.decode(encoded);
-say(decoded);

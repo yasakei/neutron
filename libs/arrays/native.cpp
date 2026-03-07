@@ -18,7 +18,7 @@ Array* getArrayFromArgs(const std::vector<Value>& arguments, int index = 0) {
 // Helper function to check if two values are equal
 bool valuesEqual(const Value& a, const Value& b) {
     if (a.type != b.type) return false;
-    
+
     switch (a.type) {
         case ValueType::NIL:
             return true;
@@ -30,6 +30,27 @@ bool valuesEqual(const Value& a, const Value& b) {
             return a.as.obj_string->chars == b.as.obj_string->chars;
         default:
             return false; // For complex types, we'll do shallow comparison
+    }
+}
+
+// Helper function to check if a value is truthy
+bool isTruthy(const Value& value) {
+    switch (value.type) {
+        case ValueType::NIL:
+            return false;
+        case ValueType::BOOLEAN:
+            return value.as.boolean;
+        case ValueType::NUMBER:
+            return value.as.number != 0.0;
+        case ValueType::OBJ_STRING:
+            return !value.as.obj_string->chars.empty();
+        case ValueType::ARRAY:
+            return value.as.array->size() > 0;
+        case ValueType::OBJECT:
+        case ValueType::CALLABLE:
+            return true; // Objects and callables are always truthy
+        default:
+            return false;
     }
 }
 
@@ -399,40 +420,163 @@ Value native_arrays_shuffle(VM& vm, std::vector<Value> arguments) {
     return arguments[0]; 
 }
 
-// Functional Programming Methods - Placeholders for now
+// Functional Programming Methods - Full implementations with VM context
 Value native_arrays_map(VM& vm, std::vector<Value> arguments) {
-    (void)vm; (void)arguments;
-    throw std::runtime_error("Map function requires VM context for function calling - not fully implemented in this version");
+    if (arguments.size() != 2 || arguments[0].type != ValueType::ARRAY ||
+        arguments[1].type != ValueType::CALLABLE) {
+        throw std::runtime_error("arrays.map() expects array and function arguments");
+    }
+
+    Array* arr = arguments[0].as.array;
+    Value callable = arguments[1];
+
+    Array* result = vm.allocate<Array>();
+    
+    for (size_t i = 0; i < arr->size(); i++) {
+        std::vector<Value> args = {arr->at(i)};
+        Value mapped = vm.call(callable, args);
+        result->push(mapped);
+    }
+
+    return Value(result);
 }
 
 Value native_arrays_filter(VM& vm, std::vector<Value> arguments) {
-    (void)vm; (void)arguments;
-    throw std::runtime_error("Filter function requires VM context for function calling - not fully implemented in this version");
+    if (arguments.size() != 2 || arguments[0].type != ValueType::ARRAY ||
+        arguments[1].type != ValueType::CALLABLE) {
+        throw std::runtime_error("arrays.filter() expects array and function arguments");
+    }
+
+    Array* arr = arguments[0].as.array;
+    Value callable = arguments[1];
+
+    Array* result = vm.allocate<Array>();
+
+    for (size_t i = 0; i < arr->size(); i++) {
+        std::vector<Value> args = {arr->at(i)};
+        Value predicate_result = vm.call(callable, args);
+
+        if (isTruthy(predicate_result)) {
+            result->push(arr->at(i));
+        }
+    }
+
+    return Value(result);
 }
 
 Value native_arrays_find(VM& vm, std::vector<Value> arguments) {
-    (void)vm; (void)arguments;
-    throw std::runtime_error("Find function requires VM context for function calling - not fully implemented in this version");
+    if (arguments.size() != 2 || arguments[0].type != ValueType::ARRAY ||
+        arguments[1].type != ValueType::CALLABLE) {
+        throw std::runtime_error("arrays.find() expects array and function arguments");
+    }
+
+    Array* arr = arguments[0].as.array;
+    Value callable = arguments[1];
+
+    for (size_t i = 0; i < arr->size(); i++) {
+        std::vector<Value> args = {arr->at(i)};
+        Value predicate_result = vm.call(callable, args);
+
+        if (isTruthy(predicate_result)) {
+            return arr->at(i);
+        }
+    }
+
+    return Value(); // Return nil if not found
 }
 
 Value native_arrays_reduce(VM& vm, std::vector<Value> arguments) {
-    (void)vm; (void)arguments;
-    throw std::runtime_error("Reduce function requires VM context for function calling - not fully implemented in this version");
+    if (arguments.size() < 2 || arguments[0].type != ValueType::ARRAY ||
+        arguments[1].type != ValueType::CALLABLE) {
+        throw std::runtime_error("arrays.reduce() expects array, function, and optional initial value");
+    }
+
+    Array* arr = arguments[0].as.array;
+    Value callable = arguments[1];
+
+    if (arr->size() == 0 && arguments.size() < 3) {
+        throw std::runtime_error("arrays.reduce() on empty array requires an initial value");
+    }
+
+    Value accumulator = (arguments.size() > 2) ? arguments[2] : arr->at(0);
+    size_t start_index = (arguments.size() > 2) ? 0 : 1;
+
+    for (size_t i = start_index; i < arr->size(); i++) {
+        std::vector<Value> args = {accumulator, arr->at(i)};
+        accumulator = vm.call(callable, args);
+    }
+
+    return accumulator;
 }
 
 Value native_arrays_every(VM& vm, std::vector<Value> arguments) {
-    (void)vm; (void)arguments;
-    throw std::runtime_error("Every function requires VM context for function calling - not fully implemented in this version");
+    if (arguments.size() != 2 || arguments[0].type != ValueType::ARRAY ||
+        arguments[1].type != ValueType::CALLABLE) {
+        throw std::runtime_error("arrays.every() expects array and function arguments");
+    }
+
+    Array* arr = arguments[0].as.array;
+    Value callable = arguments[1];
+
+    for (size_t i = 0; i < arr->size(); i++) {
+        std::vector<Value> args = {arr->at(i)};
+        Value predicate_result = vm.call(callable, args);
+
+        if (!isTruthy(predicate_result)) {
+            return Value(false);
+        }
+    }
+
+    return Value(true);
 }
 
 Value native_arrays_some(VM& vm, std::vector<Value> arguments) {
-    (void)vm; (void)arguments;
-    throw std::runtime_error("Some function requires VM context for function calling - not fully implemented in this version");
+    if (arguments.size() != 2 || arguments[0].type != ValueType::ARRAY ||
+        arguments[1].type != ValueType::CALLABLE) {
+        throw std::runtime_error("arrays.some() expects array and function arguments");
+    }
+
+    Array* arr = arguments[0].as.array;
+    Value callable = arguments[1];
+
+    for (size_t i = 0; i < arr->size(); i++) {
+        std::vector<Value> args = {arr->at(i)};
+        Value predicate_result = vm.call(callable, args);
+
+        if (isTruthy(predicate_result)) {
+            return Value(true);
+        }
+    }
+
+    return Value(false);
 }
 
 Value native_arrays_flat_map(VM& vm, std::vector<Value> arguments) {
-    (void)vm; (void)arguments;
-    throw std::runtime_error("Flat_map function requires VM context for function calling - not fully implemented in this version");
+    if (arguments.size() != 2 || arguments[0].type != ValueType::ARRAY ||
+        arguments[1].type != ValueType::CALLABLE) {
+        throw std::runtime_error("arrays.flat_map() expects array and function arguments");
+    }
+
+    Array* arr = arguments[0].as.array;
+    Value callable = arguments[1];
+
+    Array* result = vm.allocate<Array>();
+    
+    for (size_t i = 0; i < arr->size(); i++) {
+        std::vector<Value> args = {arr->at(i)};
+        Value mapped = vm.call(callable, args);
+        
+        if (mapped.type == ValueType::ARRAY) {
+            Array* mapped_arr = mapped.as.array;
+            result->elements.insert(result->elements.end(), 
+                                   mapped_arr->elements.begin(), 
+                                   mapped_arr->elements.end());
+        } else {
+            result->push(mapped);
+        }
+    }
+
+    return Value(result);
 }
 
 void register_arrays_functions(VM& vm, std::shared_ptr<Environment> env) {

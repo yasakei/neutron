@@ -236,7 +236,7 @@ bool Tier1Compiler::isCodeCacheFull() const {
     return code_cache_.offset() >= TIER1_CODE_CACHE_SIZE * 0.9;  // 90% full
 }
 
-Tier1Compiler::CacheStats Tier1Compiler::getCacheStats() const {
+neutron::jit::CacheStats Tier1Compiler::getCacheStats() const {
     CacheStats stats;
     stats.total_code_size = code_cache_.offset();
     stats.max_code_size = TIER1_CODE_CACHE_SIZE;

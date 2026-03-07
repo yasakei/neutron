@@ -1414,12 +1414,17 @@ uint64_t Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
             case IRInstruction::Opcode::JUMP:
             {
                 int_cached_xmm = -1; // Invalidate integer cache at branches
-                
+
                 // Forward jump — used for skipping past else bodies in if/else.
-                // Calculate the target IR index from the bytecode offset.
-                // operand1 is the bytecode offset of the jump.
-                // We scan forward to find the target IR instruction.
-                codegen.emitJmpRel32(code, 0); // placeholder
+                // Two-pass assembly: emit placeholder with rel32 = 0, patch later.
+                // Forward jumps can't be resolved in single pass because the target
+                // address isn't known yet. We:
+                // 1. Emit JMP with rel32 = 0 (will jump to self if not patched)
+                // 2. Record the offset in forward_jumps
+                // 3. After code generation, patch all jumps to correct offsets
+                // Note: rel32 = 0 means "jump to next instruction" which creates
+                // an infinite loop if not patched - hence the exit stub below.
+                codegen.emitJmpRel32(code, 0); // placeholder - will be patched
                 
                 // Find the target IR index — the JUMP skips bytecodes_to_skip
                 // bytecodes ahead. Use operand1 as rough offset from current IR.
@@ -1664,6 +1669,9 @@ Tier2Compiler::unrollLoop(const ExecutionTrace& trace, int unroll_factor) {
     loop_back.operand1 = unroll_factor;
     unrolled->ir_instructions.push_back(loop_back);
 
+    // Record optimization counter
+    recordLoopUnrolling();
+
     return unrolled;
 }
 
@@ -1691,6 +1699,9 @@ Tier2Compiler::inlineMethods(const ExecutionTrace& trace,
             }
         }
     }
+
+    // Record optimization counter
+    recordMethodInlining();
 
     return inlined;
 }
@@ -1729,6 +1740,9 @@ Tier2Compiler::specializeTypes(const ExecutionTrace& trace,
         specialized->ir_instructions = with_guards;
     }
 
+    // Record optimization counter
+    recordTypeSpecialization();
+
     return specialized;
 }
 
@@ -1742,7 +1756,7 @@ Tier2Compiler::getCompiledTrace(uint64_t trace_id) const {
     return it->second.get();
 }
 
-Tier2Compiler::TraceStats Tier2Compiler::getTraceStats() const {
+neutron::jit::TraceStats Tier2Compiler::getTraceStats() const {
     TraceStats stats;
     stats.total_traces = traces_.size();
     stats.active_traces = traces_.size();
