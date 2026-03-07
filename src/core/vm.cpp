@@ -74,16 +74,7 @@ struct VMException {
     VMException(Value v) : value(v) {}
 };
 
-#ifdef _MSC_VER
-__forceinline
-#else
-inline __attribute__((always_inline))
-#endif
-bool isTruthy(const Value& value) {
-    // Fast path for common cases
-    if (value.type == ValueType::BOOLEAN) return value.as.boolean;
-    return value.type != ValueType::NIL;
-}
+// Note: isTruthy() is now defined inline in vm.h for cross-library use
 
 /**
  * @brief Reports a runtime error, produces a stack trace, and either transfers control to an in-flight handler or terminates.
@@ -1003,7 +994,7 @@ void VM::run(size_t minFrameDepth) {
 
 // Computed goto optimization
 // - GCC: Supported
-// - Clang (non-Apple): Supported  
+// - Clang (non-Apple): Supported
 // - AppleClang: DISABLED - strict about computed goto in try blocks (causes SIGBUS)
 // - MSVC: Not supported (doesn't have computed goto)
 #if defined(__GNUC__) && !defined(__clang__)
@@ -1068,10 +1059,6 @@ void VM::run(size_t minFrameDepth) {
         &&CASE_OP_THROW,
         &&CASE_OP_NOT_EQUAL,
         &&CASE_DEFAULT, // OP_LOGICAL_AND
-        &&CASE_OP_VALIDATE_SAFE_FUNCTION,
-        &&CASE_OP_VALIDATE_SAFE_VARIABLE,
-        &&CASE_OP_VALIDATE_SAFE_FILE_FUNCTION,
-        &&CASE_OP_VALIDATE_SAFE_FILE_VARIABLE,
         &&CASE_DEFAULT, // OP_LOGICAL_OR
         &&CASE_OP_BITWISE_AND,
         &&CASE_OP_BITWISE_OR,
@@ -1082,8 +1069,12 @@ void VM::run(size_t minFrameDepth) {
         &&CASE_OP_INVOKE,
         &&CASE_OP_INCREMENT_LOCAL,
         &&CASE_OP_DECREMENT_LOCAL,
-        &&CASE_OP_LOOP_IF_LESS_LOCAL,
         &&CASE_OP_INCREMENT_GLOBAL,
+        &&CASE_OP_LOOP_IF_LESS_LOCAL,
+        &&CASE_OP_VALIDATE_SAFE_FUNCTION,
+        &&CASE_OP_VALIDATE_SAFE_VARIABLE,
+        &&CASE_OP_VALIDATE_SAFE_FILE_FUNCTION,
+        &&CASE_OP_VALIDATE_SAFE_FILE_VARIABLE,
         // Extended opcodes (bytecode optimizer)
         &&CASE_OP_CALL,              // OP_CALL_FAST → same as OP_CALL
         &&CASE_OP_CALL,              // OP_TAIL_CALL → same as OP_CALL (for now)

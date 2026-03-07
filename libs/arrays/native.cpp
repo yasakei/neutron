@@ -33,27 +33,6 @@ bool valuesEqual(const Value& a, const Value& b) {
     }
 }
 
-// Helper function to check if a value is truthy
-bool isTruthy(const Value& value) {
-    switch (value.type) {
-        case ValueType::NIL:
-            return false;
-        case ValueType::BOOLEAN:
-            return value.as.boolean;
-        case ValueType::NUMBER:
-            return value.as.number != 0.0;
-        case ValueType::OBJ_STRING:
-            return !value.as.obj_string->chars.empty();
-        case ValueType::ARRAY:
-            return value.as.array->size() > 0;
-        case ValueType::OBJECT:
-        case ValueType::CALLABLE:
-            return true; // Objects and callables are always truthy
-        default:
-            return false;
-    }
-}
-
 Value native_arrays_create(VM& vm, std::vector<Value> arguments) {
     (void)arguments; 
     return Value(vm.allocate<Array>());

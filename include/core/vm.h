@@ -583,6 +583,27 @@ private:
     void sweep();                    ///< Sweep unmarked objects
 };
 
+// Utility function - check if a value is truthy (inline for cross-library use)
+inline bool isTruthy(const Value& value) {
+    switch (value.type) {
+        case ValueType::NIL:
+            return false;
+        case ValueType::BOOLEAN:
+            return value.as.boolean;
+        case ValueType::NUMBER:
+            return value.as.number != 0.0;
+        case ValueType::OBJ_STRING:
+            return !value.as.obj_string->chars.empty();
+        case ValueType::ARRAY:
+            return value.as.array->size() > 0;
+        case ValueType::OBJECT:
+        case ValueType::CALLABLE:
+            return true;
+        default:
+            return false;
+    }
+}
+
 } // namespace neutron
 
 #endif // NEUTRON_VM_H
