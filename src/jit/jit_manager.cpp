@@ -170,16 +170,17 @@ bool MultiTierJITManager::executeCompiledCode(uint64_t method_id,
                 std::unordered_map<uint8_t, Tier1Compiler::HandlerFunction> handlers;
                 // Note: Handler functions would need to be registered from the VM
                 // For now, we'll compile but execution will be limited
-                auto tier1_code = tier1_compiler_->compile(method_id, *frame.chunk, handlers);
-                if (tier1_code) {
-                    tier1_code_cache_[method_id] = std::move(tier1_code);
+                auto tier1_result = tier1_compiler_->compile(method_id, *frame.chunk, handlers);
+                if (tier1_result.ok()) {
+                    tier1_code_cache_[method_id] = std::move(tier1_result.getValue());
                     it = tier1_code_cache_.find(method_id);
                 }
             }
-            
+
             // Execute compiled Tier-1 code if available
             if (it != tier1_code_cache_.end() && it->second) {
-                success = tier1_compiler_->execute(*it->second, &frame);
+                auto exec_result = tier1_compiler_->execute(*it->second, &frame);
+                success = exec_result.ok();
             } else {
                 // Fallback to interpreter if compilation failed
                 success = true;
@@ -190,7 +191,11 @@ bool MultiTierJITManager::executeCompiledCode(uint64_t method_id,
         case CompilationTier::TIER2: {
             // Execute Tier-2 compiled code
             // Look for compiled trace for this method and PC
-            uint64_t trace_id = tier2_compiler_->findTrace(method_id, frame.bytecode_pc);
+            auto trace_result = tier2_compiler_->findTrace(method_id, frame.bytecode_pc);
+            uint64_t trace_id = 0;
+            if (trace_result.ok()) {
+                trace_id = trace_result.getValue();
+            }
             if (trace_id == 0 && frame.chunk) {
                 // Compilation on demand!
                 // Compile on demand
@@ -198,15 +203,19 @@ bool MultiTierJITManager::executeCompiledCode(uint64_t method_id,
                 if (trace) {
                     auto optimized = tier2_compiler_->optimizeTrace(*trace);
                     if (optimized) {
-                        trace_id = tier2_compiler_->compileTrace(*optimized);
+                        auto compile_result = tier2_compiler_->compileTrace(*optimized);
+                        if (compile_result.ok()) {
+                            trace_id = compile_result.getValue();
+                        }
                     }
                 }
             }
-            
+
             if (trace_id != 0) {
                  // Pass execution frame as context
                  // The JIT code expects ExecutionFrame* in RDI (void* context)
-                 success = tier2_compiler_->executeTrace(trace_id, &frame);
+                 auto exec_result = tier2_compiler_->executeTrace(trace_id, &frame);
+                 success = exec_result.ok();
             }
             break;
         }
@@ -279,7 +288,7 @@ bool MultiTierJITManager::isInWarmupPhase() const {
     return elapsed_ms < 5000 && tier2_compilations_.load() == 0;
 }
 
-bool MultiTierJITManager::recompile(uint64_t method_id, CompilationTier force_tier) {
+JITResult MultiTierJITManager::recompile(uint64_t method_id, CompilationTier force_tier) {
     // Force recompilation at a specific tier
     // This is useful for optimization or debugging
 
@@ -299,14 +308,14 @@ bool MultiTierJITManager::recompile(uint64_t method_id, CompilationTier force_ti
     // Note: Actual recompilation would require access to the original bytecode chunk
     // which is typically stored elsewhere. This implementation resets the state
     // so that the next execution will trigger fresh compilation.
-    
-    // Record compilation time
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(
-        end_time - start_time).count();
-    total_compilation_time_us_.fetch_add(duration_us);
 
-    return true;  // State reset successfully
+    auto end_time = std::chrono::high_resolution_clock::now();
+    int64_t duration_us = std::chrono::duration_cast<std::chrono::microseconds>(
+        end_time - start_time).count();
+
+    total_compilation_time_us_ += duration_us;
+
+    return JITResult::OK();
 }
 
 void MultiTierJITManager::reset() {

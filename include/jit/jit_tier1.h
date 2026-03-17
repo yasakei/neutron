@@ -58,6 +58,7 @@
 #include "jit_config.h"
 #include "jit_profiler.h"
 #include "jit_memory.h"
+#include "jit_errors.h"
 #include "compiler/bytecode.h"
 #include <vector>
 #include <unordered_map>
@@ -155,8 +156,8 @@ public:
      * @param method_id Unique method identifier.
      * @param bytecode The bytecode chunk to compile.
      * @param handlers Map of opcodes to handler functions.
-     * @return Compiled threaded code, or nullptr if compilation failed.
-     * 
+     * @return JITResult with compiled threaded code, or error code on failure.
+     *
      * Compilation process:
      * 1. Iterate through bytecode instructions
      * 2. Look up handler for each opcode
@@ -164,7 +165,7 @@ public:
      * 4. Allocate executable memory and copy code
      * 5. Return ThreadedCode structure
      */
-    std::unique_ptr<ThreadedCode> compile(
+    JITResultT<std::unique_ptr<ThreadedCode>> compile(
         uint64_t method_id,
         const Chunk& bytecode,
         const std::unordered_map<uint8_t, HandlerFunction>& handlers);
@@ -173,12 +174,12 @@ public:
      * @brief Execute compiled threaded code.
      * @param code The compiled code to execute.
      * @param context Execution context (stack, frame, etc.).
-     * @return true if execution succeeded, false on error.
-     * 
+     * @return JITResult indicating success or execution error.
+     *
      * Execution jumps to code_address and runs handler calls.
      * Handlers manage the instruction sequence internally.
      */
-    bool execute(const ThreadedCode& code, void* context);
+    JITResult execute(const ThreadedCode& code, void* context);
 
     /**
      * @brief Optimize for shallow tracing - prevent side effects.

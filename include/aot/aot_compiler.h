@@ -189,10 +189,23 @@ public:
     /**
      * @brief Get source mapping (bytecode offset → C++ line).
      * @return Map of bytecode offsets to C++ line numbers.
-     * 
+     *
      * Used for debugging and error reporting in compiled executables.
      */
     const std::unordered_map<size_t, size_t>& getSourceMap() const { return sourceMap; }
+
+    /**
+     * @brief Enable/disable shared runtime linking.
+     * @param enabled True to use shared runtime headers (smaller binary, requires linking).
+     *
+     * When enabled, generated code includes the Neutron runtime headers
+     * instead of embedding Value struct definitions. This ensures ABI
+     * compatibility and reduces binary size.
+     *
+     * When disabled (default), generates self-contained code with embedded
+     * Value struct - larger binary but no external dependencies.
+     */
+    void setUseSharedRuntime(bool enabled) { useSharedRuntime = enabled; }
 
 private:
     const Chunk* chunk;           ///< Bytecode chunk being compiled
@@ -217,6 +230,9 @@ private:
 
     // Cross-compilation target
     TargetPlatform targetPlatform;  ///< Target platform
+
+    // Runtime linking mode
+    bool useSharedRuntime = false;  ///< Use shared runtime headers vs embedded
 
     // Function code cache for nested function calls
     std::unordered_map<size_t, std::string> generatedFunctions;  ///< constant index → C++ code

@@ -2481,7 +2481,8 @@ void VM::run(size_t minFrameDepth) {
                             jitFrame.stack_pointer = nullptr;
                             jitFrame.local_variables = &stk[frame->slot_offset];
                             jitFrame.current_tier = jit::CompilationTier::TIER2;
-                            if (tier2->executeTrace(cached.trace_id, &jitFrame)) {
+                            auto exec_result = tier2->executeTrace(cached.trace_id, &jitFrame);
+                            if (exec_result.ok()) {
                                 DISPATCH();
                             }
                         }
@@ -2491,13 +2492,17 @@ void VM::run(size_t minFrameDepth) {
                     if ((++jitLoopCounter & 15) == 0) {
                         auto* tier2 = jitManager.getTier2Compiler();
                         if (tier2) {
-                            uint64_t trace_id = tier2->findTrace(method_id, loop_pc);
+                            auto trace_result = tier2->findTrace(method_id, loop_pc);
+                            uint64_t trace_id = 0;
+                            if (trace_result.ok()) {
+                                trace_id = trace_result.getValue();
+                            }
                             if (trace_id != 0) {
                                 // Cache for future O(1) lookups
                                 cached.loop_pc = loop_pc;
                                 cached.method_id = method_id;
                                 cached.trace_id = trace_id;
-                                
+
                                 jit::MultiTierJITManager::ExecutionFrame jitFrame;
                                 jitFrame.method_id = method_id;
                                 jitFrame.chunk = frame->function->chunk;
@@ -2505,7 +2510,8 @@ void VM::run(size_t minFrameDepth) {
                                 jitFrame.stack_pointer = nullptr;
                                 jitFrame.local_variables = &stk[frame->slot_offset];
                                 jitFrame.current_tier = jit::CompilationTier::TIER2;
-                                if (tier2->executeTrace(trace_id, &jitFrame)) {
+                                auto exec_result = tier2->executeTrace(trace_id, &jitFrame);
+                                if (exec_result.ok()) {
                                     DISPATCH();
                                 }
                             } else if (!tier2->isTraceFailed(method_id, loop_pc)) {
@@ -2517,13 +2523,14 @@ void VM::run(size_t minFrameDepth) {
                                     if (trace) {
                                         auto optimized = tier2->optimizeTrace(*trace);
                                         if (optimized) {
-                                            uint64_t compiled = tier2->compileTrace(*optimized);
-                                            if (compiled != 0) {
+                                            auto compile_result = tier2->compileTrace(*optimized);
+                                            if (compile_result.ok()) {
+                                                uint64_t compiled = compile_result.getValue();
                                                 // Cache it
                                                 cached.loop_pc = loop_pc;
                                                 cached.method_id = method_id;
                                                 cached.trace_id = compiled;
-                                                
+
                                                 jit::MultiTierJITManager::ExecutionFrame jitFrame2;
                                                 jitFrame2.method_id = method_id;
                                                 jitFrame2.chunk = frame->function->chunk;
@@ -2531,7 +2538,8 @@ void VM::run(size_t minFrameDepth) {
                                                 jitFrame2.stack_pointer = nullptr;
                                                 jitFrame2.local_variables = &stk[frame->slot_offset];
                                                 jitFrame2.current_tier = jit::CompilationTier::TIER2;
-                                                if (tier2->executeTrace(compiled, &jitFrame2)) {
+                                                auto exec_result = tier2->executeTrace(compiled, &jitFrame2);
+                                                if (exec_result.ok()) {
                                                     jit_compile_success = true;
                                                 }
                                             }

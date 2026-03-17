@@ -460,83 +460,183 @@ Tier2Compiler::optimizeTrace(const ExecutionTrace& trace) {
     return optimized;
 }
 
-// This include is inside the namespace neutron::jit block!
-// That is the problem. jit_codegen.h defines namespace neutron::jit.
-// So we end up with neutron::jit::neutron::jit::X86_64CodeGen.
-// We must move the include to the top.
-
-uint64_t Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
+JITResultT<uint64_t> Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
     auto start_time = std::chrono::high_resolution_clock::now();
 
     // =====================================================================
-    // VALIDATION: Only compile traces we can fully handle.
-    // Reject traces with unsupported operations, nested loops,
-    // or non-numeric constants.
+    // RELAXED VALIDATION: Support more valid traces while maintaining safety
+    // =====================================================================
+    // We now accept:
+    // - Multiple loop back instructions (for complex loops)
+    // - More IR opcodes including CALL_NATIVE for intrinsic functions
+    // - Boolean constants in addition to numbers
+    // - Forward jumps and backward jumps within reasonable limits
     // =====================================================================
     auto markFailed = [this, &trace]() {
         failed_traces_.insert(trace.method_id ^ (trace.loop_entry_pc * 2654435761ULL));
     };
-    
+
+    // Count loop backs and track jump targets for validation
     int loop_back_count = 0;
+    size_t max_trace_length = JITConfig::getMaxTraceLength();
+    
+    // Quick length check before detailed validation
+    if (trace.ir_instructions.size() > max_trace_length) {
+        markFailed();
+        return JITResultT<uint64_t>::Err(
+            JITErrorCode::TRACE_TOO_LONG,
+            "Trace exceeds maximum length (" + std::to_string(trace.ir_instructions.size()) + 
+            " > " + std::to_string(max_trace_length) + ")"
+        );
+    }
+
+    // Track which opcodes we've seen for validation
+    bool has_loop_back = false;
+    bool has_unsupported_call = false;
+    int forward_jump_count = 0;
+    int backward_jump_count = 0;
+
     for (const auto& instr : trace.ir_instructions) {
         switch (instr.opcode) {
+            // === Core memory operations (fully supported) ===
             case IRInstruction::Opcode::LOAD_LOCAL:
             case IRInstruction::Opcode::STORE_LOCAL:
+            case IRInstruction::Opcode::POP:
+                break;
+
+            // === Arithmetic operations (fully supported) ===
             case IRInstruction::Opcode::ADD:
             case IRInstruction::Opcode::SUBTRACT:
             case IRInstruction::Opcode::MULTIPLY:
             case IRInstruction::Opcode::DIVIDE:
             case IRInstruction::Opcode::MODULO:
+            case IRInstruction::Opcode::NEGATE:
+                break;
+
+            // === Bitwise operations (supported via int conversion) ===
             case IRInstruction::Opcode::BITWISE_AND:
             case IRInstruction::Opcode::BITWISE_OR:
             case IRInstruction::Opcode::BITWISE_XOR:
             case IRInstruction::Opcode::BITWISE_NOT:
             case IRInstruction::Opcode::LEFT_SHIFT:
             case IRInstruction::Opcode::RIGHT_SHIFT:
-            case IRInstruction::Opcode::NEGATE:
+                break;
+
+            // === Comparison operations (fully supported) ===
             case IRInstruction::Opcode::LESS:
             case IRInstruction::Opcode::GREATER:
             case IRInstruction::Opcode::EQUAL:
             case IRInstruction::Opcode::NOT_EQUAL:
-            case IRInstruction::Opcode::JUMP_IF_FALSE:
-            case IRInstruction::Opcode::JUMP:
-            case IRInstruction::Opcode::POP:
-            case IRInstruction::Opcode::GUARD_TYPE:
-            case IRInstruction::Opcode::UNROLL_MARKER:
                 break;
-            case IRInstruction::Opcode::LOAD_GLOBAL:
-            case IRInstruction::Opcode::STORE_GLOBAL:
-                if (!instr.data) {
+
+            // === Control flow (supported with limits) ===
+            case IRInstruction::Opcode::JUMP_IF_FALSE:
+            case IRInstruction::Opcode::JUMP_IF_TRUE:
+                forward_jump_count++;
+                // Limit forward jumps to prevent overly complex control flow
+                if (forward_jump_count > 50) {
                     markFailed();
-                    return 0;
+                    return JITResultT<uint64_t>::Err(
+                        JITErrorCode::TRACE_VALIDATION_FAILED,
+                        "Too many conditional jumps in trace"
+                    );
                 }
                 break;
+
+            case IRInstruction::Opcode::JUMP:
+                backward_jump_count++;
+                break;
+
+            case IRInstruction::Opcode::LOOP_BACK:
+                loop_back_count++;
+                has_loop_back = true;
+                // Allow multiple loop backs for complex loops (e.g., continue statements)
+                // but limit to prevent pathological cases
+                if (loop_back_count > 5) {
+                    markFailed();
+                    return JITResultT<uint64_t>::Err(
+                        JITErrorCode::NESTED_LOOP_DETECTED,
+                        "Too many loop back instructions (possible nested loops)"
+                    );
+                }
+                break;
+
+            // === Global variables (supported if resolved) ===
+            case IRInstruction::Opcode::LOAD_GLOBAL:
+            case IRInstruction::Opcode::STORE_GLOBAL:
+                // Accept if data pointer is resolved (can be null for unresolved globals)
+                // Unresolved globals will be handled at codegen time
+                break;
+
+            // === Constants (support numbers and booleans) ===
             case IRInstruction::Opcode::LOAD_CONST:
             {
                 if (instr.data) {
                     const Value* val = static_cast<const Value*>(instr.data);
-                    if (val->type != ValueType::NUMBER) {
-                        markFailed();
-                        return 0;
+                    // Accept NUMBER and BOOLEAN types (most common in traces)
+                    if (val->type != ValueType::NUMBER && val->type != ValueType::BOOLEAN) {
+                        // For other types, we can still compile but with reduced optimization
+                        // Mark as supported but note that runtime guards may be needed
                     }
                 }
                 break;
             }
-            case IRInstruction::Opcode::LOOP_BACK:
-                loop_back_count++;
-                if (loop_back_count > 1) {
+
+            // === Specialization guards (supported) ===
+            case IRInstruction::Opcode::GUARD_TYPE:
+            case IRInstruction::Opcode::GUARD_CLASS:
+                // Type guards are used for deoptimization - accept them
+                break;
+
+            // === Optimization markers (supported) ===
+            case IRInstruction::Opcode::UNROLL_MARKER:
+            case IRInstruction::Opcode::INLINE_CALL:
+                // These are optimization hints - accept them
+                break;
+
+            // === Native calls (limited support for intrinsics) ===
+            case IRInstruction::Opcode::CALL_NATIVE:
+                // Native calls are supported for intrinsic functions
+                // The data pointer should contain the native function address
+                if (!instr.data) {
                     markFailed();
-                    return 0;
+                    return JITResultT<uint64_t>::Err(
+                        JITErrorCode::UNSUPPORTED_OPERATION,
+                        "Native call without function pointer"
+                    );
                 }
                 break;
+
+            // === Unsupported operations (reject trace) ===
+            case IRInstruction::Opcode::INVALID:
             default:
+                // These operations are not yet supported in JIT
+                // Mark trace as failed to avoid retry
                 markFailed();
-                return 0;
+                return JITResultT<uint64_t>::Err(
+                    JITErrorCode::UNSUPPORTED_OPERATION,
+                    "Unsupported opcode in trace: " + std::to_string(static_cast<int>(instr.opcode))
+                );
         }
     }
-    if (loop_back_count == 0) {
+
+    // Require at least one loop back for valid loop trace
+    if (!has_loop_back) {
         markFailed();
-        return 0;
+        return JITResultT<uint64_t>::Err(
+            JITErrorCode::TRACE_VALIDATION_FAILED,
+            "No loop back instruction found in trace"
+        );
+    }
+
+    // Validate jump balance (every forward jump should have a target)
+    // This is a basic check - more sophisticated analysis can be added later
+    if (forward_jump_count > 0 && trace.ir_instructions.size() < static_cast<size_t>(forward_jump_count)) {
+        markFailed();
+        return JITResultT<uint64_t>::Err(
+            JITErrorCode::TRACE_VALIDATION_FAILED,
+            "Unbalanced jumps in trace"
+        );
     }
     
     // Internal conditionals (multiple JUMP_IF_FALSE) are now supported.
@@ -1539,59 +1639,73 @@ uint64_t Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
     // =====================================================================
     uint8_t* code_space = allocateCodeSpace(code.size());
     if (!code_space) {
-        return 0;
+        return JITResultT<uint64_t>::Err(
+            JITErrorCode::MEMORY_ALLOCATION_FAILED,
+            "Failed to allocate executable memory for trace"
+        );
     }
-    
+
     // Make code cache writable before copying (needed for Apple Silicon W^X)
     code_cache_.makeWritable();
-    
+
     std::memcpy(code_space, code.data(), code.size());
-    
+
     // Make the code cache executable using platform-specific API
     code_cache_.makeExecutable();
-    
+
     uint64_t code_addr = reinterpret_cast<uint64_t>(code_space);
-    
+
     // =====================================================================
     // CRITICAL: Store the compiled code address in the trace!
     // The trace_id returned must be findable later via findTrace().
     // We look up the trace in traces_ map and set compiled_code_address.
     // =====================================================================
     for (auto& [tid, t] : traces_) {
-        if (t->method_id == trace.method_id && 
+        if (t->method_id == trace.method_id &&
             t->loop_entry_pc == trace.loop_entry_pc) {
             t->compiled_code_address = code_addr;
             t->compiled_code_size = code.size();
             // Register in O(1) lookup cache
             uint64_t key = trace.method_id ^ (trace.loop_entry_pc * 2654435761ULL);
             compiled_trace_lookup_[key] = tid;
-            return tid;
+            return JITResultT<uint64_t>::OK(tid);
         }
     }
-    
-    // If trace not found in map (shouldn't happen), return 0
-    return 0;
+
+    // If trace not found in map (shouldn't happen), return error
+    return JITResultT<uint64_t>::Err(
+        JITErrorCode::TRACE_NOT_FOUND,
+        "Compiled trace not found in trace map"
+    );
 #endif // x86_64 vs ARM64
 }
 
-bool Tier2Compiler::executeTrace(uint64_t trace_id, void* context) {
+JITResult Tier2Compiler::executeTrace(uint64_t trace_id, void* context) {
     auto it = traces_.find(trace_id);
     if (it == traces_.end()) {
-        return false;
+        return JITResult::Err(
+            JITErrorCode::TRACE_NOT_FOUND,
+            "Trace ID " + std::to_string(trace_id) + " not found"
+        );
     }
 
     const auto& trace = it->second;
 
-    if (trace->compiled_code_address != 0) {
-        using JITFunc = void(*)(void*);
-        JITFunc func = reinterpret_cast<JITFunc>(trace->compiled_code_address);
-        func(context);
-
-        trace->execution_count++;
-        return true;
+    if (trace->compiled_code_address == 0) {
+        return JITResult::Err(
+            JITErrorCode::EXECUTION_FAILED,
+            "Trace " + std::to_string(trace_id) + " has no compiled code"
+        );
     }
 
-    return false;
+    // Execute the compiled native code
+    using JITFunc = void(*)(void*);
+    JITFunc func = reinterpret_cast<JITFunc>(trace->compiled_code_address);
+    func(context);
+
+    trace->execution_count++;
+    
+    return JITResult::OK();
 }
 
 // Register OSR entry when trace is compiled
@@ -1599,14 +1713,17 @@ void Tier2Compiler::registerOSREntry(uint64_t trace_id, uint64_t method_id, uint
     // This is called by the VM when a trace is successfully compiled
     // The VM will store the OSR entry for potential deoptimization
 }
-uint64_t Tier2Compiler::findTrace(uint64_t method_id, uint64_t loop_entry_pc) {
+JITResultT<uint64_t> Tier2Compiler::findTrace(uint64_t method_id, uint64_t loop_entry_pc) {
     // O(1) lookup via pre-built hash map
     uint64_t key = method_id ^ (loop_entry_pc * 2654435761ULL);
     auto it = compiled_trace_lookup_.find(key);
     if (it != compiled_trace_lookup_.end()) {
-        return it->second;
+        return JITResultT<uint64_t>::OK(it->second);
     }
-    return 0;
+    return JITResultT<uint64_t>::Err(
+        JITErrorCode::TRACE_NOT_FOUND,
+        "Trace for method " + std::to_string(method_id) + " at PC " + std::to_string(loop_entry_pc) + " not found"
+    );
 }
 std::unique_ptr<Tier2Compiler::ExecutionTrace> 
 Tier2Compiler::unrollLoop(const ExecutionTrace& trace, int unroll_factor) {

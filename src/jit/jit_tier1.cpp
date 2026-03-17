@@ -15,7 +15,7 @@ Tier1Compiler::Tier1Compiler()
 
 Tier1Compiler::~Tier1Compiler() = default;
 
-std::unique_ptr<Tier1Compiler::ThreadedCode> Tier1Compiler::compile(
+JITResultT<std::unique_ptr<Tier1Compiler::ThreadedCode>> Tier1Compiler::compile(
     uint64_t method_id,
     const Chunk& bytecode,
     const std::unordered_map<uint8_t, HandlerFunction>& handlers) {
@@ -23,7 +23,7 @@ std::unique_ptr<Tier1Compiler::ThreadedCode> Tier1Compiler::compile(
     auto start_time = std::chrono::high_resolution_clock::now();
 
     if (bytecode.code.empty()) {
-        return nullptr;
+        return JITResultT<std::unique_ptr<ThreadedCode>>::Err(JITErrorCode::INVALID_ARGUMENT, "Empty bytecode");
     }
 
     auto code = std::make_unique<ThreadedCode>();
@@ -45,11 +45,11 @@ std::unique_ptr<Tier1Compiler::ThreadedCode> Tier1Compiler::compile(
 
         ThreadedInstruction instr;
         instr.opcode = opcode;
-        
+
         // Get handler function address
         const void* handler_ptr = it->second.target<void*>();
         uint64_t handler_addr = handler_ptr ? reinterpret_cast<uint64_t>(const_cast<void*>(handler_ptr)) : 0;
-        
+
         if (handler_addr == 0) {
             continue;  // Skip if handler is null
         }
@@ -85,12 +85,12 @@ std::unique_ptr<Tier1Compiler::ThreadedCode> Tier1Compiler::compile(
     
     // Check code cache space
     if (code->code_size > TIER1_CODE_CACHE_SIZE - code_cache_.offset()) {
-        return nullptr;  // Code cache full
+        return JITResultT<std::unique_ptr<ThreadedCode>>::Err(JITErrorCode::CODE_CACHE_FULL, "Code cache full");
     }
 
     uint8_t* code_space = allocateCodeSpace(code->code_size);
     if (!code_space) {
-        return nullptr;
+        return JITResultT<std::unique_ptr<ThreadedCode>>::Err(JITErrorCode::MEMORY_ALLOCATION_FAILED, "Failed to allocate code space");
     }
 
     // Copy native code to code cache
@@ -99,8 +99,9 @@ std::unique_ptr<Tier1Compiler::ThreadedCode> Tier1Compiler::compile(
     code->code_address = reinterpret_cast<uint64_t>(code_space);
 
     // Make code executable
-    if (!code_cache_.makeExecutable()) {
-        return nullptr;
+    auto execResult = code_cache_.makeExecutable();
+    if (!execResult.ok()) {
+        return JITResultT<std::unique_ptr<ThreadedCode>>::Err(execResult.code, execResult.message);
     }
 
     auto end_time = std::chrono::high_resolution_clock::now();
@@ -112,40 +113,21 @@ std::unique_ptr<Tier1Compiler::ThreadedCode> Tier1Compiler::compile(
 
     compiled_methods_[method_id] = std::make_unique<ThreadedCode>(*code);
 
-    return code;
+    return JITResultT<std::unique_ptr<ThreadedCode>>::OK(std::move(code));
 }
 
-bool Tier1Compiler::execute(const ThreadedCode& code, void* context) {
+JITResult Tier1Compiler::execute(const ThreadedCode& code, void* context) {
     // Cast to function pointer and execute the threaded code
     // The code_address points to native x86-64 code
     typedef void(*ThreadedFunc)(void*);
     ThreadedFunc func = reinterpret_cast<ThreadedFunc>(code.code_address);
-    
+
     try {
         func(context);
-        return true;
+        return JITResult::OK();
     } catch (...) {
-        return false;
+        return JITResult::Err(JITErrorCode::EXECUTION_FAILED, "Exception during execution");
     }
-    
-    if (code.instructions.empty() || context == nullptr) {
-        return false;
-    }
-
-    // Simulate execution of threaded code
-    // In a real implementation, this would jump to code.code_address
-    // and let the CPU execute the compiled code
-    
-    // For now, iterate through instructions and count them
-    for (const auto& instr : code.instructions) {
-        if (instr.handler_address != 0) {
-            // In a real implementation, call the handler via function pointer
-            // void (*handler)(void*) = reinterpret_cast<void(*)(void*)>(instr.handler_address);
-            // handler(context);
-        }
-    }
-
-    return true;
 }
 
 Chunk Tier1Compiler::optimizeShallowTracing(const Chunk& bytecode) {

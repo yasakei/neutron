@@ -59,6 +59,7 @@
 #include "jit_profiler.h"
 #include "jit_tier1.h"
 #include "jit_tier2.h"
+#include "jit_errors.h"
 #include "compiler/bytecode.h"
 #include <memory>
 #include <unordered_map>
@@ -176,26 +177,26 @@ public:
     /**
      * @brief Initialize the JIT manager.
      * @param enable_monitoring Enable compilation event monitoring.
-     * @return true if initialization succeeded.
-     * 
+     * @return JITResult with error code if initialization failed.
+     *
      * Must be called before any JIT operations. Initializes:
      * - Tier-1 and Tier-2 compilers
      * - Profiler for hot spot detection
      * - Code caches for compiled code
      */
-    bool initialize(bool enable_monitoring = false);
+    JITResult initialize(bool enable_monitoring = false);
 
     /**
      * @brief Request compilation for a method/function.
      * @param method_id Unique method identifier.
      * @param bytecode The bytecode of the method.
      * @param current_tier Current execution tier.
-     * @return true if compilation was triggered.
-     * 
+     * @return JITResult indicating success or compilation error.
+     *
      * The JIT manager decides whether to compile based on profiling data.
      * Not all requests result in compilation (cold code may be ignored).
      */
-    bool requestCompilation(uint64_t method_id, const Chunk& bytecode,
+    JITResult requestCompilation(uint64_t method_id, const Chunk& bytecode,
                            CompilationTier current_tier);
 
     /**
@@ -215,12 +216,12 @@ public:
      * @param to_tier Target compilation tier.
      * @param method_id The method transitioning.
      * @param frame Current execution frame.
-     * @return true if transition succeeded.
-     * 
+     * @return JITResult with error code if transition failed.
+     *
      * Transitions occur when profiling indicates a tier change is beneficial.
      * The manager handles state transfer between tiers.
      */
-    bool transitionTier(CompilationTier from_tier, CompilationTier to_tier,
+    JITResult transitionTier(CompilationTier from_tier, CompilationTier to_tier,
                        uint64_t method_id, ExecutionFrame& frame);
 
     /**
@@ -228,12 +229,12 @@ public:
      * @param method_id The method to execute.
      * @param tier The compilation tier to use.
      * @param frame Execution context.
-     * @return true if execution succeeded.
-     * 
+     * @return JITResult indicating success or execution error.
+     *
      * Dispatches to the appropriate compiled code based on tier.
      * Tier-1 uses threaded code, Tier-2 uses native traces.
      */
-    bool executeCompiledCode(uint64_t method_id, CompilationTier tier,
+    JITResult executeCompiledCode(uint64_t method_id, CompilationTier tier,
                             ExecutionFrame& frame);
 
     /**
@@ -269,12 +270,12 @@ public:
      * @brief Force recompilation of a method.
      * @param method_id The method to recompile.
      * @param force_tier Which tier to compile to.
-     * @return true if recompilation was triggered.
-     * 
+     * @return JITResult indicating success or recompilation error.
+     *
      * Use for debugging or when profiling data has changed significantly.
      * Normal operation should not require forced recompilation.
      */
-    bool recompile(uint64_t method_id, CompilationTier force_tier);
+    JITResult recompile(uint64_t method_id, CompilationTier force_tier);
 
     /**
      * @brief Clear all compiled code and reset JIT state.

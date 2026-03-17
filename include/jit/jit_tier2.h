@@ -71,6 +71,7 @@
 #include "jit_config.h"
 #include "jit_profiler.h"
 #include "jit_memory.h"
+#include "jit_errors.h"
 #include "compiler/bytecode.h"
 #include <vector>
 #include <unordered_map>
@@ -242,8 +243,8 @@ public:
     /**
      * @brief Compile optimized trace to native code.
      * @param trace The optimized trace.
-     * @return Compiled code address, or 0 on failure.
-     * 
+     * @return JITResultT<uint64_t> with compiled code address, or error code on failure.
+     *
      * Code generation process:
      * 1. Lower IR to architecture-specific instructions
      * 2. Allocate registers (linear scan or graph coloring)
@@ -251,26 +252,26 @@ public:
      * 4. Insert guard checks for deoptimization
      * 5. Return entry point address
      */
-    uint64_t compileTrace(const ExecutionTrace& trace);
+    JITResultT<uint64_t> compileTrace(const ExecutionTrace& trace);
 
     /**
      * @brief Execute compiled trace.
      * @param trace_id ID of the trace to execute.
      * @param context Execution context (stack, locals, etc.).
-     * @return true if execution succeeded.
-     * 
+     * @return JITResult indicating success or execution error.
+     *
      * Execution jumps to compiled_code_address and runs native code.
      * If a guard fails, execution deoptimizes to the interpreter.
      */
-    bool executeTrace(uint64_t trace_id, void* context);
+    JITResult executeTrace(uint64_t trace_id, void* context);
 
     /**
      * @brief Find a compiled trace by method and loop entry.
      * @param method_id The method containing the trace.
      * @param loop_entry_pc Loop header bytecode offset.
-     * @return Trace ID, or 0 if not found.
+     * @return JITResultT<uint64_t> with trace ID, or TRACE_NOT_FOUND error.
      */
-    uint64_t findTrace(uint64_t method_id, uint64_t loop_entry_pc);
+    JITResultT<uint64_t> findTrace(uint64_t method_id, uint64_t loop_entry_pc);
 
     /**
      * @brief Register OSR entry for deoptimization support.

@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include "jit_errors.h"
 
 namespace neutron::jit {
 
@@ -31,30 +32,40 @@ public:
     /**
      * Initialize the JIT memory region with the given capacity.
      * @param capacity Size in bytes of the JIT code cache
-     * @return true if allocation succeeded
+     * @return JITResult indicating success or memory allocation error.
      */
-    bool initialize(size_t capacity);
+    JITResult initialize(size_t capacity);
 
     /**
      * Allocate a contiguous block from the code cache.
      * @param size Number of bytes to allocate
-     * @return Pointer to writable memory, or nullptr if full
+     * @return Pointer to writable memory, or nullptr if full.
+     * 
+     * For better error handling, use allocateWithResult() which provides
+     * detailed error information.
      */
     uint8_t* allocate(size_t size);
 
     /**
+     * Allocate with detailed error handling.
+     * @param size Number of bytes to allocate.
+     * @return JITResult with pointer on success, or CODE_CACHE_FULL error.
+     */
+    JITResultPtr allocateWithResult(size_t size);
+
+    /**
      * Make the entire allocated region executable.
      * On macOS Apple Silicon, this toggles from write mode to execute mode.
-     * @return true if the operation succeeded
+     * @return JITResult indicating success or memory protection error.
      */
-    bool makeExecutable();
+    JITResult makeExecutable();
 
     /**
      * Make the region writable again (for appending more code).
      * On macOS Apple Silicon, this toggles from execute mode to write mode.
-     * @return true if the operation succeeded
+     * @return JITResult indicating success or memory protection error.
      */
-    bool makeWritable();
+    JITResult makeWritable();
 
     /**
      * Get the base pointer of the code cache.
@@ -85,6 +96,34 @@ public:
      * Free all memory and reset state.
      */
     void release();
+
+    /**
+     * Check if there's enough space for allocation.
+     * @param size Number of bytes needed.
+     * @return true if space is available.
+     */
+    bool hasSpace(size_t size) const;
+
+    /**
+     * Get available space in the code cache.
+     * @return Number of bytes available.
+     */
+    size_t availableSpace() const;
+
+    /**
+     * Get utilization ratio (used / capacity).
+     * @return Float between 0.0 and 1.0.
+     */
+    float utilizationRatio() const;
+
+    /**
+     * Compact the code cache by removing unused regions.
+     * This is a simple defragmentation that resets offset to 0.
+     * 
+     * Note: This invalidates all pointers returned by allocate().
+     * Only call when no code is actively executing.
+     */
+    void compact();
 
 private:
     uint8_t* base_ = nullptr;
