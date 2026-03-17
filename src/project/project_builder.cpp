@@ -293,9 +293,9 @@ bool ProjectBuilder::buildProjectExecutable(
     bool aotSuccess = false;
     if (aotCompile) {
         std::cout << "[2/4] Analyzing dependencies..." << std::endl;
-        
+
         std::vector<std::string> aotUsedModules = getUsedModules(sourceCode);
-        auto boxModules = findBoxModules(projectRoot);
+        boxModules = findBoxModules(projectRoot);  // Refresh for AOT check
 
         // Modules that require interpreter (native code or external dependencies)
         // Note: math, random, fmt, path have AOT-compatible implementations in aot_module.h

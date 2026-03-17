@@ -2481,9 +2481,11 @@ void VM::run(size_t minFrameDepth) {
                             jitFrame.stack_pointer = nullptr;
                             jitFrame.local_variables = &stk[frame->slot_offset];
                             jitFrame.current_tier = jit::CompilationTier::TIER2;
-                            auto exec_result = tier2->executeTrace(cached.trace_id, &jitFrame);
-                            if (exec_result.ok()) {
-                                DISPATCH();
+                            {
+                                auto exec_result = tier2->executeTrace(cached.trace_id, &jitFrame);
+                                if (exec_result.ok()) {
+                                    DISPATCH();
+                                }
                             }
                         }
                     }
@@ -2510,9 +2512,11 @@ void VM::run(size_t minFrameDepth) {
                                 jitFrame.stack_pointer = nullptr;
                                 jitFrame.local_variables = &stk[frame->slot_offset];
                                 jitFrame.current_tier = jit::CompilationTier::TIER2;
-                                auto exec_result = tier2->executeTrace(trace_id, &jitFrame);
-                                if (exec_result.ok()) {
-                                    DISPATCH();
+                                {
+                                    auto exec_result = tier2->executeTrace(trace_id, &jitFrame);
+                                    if (exec_result.ok()) {
+                                        DISPATCH();
+                                    }
                                 }
                             } else if (!tier2->isTraceFailed(method_id, loop_pc)) {
                                 tier2->setGlobalsMap(&globals);
@@ -2538,9 +2542,11 @@ void VM::run(size_t minFrameDepth) {
                                                 jitFrame2.stack_pointer = nullptr;
                                                 jitFrame2.local_variables = &stk[frame->slot_offset];
                                                 jitFrame2.current_tier = jit::CompilationTier::TIER2;
-                                                auto exec_result = tier2->executeTrace(compiled, &jitFrame2);
-                                                if (exec_result.ok()) {
-                                                    jit_compile_success = true;
+                                                {
+                                                    auto exec_result = tier2->executeTrace(compiled, &jitFrame2);
+                                                    if (exec_result.ok()) {
+                                                        jit_compile_success = true;
+                                                    }
                                                 }
                                             }
                                         }

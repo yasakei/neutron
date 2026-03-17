@@ -16,21 +16,21 @@ MultiTierJITManager::MultiTierJITManager()
 
 MultiTierJITManager::~MultiTierJITManager() = default;
 
-bool MultiTierJITManager::initialize(bool enable_monitoring) {
+JITResult MultiTierJITManager::initialize(bool enable_monitoring) {
     monitoring_enabled_ = enable_monitoring;
-    return true;  // Initialization successful
+    return JITResult::OK();
 }
 
-bool MultiTierJITManager::requestCompilation(uint64_t method_id, 
+JITResult MultiTierJITManager::requestCompilation(uint64_t method_id,
                                              const Chunk& bytecode,
                                              CompilationTier current_tier) {
 
     auto start_time = std::chrono::high_resolution_clock::now();
-    
+
     CompilationTier target_tier = decideCompilationTier(method_id, current_tier);
 
     if (target_tier == current_tier) {
-        return false;  // No compilation needed
+        return JITResult::Err(JITErrorCode::UNKNOWN_ERROR, "No compilation needed");
     }
 
     CompilationEvent event;
@@ -48,14 +48,14 @@ bool MultiTierJITManager::requestCompilation(uint64_t method_id,
         // Compile using Tier-1 (lightweight threaded code generation)
         std::unordered_map<uint8_t, Tier1Compiler::HandlerFunction> handlers;
         // In a real implementation, populate handlers from the VM's bytecode handlers
-        
-        auto tier1_code = tier1_compiler_->compile(method_id, bytecode, handlers);
 
-        if (tier1_code) {
+        auto tier1_result = tier1_compiler_->compile(method_id, bytecode, handlers);
+
+        if (tier1_result.ok()) {
             tier1_compilations_++;
-            
+
             // Cache the compiled Tier-1 code for execution
-            tier1_code_cache_[method_id] = std::move(tier1_code);
+            tier1_code_cache_[method_id] = std::move(tier1_result.getValue());
 
             event.type = CompilationEvent::Type::TIER1_COMPILATION_COMPLETED;
             auto end_time = std::chrono::high_resolution_clock::now();
@@ -76,20 +76,24 @@ bool MultiTierJITManager::requestCompilation(uint64_t method_id,
 
         // Compile using Tier-2 (tracing JIT with optimizations)
         auto trace = tier2_compiler_->recordTrace(method_id, bytecode, 0, *profiler_);
-        
+
         if (trace) {
             auto optimized = tier2_compiler_->optimizeTrace(*trace);
-            uint64_t code_addr = tier2_compiler_->compileTrace(*optimized);
-            
+            auto compile_result = tier2_compiler_->compileTrace(*optimized);
+            uint64_t code_addr = 0;
+            if (compile_result.ok()) {
+                code_addr = compile_result.getValue();
+            }
+
             if (code_addr != 0) {
                 tier2_compilations_++;
-                
+
                 event.type = CompilationEvent::Type::TIER2_COMPILATION_COMPLETED;
                 auto end_time = std::chrono::high_resolution_clock::now();
                 event.duration_us = std::chrono::duration_cast<std::chrono::microseconds>(
                     end_time - start_time).count();
                 emitEvent(event);
-                
+
                 total_compilation_time_us_ += event.duration_us;
                 success = true;
             } else {
@@ -118,7 +122,7 @@ CompilationTier MultiTierJITManager::recordExecution(uint64_t method_id,
     return CompilationTier::INTERPRETER;
 }
 
-bool MultiTierJITManager::transitionTier(CompilationTier from_tier,
+JITResult MultiTierJITManager::transitionTier(CompilationTier from_tier,
                                          CompilationTier to_tier,
                                          uint64_t method_id,
                                          ExecutionFrame& frame) {
@@ -143,10 +147,10 @@ bool MultiTierJITManager::transitionTier(CompilationTier from_tier,
     emitEvent(event);
     recordTierTransition(from_tier, to_tier, event.duration_us);
 
-    return true;
+    return JITResult::OK();
 }
 
-bool MultiTierJITManager::executeCompiledCode(uint64_t method_id,
+JITResult MultiTierJITManager::executeCompiledCode(uint64_t method_id,
                                               CompilationTier tier,
                                               ExecutionFrame& frame) {
 
@@ -238,7 +242,11 @@ bool MultiTierJITManager::executeCompiledCode(uint64_t method_id,
             break;
     }
 
-    return success;
+    if (success) {
+        return JITResult::OK();
+    } else {
+        return JITResult::Err(JITErrorCode::EXECUTION_FAILED, "Execution failed");
+    }
 }
 
 const HotSpotProfiler::MethodProfile* 
