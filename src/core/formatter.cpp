@@ -114,7 +114,7 @@ std::string Formatter::format(const std::string& source, const Options& options)
     std::ostringstream result;
     int indentLevel = 0;
     bool lastWasBlank = false;
-    // bool inMultilineComment = false;  // Reserved for future multiline comment handling
+    bool inMultilineComment = false;
 
     for (size_t i = 0; i < lines.size(); i++) {
         std::string& currentLine = lines[i];
@@ -183,11 +183,14 @@ std::string Formatter::format(const std::string& source, const Options& options)
         
         // Ensure indent never goes negative
         indentLevel = std::max(0, indentLevel);
-        
+
         // Check for end of multiline comment
         if (content.find("*/") != std::string::npos) {
             inMultilineComment = false;
         }
+        
+        // Note: inMultilineComment tracking reserved for future comment-aware formatting
+        (void)inMultilineComment;  // Suppress unused warning
     }
     
     std::string formatted = result.str();
