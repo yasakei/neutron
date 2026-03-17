@@ -114,8 +114,8 @@ std::string Formatter::format(const std::string& source, const Options& options)
     std::ostringstream result;
     int indentLevel = 0;
     bool lastWasBlank = false;
-    bool inMultilineComment = false;
-    
+    // bool inMultilineComment = false;  // Reserved for future multiline comment handling
+
     for (size_t i = 0; i < lines.size(); i++) {
         std::string& currentLine = lines[i];
         

@@ -185,8 +185,6 @@ void AotCompiler::optimizeBytecode(std::vector<uint8_t>& code, std::vector<Value
                     break;
             }
 
-            size_t instrEnd = ip;
-
             // Track constant loads into locals
             if (op == OpCode::OP_CONST_ZERO) {
                 // Next instruction should be SET_LOCAL for propagation
@@ -587,7 +585,6 @@ void AotCompiler::generateBytecodeBody() {
     std::vector<bool> isJumpTarget(codeSize + 1, false);
     size_t scanIp = 0;
     while (scanIp < codeSize) {
-        size_t instrStart = scanIp;
         uint8_t instruction = chunk->code[scanIp++];
         OpCode op = static_cast<OpCode>(instruction);
 
@@ -1631,6 +1628,7 @@ std::string AotCompiler::generateFunctionCode(const Chunk* funcChunk, const std:
             }
             case OpCode::OP_CALL: {
                 uint8_t argCount = funcCompiler.readByte();
+                (void)argCount;  // Reserved for future implementation
                 funcCode << "    // CALL (interpreter fallback)\n";
                 break;
             }

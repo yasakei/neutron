@@ -492,7 +492,6 @@ JITResultT<uint64_t> Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
 
     // Track which opcodes we've seen for validation
     bool has_loop_back = false;
-    bool has_unsupported_call = false;
     int forward_jump_count = 0;
     int backward_jump_count = 0;
 
@@ -1924,6 +1923,7 @@ Tier2Compiler::convertToIR(const Chunk& bytecode, uint64_t start_pc, uint64_t en
     for (uint64_t pc = start_pc; pc < end_pc && pc < bytecode.code.size(); ) {
         uint8_t opcode = bytecode.code[pc];
         int instr_size = getInstructionSize(opcode);
+        (void)instr_size;  // Used for trace length calculation
         pc++; // Consume opcode
 
         IRInstruction instr;
@@ -2487,7 +2487,8 @@ void Tier2Compiler::addTypeGuard(ExecutionTrace& trace, uint64_t value_id,
 uint8_t* Tier2Compiler::allocateCodeSpace(size_t size) {
     // Lazy-init code cache on first allocation
     if (!code_cache_initialized_) {
-        if (!code_cache_.initialize(TIER2_CODE_CACHE_SIZE)) {
+        auto init_result = code_cache_.initialize(TIER2_CODE_CACHE_SIZE);
+        if (!init_result.ok()) {
             return nullptr;
         }
         code_cache_initialized_ = true;

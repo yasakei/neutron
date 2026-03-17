@@ -63,7 +63,7 @@ JITResult JITMemory::initialize(size_t capacity) {
 
     capacity_ = capacity;
     offset_ = 0;
-    return true;
+    return JITResult::OK();
 }
 
 uint8_t* JITMemory::allocate(size_t size) {

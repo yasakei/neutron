@@ -106,7 +106,11 @@ JITResult MultiTierJITManager::requestCompilation(uint64_t method_id,
         }
     }
 
-    return success;
+    if (success) {
+        return JITResult::OK();
+    } else {
+        return JITResult::Err(JITErrorCode::COMPILATION_FAILED, "Compilation failed");
+    }
 }
 
 CompilationTier MultiTierJITManager::recordExecution(uint64_t method_id, 
@@ -399,8 +403,11 @@ CompilationTier MultiTierJITManager::decideCompilationTier(
 void MultiTierJITManager::recordTierTransition(CompilationTier from_tier,
                                                CompilationTier to_tier,
                                                int64_t duration_us) {
-    // Record tier transition for performance analysis
-    // This is useful for understanding warmup characteristics
+    // Placeholder for tier transition statistics
+    // Parameters currently unused but available for future profiling
+    (void)from_tier;
+    (void)to_tier;
+    (void)duration_us;
 }
 
 } // namespace neutron::jit

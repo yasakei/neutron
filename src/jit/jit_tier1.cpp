@@ -292,7 +292,8 @@ std::vector<uint8_t> Tier1Compiler::emitHandlerCall(uint64_t handler_address) {
 uint8_t* Tier1Compiler::allocateCodeSpace(size_t size) {
     // Lazy-init code cache on first allocation
     if (!code_cache_.isInitialized()) {
-        if (!code_cache_.initialize(TIER1_CODE_CACHE_SIZE)) {
+        auto init_result = code_cache_.initialize(TIER1_CODE_CACHE_SIZE);
+        if (!init_result.ok()) {
             return nullptr;
         }
     }
