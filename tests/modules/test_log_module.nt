@@ -71,7 +71,8 @@ test("set_timestamp non-bool throws", fun() {
 });
 
 // --- file output ---
-var tmplog = ".temp/test_log_output.txt";
+// Use OS temp directory: /tmp on Linux/macOS, C:/temp on Windows
+var tmplog = sys.exists("/tmp") ? "/tmp/test_log_output.txt" : "C:/temp/test_log_output.txt";
 
 test("set_file writes to file", fun() {
     log.set_color(false);
