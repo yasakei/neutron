@@ -12,6 +12,7 @@ node_modules/
 neutronc
 /neutron
 /box
+/neutron-lsp
 *.vsix
 *.exe
 *.dll
@@ -45,6 +46,7 @@ tools/
 .DS_Store
 Thumbs.db
 desktop.ini
+__pycache__/
 
 # Temporary files
 .vs/

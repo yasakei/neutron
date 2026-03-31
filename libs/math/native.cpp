@@ -75,7 +75,11 @@ Value divide(VM& vm, std::vector<Value> args) {
     if (b == 0) {
         throw std::runtime_error("Division by zero.");
     }
-    return Value(a / b);
+    double result = a / b;
+    if (std::isnan(result) || std::isinf(result)) {
+        throw std::runtime_error("Division resulted in invalid value.");
+    }
+    return Value(result);
 }
 
 // Function to calculate the square root of a number
@@ -88,7 +92,14 @@ Value sqrt_fn(VM& vm, std::vector<Value> args) {
         throw std::runtime_error("sqrt() expects a number.");
     }
     double num = args[0].as.number;
-    return Value(std::sqrt(num));
+    if (num < 0) {
+        throw std::runtime_error("sqrt() domain error: argument must be non-negative.");
+    }
+    double result = std::sqrt(num);
+    if (std::isnan(result) || std::isinf(result)) {
+        throw std::runtime_error("sqrt() resulted in invalid value.");
+    }
+    return Value(result);
 }
 
 Value pow_fn(VM& vm, std::vector<Value> args) {
@@ -101,7 +112,20 @@ Value pow_fn(VM& vm, std::vector<Value> args) {
     }
     double base = args[0].as.number;
     double exp = args[1].as.number;
-    return Value(std::pow(base, exp));
+    
+    // Check for domain errors
+    if (base == 0 && exp < 0) {
+        throw std::runtime_error("pow() domain error: 0 raised to negative power.");
+    }
+    if (base < 0 && std::floor(exp) != exp) {
+        throw std::runtime_error("pow() domain error: negative base with non-integer exponent.");
+    }
+    
+    double result = std::pow(base, exp);
+    if (std::isnan(result) || std::isinf(result)) {
+        throw std::runtime_error("pow() resulted in invalid value.");
+    }
+    return Value(result);
 }
 
 Value abs_fn(VM& vm, std::vector<Value> args) {

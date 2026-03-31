@@ -1,0 +1,123 @@
+// Fmt module tests
+use fmt;
+
+say("=== Fmt Module Tests ===");
+
+var test_count = 0;
+var pass_count = 0;
+
+fun test(desc, fn) {
+    test_count = test_count + 1;
+    try {
+        var r = fn();
+        if (r) {
+            say("✓ " + desc);
+            pass_count = pass_count + 1;
+        } else {
+            say("✗ " + desc + " (assertion failed)");
+        }
+    } catch (e) {
+        say("✗ " + desc + " (error: " + e + ")");
+    }
+}
+
+// --- to_int ---
+test("to_int from float truncates", fun() { return fmt.to_int(42.9) == 42; });
+test("to_int from string", fun() { return fmt.to_int("123") == 123; });
+test("to_int from true", fun() { return fmt.to_int(true) == 1; });
+test("to_int from false", fun() { return fmt.to_int(false) == 0; });
+test("to_int from nil", fun() { return fmt.to_int(nil) == 0; });
+test("to_int from array throws", fun() {
+    try { fmt.to_int([1, 2]); return false; } catch (e) { return true; }
+});
+
+// --- to_float ---
+test("to_float from int", fun() { return fmt.to_float(42) == 42; });
+test("to_float from string", fun() { return fmt.to_float("3.14") == 3.14; });
+test("to_float from true", fun() { return fmt.to_float(true) == 1.0; });
+test("to_float from nil", fun() { return fmt.to_float(nil) == 0.0; });
+
+// --- to_str ---
+test("to_str from number", fun() { return fmt.to_str(42) == "42"; });
+test("to_str from string passthrough", fun() { return fmt.to_str("hi") == "hi"; });
+test("to_str from true", fun() { return fmt.to_str(true) == "true"; });
+test("to_str from false", fun() { return fmt.to_str(false) == "false"; });
+test("to_str from nil", fun() { return fmt.to_str(nil) == "nil"; });
+
+// --- to_bin ---
+test("to_bin(10) == '1010'", fun() { return fmt.to_bin(10) == "1010"; });
+test("to_bin(0) == '0'", fun() { return fmt.to_bin(0) == "0"; });
+test("to_bin(1) == '1'", fun() { return fmt.to_bin(1) == "1"; });
+test("to_bin(255) == '11111111'", fun() { return fmt.to_bin(255) == "11111111"; });
+test("to_bin(true) == '1'", fun() { return fmt.to_bin(true) == "1"; });
+test("to_bin(false) == '0'", fun() { return fmt.to_bin(false) == "0"; });
+
+// --- type ---
+test("type(nil) == 'nil'", fun() { return fmt.type(nil) == "nil"; });
+test("type(true) == 'bool'", fun() { return fmt.type(true) == "bool"; });
+test("type(42) == 'number'", fun() { return fmt.type(42) == "number"; });
+test("type('hi') == 'string'", fun() { return fmt.type("hi") == "string"; });
+test("type([]) == 'array'", fun() { return fmt.type([]) == "array"; });
+
+// --- is_int ---
+test("is_int(42) == true", fun() { return fmt.is_int(42) == true; });
+test("is_int(42.5) == false", fun() { return fmt.is_int(42.5) == false; });
+test("is_int('hi') == false", fun() { return fmt.is_int("hi") == false; });
+
+// --- is_float ---
+test("is_float(3.14) == true", fun() { return fmt.is_float(3.14) == true; });
+test("is_float(42) == true", fun() { return fmt.is_float(42) == true; });
+test("is_float('x') == false", fun() { return fmt.is_float("x") == false; });
+
+// --- is_string ---
+test("is_string('hi') == true", fun() { return fmt.is_string("hi") == true; });
+test("is_string(42) == false", fun() { return fmt.is_string(42) == false; });
+
+// --- is_bool ---
+test("is_bool(true) == true", fun() { return fmt.is_bool(true) == true; });
+test("is_bool(false) == true", fun() { return fmt.is_bool(false) == true; });
+test("is_bool(1) == false", fun() { return fmt.is_bool(1) == false; });
+
+// --- is_nil ---
+test("is_nil(nil) == true", fun() { return fmt.is_nil(nil) == true; });
+test("is_nil(0) == false", fun() { return fmt.is_nil(0) == false; });
+test("is_nil('') == false", fun() { return fmt.is_nil("") == false; });
+
+// --- is_array ---
+test("is_array([]) == true", fun() { return fmt.is_array([]) == true; });
+test("is_array(42) == false", fun() { return fmt.is_array(42) == false; });
+
+// --- to_hex ---
+test("to_hex(255) == 'ff'", fun() { return fmt.to_hex(255) == "ff"; });
+test("to_hex(16) == '10'", fun() { return fmt.to_hex(16) == "10"; });
+test("to_hex(0) == '0'", fun() { return fmt.to_hex(0) == "0"; });
+test("to_hex non-number throws", fun() {
+    try { fmt.to_hex("x"); return false; } catch (e) { return true; }
+});
+
+// --- to_oct ---
+test("to_oct(8) == '10'", fun() { return fmt.to_oct(8) == "10"; });
+test("to_oct(255) == '377'", fun() { return fmt.to_oct(255) == "377"; });
+test("to_oct(0) == '0'", fun() { return fmt.to_oct(0) == "0"; });
+
+// --- pad_left ---
+test("pad_left default space", fun() { return fmt.pad_left("42", 5) == "   42"; });
+test("pad_left with '0'", fun() { return fmt.pad_left("42", 5, "0") == "00042"; });
+test("pad_left no-op when already wide enough", fun() { return fmt.pad_left("hello", 3) == "hello"; });
+
+// --- pad_right ---
+test("pad_right default space", fun() { return fmt.pad_right("hi", 5) == "hi   "; });
+test("pad_right with '-'", fun() { return fmt.pad_right("hi", 5, "-") == "hi---"; });
+test("pad_right no-op when already wide enough", fun() { return fmt.pad_right("hello", 3) == "hello"; });
+
+// --- Summary ---
+say("\n=== Test Summary ===");
+say("Tests run: " + test_count);
+say("Tests passed: " + pass_count);
+say("Tests failed: " + (test_count - pass_count));
+
+if (pass_count == test_count) {
+    say("✓ All fmt module tests passed!");
+} else {
+    say("✗ Some fmt module tests failed.");
+}

@@ -165,14 +165,68 @@ def run_quark_test(neutron_bin, root_dir):
         print(f"    {str(e)}")
         return 0, 1
 
+def compare_outputs(expected, actual, test_name):
+    """Compare expected and actual outputs, handling common variations"""
+    # Normalize whitespace and line endings
+    expected_normalized = '\n'.join(line.strip() for line in expected.strip().splitlines())
+    actual_normalized = '\n'.join(line.strip() for line in actual.strip().splitlines())
+    
+    if expected_normalized == actual_normalized:
+        return True, None
+    
+    # Try numeric comparison for floating point differences
+    expected_lines = expected_normalized.split('\n')
+    actual_lines = actual_normalized.split('\n')
+    
+    if len(expected_lines) != len(actual_lines):
+        return False, {
+            'type': 'line_count_mismatch',
+            'expected_lines': len(expected_lines),
+            'actual_lines': len(actual_lines)
+        }
+    
+    mismatches = []
+    for i, (exp_line, act_line) in enumerate(zip(expected_lines, actual_lines)):
+        if exp_line != act_line:
+            # Try to parse as numbers for floating point comparison
+            try:
+                exp_nums = [float(x) for x in exp_line.split()]
+                act_nums = [float(x) for x in act_line.split()]
+                if len(exp_nums) == len(act_nums):
+                    # Check if all numbers are within 0.1% tolerance
+                    all_close = all(
+                        abs(e - a) < max(1e-9, abs(e) * 0.001) 
+                        for e, a in zip(exp_nums, act_nums)
+                    )
+                    if all_close:
+                        continue  # Consider it a match
+            except (ValueError, ZeroDivisionError):
+                pass
+            
+            mismatches.append({
+                'line': i + 1,
+                'expected': exp_line,
+                'actual': act_line
+            })
+    
+    if mismatches:
+        return False, {
+            'type': 'output_mismatch',
+            'mismatches': mismatches[:10],  # Limit to first 10 mismatches
+            'total_mismatches': len(mismatches)
+        }
+    
+    return True, None
+
+
 def run_box_test(neutron_bin, root_dir):
     """Run box module installation and test"""
     Colors.print("Testing: box module", Colors.BLUE)
-    
+
     # Find box binary
     is_windows = platform.system() == "Windows"
     box_name = "box.exe" if is_windows else "box"
-    
+
     box_paths = [
         os.path.join(root_dir, "build", box_name),
         os.path.join(root_dir, "build", "Release", box_name),
@@ -181,13 +235,13 @@ def run_box_test(neutron_bin, root_dir):
         os.path.join(root_dir, "nt-box", "build", "Release", box_name),
         os.path.join(root_dir, "nt-box", "build", "Debug", box_name),
     ]
-    
+
     box_bin = None
     for p in box_paths:
         if os.path.exists(p):
             box_bin = p
             break
-    
+
     # Check system PATH
     if not box_bin:
         try:
@@ -197,13 +251,13 @@ def run_box_test(neutron_bin, root_dir):
                 box_bin = "box"
         except:
             pass
-    
+
     if not box_bin:
         print(f"  ", end="")
         Colors.print("[SKIP]", Colors.YELLOW, end="")
         print(f" box binary not found")
         return 0, 0
-    
+
     try:
         # Install base64 module
         result = subprocess.run([box_bin, "install", "base64"], capture_output=True, text=True)
@@ -213,11 +267,11 @@ def run_box_test(neutron_bin, root_dir):
             print(f" box install base64")
             print(f"    {result.stderr}")
             return 0, 1
-        
+
         # Run the test
         test_file = os.path.join(root_dir, "tests", "box_base64_test.nt")
         result = subprocess.run([neutron_bin, test_file], capture_output=True, text=True)
-        
+
         if result.returncode == 0:
             print(f"  ", end="")
             Colors.print("[PASS]", Colors.GREEN, end="")
@@ -231,7 +285,7 @@ def run_box_test(neutron_bin, root_dir):
             for line in output.splitlines():
                 print(f"    {line}")
             return 0, 1
-            
+
     except Exception as e:
         print(f"  ", end="")
         Colors.print("[FAIL]", Colors.RED, end="")
@@ -515,13 +569,13 @@ def main():
                     errors='replace',
                     timeout=30  # Add timeout to prevent hanging
                 )
-                
+
                 # Debug: Check the actual return code
                 actual_returncode = result.returncode
-                
+
                 # Determine if test passed based on return code only
                 test_passed = (actual_returncode == 0)
-                
+
                 if test_passed:
                     print(f"  ", end="")
                     Colors.print("[PASS]", Colors.GREEN, end="")
@@ -533,7 +587,7 @@ def main():
                     Colors.print("[FAIL]", Colors.RED, end="")
                     print(f" {test_name}")
                     print(f"    Return code: {actual_returncode}")
-                    
+
                     # Print stderr/stdout indented
                     if result.stdout:
                         print("    STDOUT:")
@@ -543,11 +597,11 @@ def main():
                         print("    STDERR:")
                         for line in result.stderr.splitlines():
                             print(f"      {line}")
-                        
+
                     failed_tests.append(os.path.relpath(test_file, root_dir))
                     dir_failed += 1
                     total_failed += 1
-                    
+
             except subprocess.TimeoutExpired:
                 print(f"  ", end="")
                 Colors.print("[FAIL]", Colors.RED, end="")

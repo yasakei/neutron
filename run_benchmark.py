@@ -322,20 +322,28 @@ def main():
         ("Algorithms", [
             ("Fibonacci", "neutron/fibonacci.nt", "python/fibonacci.py", "javascript/fibonacci.js"),
             ("Prime Numbers", "neutron/primes.nt", "python/primes.py", "javascript/primes.js"),
-            ("Matrix Ops", "neutron/matrix.nt", "python/matrix.py", "javascript/matrix.js")
+            ("Matrix Ops", "neutron/matrix.nt", "python/matrix.py", "javascript/matrix.js"),
+            ("Binary Search", "neutron/binary_search.nt", "python/binary_search.py", "javascript/binary_search.js"),
+            ("Binary Trees", "neutron/binary_trees.nt", "python/binary_trees.py", "javascript/binary_trees.js")
         ]),
         ("Recursion", [
             ("Deep Recursion", "neutron/ackermann.nt", "python/ackermann.py", "javascript/ackermann.js"),
-            ("Recursive Algos", "neutron/recursion.nt", "python/recursion.py", "javascript/recursion.js")
+            ("Recursive Algos", "neutron/recursion.nt", "python/recursion.py", "javascript/recursion.js"),
+            ("Mandelbrot", "neutron/mandelbrot.nt", "python/mandelbrot.py", "javascript/mandelbrot.js")
         ]),
          ("Data Structures", [
             ("Sorting", "neutron/sorting.nt", "python/sorting.py", "javascript/sorting.js"),
             ("Array/List Ops", "neutron/list_ops.nt", "python/list_ops.py", "javascript/list_ops.js"),
-            ("Object/Dict Ops", "neutron/dict_ops.nt", "python/dict_ops.py", "javascript/dict_ops.js")
+            ("Object/Dict Ops", "neutron/dict_ops.nt", "python/dict_ops.py", "javascript/dict_ops.js"),
+            ("Hashmap", "neutron/hashmap.nt", "python/hashmap.py", "javascript/hashmap.js"),
+            ("Linked List", "neutron/linked_list.nt", "python/linked_list.py", "javascript/linked_list.js"),
+            ("Classes/OOP", "neutron/classes.nt", "python/classes.py", "javascript/classes.js")
         ]),
         ("Math Operations", [
-            ("Math Functions", "neutron/math.nt", "python/math.py", "javascript/math.js"),
-            ("Bitwise Ops", "neutron/bitwise.nt", "python/bitwise.py", "javascript/bitwise.js")
+            ("Math Functions", "neutron/math_ops.nt", "python/math_ops.py", "javascript/math_ops.js"),
+            ("Bitwise Ops", "neutron/bitwise.nt", "python/bitwise.py", "javascript/bitwise.js"),
+            ("N-Body", "neutron/nbody.nt", "python/nbody.py", "javascript/nbody.js"),
+            ("Raytracer", "neutron/raytracer.nt", "python/raytracer.py", "javascript/raytracer.js")
         ]),
         ("String Operations", [
              ("String Manipulation", "neutron/strings.nt", "python/strings.py", "javascript/strings.js"),
@@ -343,11 +351,14 @@ def main():
              ("String Concat", "neutron/string_concat.nt", "python/string_concat.py", "javascript/string_concat.js")
         ]),
         ("Object Operations", [
-            ("Object Creation", "neutron/objects.nt", "python/objects.py", "javascript/objects.js")
+            ("Object Creation", "neutron/objects.nt", "python/objects.py", "javascript/objects.js"),
+            ("JSON Ops", "neutron/json_ops.nt", "python/json_ops.py", "javascript/json_ops.js")
         ]),
         ("Loop Performance", [
             ("Loop Operations", "neutron/loops.nt", "python/loops.py", "javascript/loops.js"),
-            ("Nested Loops", "neutron/nested_loops.nt", "python/nested_loops.py", "javascript/nested_loops.js")
+            ("Nested Loops", "neutron/nested_loops.nt", "python/nested_loops.py", "javascript/nested_loops.js"),
+            ("Tree Traversal", "neutron/tree_traversal.nt", "python/tree_traversal.py", "javascript/tree_traversal.js"),
+            ("Reduction", "neutron/reduction.nt", "python/reduction.py", "javascript/reduction.js")
         ])
     ]
 

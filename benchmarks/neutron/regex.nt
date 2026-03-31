@@ -1,0 +1,83 @@
+// Regex Matching benchmark in Neutron
+use strings;
+
+// Test data - repeat 100 times
+var testStrings = [
+    "Contact us at support@example.com or sales@company.org",
+    "Call 123-456-7890 or 987-654-3210",
+    "Server IP: 192.168.1.1 or 10.0.0.255",
+    "Visit https://example.com or http://test.org/page",
+    "Hello World This Is A Test String Here"
+];
+
+// Email pattern matching (count @)
+fun matchEmail(text) {
+    var count = 0;
+    var i = 0;
+    while (i < text.length) {
+        if (text[i] == "@") {
+            count = count + 1;
+        }
+        i = i + 1;
+    }
+    return count;
+}
+
+// Phone pattern matching (xxx-xxx-xxxx)
+fun matchPhone(text) {
+    var count = 0;
+    var i = 0;
+    while (i < text.length - 11) {
+        if (text[i + 3] == "-" && text[i + 7] == "-") {
+            count = count + 1;
+            i = i + 12;
+        } else {
+            i = i + 1;
+        }
+    }
+    return count;
+}
+
+// URL pattern matching
+fun matchURL(text) {
+    var count = 0;
+    if (strings.contains(text, "http")) {
+        count = 1;
+    }
+    return count;
+}
+
+// Capitalized word matching (check if uppercase)
+fun matchCapitalized(text) {
+    var count = 0;
+    var i = 0;
+    while (i < text.length) {
+        var c = text[i];
+        // Check if character is uppercase by comparing
+        var upper = strings.upper(c);
+        var lower = strings.lower(c);
+        if (c == upper && c != lower) {
+            count = count + 1;
+        }
+        i = i + 1;
+    }
+    return count;
+}
+
+// Run all matches
+var totalMatches = 0;
+var reps = 0;
+while (reps < 100) {
+    var j = 0;
+    while (j < testStrings.length) {
+        var text = testStrings[j];
+        totalMatches = totalMatches + matchEmail(text);
+        totalMatches = totalMatches + matchPhone(text);
+        totalMatches = totalMatches + matchURL(text);
+        totalMatches = totalMatches + matchCapitalized(text);
+        j = j + 1;
+    }
+    reps = reps + 1;
+}
+
+say("Total matches: ${totalMatches}");

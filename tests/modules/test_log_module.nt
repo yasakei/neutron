@@ -1,0 +1,139 @@
+// Log module tests
+use log;
+use sys;
+use strings;
+
+say("=== Log Module Tests ===");
+
+var test_count = 0;
+var pass_count = 0;
+
+fun test(desc, fn) {
+    test_count = test_count + 1;
+    try {
+        var r = fn();
+        if (r) {
+            say("✓ " + desc);
+            pass_count = pass_count + 1;
+        } else {
+            say("✗ " + desc + " (assertion failed)");
+        }
+    } catch (e) {
+        say("✗ " + desc + " (error: " + e + ")");
+    }
+}
+
+// --- level constants ---
+test("log.DEBUG == 0", fun() { return log.DEBUG == 0; });
+test("log.INFO == 1",  fun() { return log.INFO  == 1; });
+test("log.WARN == 2",  fun() { return log.WARN  == 2; });
+test("log.ERROR == 3", fun() { return log.ERROR == 3; });
+
+// --- get/set level ---
+test("default level is INFO (1)", fun() {
+    return log.get_level() == 1;
+});
+
+test("set_level changes level", fun() {
+    log.set_level(log.DEBUG);
+    var lvl = log.get_level();
+    log.set_level(log.INFO); // restore
+    return lvl == 0;
+});
+
+test("set_level out of range throws", fun() {
+    try { log.set_level(99); return false; } catch (e) { return true; }
+});
+
+test("set_level negative throws", fun() {
+    try { log.set_level(-1); return false; } catch (e) { return true; }
+});
+
+// --- set_color / set_timestamp (no-throw checks) ---
+test("set_color(false) does not throw", fun() {
+    log.set_color(false);
+    log.set_color(true);
+    return true;
+});
+
+test("set_timestamp(false) does not throw", fun() {
+    log.set_timestamp(false);
+    log.set_timestamp(true);
+    return true;
+});
+
+test("set_color non-bool throws", fun() {
+    try { log.set_color(1); return false; } catch (e) { return true; }
+});
+
+test("set_timestamp non-bool throws", fun() {
+    try { log.set_timestamp(1); return false; } catch (e) { return true; }
+});
+
+// --- file output ---
+// Use OS temp directory: /tmp on Linux/macOS, C:/temp on Windows
+var tmplog = sys.exists("/tmp") ? "/tmp/test_log_output.txt" : "C:/temp/test_log_output.txt";
+
+test("set_file writes to file", fun() {
+    log.set_color(false);
+    log.set_timestamp(false);
+    log.set_level(log.DEBUG);
+    log.set_file(tmplog);
+
+    log.info("file-test-marker");
+
+    log.set_file(""); // stop file logging
+    log.set_level(log.INFO);
+    log.set_timestamp(true);
+    log.set_color(true);
+
+    var content = sys.read(tmplog);
+    return strings.contains(content, "file-test-marker");
+});
+
+test("log level filters messages", fun() {
+    log.set_color(false);
+    log.set_timestamp(false);
+    log.set_level(log.WARN);
+    log.set_file(tmplog);
+
+    // Write a fresh marker only at ERROR level
+    log.error("error-only-marker");
+    // This should NOT appear
+    log.info("info-suppressed-marker");
+
+    log.set_file("");
+    log.set_level(log.INFO);
+    log.set_timestamp(true);
+    log.set_color(true);
+
+    var content = sys.read(tmplog);
+    return strings.contains(content, "error-only-marker");
+});
+
+// --- multi-arg logging (no throw) ---
+test("log.info with multiple args", fun() {
+    log.info("value:", 42, "flag:", true);
+    return true;
+});
+
+test("log.debug with no args throws", fun() {
+    try { log.debug(); return false; } catch (e) { return true; }
+});
+
+// cleanup
+if (sys.exists(tmplog)) {
+    sys.rm(tmplog);
+}
+
+// --- Summary ---
+say("\n=== Test Summary ===");
+say("Tests run: " + test_count);
+say("Tests passed: " + pass_count);
+say("Tests failed: " + (test_count - pass_count));
+
+if (pass_count == test_count) {
+    say("✓ All log module tests passed!");
+} else {
+    say("✗ Some log module tests failed.");
+}

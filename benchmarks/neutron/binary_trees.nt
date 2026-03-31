@@ -1,0 +1,96 @@
+// Binary Trees benchmark in Neutron
+use arrays;
+
+class BinaryTreeNode {
+    var val;
+    var left;
+    var right;
+    
+    fun initialize(val) {
+        this.val = val;
+        this.left = nil;
+        this.right = nil;
+    }
+}
+
+fun btInsert(root, val) {
+    if (root == nil) {
+        return BinaryTreeNode(val);
+    }
+    if (val < root.val) {
+        root.left = btInsert(root.left, val);
+    } else {
+        root.right = btInsert(root.right, val);
+    }
+    return root;
+}
+
+fun btSearch(root, val) {
+    if (root == nil) { return nil; }
+    if (root.val == val) {
+        return root;
+    }
+    if (val < root.val) {
+        return btSearch(root.left, val);
+    }
+    return btSearch(root.right, val);
+}
+
+fun btHeight(root) {
+    if (root == nil) {
+        return 0;
+    }
+    var leftH = btHeight(root.left);
+    var rightH = btHeight(root.right);
+    if (leftH > rightH) {
+        return 1 + leftH;
+    } else {
+        return 1 + rightH;
+    }
+}
+
+fun btCount(root) {
+    if (root == nil) {
+        return 0;
+    }
+    return 1 + btCount(root.left) + btCount(root.right);
+}
+
+fun btSum(root) {
+    if (root == nil) {
+        return 0;
+    }
+    return btSum(root.left) + root.val + btSum(root.right);
+}
+
+// Build tree with values 0-999 shuffled to avoid depth-1000 skewed tree
+// Use middle-out insertion for a balanced tree without needing random
+fun buildBalanced(arr, lo, hi, root) {
+    if (lo > hi) { return root; }
+    var mid = lo + ((hi - lo) / 2);
+    var midInt = mid - (mid % 1); // floor
+    root = btInsert(root, arrays.at(arr, midInt));
+    root = buildBalanced(arr, lo, midInt - 1, root);
+    root = buildBalanced(arr, midInt + 1, hi, root);
+    return root;
+}
+
+var sortedOrder = arrays.range(0, 1000);
+var root = nil;
+root = buildBalanced(sortedOrder, 0, 999, root);
+
+// Operations
+var foundCount = 0;
+var m = 0;
+while (m < 1000) {
+    if (btSearch(root, m) != nil) {
+        foundCount = foundCount + 1;
+    }
+    m = m + 10;
+}
+
+var treeHeight = btHeight(root);
+var nodeCount = btCount(root);
+var totalSum = btSum(root);
+
+say("Found: ${foundCount}, Height: ${treeHeight}, Nodes: ${nodeCount}, Sum: ${totalSum}");

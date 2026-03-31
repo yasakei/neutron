@@ -279,12 +279,193 @@ Value native_fmt_to_float(VM& vm, std::vector<Value> arguments) {
     }
 }
 
+Value native_fmt_is_int(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
+    if (arguments.size() != 1) {
+        throw std::runtime_error("Expected one argument for fmt.is_int().");
+    }
+    Value val = arguments[0];
+    if (val.type != ValueType::NUMBER) {
+        return Value(false);
+    }
+    double d = val.as.number;
+    return Value(d == static_cast<double>(static_cast<long long>(d)));
+}
+
+Value native_fmt_is_float(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
+    if (arguments.size() != 1) {
+        throw std::runtime_error("Expected one argument for fmt.is_float().");
+    }
+    Value val = arguments[0];
+    return Value(val.type == ValueType::NUMBER);
+}
+
+Value native_fmt_is_string(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
+    if (arguments.size() != 1) {
+        throw std::runtime_error("Expected one argument for fmt.is_string().");
+    }
+    Value val = arguments[0];
+    return Value(val.type == ValueType::OBJ_STRING);
+}
+
+Value native_fmt_is_bool(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
+    if (arguments.size() != 1) {
+        throw std::runtime_error("Expected one argument for fmt.is_bool().");
+    }
+    Value val = arguments[0];
+    return Value(val.type == ValueType::BOOLEAN);
+}
+
+Value native_fmt_is_nil(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
+    if (arguments.size() != 1) {
+        throw std::runtime_error("Expected one argument for fmt.is_nil().");
+    }
+    Value val = arguments[0];
+    return Value(val.type == ValueType::NIL);
+}
+
+Value native_fmt_is_array(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
+    if (arguments.size() != 1) {
+        throw std::runtime_error("Expected one argument for fmt.is_array().");
+    }
+    Value val = arguments[0];
+    return Value(val.type == ValueType::ARRAY);
+}
+
+Value native_fmt_is_object(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
+    if (arguments.size() != 1) {
+        throw std::runtime_error("Expected one argument for fmt.is_object().");
+    }
+    Value val = arguments[0];
+    return Value(val.type == ValueType::OBJECT);
+}
+
+Value native_fmt_is_callable(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
+    if (arguments.size() != 1) {
+        throw std::runtime_error("Expected one argument for fmt.is_callable().");
+    }
+    Value val = arguments[0];
+    return Value(val.type == ValueType::CALLABLE);
+}
+
+Value native_fmt_to_hex(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
+    if (arguments.size() != 1) {
+        throw std::runtime_error("Expected one argument for fmt.to_hex().");
+    }
+    Value val = arguments[0];
+    if (val.type != ValueType::NUMBER) {
+        throw std::runtime_error("fmt.to_hex() expects a number.");
+    }
+    long long n = static_cast<long long>(val.as.number);
+    if (n < 0) {
+        throw std::runtime_error("fmt.to_hex() expects a non-negative number.");
+    }
+    std::stringstream ss;
+    ss << std::hex << n;
+    return Value(vm.allocate<neutron::ObjString>(ss.str()));
+}
+
+Value native_fmt_to_oct(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
+    if (arguments.size() != 1) {
+        throw std::runtime_error("Expected one argument for fmt.to_oct().");
+    }
+    Value val = arguments[0];
+    if (val.type != ValueType::NUMBER) {
+        throw std::runtime_error("fmt.to_oct() expects a number.");
+    }
+    long long n = static_cast<long long>(val.as.number);
+    if (n < 0) {
+        throw std::runtime_error("fmt.to_oct() expects a non-negative number.");
+    }
+    std::stringstream ss;
+    ss << std::oct << n;
+    return Value(vm.allocate<neutron::ObjString>(ss.str()));
+}
+
+Value native_fmt_pad_left(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
+    if (arguments.size() < 2 || arguments.size() > 3) {
+        throw std::runtime_error("fmt.pad_left() expects 2 or 3 arguments.");
+    }
+    if (arguments[0].type != ValueType::OBJ_STRING) {
+        throw std::runtime_error("fmt.pad_left() expects string as first argument.");
+    }
+    if (arguments[1].type != ValueType::NUMBER) {
+        throw std::runtime_error("fmt.pad_left() expects number as second argument.");
+    }
+    std::string str = arguments[0].asString()->chars;
+    int width = static_cast<int>(arguments[1].as.number);
+    std::string pad = " ";
+    if (arguments.size() == 3 && arguments[2].type == ValueType::OBJ_STRING) {
+        pad = arguments[2].asString()->chars;
+    }
+    if (static_cast<int>(str.length()) >= width) {
+        return Value(vm.allocate<neutron::ObjString>(str));
+    }
+    int padCount = width - static_cast<int>(str.length());
+    std::string result;
+    for (int i = 0; i < padCount; i++) {
+        result += pad;
+    }
+    result += str;
+    return Value(vm.allocate<neutron::ObjString>(result));
+}
+
+Value native_fmt_pad_right(VM& vm, std::vector<Value> arguments) {
+    (void)vm;
+    if (arguments.size() < 2 || arguments.size() > 3) {
+        throw std::runtime_error("fmt.pad_right() expects 2 or 3 arguments.");
+    }
+    if (arguments[0].type != ValueType::OBJ_STRING) {
+        throw std::runtime_error("fmt.pad_right() expects string as first argument.");
+    }
+    if (arguments[1].type != ValueType::NUMBER) {
+        throw std::runtime_error("fmt.pad_right() expects number as second argument.");
+    }
+    std::string str = arguments[0].asString()->chars;
+    int width = static_cast<int>(arguments[1].as.number);
+    std::string pad = " ";
+    if (arguments.size() == 3 && arguments[2].type == ValueType::OBJ_STRING) {
+        pad = arguments[2].asString()->chars;
+    }
+    if (static_cast<int>(str.length()) >= width) {
+        return Value(vm.allocate<neutron::ObjString>(str));
+    }
+    int padCount = width - static_cast<int>(str.length());
+    std::string result = str;
+    for (int i = 0; i < padCount; i++) {
+        result += pad;
+    }
+    return Value(vm.allocate<neutron::ObjString>(result));
+}
+
 void register_fmt_functions(VM& vm, std::shared_ptr<Environment> env) {
     env->define("to_int", Value(vm.allocate<NativeFn>(native_fmt_to_int, 1, true)));    // Dynamic int conversion
     env->define("to_str", Value(vm.allocate<NativeFn>(native_fmt_to_str, 1, true)));    // Dynamic string conversion
     env->define("to_bin", Value(vm.allocate<NativeFn>(native_fmt_to_bin, 1, true)));    // Dynamic binary conversion
     env->define("to_float", Value(vm.allocate<NativeFn>(native_fmt_to_float, 1, true))); // Dynamic float conversion
     env->define("type", Value(vm.allocate<NativeFn>(native_fmt_type, 1, true)));        // Type detection function
+    env->define("is_int", Value(vm.allocate<NativeFn>(native_fmt_is_int, 1, true)));
+    env->define("is_float", Value(vm.allocate<NativeFn>(native_fmt_is_float, 1, true)));
+    env->define("is_string", Value(vm.allocate<NativeFn>(native_fmt_is_string, 1, true)));
+    env->define("is_bool", Value(vm.allocate<NativeFn>(native_fmt_is_bool, 1, true)));
+    env->define("is_nil", Value(vm.allocate<NativeFn>(native_fmt_is_nil, 1, true)));
+    env->define("is_array", Value(vm.allocate<NativeFn>(native_fmt_is_array, 1, true)));
+    env->define("is_object", Value(vm.allocate<NativeFn>(native_fmt_is_object, 1, true)));
+    env->define("is_callable", Value(vm.allocate<NativeFn>(native_fmt_is_callable, 1, true)));
+    env->define("to_hex", Value(vm.allocate<NativeFn>(native_fmt_to_hex, 1, true)));
+    env->define("to_oct", Value(vm.allocate<NativeFn>(native_fmt_to_oct, 1, true)));
+    env->define("pad_left", Value(vm.allocate<NativeFn>(native_fmt_pad_left, -1, true)));
+    env->define("pad_right", Value(vm.allocate<NativeFn>(native_fmt_pad_right, -1, true)));
 }
 
 } // namespace neutron

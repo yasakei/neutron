@@ -202,6 +202,9 @@ set(NEUTRON_BUILTIN_MODULE_SOURCES
     libs/crypto/native.cpp
     libs/path/native.cpp
     libs/random/native.cpp
+    libs/log/native.cpp
+    libs/strings/native.cpp
+    libs/collections/native.cpp
 )
 
 # All module-related sources (internal and built-in)

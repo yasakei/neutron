@@ -1,0 +1,92 @@
+// Array Reduction benchmark in Neutron
+
+fun reduceSum(arr) {
+    var result = 0;
+    var i = 0;
+    while (i < arr.length) {
+        result = result + arr[i];
+        i = i + 1;
+    }
+    return result;
+}
+
+fun reduceMax(arr) {
+    var result = arr[0];
+    var i = 1;
+    while (i < arr.length) {
+        if (arr[i] > result) {
+            result = arr[i];
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+fun reduceMin(arr) {
+    var result = arr[0];
+    var i = 1;
+    while (i < arr.length) {
+        if (arr[i] < result) {
+            result = arr[i];
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+fun reduceAverage(arr) {
+    var total = 0;
+    var count = 0;
+    var i = 0;
+    while (i < arr.length) {
+        total = total + arr[i];
+        count = count + 1;
+        i = i + 1;
+    }
+    if (count > 0) {
+        return total / count;
+    }
+    return 0;
+}
+
+fun reduceFilterPositive(arr) {
+    var result = [];
+    var i = 0;
+    while (i < arr.length) {
+        if (arr[i] > 0) {
+            result.push(arr[i]);
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+fun reduceCountEven(arr) {
+    var count = 0;
+    var i = 0;
+    while (i < arr.length) {
+        if (arr[i] % 2 == 0) {
+            count = count + 1;
+        }
+        i = i + 1;
+    }
+    return count;
+}
+
+// Create test array
+var arr = [];
+var i = -5000;
+while (i <= 5000) {
+    arr.push(i);
+    i = i + 1;
+}
+
+// Perform reductions
+var sumResult = reduceSum(arr);
+var maxResult = reduceMax(arr);
+var minResult = reduceMin(arr);
+var avgResult = reduceAverage(arr);
+var evenCount = reduceCountEven(arr);
+var positive = reduceFilterPositive(arr);
+
+say("Sum: ${sumResult}, Max: ${maxResult}, Min: ${minResult}, Avg: ${avgResult}, Even: ${evenCount}, Positive: ${positive.length}");

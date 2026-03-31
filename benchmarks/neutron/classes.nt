@@ -1,0 +1,58 @@
+// Class Inheritance benchmark in Neutron
+
+// Simple class-like structures using arrays
+var animal_names = [];
+var animal_types = [];  // 0=Animal, 1=Dog, 2=Cat, 3=Parrot
+
+fun animalCreate(name, type) {
+    animal_names.push(name);
+    animal_types.push(type);
+}
+
+fun animalSpeak(idx) {
+    var type = animal_types[idx];
+    var name = animal_names[idx];
+    if (type == 1) {
+        return name + " says Woof!";
+    } elif (type == 2) {
+        return name + " says Meow!";
+    } elif (type == 3) {
+        return name + " says Hello!";
+    }
+    return "...";
+}
+
+fun animalAction(idx) {
+    var type = animal_types[idx];
+    var name = animal_names[idx];
+    if (type == 1) {
+        return name + " fetches";
+    } elif (type == 2) {
+        return name + " climbs";
+    } elif (type == 3) {
+        return name + " mimics whistle";
+    }
+    return "";
+}
+
+// Create instances
+var i = 0;
+while (i < 100) {
+    animalCreate("Dog" + i, 1);
+    animalCreate("Cat" + i, 2);
+    animalCreate("Parrot" + i, 3);
+    i = i + 1;
+}
+
+// Test
+var soundsCount = 0;
+var actionsCount = 0;
+
+var j = 0;
+while (j < animal_names.length) {
+    soundsCount = soundsCount + 1;
+    actionsCount = actionsCount + 1;
+    j = j + 1;
+}
+
+say("Created ${animal_names.length} animals, ${soundsCount} sounds, ${actionsCount} actions");

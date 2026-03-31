@@ -1,0 +1,139 @@
+// Strings module tests
+use strings;
+
+say("=== Strings Module Tests ===");
+
+var test_count = 0;
+var pass_count = 0;
+
+fun test(desc, fn) {
+    test_count = test_count + 1;
+    try {
+        var r = fn();
+        if (r) {
+            say("✓ " + desc);
+            pass_count = pass_count + 1;
+        } else {
+            say("✗ " + desc + " (assertion failed)");
+        }
+    } catch (e) {
+        say("✗ " + desc + " (error: " + e + ")");
+    }
+}
+
+// --- split ---
+test("split by comma", fun() {
+    var parts = strings.split("a,b,c", ",");
+    return parts.length == 3 and parts[0] == "a" and parts[1] == "b" and parts[2] == "c";
+});
+
+test("split by space (default)", fun() {
+    var parts = strings.split("hello world");
+    return parts.length == 2 and parts[0] == "hello";
+});
+
+test("split into chars", fun() {
+    var parts = strings.split("abc", "");
+    return parts.length == 3 and parts[0] == "a";
+});
+
+test("split no match returns whole string", fun() {
+    var parts = strings.split("hello", ",");
+    return parts.length == 1 and parts[0] == "hello";
+});
+
+// --- join ---
+test("join with delimiter", fun() {
+    return strings.join(["a", "b", "c"], ", ") == "a, b, c";
+});
+
+test("join with empty delimiter", fun() {
+    return strings.join(["x", "y", "z"]) == "xyz";
+});
+
+// --- trim ---
+test("trim both sides", fun() { return strings.trim("  hi  ") == "hi"; });
+test("trim tabs and newlines", fun() { return strings.trim("\t\nhello\n") == "hello"; });
+test("trim empty string", fun() { return strings.trim("") == ""; });
+test("trim_left", fun() { return strings.trim_left("  hi  ") == "hi  "; });
+test("trim_right", fun() { return strings.trim_right("  hi  ") == "  hi"; });
+
+// --- upper / lower ---
+test("upper", fun() { return strings.upper("hello") == "HELLO"; });
+test("lower", fun() { return strings.lower("WORLD") == "world"; });
+test("upper already upper", fun() { return strings.upper("ABC") == "ABC"; });
+
+// --- replace ---
+test("replace all", fun() { return strings.replace("aabbaa", "a", "x") == "xxbbxx"; });
+test("replace no match", fun() { return strings.replace("hello", "z", "x") == "hello"; });
+test("replace_first", fun() { return strings.replace_first("aabbaa", "a", "x") == "xabbaa"; });
+
+// --- contains / starts_with / ends_with ---
+test("contains true", fun() { return strings.contains("hello world", "world") == true; });
+test("contains false", fun() { return strings.contains("hello", "xyz") == false; });
+test("starts_with true", fun() { return strings.starts_with("hello", "hel") == true; });
+test("starts_with false", fun() { return strings.starts_with("hello", "llo") == false; });
+test("ends_with true", fun() { return strings.ends_with("hello", "llo") == true; });
+test("ends_with false", fun() { return strings.ends_with("hello", "hel") == false; });
+
+// --- index_of / last_index_of ---
+test("index_of found", fun() { return strings.index_of("abcabc", "bc") == 1; });
+test("index_of not found", fun() { return strings.index_of("hello", "x") == -1; });
+test("index_of with start", fun() { return strings.index_of("abcabc", "bc", 2) == 4; });
+test("last_index_of", fun() { return strings.last_index_of("abcabc", "bc") == 4; });
+test("last_index_of not found", fun() { return strings.last_index_of("hello", "x") == -1; });
+
+// --- substring ---
+test("substring with end", fun() { return strings.substring("hello", 1, 3) == "el"; });
+test("substring to end", fun() { return strings.substring("hello", 2) == "llo"; });
+test("substring empty range", fun() { return strings.substring("hello", 3, 3) == ""; });
+
+// --- repeat ---
+test("repeat", fun() { return strings.repeat("ab", 3) == "ababab"; });
+test("repeat 0 times", fun() { return strings.repeat("ab", 0) == ""; });
+
+// --- reverse ---
+test("reverse", fun() { return strings.reverse("hello") == "olleh"; });
+test("reverse empty", fun() { return strings.reverse("") == ""; });
+test("reverse single char", fun() { return strings.reverse("a") == "a"; });
+
+// --- length ---
+test("length", fun() { return strings.length("hello") == 5; });
+test("length empty", fun() { return strings.length("") == 0; });
+
+// --- count ---
+test("count occurrences", fun() { return strings.count("banana", "an") == 2; });
+test("count no match", fun() { return strings.count("hello", "x") == 0; });
+
+// --- char_at / char_code / from_char_code ---
+test("char_at", fun() { return strings.char_at("hello", 1) == "e"; });
+test("char_at out of bounds throws", fun() {
+    try { strings.char_at("hi", 5); return false; } catch (e) { return true; }
+});
+test("char_code", fun() { return strings.char_code("A") == 65; });
+test("from_char_code", fun() { return strings.from_char_code(65) == "A"; });
+test("char_code roundtrip", fun() {
+    return strings.from_char_code(strings.char_code("Z")) == "Z";
+});
+
+// --- is_empty / is_alpha / is_digit / is_alnum ---
+test("is_empty true", fun() { return strings.is_empty("") == true; });
+test("is_empty false", fun() { return strings.is_empty("a") == false; });
+test("is_alpha true", fun() { return strings.is_alpha("abc") == true; });
+test("is_alpha false (has digit)", fun() { return strings.is_alpha("abc1") == false; });
+test("is_digit true", fun() { return strings.is_digit("123") == true; });
+test("is_digit false", fun() { return strings.is_digit("12a") == false; });
+test("is_alnum true", fun() { return strings.is_alnum("abc123") == true; });
+test("is_alnum false (has space)", fun() { return strings.is_alnum("abc 1") == false; });
+
+// --- Summary ---
+say("\n=== Test Summary ===");
+say("Tests run: " + test_count);
+say("Tests passed: " + pass_count);
+say("Tests failed: " + (test_count - pass_count));
+
+if (pass_count == test_count) {
+    say("✓ All strings module tests passed!");
+} else {
+    say("✗ Some strings module tests failed.");
+}
