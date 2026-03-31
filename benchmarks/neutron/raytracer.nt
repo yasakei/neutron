@@ -1,0 +1,70 @@
+// Ray Tracer benchmark in Neutron
+// Simple ray-sphere intersection - just check if ray hits sphere at origin
+
+// Single sphere at origin with radius 10
+var sphere_x = 0;
+var sphere_y = 0;
+var sphere_z = 0;
+var sphere_r = 10;
+
+fun sqrtApprox(x) {
+    if (x <= 0) return 0;
+    var guess = x / 2;
+    var i = 0;
+    while (i < 20) {
+        guess = (guess + x / guess) / 2;
+        i = i + 1;
+    }
+    return guess;
+}
+
+fun sphereIntersect(sx, sy, sz, sr, ox, oy, oz, dx, dy, dz) {
+    var ocx = ox - sx;
+    var ocy = oy - sy;
+    var ocz = oz - sz;
+    
+    var a = dx * dx + dy * dy + dz * dz;
+    var b = 2 * (ocx * dx + ocy * dy + ocz * dz);
+    var c = ocx * ocx + ocy * ocy + ocz * ocz - sr * sr;
+    
+    var disc = b * b - 4 * a * c;
+    if (disc < 0) {
+        return -1;
+    }
+    return (-b - sqrtApprox(disc)) / (2 * a);
+}
+
+fun render(width, height) {
+    var pixelsHit = 0;
+    
+    var y = 0;
+    while (y < height) {
+        var x = 0;
+        while (x < width) {
+            // Normalized device coordinates
+            var nx = (x / width - 0.5) * 2;
+            var ny = (y / height - 0.5) * 2;
+            
+            // Ray from (0,0,-20) in direction (nx, ny, 1) normalized
+            var dirLen = sqrtApprox(nx * nx + ny * ny + 1);
+            var rdx = nx / dirLen;
+            var rdy = ny / dirLen;
+            var rdz = 1 / dirLen;
+            
+            var t = sphereIntersect(sphere_x, sphere_y, sphere_z, sphere_r, 0, 0, -20, rdx, rdy, rdz);
+            if (t > 0.001) {
+                pixelsHit = pixelsHit + 1;
+            }
+            x = x + 1;
+        }
+        y = y + 1;
+    }
+    
+    return pixelsHit;
+}
+
+// Render
+var width = 100;
+var height = 100;
+var pixels = render(width, height);
+say("Rendered ${width}x${height}, lit pixels: ${pixels}");

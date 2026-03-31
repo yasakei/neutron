@@ -1,0 +1,92 @@
+// N-Body Simulation benchmark in Neutron
+
+// Store bodies in parallel arrays
+var body_x = [];
+var body_y = [];
+var body_vx = [];
+var body_vy = [];
+var body_mass = [];
+
+fun bodyCreate(x, y, vx, vy, mass) {
+    body_x.push(x);
+    body_y.push(y);
+    body_vx.push(vx);
+    body_vy.push(vy);
+    body_mass.push(mass);
+}
+
+fun sqrtApprox(x) {
+    if (x <= 0) {
+        return 0;
+    }
+    var guess = x / 2;
+    var i = 0;
+    while (i < 20) {
+        guess = (guess + x / guess) / 2;
+        i = i + 1;
+    }
+    return guess;
+}
+
+fun simulate(dt, steps) {
+    var n = body_x.length;
+    var step = 0;
+    while (step < steps) {
+        // Calculate forces and update velocities
+        var i = 0;
+        while (i < n) {
+            var fx = 0;
+            var fy = 0;
+            
+            var j = 0;
+            while (j < n) {
+                if (i != j) {
+                    var dx = body_x[j] - body_x[i];
+                    var dy = body_y[j] - body_y[i];
+                    var distSq = dx * dx + dy * dy;
+                    var dist = sqrtApprox(distSq);
+                    
+                    if (dist > 0.1) {
+                        var f = (body_mass[i] * body_mass[j]) / distSq;
+                        fx = fx + f * dx / dist;
+                        fy = fy + f * dy / dist;
+                    }
+                }
+                j = j + 1;
+            }
+            
+            body_vx[i] = body_vx[i] + fx / body_mass[i] * dt;
+            body_vy[i] = body_vy[i] + fy / body_mass[i] * dt;
+            i = i + 1;
+        }
+        
+        // Update positions
+        var k = 0;
+        while (k < n) {
+            body_x[k] = body_x[k] + body_vx[k] * dt;
+            body_y[k] = body_y[k] + body_vy[k] * dt;
+            k = k + 1;
+        }
+        
+        step = step + 1;
+    }
+}
+
+// Create solar system-like setup
+bodyCreate(0, 0, 0, 0, 1000);
+bodyCreate(10, 0, 0, 10, 1);
+bodyCreate(20, 0, 0, 7, 2);
+bodyCreate(30, 0, 0, 5, 1.5);
+
+// Run simulation
+simulate(0.01, 500);
+
+// Output final energy
+var totalEnergy = 0;
+var i = 0;
+while (i < body_x.length) {
+    totalEnergy = totalEnergy + body_x[i] * body_x[i] + body_y[i] * body_y[i];
+    i = i + 1;
+}
+
+say("Final energy: ${totalEnergy}");

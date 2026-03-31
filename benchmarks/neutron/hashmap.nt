@@ -1,0 +1,36 @@
+// Hash Map benchmark in Neutron
+use arrays;
+
+use math;
+
+// Create and populate hash map
+var hm = {};
+var hm_size = 0;
+var i = 0;
+while (i < 5000) {
+    var key = "key_" + i;
+    if (hm[key] == nil) { hm_size = hm_size + 1; }
+    hm[key] = i * 2;
+    i = i + 1;
+}
+
+// Get values
+var total = 0;
+var j = 0;
+while (j < 5000) {
+    var val = hm["key_" + j];
+    if (val != nil) {
+        total = total + val;
+    }
+    j = j + 10;
+}
+
+// Remove some
+var k = 0;
+while (k < 2500) {
+    hm["key_" + k] = nil; // JsonObject doesn't have true delete yet, nil signifies removed for logic
+    hm_size = hm_size - 1;
+    k = k + 10;
+}
+
+say("Map size: ${hm_size}, Sum: ${total}");

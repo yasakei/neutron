@@ -1,0 +1,54 @@
+// Math operations benchmark in Neutron
+
+fun power(base, exp) {
+    var result = 1;
+    var i = 0;
+    while (i < exp) {
+        result = result * base;
+        i = i + 1;
+    }
+    return result;
+}
+
+fun sqrt(n) {
+    if (n < 0) {
+        return 0;
+    }
+    if (n == 0 or n == 1) {
+        return n;
+    }
+    
+    var guess = n / 2;
+    var epsilon = 0.00001;
+    var iterations = 0;
+    
+    while (iterations < 100) {
+        var newGuess = (guess + n / guess) / 2;
+        if (guess - newGuess < epsilon and newGuess - guess < epsilon) {
+            return newGuess;
+        }
+        guess = newGuess;
+        iterations = iterations + 1;
+    }
+    return guess;
+}
+
+fun gcd(a, b) {
+    while (b != 0) {
+        var temp = b;
+        b = a % b;
+        a = temp;
+    }
+    return a;
+}
+
+// Run math operations
+var pow1 = power(2, 20);
+var pow2 = power(3, 15);
+var sq1 = sqrt(144);
+var sq2 = sqrt(2);
+var gcd1 = gcd(48, 18);
+var gcd2 = gcd(100, 75);
+
+say("Math operations completed");
+say("Results: ${pow1}, ${pow2}, ${gcd1}, ${gcd2}");

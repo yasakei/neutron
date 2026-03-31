@@ -189,19 +189,19 @@ void Compiler::visitBinaryExpr(const BinaryExpr* expr) {
         compileExpression(expr->left.get());
         emitByte((uint8_t)OpCode::OP_DUP);  // Duplicate left to keep original as potential result
         int jumpToRight = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE); // Jump if duplicate is falsy (original is falsy)
-        
+
         // If we reach here, original left was truthy (duplicate was truthy, so no jump)
         // Stack has original left value since OP_JUMP_IF_FALSE popped the duplicate
         emitByte((uint8_t)OpCode::OP_POP);  // Pop the original left value
         compileExpression(expr->right.get());  // Evaluate right as result
-        
+
         int skipFalsy = emitJump((uint8_t)OpCode::OP_JUMP);  // Skip the falsy case
-        
-        // When original left was falsy, we jump here
+
+        // When original left was falsy, jump here
         patchJump(jumpToRight);
         // Stack has original falsy left value (since OP_JUMP_IF_FALSE popped the duplicate)
         // That's our result when left is falsy - no additional operation needed
-        
+
         patchJump(skipFalsy);  // End of both paths
         return;
     }

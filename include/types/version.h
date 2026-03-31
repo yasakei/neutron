@@ -1,4 +1,4 @@
-//v26.3.0
+//v26.4.0
 #ifndef NEUTRON_VERSION_H
 #define NEUTRON_VERSION_H
 
@@ -10,9 +10,9 @@ class Version {
 public:
     // Version components
     static constexpr int MAJOR = 26;
-    static constexpr int MINOR = 3;
+    static constexpr int MINOR = 4;
     static constexpr int PATCH = 0;
-    static constexpr const char* STAGE = "stable";
+    static constexpr const char* STAGE = "beta";
     
     // Full version string
     static std::string getVersion();

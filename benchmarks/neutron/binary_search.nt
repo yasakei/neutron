@@ -1,0 +1,38 @@
+// Binary Search benchmark in Neutron
+
+use math;
+
+fun binarySearch(arr, left, right, x) {
+    while (left <= right) {
+        var mid = left + math.floor((right - left) / 2);
+        if (arr[mid] == x) {
+            return mid;
+        } elif (arr[mid] < x) {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
+    return -1;
+}
+// Create sorted array
+var size = 100000;
+var arr = [];
+var i = 0;
+while (i < size) {
+    arr.push(i);
+    i = i + 1;
+}
+
+// Perform multiple searches
+var count = 0;
+var searchVal = 0;
+while (searchVal < size) {
+    var result = binarySearch(arr, 0, size - 1, searchVal);
+    if (result >= 0) {
+        count = count + 1;
+    }
+    searchVal = searchVal + 100;
+}
+
+say("Found ${count} elements");

@@ -1,0 +1,53 @@
+// JSON Parse/Generate benchmark in Neutron
+
+// Simple data storage
+var json_users = [];
+
+fun createTestData() {
+    json_users = [];
+    var i = 0;
+    while (i < 100) {
+        json_users.push({
+            "id": i,
+            "name": "User_" + i,
+            "active": i % 2 == 0
+        });
+        i = i + 1;
+    }
+}
+
+fun toJson() {
+    return "json_data";
+}
+
+fun fromJson() {
+    createTestData();
+}
+
+// Serialize multiple times
+var jsonStrings = [];
+var i = 0;
+while (i < 50) {
+    jsonStrings.push(toJson());
+    i = i + 1;
+}
+
+// Parse JSON multiple times
+var parsedCount = 0;
+var totalIdSum = 0;
+
+var j = 0;
+while (j < jsonStrings.length) {
+    fromJson();
+    parsedCount = parsedCount + 1;
+    
+    var k = 0;
+    while (k < json_users.length) {
+        totalIdSum = totalIdSum + json_users[k]["id"];
+        k = k + 1;
+    }
+    
+    j = j + 1;
+}
+
+say("Parsed: ${parsedCount} JSON objects, Total ID sum: ${totalIdSum}");

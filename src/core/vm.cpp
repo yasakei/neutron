@@ -57,6 +57,9 @@
 #include "../libs/async/native.h"
 #include "../libs/regex/native.h"
 #include "../libs/process/native.h"
+#include "../libs/log/native.h"
+#include "../libs/strings/native.h"
+#include "../libs/collections/native.h"
 #include "modules/module_registry.h"
 #include "utils/component_interface.h"
 
@@ -593,7 +596,8 @@ bool VM::callValue(Value callee, int argCount) {
                 stack.resize(stack.size() - argCount - 1);
                 push(result);
             } catch (const std::exception& e) {
-                runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
+                // Convert C++ exception to VM exception that can be caught by try/catch
+                throw VMException(Value(allocate<ObjString>(e.what())));
             }
             return true;
         }
@@ -612,7 +616,8 @@ bool VM::callValue(Value callee, int argCount) {
                     stack.resize(stack.size() - argCount - 1);
                     push(result);
                 } catch (const std::exception& e) {
-                    runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
+                    // Convert C++ exception to VM exception that can be caught by try/catch
+                    throw VMException(Value(allocate<ObjString>(e.what())));
                 }
                 return true;
             }
@@ -1922,6 +1927,10 @@ void VM::run(size_t minFrameDepth) {
                     double val_b = b.as.number;
                     if (NEUTRON_LIKELY(val_b != 0)) {
                         a.as.number /= val_b;
+                        // Check for NaN or Infinity results
+                        if (NEUTRON_UNLIKELY(std::isnan(a.as.number) || std::isinf(a.as.number))) {
+                            runtimeError(this, "Division resulted in NaN or Infinity.", frames.empty() ? -1 : frames.back().currentLine);
+                        }
                         stk.pop_back();
                     } else {
                         runtimeError(this, "Division by zero.", frames.empty() ? -1 : frames.back().currentLine);
@@ -1939,6 +1948,10 @@ void VM::run(size_t minFrameDepth) {
                     double val_b = b.as.number;
                     if (NEUTRON_LIKELY(val_b != 0)) {
                         a.as.number = fmod(a.as.number, val_b);
+                        // Check for NaN result
+                        if (NEUTRON_UNLIKELY(std::isnan(a.as.number))) {
+                            runtimeError(this, "Modulo resulted in NaN.", frames.empty() ? -1 : frames.back().currentLine);
+                        }
                         stk.pop_back();
                     } else {
                         runtimeError(this, "Modulo by zero.", frames.empty() ? -1 : frames.back().currentLine);
@@ -3225,6 +3238,18 @@ void VM::load_module(const std::string& name) {
         return;
     } else if (name == "random") {
         neutron_init_random_module(this);
+        loadedModuleCache[name] = true;
+        return;
+    } else if (name == "log") {
+        neutron_init_log_module(this);
+        loadedModuleCache[name] = true;
+        return;
+    } else if (name == "strings") {
+        neutron_init_strings_module(this);
+        loadedModuleCache[name] = true;
+        return;
+    } else if (name == "collections") {
+        neutron_init_collections_module(this);
         loadedModuleCache[name] = true;
         return;
     }

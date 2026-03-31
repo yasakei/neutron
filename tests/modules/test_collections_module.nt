@@ -1,0 +1,236 @@
+// Collections module tests
+use collections;
+
+say("=== Collections Module Tests ===");
+
+var test_count = 0;
+var pass_count = 0;
+
+fun test(desc, fn) {
+    test_count = test_count + 1;
+    try {
+        var r = fn();
+        if (r) {
+            say("✓ " + desc);
+            pass_count = pass_count + 1;
+        } else {
+            say("✗ " + desc + " (assertion failed)");
+        }
+    } catch (e) {
+        say("✗ " + desc + " (error: " + e + ")");
+    }
+}
+
+// ── SET ───────────────────────────────────────────────────────────────────────
+
+test("set_new creates empty set", fun() {
+    var s = collections.set_new();
+    return collections.set_size(s) == 0;
+});
+
+test("set_add returns true on new element", fun() {
+    var s = collections.set_new();
+    return collections.set_add(s, "a") == true;
+});
+
+test("set_add returns false on duplicate", fun() {
+    var s = collections.set_new();
+    collections.set_add(s, "a");
+    return collections.set_add(s, "a") == false;
+});
+
+test("set_size after adds", fun() {
+    var s = collections.set_new();
+    collections.set_add(s, 1);
+    collections.set_add(s, 2);
+    collections.set_add(s, 2);
+    return collections.set_size(s) == 2;
+});
+
+test("set_has true", fun() {
+    var s = collections.set_new();
+    collections.set_add(s, "hello");
+    return collections.set_has(s, "hello") == true;
+});
+
+test("set_has false", fun() {
+    var s = collections.set_new();
+    return collections.set_has(s, "x") == false;
+});
+
+test("set_remove existing", fun() {
+    var s = collections.set_new();
+    collections.set_add(s, 42);
+    var removed = collections.set_remove(s, 42);
+    return removed == true and collections.set_size(s) == 0;
+});
+
+test("set_remove non-existing returns false", fun() {
+    var s = collections.set_new();
+    return collections.set_remove(s, 99) == false;
+});
+
+test("set_to_array returns copy", fun() {
+    var s = collections.set_new();
+    collections.set_add(s, 1);
+    collections.set_add(s, 2);
+    var arr = collections.set_to_array(s);
+    return arr.length == 2;
+});
+
+test("set works with strings", fun() {
+    var s = collections.set_new();
+    collections.set_add(s, "a");
+    collections.set_add(s, "b");
+    collections.set_add(s, "a");
+    return collections.set_size(s) == 2;
+});
+
+test("set works with booleans", fun() {
+    var s = collections.set_new();
+    collections.set_add(s, true);
+    collections.set_add(s, false);
+    collections.set_add(s, true);
+    return collections.set_size(s) == 2;
+});
+
+test("set_union", fun() {
+    var a = collections.set_new();
+    collections.set_add(a, 1);
+    collections.set_add(a, 2);
+    var b = collections.set_new();
+    collections.set_add(b, 2);
+    collections.set_add(b, 3);
+    var u = collections.set_union(a, b);
+    return collections.set_size(u) == 3;
+});
+
+test("set_intersection", fun() {
+    var a = collections.set_new();
+    collections.set_add(a, 1);
+    collections.set_add(a, 2);
+    collections.set_add(a, 3);
+    var b = collections.set_new();
+    collections.set_add(b, 2);
+    collections.set_add(b, 3);
+    collections.set_add(b, 4);
+    var i = collections.set_intersection(a, b);
+    return collections.set_size(i) == 2;
+});
+
+test("set_difference", fun() {
+    var a = collections.set_new();
+    collections.set_add(a, 1);
+    collections.set_add(a, 2);
+    collections.set_add(a, 3);
+    var b = collections.set_new();
+    collections.set_add(b, 2);
+    collections.set_add(b, 3);
+    var d = collections.set_difference(a, b);
+    return collections.set_size(d) == 1;
+});
+
+// ── STACK ─────────────────────────────────────────────────────────────────────
+
+test("stack_new creates empty stack", fun() {
+    var st = collections.stack_new();
+    return collections.stack_is_empty(st) == true;
+});
+
+test("stack_push and size", fun() {
+    var st = collections.stack_new();
+    collections.stack_push(st, 1);
+    collections.stack_push(st, 2);
+    return collections.stack_size(st) == 2;
+});
+
+test("stack_peek returns top without removing", fun() {
+    var st = collections.stack_new();
+    collections.stack_push(st, 10);
+    collections.stack_push(st, 20);
+    var top = collections.stack_peek(st);
+    return top == 20 and collections.stack_size(st) == 2;
+});
+
+test("stack_pop removes top (LIFO)", fun() {
+    var st = collections.stack_new();
+    collections.stack_push(st, 1);
+    collections.stack_push(st, 2);
+    collections.stack_push(st, 3);
+    return collections.stack_pop(st) == 3 and collections.stack_pop(st) == 2;
+});
+
+test("stack_pop empty throws", fun() {
+    var st = collections.stack_new();
+    try { collections.stack_pop(st); return false; } catch (e) { return true; }
+});
+
+test("stack_peek empty throws", fun() {
+    var st = collections.stack_new();
+    try { collections.stack_peek(st); return false; } catch (e) { return true; }
+});
+
+test("stack_is_empty after pop all", fun() {
+    var st = collections.stack_new();
+    collections.stack_push(st, 1);
+    collections.stack_pop(st);
+    return collections.stack_is_empty(st) == true;
+});
+
+// ── QUEUE ─────────────────────────────────────────────────────────────────────
+
+test("queue_new creates empty queue", fun() {
+    var q = collections.queue_new();
+    return collections.queue_is_empty(q) == true;
+});
+
+test("queue_enqueue and size", fun() {
+    var q = collections.queue_new();
+    collections.queue_enqueue(q, "a");
+    collections.queue_enqueue(q, "b");
+    return collections.queue_size(q) == 2;
+});
+
+test("queue_peek returns front without removing", fun() {
+    var q = collections.queue_new();
+    collections.queue_enqueue(q, "first");
+    collections.queue_enqueue(q, "second");
+    return collections.queue_peek(q) == "first" and collections.queue_size(q) == 2;
+});
+
+test("queue_dequeue removes front (FIFO)", fun() {
+    var q = collections.queue_new();
+    collections.queue_enqueue(q, 1);
+    collections.queue_enqueue(q, 2);
+    collections.queue_enqueue(q, 3);
+    return collections.queue_dequeue(q) == 1 and collections.queue_dequeue(q) == 2;
+});
+
+test("queue_dequeue empty throws", fun() {
+    var q = collections.queue_new();
+    try { collections.queue_dequeue(q); return false; } catch (e) { return true; }
+});
+
+test("queue_peek empty throws", fun() {
+    var q = collections.queue_new();
+    try { collections.queue_peek(q); return false; } catch (e) { return true; }
+});
+
+test("queue_is_empty after dequeue all", fun() {
+    var q = collections.queue_new();
+    collections.queue_enqueue(q, 1);
+    collections.queue_dequeue(q);
+    return collections.queue_is_empty(q) == true;
+});
+
+// ── Summary ───────────────────────────────────────────────────────────────────
+say("\n=== Test Summary ===");
+say("Tests run: " + test_count);
+say("Tests passed: " + pass_count);
+say("Tests failed: " + (test_count - pass_count));
+
+if (pass_count == test_count) {
+    say("✓ All collections module tests passed!");
+} else {
+    say("✗ Some collections module tests failed.");
+}
