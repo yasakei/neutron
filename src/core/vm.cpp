@@ -3466,7 +3466,12 @@ void VM::load_file(const std::string& filepath) {
         if (!file.is_open()) {
             // Try with module search paths
             for (const auto& search_path : module_search_paths) {
-                std::string full_path = search_path + filepath;
+                // Ensure separator between search path and filepath
+                std::string full_path = search_path;
+                if (!full_path.empty() && full_path.back() != '/' && full_path.back() != '\\') {
+                    full_path += '/';
+                }
+                full_path += filepath;
                 
                 // Check embedded files in search paths
                 auto it2 = embeddedFiles.find(full_path);
@@ -3545,7 +3550,12 @@ Module* VM::load_file_as_module(const std::string& filepath) {
         if (!file.is_open()) {
             // Try with module search paths
             for (const auto& search_path : module_search_paths) {
-                std::string full_path = search_path + filepath;
+                // Ensure separator between search path and filepath
+                std::string full_path = search_path;
+                if (!full_path.empty() && full_path.back() != '/' && full_path.back() != '\\') {
+                    full_path += '/';
+                }
+                full_path += filepath;
                 
                 // Check embedded files in search paths
                 auto it2 = embeddedFiles.find(full_path);

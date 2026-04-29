@@ -147,6 +147,30 @@ void Scanner::scanToken() {
                 addToken(TokenType::GREATER);
             }
             break;
+        case '#':
+            if (match('{')) {
+                // Block comment: #{ ... #}  (supports nesting)
+                int depth = 1;
+                while (!isAtEnd() && depth > 0) {
+                    if (peek() == '#' && peekNext() == '{') {
+                        advance(); advance();
+                        depth++;
+                    } else if (peek() == '#' && peekNext() == '}') {
+                        advance(); advance();
+                        depth--;
+                    } else {
+                        if (peek() == '\n') line++;
+                        advance();
+                    }
+                }
+                if (depth > 0) {
+                    ErrorHandler::reportLexicalError("Unterminated block comment.", line, 0);
+                }
+            } else {
+                std::string msg = "Unexpected character '#'";
+                ErrorHandler::reportLexicalError(msg, line, current - start);
+            }
+            break;
         case '/':
             if (match('/')) {
                 while (peek() != '\n' && !isAtEnd()) advance();

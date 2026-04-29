@@ -81,6 +81,7 @@ benchmark/
 cmake-build-*/
 CMakeCache.txt
 CMakeFiles/
+Makefile
 Makefile.cmake
 cmake_install.cmake
 

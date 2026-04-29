@@ -22,4 +22,26 @@ if (y == 20) {
     say("✓ Commented code is ignored");
 }
 
+// Block comments
+#{ This is a block comment }#
+
+var a = 5;
+#{ 
+    This is a
+    multi-line block comment
+    var a = 999; // this should be ignored
+}#
+
+if (a == 5) {
+    say("✓ Block comments don't affect code execution");
+}
+
+#{ Nested #{ block }# comments work too }#
+say("✓ Nested block comments work");
+
+var b = 1; #{ inline block comment }# var c = 2;
+if (b == 1 and c == 2) {
+    say("✓ Inline block comments work");
+}
+
 say("\n=== All comment tests passed ===");

@@ -489,8 +489,10 @@ def main():
     # Parse command line arguments
     run_aot = "--aot" in sys.argv
     
-    root_dir = os.path.dirname(os.path.abspath(__file__))
-    os.chdir(root_dir)
+    # Script lives in tests/, root is one level up
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.dirname(script_dir)
+    os.chdir(script_dir)
 
     # Build neutron if needed
     neutron_bin = build_neutron(root_dir)

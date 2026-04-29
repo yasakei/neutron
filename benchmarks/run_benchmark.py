@@ -262,8 +262,10 @@ def main():
     parser.add_argument('--no-jit', action='store_true', help='Disable JIT compilation for Neutron benchmarks')
     args = parser.parse_args()
 
-    root_dir = os.path.dirname(os.path.abspath(__file__))
-    bench_dir = os.path.join(root_dir, "benchmarks")
+    # Script lives in benchmarks/, root is one level up
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.dirname(script_dir)
+    bench_dir = script_dir  # benchmark files are in the same folder as this script
 
     # Find neutron binary
     exe_name = "neutron.exe" if platform.system() == "Windows" else "neutron"

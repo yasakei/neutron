@@ -33,7 +33,6 @@
  * 
  * 1. Project Initialization (neutron init):
  *    - Create project directory structure
- *    - Generate neutron-module.toml config
  *    - Create main.nt entry point
  *    - Initialize .quark dependency file
  * 
@@ -57,7 +56,6 @@
  * ------------------
  * @code
  * my-project/
- * ├── neutron-module.toml  # Project configuration
  * ├── .quark               # Dependencies file
  * ├── src/
  * │   └── main.nt          # Entry point
@@ -117,7 +115,6 @@ public:
      * 
      * Creates:
      * - Project directory structure
-     * - neutron-module.toml configuration
      * - src/main.nt entry point
      * - .quark dependency file
      * - README.md with getting started instructions
@@ -160,7 +157,7 @@ public:
     /**
      * @brief Check if a directory is a Neutron project.
      * @param path Directory to check (default: current directory).
-     * @return true if the directory contains neutron-module.toml.
+     * @return true if the directory contains a .quark file.
      */
     static bool isNeutronProject(const std::string& path = ".");
 
@@ -169,7 +166,7 @@ public:
      * @param startPath Starting directory (default: current directory).
      * @return Path to project root, or empty string if not found.
      * 
-     * Searches upward through parent directories for neutron-module.toml.
+     * Searches upward through parent directories for a .quark file.
      */
     static std::string findProjectRoot(const std::string& startPath = ".");
 
@@ -178,7 +175,7 @@ public:
      * @param projectRoot Path to project root.
      * @return ProjectConfig pointer, or nullptr if loading failed.
      * 
-     * Reads neutron-module.toml and parses:
+     * Reads .quark and parses:
      * - Project name and version
      * - Entry point file
      * - Dependencies

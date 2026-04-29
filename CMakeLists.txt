@@ -66,7 +66,7 @@ if(MSVC)
     # Linker optimizations
     add_link_options(/LTCG /OPT:REF /OPT:ICF)
 else()
-    add_compile_options(-Wall -Wextra -O3 -flto)
+    add_compile_options(-Wall -Wextra -w -O3 -flto)
     # Only use -march=native for native builds (not cross-compilation or universal binaries)
     if((NOT CMAKE_OSX_ARCHITECTURES OR CMAKE_OSX_ARCHITECTURES STREQUAL "") AND NOT CMAKE_CROSSCOMPILING)
         add_compile_options(-march=native)
