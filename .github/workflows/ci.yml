@@ -70,10 +70,10 @@ jobs:
         ./box --version
         
     - name: Run tests
-      run: python3 run_tests.py
+      run: python3 tests/run_tests.py
 
     - name: Run AOT compilation tests
-      run: python3 run_tests.py --aot
+      run: python3 tests/run_tests.py --aot
 
     - name: Install Neutron globally
       run: |
@@ -138,7 +138,7 @@ jobs:
         echo "==========================================================="
         echo "  LINUX (Ubuntu) PERFORMANCE BENCHMARKS"
         echo "==========================================================="
-        python3 run_benchmark.py | tee benchmark-linux.txt
+        python3 benchmarks/run_benchmark.py | tee benchmark-linux.txt
         echo ""
         echo "==========================================================="
       
@@ -205,14 +205,14 @@ jobs:
         ./box --version
 
     - name: Run tests
-      run: python3 run_tests.py
+      run: python3 tests/run_tests.py
 
     - name: Run AOT compilation tests (macOS)
       run: |
         # AOT uses clang on macOS (included with Xcode Command Line Tools)
         echo "Checking for C++ compiler..."
         which clang && clang --version || echo "clang not available"
-        python3 run_tests.py --aot
+        python3 tests/run_tests.py --aot
 
     - name: Install Neutron globally
       run: |
@@ -297,7 +297,7 @@ jobs:
         echo "==========================================================="
         echo "  macOS (Apple Silicon) PERFORMANCE BENCHMARKS"
         echo "==========================================================="
-        python3 run_benchmark.py | tee benchmark-macos-arm64.txt
+        python3 benchmarks/run_benchmark.py | tee benchmark-macos-arm64.txt
         echo ""
         echo "==========================================================="
 
@@ -369,14 +369,14 @@ jobs:
         .\box.exe --version
         
     - name: Run tests
-      run: python run_tests.py
+      run: python tests/run_tests.py
 
     - name: Run AOT compilation tests
       run: |
         # AOT requires C++ compiler - MSVC is already set up
         Write-Host "Checking for C++ compiler..."
         cl.exe || echo "MSVC compiler not found"
-        python run_tests.py --aot
+        python tests/run_tests.py --aot
 
     - name: Install Neutron globally (Windows)
       run: |
@@ -516,7 +516,7 @@ jobs:
         Write-Host "==========================================================="
         Write-Host "  WINDOWS (x64) PERFORMANCE BENCHMARKS"
         Write-Host "==========================================================="
-        python run_benchmark.py | Tee-Object -FilePath benchmark-windows.txt
+        python benchmarks/run_benchmark.py | Tee-Object -FilePath benchmark-windows.txt
         Write-Host ""
         Write-Host "==========================================================="
       
