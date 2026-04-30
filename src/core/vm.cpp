@@ -3128,6 +3128,20 @@ void VM::add_module_search_path(const std::string& path) {
     module_search_paths.push_back(path);
 }
 
+// Extract the directory portion of a file path, handling both / and \ separators
+static std::string extractDirectory(const std::string& filepath) {
+    const size_t last_slash     = filepath.rfind('/');
+    const size_t last_backslash = filepath.rfind('\\');
+    size_t last_sep = std::string::npos;
+    if (last_slash != std::string::npos && last_backslash != std::string::npos)
+        last_sep = std::max(last_slash, last_backslash);
+    else if (last_slash != std::string::npos)
+        last_sep = last_slash;
+    else if (last_backslash != std::string::npos)
+        last_sep = last_backslash;
+    return (last_sep != std::string::npos) ? filepath.substr(0, last_sep) : "";
+}
+
 void VM::define_module(const std::string& name, Module* module) {
     globals[name] = Value(module);
 }
@@ -3737,7 +3751,15 @@ Module* VM::load_file_as_module(const std::string& filepath) {
     
     std::string previousFileName = currentFileName;
     currentFileName = filepath;
+    // Temporarily add the loaded file's directory to search paths
+    std::string fileDir = extractDirectory(filepath);
+    if (!fileDir.empty()) {
+        module_search_paths.push_back(fileDir);
+    }
     interpret_module(statements, module_env);
+    if (!fileDir.empty()) {
+        module_search_paths.pop_back();
+    }
     currentFileName = previousFileName;
     
     // Create the module

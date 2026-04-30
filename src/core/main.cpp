@@ -202,9 +202,19 @@ void runFile(const std::string& path, neutron::VM& vm) {
     // Add the script's directory to the module search path
     // This allows modules in the same directory to be imported relatively
     std::string directory;
-    const size_t last_slash_idx = path.rfind('/');
-    if (std::string::npos != last_slash_idx) {
-        directory = path.substr(0, last_slash_idx);
+    // Find last path separator — handle both Unix '/' and Windows '\'
+    const size_t last_slash = path.rfind('/');
+    const size_t last_backslash = path.rfind('\\');
+    size_t last_sep = std::string::npos;
+    if (last_slash != std::string::npos && last_backslash != std::string::npos)
+        last_sep = std::max(last_slash, last_backslash);
+    else if (last_slash != std::string::npos)
+        last_sep = last_slash;
+    else if (last_backslash != std::string::npos)
+        last_sep = last_backslash;
+
+    if (last_sep != std::string::npos) {
+        directory = path.substr(0, last_sep);
     }
     vm.add_module_search_path(directory);
 
