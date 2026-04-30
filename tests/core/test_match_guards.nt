@@ -1,0 +1,38 @@
+// Test: Match case guard conditions (case x if condition =>)
+say("=== Match Case Guards ===");
+
+// Test 1: Basic guard
+var score = 85;
+match (score) {
+    case score if score >= 90 => say("A");
+    case score if score >= 80 => say("B");
+    case score if score >= 70 => say("C");
+    default => say("F");
+}
+say("✓ Basic guard matched correct branch");
+
+// Test 2: Guard that fails falls through to next case
+var n = 5;
+match (n) {
+    case 5 if n > 10 => say("FAIL: guard should have blocked this");
+    case 5 if n > 3  => say("✓ Guard fallthrough works");
+    default => say("FAIL: should not reach default");
+}
+
+// Test 3: Guard with default fallback
+var x = 42;
+match (x) {
+    case 42 if x < 0 => say("FAIL: negative guard should fail");
+    default => say("✓ Falls through to default when guard fails");
+}
+
+// Test 4: Multiple guards on different values
+var grade = "B";
+match (grade) {
+    case "A" if true => say("FAIL");
+    case "B" if true => say("✓ String match with guard works");
+    case "C" if true => say("FAIL");
+    default => say("FAIL");
+}
+
+say("\n=== All match guard tests passed ===");

@@ -1,0 +1,49 @@
+// Test: Destructuring assignment
+say("=== Destructuring ===");
+
+// Test 1: Basic array destructuring
+var [a, b, c] = [10, 20, 30];
+if (a == 10 and b == 20 and c == 30) {
+    say("✓ Basic array destructuring works");
+} else {
+    say("FAIL: a=" + a + " b=" + b + " c=" + c);
+}
+
+// Test 2: Array destructuring with expressions
+var [x, y] = [1 + 1, 3 * 3];
+if (x == 2 and y == 9) {
+    say("✓ Array destructuring with expressions works");
+}
+
+// Test 3: Basic object destructuring
+var {name, age} = {"name": "Bob", "age": 25};
+if (name == "Bob" and age == 25) {
+    say("✓ Basic object destructuring works");
+} else {
+    say("FAIL: name=" + name + " age=" + age);
+}
+
+// Test 4: Object destructuring with rename
+var {name: firstName, age: years} = {"name": "Carol", "age": 32};
+if (firstName == "Carol" and years == 32) {
+    say("✓ Object destructuring with rename works");
+} else {
+    say("FAIL: firstName=" + firstName + " years=" + years);
+}
+
+// Test 5: Destructuring from function return
+fun getCoords() {
+    return [100, 200];
+}
+var [px, py] = getCoords();
+if (px == 100 and py == 200) {
+    say("✓ Destructuring from function return works");
+}
+
+// Test 6: Single element array destructure
+var [only] = [42];
+if (only == 42) {
+    say("✓ Single element array destructuring works");
+}
+
+say("\n=== All destructuring tests passed ===");

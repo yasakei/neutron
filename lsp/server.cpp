@@ -551,6 +551,22 @@ void LSPServer::collectSymbols(
       set(symbol, "selectionRange") = range;
 
       isSymbol = true;
+    } else if (stmt->type == StmtType::ENUM) {
+      const auto *en = static_cast<const EnumStmt *>(stmt.get());
+      set(symbol, "name") = en->name.lexeme;
+      set(symbol, "kind") = 10; // Enum
+      int line = en->name.line > 0 ? en->name.line - 1 : 0;
+
+      Json::Value range;
+      set(set(range, "start"), "line") = line;
+      set(set(range, "start"), "character") = 0;
+      set(set(range, "end"), "line") = line;
+      set(set(range, "end"), "character") = 10;
+
+      set(symbol, "range") = range;
+      set(symbol, "selectionRange") = range;
+
+      isSymbol = true;
     }
 
     if (isSymbol) {
@@ -1075,11 +1091,12 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
 
   // Keywords
   const char *keywords[] = {"var",      "fun",     "class",  "if",      "else",
-                            "while",    "for",     "do",     "return",  "break",
+                            "elif",     "while",   "for",    "do",      "return",  "break",
                             "continue", "match",   "case",   "default", "try",
                             "catch",    "finally", "throw",  "retry",   "use",
                             "using",    "from",    "static", "safe",    "true",
-                            "false",    "nil",     "this",   "super",   "init"};
+                            "false",    "nil",     "this",   "super",   "init",
+                            "enum",     "in"};
   for (const char *kw : keywords) {
     Json::Value item;
     set(item, "label") = kw;
@@ -1182,6 +1199,94 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
   set(safeBlock, "insertText") = "safe {\n\t$0\n}";
   set(safeBlock, "insertTextFormat") = 2;
   result.append(safeBlock);
+
+  // ── New feature snippets ──────────────────────────────────────────────────
+
+  // enum snippet
+  {
+    Json::Value item;
+    set(item, "label") = "enum";
+    set(item, "kind") = 15; // Snippet
+    set(item, "detail") = "Enum declaration";
+    set(item, "documentation") = "Declare a set of named constants with optional explicit values.";
+    set(item, "insertText") = "enum ${1:Name} {\n\t${2:MEMBER_A},\n\t${3:MEMBER_B}\n}";
+    set(item, "insertTextFormat") = 2;
+    result.append(item);
+  }
+
+  // for...in snippet
+  {
+    Json::Value item;
+    set(item, "label") = "for...in";
+    set(item, "kind") = 15; // Snippet
+    set(item, "detail") = "for-in loop (iterate object keys / array indices)";
+    set(item, "documentation") = "Iterate over the keys of an object or indices of an array.";
+    set(item, "insertText") = "for (var ${1:key} in ${2:obj}) {\n\t$0\n}";
+    set(item, "insertTextFormat") = 2;
+    result.append(item);
+  }
+
+  // destructuring array snippet
+  {
+    Json::Value item;
+    set(item, "label") = "var [...] = (array destructure)";
+    set(item, "kind") = 15; // Snippet
+    set(item, "detail") = "Array destructuring assignment";
+    set(item, "documentation") = "Unpack array elements into individual variables.";
+    set(item, "insertText") = "var [${1:a}, ${2:b}] = ${3:array};";
+    set(item, "insertTextFormat") = 2;
+    result.append(item);
+  }
+
+  // destructuring object snippet
+  {
+    Json::Value item;
+    set(item, "label") = "var {...} = (object destructure)";
+    set(item, "kind") = 15; // Snippet
+    set(item, "detail") = "Object destructuring assignment";
+    set(item, "documentation") = "Unpack object properties into individual variables.";
+    set(item, "insertText") = "var {${1:key}} = ${2:obj};";
+    set(item, "insertTextFormat") = 2;
+    result.append(item);
+  }
+
+  // match with guard snippet
+  {
+    Json::Value item;
+    set(item, "label") = "match (with guards)";
+    set(item, "kind") = 15; // Snippet
+    set(item, "detail") = "Match statement with guard conditions";
+    set(item, "documentation") = "Pattern matching with optional `if` guard conditions per case.";
+    set(item, "insertText") = "match (${1:expr}) {\n\tcase ${2:val} if ${3:condition} => $4\n\tdefault => $0\n}";
+    set(item, "insertTextFormat") = 2;
+    result.append(item);
+  }
+
+  // spread snippet
+  {
+    Json::Value item;
+    set(item, "label") = "...spread";
+    set(item, "kind") = 15; // Snippet
+    set(item, "detail") = "Spread array into function arguments";
+    set(item, "documentation") = "Expand an array as individual arguments: fn(...arr)";
+    set(item, "insertText") = "...${1:array}";
+    set(item, "insertTextFormat") = 2;
+    result.append(item);
+  }
+
+  // optional chaining snippet
+  {
+    Json::Value item;
+    set(item, "label") = "?.property";
+    set(item, "kind") = 15; // Snippet
+    set(item, "detail") = "Optional chaining — returns nil if object is nil";
+    set(item, "documentation") = "Safe property access: obj?.prop returns nil instead of crashing when obj is nil.";
+    set(item, "insertText") = "${1:obj}?.${2:property}";
+    set(item, "insertTextFormat") = 2;
+    result.append(item);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Only suggest module functions for imported modules
   for (const auto &mod : allModules) {
@@ -1321,13 +1426,15 @@ void LSPServer::onHover(const Json::Value &params, const Json::Value &id) {
               "{\n    riskyOp();\n} catch (e) {\n    say(e);\n} finally {\n    "
               "cleanup();\n}\n```";
       else if (word == "match")
-        doc = "**match**\n\nPattern matching (switch-like).\n```neutron\nmatch "
-              "(x) {\n    case 1 => say(\"one\");\n    case 2 => "
-              "say(\"two\");\n    default => say(\"other\");\n}\n```";
+        doc = "**match**\n\nPattern matching with optional guard conditions.\n```neutron\nmatch (x) {\n    case 1 => say(\"one\");\n    case n if n > 10 => say(\"big\");\n    default => say(\"other\");\n}\n```";
       else if (word == "retry")
         doc =
             "**retry**\n\nRetry a block multiple times.\n```neutron\nretry (3) "
             "{\n    connect();\n} catch (e) {\n    say(\"Failed\");\n}\n```";
+      else if (word == "enum")
+        doc = "**enum**\n\nDeclare a set of named constants.\n```neutron\nenum Direction {\n    NORTH,\n    SOUTH,\n    EAST,\n    WEST\n}\n\nenum Status {\n    OK = 200,\n    NOT_FOUND = 404\n}\n\nsay(Direction.NORTH);  // 0\nsay(Status.OK);        // 200\n```";
+      else if (word == "in")
+        doc = "**in**\n\nIterate over object keys or array indices with `for...in`.\n```neutron\nvar obj = {\"a\": 1, \"b\": 2};\nfor (var key in obj) {\n    say(key + \": \" + obj[key]);\n}\n\nvar arr = [10, 20, 30];\nfor (var i in arr) {\n    say(i);  // prints 0, 1, 2 (indices)\n}\n```";
       // Type keywords
       else if (word == "int")
         doc = "**int**\n\nInteger type.\n```neutron\nvar int x = 42;\nfun "
@@ -1384,6 +1491,12 @@ void LSPServer::onHover(const Json::Value &params, const Json::Value &id) {
         doc = "**encode(encoding)** (method)\n\nEncodes string to bytes.\n```neutron\nvar bytes = \"hello\".encode(\"utf-8\");\n```";
       else if (word == "isunicode")
         doc = "**isunicode()** (method)\n\nChecks if string contains Unicode characters.\n```neutron\nsay(\"café\".isunicode());  // true\nsay(\"hello\".isunicode());  // false\n```";
+
+      // New features
+      else if (word == "var" && false) {} // placeholder — var handled above
+      // Spread operator hint (shown when hovering '...')
+      // Optional chaining hint (shown when hovering '?.')
+      // These are operators, not keywords, so we add them as special completions below
 
       if (!doc.empty()) {
         Json::Value contents;

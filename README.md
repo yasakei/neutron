@@ -500,15 +500,14 @@ We welcome contributions from the community! Whether it's bug fixes, new feature
 
 ### Guidelines
 
-- Read [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines
 - Follow the existing code style and conventions
 - Write tests for new features
 - Update documentation as needed
 
 ### Community
 
-- **Discord:** [Join our server](https://discord.gg/29f2w6jme8) for discussions and support
-- **Issues:** [Report bugs or request features](https://github.com/YourUsername/neutron/issues)
+- **Discord:** [Not Available](#) for discussions and support
+- **Issues:** [Report bugs or request features](https://github.com/yasakei/neutron/issues)
 - **Discussions:** Share ideas and get help from the community
 
 ## License

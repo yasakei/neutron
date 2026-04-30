@@ -21,6 +21,8 @@ enum class TokenType {
     AND_SYM, OR_SYM,        // && and ||
     ARROW,  // => for match cases
     RETURN_ARROW,  // -> for function return types
+    DOT_DOT_DOT,    // ... spread/rest operator
+    QUESTION_DOT,   // ?. optional chaining
 
     // Literals
     IDENTIFIER, STRING, NUMBER,
@@ -32,6 +34,8 @@ enum class TokenType {
     MATCH, CASE, DEFAULT,  // Match statement
     TRY, CATCH, FINALLY, THROW, RETRY,  // Exception handling
     SAFE,  // Safe block - enforces type annotations
+    ENUM,  // Enum declaration
+    IN,    // for...in loop
     
     // Library features
     USE, USING, FROM, AS,

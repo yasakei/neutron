@@ -226,6 +226,16 @@ enum class OpCode : uint8_t {
     OP_TYPE_GUARD,       ///< Runtime type guard (for JIT deoptimization)
     OP_LOOP_HINT,        ///< Hint for JIT loop compilation
 
+    // === For-in loop ===
+    OP_FOR_IN_INIT,      ///< Initialize for-in iterator (object/array on stack → push key list)
+    OP_FOR_IN_NEXT,      ///< Advance for-in iterator; jump if done
+
+    // === Optional chaining ===
+    OP_OPTIONAL_CHAIN,   ///< Get property, push nil if object is nil (no error)
+
+    // === Spread/rest ===
+    OP_SPREAD,           ///< Spread array onto stack as individual values
+
     OP_COUNT             ///< Sentinel: total number of opcodes (not a real opcode)
 };
 

@@ -200,6 +200,8 @@ public:
     void visitThisExpr(const ThisExpr* expr);
     void visitFunctionExpr(const FunctionExpr* expr);
     void visitTernaryExpr(const TernaryExpr* expr);
+    void visitOptionalChainExpr(const OptionalChainExpr* expr);
+    void visitSpreadExpr(const SpreadExpr* expr);
 
     // Visitor methods for statements
     void visitExpressionStmt(const ExpressionStmt* stmt);
@@ -220,6 +222,9 @@ public:
     void visitThrowStmt(const ThrowStmt* stmt);
     void visitRetryStmt(const RetryStmt* stmt);
     void visitSafeStmt(const SafeStmt* stmt);
+    void visitForInStmt(const ForInStmt* stmt);
+    void visitEnumStmt(const EnumStmt* stmt);
+    void visitDestructureStmt(const DestructureStmt* stmt);
 
     // Compiler state
     Compiler* enclosing;      ///< Enclosing compiler (for closures)

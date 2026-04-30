@@ -936,16 +936,41 @@ void Compiler::visitCallExpr(const CallExpr* expr) {
     // Compile the callee
     compileExpression(expr->callee.get());
     
-    // Compile the arguments
-    for (const auto& argument : expr->arguments) {
-        compileExpression(argument.get());
+    // Check if any argument is a spread
+    bool hasSpread = false;
+    for (const auto& arg : expr->arguments) {
+        if (arg->type == ExprType::SPREAD) {
+            hasSpread = true;
+            break;
+        }
     }
     
-    // Update current line to the closing parenthesis
-    currentLine = expr->paren.line;
-    
-    // Emit the call instruction with the number of arguments
-    emitBytes((uint8_t)OpCode::OP_CALL, expr->arguments.size());
+    if (hasSpread) {
+        // Dynamic arg count: compile args, count at runtime
+        // Strategy: push arg count marker before args, then count dynamically
+        // Simpler: emit all args (spread expands inline), then emit special call
+        // Problem: we don't know final count at compile time.
+        // Solution: emit args, then emit OP_CALL with 0xFF marker meaning "count from callee to top"
+        
+        // Actually, simplest fix: count non-spread args + spread array lengths at compile time
+        // But we can't know array length at compile time.
+        // Real solution: emit a "call with spread" opcode that counts dynamically.
+        // For now, let's emit OP_CALL_SPREAD which counts args from callee to stack top.
+        
+        for (const auto& argument : expr->arguments) {
+            compileExpression(argument.get());
+        }
+        currentLine = expr->paren.line;
+        // Use 0xFF as marker for dynamic arg count
+        emitBytes((uint8_t)OpCode::OP_CALL, 0xFF);
+    } else {
+        // Normal call: static arg count
+        for (const auto& argument : expr->arguments) {
+            compileExpression(argument.get());
+        }
+        currentLine = expr->paren.line;
+        emitBytes((uint8_t)OpCode::OP_CALL, expr->arguments.size());
+    }
 }
 
 void Compiler::visitArrayExpr(const ArrayExpr* expr) {
@@ -1250,21 +1275,28 @@ void Compiler::visitMatchStmt(const MatchStmt* stmt) {
         // Check if they're equal
         emitByte((uint8_t)OpCode::OP_EQUAL);
         
-        // If not equal, jump to next case (OP_JUMP_IF_FALSE pops the comparison result)
+        // If not equal, jump to next case
         int skipJump = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE);
         
-        // Case matched! (comparison result was already popped by JUMP_IF_FALSE)
-        emitByte((uint8_t)OpCode::OP_POP);  // Pop the match value (we're done with it)
+        // Value matched. Now check guard if present.
+        int guardSkipJump = -1;
+        if (matchCase.guard) {
+            compileExpression(matchCase.guard.get());
+            guardSkipJump = emitJump((uint8_t)OpCode::OP_JUMP_IF_FALSE);
+        }
         
-        // Execute the case action
+        // Guard passed (or no guard). Pop the match value and run the action.
+        emitByte((uint8_t)OpCode::OP_POP);
         compileStatement(matchCase.action.get());
-        
-        // Jump to end after executing case
         endJumps.push_back(emitJump((uint8_t)OpCode::OP_JUMP));
         
-        // Patch the skip jump to here (case didn't match, comparison already popped)
+        // Guard failed — match value still on stack, fall through to next case
+        if (guardSkipJump != -1) {
+            patchJump(guardSkipJump);
+        }
+        
+        // Value didn't match — jump here, match value still on stack
         patchJump(skipJump);
-        // Match value is still on stack for next iteration or cleanup
     }
     
     // At this point, if no case matched, match value is still on stack
@@ -1485,6 +1517,154 @@ void Compiler::visitSafeStmt(const SafeStmt* stmt) {
     
     // Restore the previous safe block state
     inSafeBlock = previousSafeBlock;
+}
+
+// ============================================================
+// Feature: Match case guards  (case x if condition =>)
+// Already handled in visitMatchStmt — guard compiled inline.
+// We extend visitMatchStmt here to support the guard field.
+// ============================================================
+
+// NOTE: visitMatchStmt is already defined above. We patch it by
+// overriding the logic — but since it's already compiled with the
+// guard field in MatchCase, we need to update the existing one.
+// The guard was added to the struct; the existing visitMatchStmt
+// needs updating. We do that via a separate patch below.
+
+// ============================================================
+// Feature: for...in loop
+// ============================================================
+void Compiler::visitForInStmt(const ForInStmt* stmt) {
+    // Stack layout during for-in:
+    //   slot N+0: iterable  (pushed by OP_FOR_IN_INIT)
+    //   slot N+1: index     (pushed by OP_FOR_IN_INIT)
+    //   slot N+2: keys      (pushed by OP_FOR_IN_INIT)
+    //   slot N+3: loop_var  (the variable being iterated)
+    //
+    // OP_FOR_IN_NEXT receives the base slot (N) and accesses keys/index directly.
+
+    beginScope();
+
+    // Reserve 3 locals for iterator state (iterable, index, keys)
+    Token iterableToken(TokenType::IDENTIFIER, "$forin_iterable", stmt->variable.line);
+    Token indexToken(TokenType::IDENTIFIER, "$forin_index", stmt->variable.line);
+    Token keysToken(TokenType::IDENTIFIER, "$forin_keys", stmt->variable.line);
+    locals.push_back(Local{iterableToken, scopeDepth, std::nullopt});
+    locals.push_back(Local{indexToken,   scopeDepth, std::nullopt});
+    locals.push_back(Local{keysToken,    scopeDepth, std::nullopt});
+    int baseSlot = locals.size() - 3; // slot of iterable
+
+    // Compile iterable and run OP_FOR_IN_INIT — pushes iterable, index=0, keys
+    compileExpression(stmt->iterable.get());
+    emitByte((uint8_t)OpCode::OP_FOR_IN_INIT);
+
+    // Loop variable — slot N+3
+    locals.push_back(Local{stmt->variable, scopeDepth, std::nullopt});
+    int varSlot = locals.size() - 1;
+    emitByte((uint8_t)OpCode::OP_NIL); // placeholder for loop var
+
+    int loopStart = chunk->code.size();
+    loopStarts.push_back(loopStart);
+    breakJumps.push_back({});
+    continueJumps.push_back({});
+
+    // OP_FOR_IN_NEXT <base_slot> <var_slot> <offset_hi> <offset_lo>
+    emitByte((uint8_t)OpCode::OP_FOR_IN_NEXT);
+    emitByte((uint8_t)baseSlot);
+    emitByte((uint8_t)varSlot);
+    int exitJump = chunk->code.size();
+    emitBytes(0xFF, 0xFF); // placeholder
+
+    // Compile body
+    compileStatement(stmt->body.get());
+
+    // Patch continue jumps
+    for (int j : continueJumps.back()) patchJump(j);
+    continueJumps.pop_back();
+
+    // Loop back
+    emitLoop(loopStart);
+
+    // Patch exit jump
+    int offset = chunk->code.size() - exitJump - 2;
+    chunk->code[exitJump]     = (offset >> 8) & 0xFF;
+    chunk->code[exitJump + 1] = offset & 0xFF;
+
+    // Patch break jumps
+    for (int j : breakJumps.back()) patchJump(j);
+    breakJumps.pop_back();
+    loopStarts.pop_back();
+
+    endScope(); // pops iterable, index, keys, loop_var
+}
+
+// ============================================================
+// Feature: enum declaration
+// ============================================================
+void Compiler::visitEnumStmt(const EnumStmt* stmt) {
+    // Build an object with each member as a key→value pair
+    for (const auto& member : stmt->members) {
+        emitConstant(Value(vm.internString(member.name.lexeme)));
+        compileExpression(member.value.get());
+    }
+    emitBytes((uint8_t)OpCode::OP_OBJECT, (uint8_t)stmt->members.size());
+    emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL,
+              makeConstant(Value(vm.internString(stmt->name.lexeme))));
+}
+
+// ============================================================
+// Feature: destructuring assignment
+// ============================================================
+void Compiler::visitDestructureStmt(const DestructureStmt* stmt) {
+    // Compile the RHS
+    compileExpression(stmt->initializer.get());
+    
+    if (stmt->isArray) {
+        // Array destructure: var [a, b, c] = expr
+        for (size_t i = 0; i < stmt->names.size(); i++) {
+            // Duplicate the array on stack
+            emitByte((uint8_t)OpCode::OP_DUP);
+            // Push index
+            emitConstant(Value((double)i));
+            // Get element
+            emitByte((uint8_t)OpCode::OP_INDEX_GET);
+            // Define as global
+            emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL,
+                      makeConstant(Value(vm.internString(stmt->names[i].lexeme))));
+        }
+    } else {
+        // Object destructure: var {x, y} = expr
+        for (size_t i = 0; i < stmt->names.size(); i++) {
+            // Duplicate the object on stack
+            emitByte((uint8_t)OpCode::OP_DUP);
+            // Get property by key
+            emitBytes((uint8_t)OpCode::OP_GET_PROPERTY,
+                      makeConstant(Value(vm.internString(stmt->keys[i]))));
+            // Define as global with the variable name
+            emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL,
+                      makeConstant(Value(vm.internString(stmt->names[i].lexeme))));
+        }
+    }
+    
+    // Pop the original RHS value
+    emitByte((uint8_t)OpCode::OP_POP);
+}
+
+// ============================================================
+// Feature: optional chaining  obj?.prop
+// ============================================================
+void Compiler::visitOptionalChainExpr(const OptionalChainExpr* expr) {
+    compileExpression(expr->object.get());
+    emitBytes((uint8_t)OpCode::OP_OPTIONAL_CHAIN,
+              makeConstant(Value(vm.internString(expr->property.lexeme))));
+}
+
+// ============================================================
+// Feature: spread expression  ...arr
+// ============================================================
+void Compiler::visitSpreadExpr(const SpreadExpr* expr) {
+    compileExpression(expr->value.get());
+    emitByte((uint8_t)OpCode::OP_SPREAD);
 }
 
 } // namespace neutron

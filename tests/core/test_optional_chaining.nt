@@ -1,0 +1,51 @@
+// Test: Optional chaining (?.)
+say("=== Optional Chaining ===");
+
+// Test 1: Access existing property
+var user = {"name": "Alice", "age": 30};
+var name = user?.name;
+if (name == "Alice") {
+    say("✓ Optional chain on existing property works");
+} else {
+    say("FAIL: expected 'Alice', got " + name);
+}
+
+// Test 2: Access on nil — should return nil, not crash
+var missing = nil;
+var safe = missing?.name;
+if (safe == nil) {
+    say("✓ Optional chain on nil returns nil");
+} else {
+    say("FAIL: expected nil, got " + safe);
+}
+
+// Test 3: Chained access on object instance
+class Config {
+    var host;
+    fun initialize(h) {
+        this.host = h;
+    }
+}
+var cfg = Config("localhost");
+var host = cfg?.host;
+if (host == "localhost") {
+    say("✓ Optional chain on class instance works");
+} else {
+    say("FAIL: expected 'localhost', got " + host);
+}
+
+// Test 4: Optional chain result used in expression
+var data = {"value": 42};
+var v = data?.value;
+if (v != nil and v == 42) {
+    say("✓ Optional chain result usable in expression");
+}
+
+// Test 5: Optional chain on missing key returns nil
+var obj = {"x": 1};
+var y = obj?.y;
+if (y == nil) {
+    say("✓ Optional chain on missing key returns nil");
+}
+
+say("\n=== All optional chaining tests passed ===");

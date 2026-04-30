@@ -60,6 +60,8 @@ Scanner::Scanner(const std::string& source)
     keywords["throw"] = TokenType::THROW;
     keywords["retry"] = TokenType::RETRY;
     keywords["safe"] = TokenType::SAFE;
+    keywords["enum"] = TokenType::ENUM;
+    keywords["in"] = TokenType::IN;
     keywords["use"] = TokenType::USE;
     keywords["using"] = TokenType::USING;
     keywords["from"] = TokenType::FROM;
@@ -99,7 +101,13 @@ void Scanner::scanToken() {
         case '[': addToken(TokenType::LEFT_BRACKET); break;
         case ']': addToken(TokenType::RIGHT_BRACKET); break;
         case ',': addToken(TokenType::COMMA); break;
-        case '.': addToken(TokenType::DOT); break;
+        case '.': 
+            if (match('.') && match('.')) {
+                addToken(TokenType::DOT_DOT_DOT);
+            } else {
+                addToken(TokenType::DOT);
+            }
+            break;
         case '-': 
             if (match('-')) {
                 addToken(TokenType::MINUS_MINUS);
@@ -118,7 +126,13 @@ void Scanner::scanToken() {
         case '%': addToken(TokenType::PERCENT); break;
         case '^': addToken(TokenType::CARET); break;
         case '~': addToken(TokenType::TILDE); break;
-        case '?': addToken(TokenType::QUESTION); break;
+        case '?':
+            if (match('.')) {
+                addToken(TokenType::QUESTION_DOT);
+            } else {
+                addToken(TokenType::QUESTION);
+            }
+            break;
         case '!': addToken(match('=') ? TokenType::BANG_EQUAL : TokenType::BANG); break;
         case '=': 
             if (match('=')) {

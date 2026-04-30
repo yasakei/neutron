@@ -182,6 +182,10 @@ std::unique_ptr<Stmt> Parser::statement() {
         return safeStatement();
     }
     
+    if (match({TokenType::ENUM})) {
+        return enumDeclaration();
+    }
+    
     if (check(TokenType::LEFT_BRACE)) {
         return block();
     }
@@ -204,6 +208,44 @@ std::unique_ptr<Stmt> Parser::expressionStatement() {
 }
 
 std::unique_ptr<Stmt> Parser::varDeclaration(bool isStatic) {
+    // Check for destructuring: var [a, b] = expr  or  var {x, y} = expr
+    if (check(TokenType::LEFT_BRACKET)) {
+        advance(); // consume '['
+        std::vector<Token> names;
+        while (!check(TokenType::RIGHT_BRACKET) && !isAtEnd()) {
+            names.push_back(consume(TokenType::IDENTIFIER, "Expect variable name in array destructure."));
+            if (!check(TokenType::RIGHT_BRACKET)) consume(TokenType::COMMA, "Expect ',' between names.");
+        }
+        consume(TokenType::RIGHT_BRACKET, "Expect ']' after array destructure.");
+        consume(TokenType::EQUAL, "Expect '=' after destructure pattern.");
+        auto init = expression();
+        consume(TokenType::SEMICOLON, "Expect ';' after destructure.");
+        return std::make_unique<DestructureStmt>(true, std::move(names), std::vector<std::string>{}, std::move(init));
+    }
+    
+    if (check(TokenType::LEFT_BRACE)) {
+        advance(); // consume '{'
+        std::vector<Token> names;
+        std::vector<std::string> keys;
+        while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+            Token key = consume(TokenType::IDENTIFIER, "Expect key name in object destructure.");
+            keys.push_back(key.lexeme);
+            // Support renaming: { key: varName }
+            if (match({TokenType::COLON})) {
+                Token varName = consume(TokenType::IDENTIFIER, "Expect variable name after ':'.");
+                names.push_back(varName);
+            } else {
+                names.push_back(key);
+            }
+            if (!check(TokenType::RIGHT_BRACE)) consume(TokenType::COMMA, "Expect ',' between keys.");
+        }
+        consume(TokenType::RIGHT_BRACE, "Expect '}' after object destructure.");
+        consume(TokenType::EQUAL, "Expect '=' after destructure pattern.");
+        auto init = expression();
+        consume(TokenType::SEMICOLON, "Expect ';' after destructure.");
+        return std::make_unique<DestructureStmt>(false, std::move(names), std::move(keys), std::move(init));
+    }
+
     // Check for optional type annotation
     std::optional<Token> typeAnnotation = std::nullopt;
     if (match({TokenType::TYPE_INT, TokenType::TYPE_FLOAT, TokenType::TYPE_STRING, 
@@ -302,6 +344,42 @@ std::unique_ptr<Stmt> Parser::doWhileStatement() {
 
 std::unique_ptr<Stmt> Parser::forStatement() {
     consume(TokenType::LEFT_PAREN, "Expect '(' after 'for'.");
+
+    // Detect for-in: for (var key in obj) or for (key in obj)
+    // Peek ahead: if next is VAR + IDENTIFIER + IN, it's a for-in
+    bool isForIn = false;
+    Token forInVar = Token(TokenType::IDENTIFIER, "", 0);
+    
+    if (check(TokenType::VAR)) {
+        // Look ahead: VAR IDENTIFIER IN
+        int saved = current;
+        advance(); // consume VAR
+        if (check(TokenType::IDENTIFIER)) {
+            Token varName = advance();
+            if (check(TokenType::IN)) {
+                advance(); // consume IN
+                isForIn = true;
+                forInVar = varName;
+            }
+        }
+        if (!isForIn) current = saved; // backtrack
+    } else if (check(TokenType::IDENTIFIER)) {
+        int saved = current;
+        Token varName = advance();
+        if (check(TokenType::IN)) {
+            advance(); // consume IN
+            isForIn = true;
+            forInVar = varName;
+        }
+        if (!isForIn) current = saved;
+    }
+    
+    if (isForIn) {
+        auto iterable = expression();
+        consume(TokenType::RIGHT_PAREN, "Expect ')' after for-in expression.");
+        auto body = statement();
+        return std::make_unique<ForInStmt>(forInVar, std::move(iterable), std::move(body));
+    }
 
     std::unique_ptr<Stmt> initializer;
     if (match({TokenType::SEMICOLON})) {
@@ -668,7 +746,12 @@ std::unique_ptr<Expr> Parser::call() {
                     if (arguments.size() >= 255) {
                         error(peek(), "Can't have more than 255 arguments.");
                     }
-                    arguments.push_back(expression());
+                    // Support spread argument: ...expr
+                    if (match({TokenType::DOT_DOT_DOT})) {
+                        arguments.push_back(std::make_unique<SpreadExpr>(expression()));
+                    } else {
+                        arguments.push_back(expression());
+                    }
                 } while (match({TokenType::COMMA}));
             }
             
@@ -677,6 +760,10 @@ std::unique_ptr<Expr> Parser::call() {
         } else if (match({TokenType::DOT})) {
             Token name = consume(TokenType::IDENTIFIER, "Expect property name after '.'.");
             expr = std::make_unique<MemberExpr>(std::move(expr), name);
+        } else if (match({TokenType::QUESTION_DOT})) {
+            // Optional chaining: obj?.prop
+            Token name = consume(TokenType::IDENTIFIER, "Expect property name after '?.'.");
+            expr = std::make_unique<OptionalChainExpr>(std::move(expr), name);
         } else if (match({TokenType::LEFT_BRACKET})) {
             std::unique_ptr<Expr> index = expression();
             consume(TokenType::RIGHT_BRACKET, "Expect ']' after index.");
@@ -1141,6 +1228,26 @@ void SafeStmt::accept(Compiler* compiler) const {
     compiler->visitSafeStmt(this);
 }
 
+void ForInStmt::accept(Compiler* compiler) const {
+    compiler->visitForInStmt(this);
+}
+
+void EnumStmt::accept(Compiler* compiler) const {
+    compiler->visitEnumStmt(this);
+}
+
+void DestructureStmt::accept(Compiler* compiler) const {
+    compiler->visitDestructureStmt(this);
+}
+
+void OptionalChainExpr::accept(Compiler* compiler) const {
+    compiler->visitOptionalChainExpr(this);
+}
+
+void SpreadExpr::accept(Compiler* compiler) const {
+    compiler->visitSpreadExpr(this);
+}
+
 std::unique_ptr<Stmt> Parser::matchStatement() {
     consume(TokenType::LEFT_PAREN, "Expect '(' after 'match'.");
     auto expr = expression();
@@ -1154,6 +1261,13 @@ std::unique_ptr<Stmt> Parser::matchStatement() {
         if (match({TokenType::CASE})) {
             // Parse case value
             auto caseValue = expression();
+            
+            // Optional guard: case x if condition =>
+            std::unique_ptr<Expr> guard = nullptr;
+            if (match({TokenType::IF})) {
+                guard = expression();
+            }
+            
             consume(TokenType::ARROW, "Expect '=>' after case value.");
             
             // Parse case action (can be a block or single statement)
@@ -1166,6 +1280,7 @@ std::unique_ptr<Stmt> Parser::matchStatement() {
             
             MatchCase matchCase;
             matchCase.value = std::move(caseValue);
+            matchCase.guard = std::move(guard);
             matchCase.action = std::move(action);
             cases.push_back(std::move(matchCase));
             
@@ -1189,8 +1304,42 @@ std::unique_ptr<Stmt> Parser::matchStatement() {
     return std::make_unique<MatchStmt>(std::move(expr), std::move(cases), std::move(defaultCase));
 }
 
-std::unique_ptr<Stmt> Parser::tryStatement() {
-    // Expect a block after 'try' keyword
+std::unique_ptr<Stmt> Parser::enumDeclaration() {
+    Token name = consume(TokenType::IDENTIFIER, "Expect enum name.");
+    consume(TokenType::LEFT_BRACE, "Expect '{' after enum name.");
+    
+    std::vector<EnumMember> members;
+    double autoValue = 0;
+    
+    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        Token memberName = consume(TokenType::IDENTIFIER, "Expect enum member name.");
+        std::unique_ptr<Expr> value = nullptr;
+        
+        if (match({TokenType::EQUAL})) {
+            value = expression();
+            // Track auto-increment from explicit value
+            if (value->type == ExprType::LITERAL) {
+                auto* lit = static_cast<LiteralExpr*>(value.get());
+                if (lit->valueType == LiteralValueType::NUMBER) {
+                    autoValue = *static_cast<double*>(lit->value.get()) + 1;
+                }
+            }
+        } else {
+            value = std::make_unique<LiteralExpr>(autoValue, memberName.line);
+            autoValue++;
+        }
+        
+        members.push_back({memberName, std::move(value)});
+        
+        // Optional trailing comma
+        match({TokenType::COMMA});
+    }
+    
+    consume(TokenType::RIGHT_BRACE, "Expect '}' after enum members.");
+    return std::make_unique<EnumStmt>(name, std::move(members));
+}
+
+std::unique_ptr<Stmt> Parser::tryStatement() {    // Expect a block after 'try' keyword
     std::unique_ptr<Stmt> tryBlock = block();
     
     Token catchVar = Token(TokenType::IDENTIFIER, "", current);  // Placeholder
