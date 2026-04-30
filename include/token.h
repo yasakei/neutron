@@ -34,8 +34,8 @@ enum class TokenType {
     MATCH, CASE, DEFAULT,  // Match statement
     TRY, CATCH, FINALLY, THROW, RETRY,  // Exception handling
     SAFE,  // Safe block - enforces type annotations
-    ENUM,  // Enum declaration
-    IN,    // for...in loop
+    ENUM,   // Enum declaration
+    KW_IN,  // for...in loop keyword
     
     // Library features
     USE, USING, FROM, AS,

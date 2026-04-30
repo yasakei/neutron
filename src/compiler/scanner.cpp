@@ -61,7 +61,7 @@ Scanner::Scanner(const std::string& source)
     keywords["retry"] = TokenType::RETRY;
     keywords["safe"] = TokenType::SAFE;
     keywords["enum"] = TokenType::ENUM;
-    keywords["in"] = TokenType::IN;
+    keywords["in"] = TokenType::KW_IN;
     keywords["use"] = TokenType::USE;
     keywords["using"] = TokenType::USING;
     keywords["from"] = TokenType::FROM;

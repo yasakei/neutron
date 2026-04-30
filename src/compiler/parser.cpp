@@ -356,7 +356,7 @@ std::unique_ptr<Stmt> Parser::forStatement() {
         advance(); // consume VAR
         if (check(TokenType::IDENTIFIER)) {
             Token varName = advance();
-            if (check(TokenType::IN)) {
+            if (check(TokenType::KW_IN)) {
                 advance(); // consume IN
                 isForIn = true;
                 forInVar = varName;
@@ -366,7 +366,7 @@ std::unique_ptr<Stmt> Parser::forStatement() {
     } else if (check(TokenType::IDENTIFIER)) {
         int saved = current;
         Token varName = advance();
-        if (check(TokenType::IN)) {
+        if (check(TokenType::KW_IN)) {
             advance(); // consume IN
             isForIn = true;
             forInVar = varName;

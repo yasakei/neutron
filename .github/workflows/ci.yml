@@ -347,12 +347,19 @@ jobs:
         $vcpkgPath = if (Test-Path "C:\vcpkg\scripts\buildsystems\vcpkg.cmake") { "C:\vcpkg\scripts\buildsystems\vcpkg.cmake" } else { "$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" }
         echo "Using vcpkg toolchain: $vcpkgPath"
         cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="$vcpkgPath"
-        cmake --build build --config Release
+        # Build: capture output, show only errors, but preserve exit code
+        $buildOutput = cmake --build build --config Release 2>&1
+        $exitCode = $LASTEXITCODE
+        $buildOutput | Where-Object { $_ -match ': error C|: fatal error|cmake.*Error|FAILED|Build FAILED' } | Select-Object -Unique
+        if ($exitCode -ne 0) { exit $exitCode }
       
     - name: Build Box Package Manager
       run: |
         cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
-        cmake --build nt-box/build --config Release
+        $buildOutput = cmake --build nt-box/build --config Release 2>&1
+        $exitCode = $LASTEXITCODE
+        $buildOutput | Where-Object { $_ -match ': error C|: fatal error|cmake.*Error|FAILED|Build FAILED' } | Select-Object -Unique
+        if ($exitCode -ne 0) { exit $exitCode }
         copy nt-box\build\Release\box.exe .
       
     - name: Package
