@@ -10,7 +10,7 @@ class Version {
 public:
     // Version components
     static constexpr int MAJOR = 26;
-    static constexpr int MINOR = 4;
+    static constexpr int MINOR = 5;
     static constexpr int PATCH = 0;
     static constexpr const char* STAGE = "beta";
     

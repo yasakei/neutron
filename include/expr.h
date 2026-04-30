@@ -31,7 +31,9 @@ enum class ExprType {
     MEMBER_SET,
     THIS,
     FUNCTION,  // Lambda/anonymous function expression
-    TERNARY
+    TERNARY,
+    OPTIONAL_CHAIN,  // obj?.prop or obj?.method()
+    SPREAD           // ...expr (spread/rest)
 };
 
 // Literal types
@@ -261,6 +263,29 @@ public:
     
     TernaryExpr(std::unique_ptr<Expr> condition, std::unique_ptr<Expr> thenBranch, std::unique_ptr<Expr> elseBranch)
         : Expr(ExprType::TERNARY), condition(std::move(condition)), thenBranch(std::move(thenBranch)), elseBranch(std::move(elseBranch)) {}
+        
+    void accept(Compiler* compiler) const override;
+};
+
+// Optional chain expression (obj?.prop or obj?.method())
+class OptionalChainExpr : public Expr {
+public:
+    std::unique_ptr<Expr> object;
+    Token property;
+    
+    OptionalChainExpr(std::unique_ptr<Expr> object, Token property)
+        : Expr(ExprType::OPTIONAL_CHAIN), object(std::move(object)), property(property) {}
+        
+    void accept(Compiler* compiler) const override;
+};
+
+// Spread expression (...expr)
+class SpreadExpr : public Expr {
+public:
+    std::unique_ptr<Expr> value;
+    
+    SpreadExpr(std::unique_ptr<Expr> value)
+        : Expr(ExprType::SPREAD), value(std::move(value)) {}
         
     void accept(Compiler* compiler) const override;
 };

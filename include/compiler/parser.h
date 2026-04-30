@@ -149,6 +149,7 @@ private:
     std::unique_ptr<Stmt> throwStatement();     ///< Parse throw statement
     std::unique_ptr<Stmt> retryStatement();     ///< Parse retry statement
     std::unique_ptr<Stmt> safeStatement();      ///< Parse safe block
+    std::unique_ptr<Stmt> enumDeclaration();    ///< Parse enum declaration
 
     std::unique_ptr<Stmt> block();              ///< Parse block { statements }
 

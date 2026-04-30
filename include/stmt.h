@@ -49,7 +49,10 @@ enum class StmtType {
     TRY,
     THROW,
     RETRY,
-    SAFE
+    SAFE,
+    FOR_IN,       // for x in obj
+    ENUM,         // enum Color { RED, GREEN, BLUE }
+    DESTRUCTURE   // var [a, b] = arr  or  var {x, y} = obj
 };
 
 // Base statement class
@@ -247,7 +250,8 @@ public:
 
 // Match case clause
 struct MatchCase {
-    std::unique_ptr<Expr> value;  // Case value to match against
+    std::unique_ptr<Expr> value;   // Case value to match against
+    std::unique_ptr<Expr> guard;   // Optional guard: case x if condition =>
     std::unique_ptr<Stmt> action;  // Statement to execute if matched
 };
 
@@ -329,6 +333,50 @@ public:
     
     SafeStmt(std::unique_ptr<Stmt> body)
         : Stmt(StmtType::SAFE), body(std::move(body)) {}
+    
+    void accept(Compiler* compiler) const override;
+};
+
+// For-in statement: for (var key in obj) { ... }
+class ForInStmt : public Stmt {
+public:
+    Token variable;    // Loop variable name
+    std::unique_ptr<Expr> iterable;  // Object/array to iterate
+    std::unique_ptr<Stmt> body;
+    
+    ForInStmt(Token variable, std::unique_ptr<Expr> iterable, std::unique_ptr<Stmt> body)
+        : Stmt(StmtType::FOR_IN), variable(variable), iterable(std::move(iterable)), body(std::move(body)) {}
+    
+    void accept(Compiler* compiler) const override;
+};
+
+// Enum statement: enum Color { RED, GREEN = 5, BLUE }
+struct EnumMember {
+    Token name;
+    std::unique_ptr<Expr> value;  // Optional explicit value
+};
+
+class EnumStmt : public Stmt {
+public:
+    Token name;
+    std::vector<EnumMember> members;
+    
+    EnumStmt(Token name, std::vector<EnumMember> members)
+        : Stmt(StmtType::ENUM), name(name), members(std::move(members)) {}
+    
+    void accept(Compiler* compiler) const override;
+};
+
+// Destructure statement: var [a, b] = arr  or  var {x, y} = obj
+class DestructureStmt : public Stmt {
+public:
+    bool isArray;                    // true = array destructure, false = object destructure
+    std::vector<Token> names;        // Variable names to bind
+    std::vector<std::string> keys;   // For object destructure: key names (may differ from var names)
+    std::unique_ptr<Expr> initializer;
+    
+    DestructureStmt(bool isArray, std::vector<Token> names, std::vector<std::string> keys, std::unique_ptr<Expr> initializer)
+        : Stmt(StmtType::DESTRUCTURE), isArray(isArray), names(std::move(names)), keys(std::move(keys)), initializer(std::move(initializer)) {}
     
     void accept(Compiler* compiler) const override;
 };

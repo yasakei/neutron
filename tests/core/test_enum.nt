@@ -1,0 +1,61 @@
+// Test: Enum declarations
+say("=== Enum ===");
+
+// Test 1: Auto-incrementing enum starting at 0
+enum Direction {
+    NORTH,
+    SOUTH,
+    EAST,
+    WEST
+}
+if (Direction.NORTH == 0 and Direction.SOUTH == 1 and Direction.EAST == 2 and Direction.WEST == 3) {
+    say("✓ Auto-increment enum works");
+} else {
+    say("FAIL: NORTH=" + Direction.NORTH + " SOUTH=" + Direction.SOUTH);
+}
+
+// Test 2: Explicit values
+enum HttpStatus {
+    OK = 200,
+    NOT_FOUND = 404,
+    SERVER_ERROR = 500
+}
+if (HttpStatus.OK == 200 and HttpStatus.NOT_FOUND == 404 and HttpStatus.SERVER_ERROR == 500) {
+    say("✓ Explicit value enum works");
+} else {
+    say("FAIL: OK=" + HttpStatus.OK);
+}
+
+// Test 3: Mixed explicit and auto-increment
+enum Priority {
+    LOW = 1,
+    MEDIUM,
+    HIGH
+}
+if (Priority.LOW == 1 and Priority.MEDIUM == 2 and Priority.HIGH == 3) {
+    say("✓ Mixed explicit/auto enum works");
+} else {
+    say("FAIL: LOW=" + Priority.LOW + " MEDIUM=" + Priority.MEDIUM + " HIGH=" + Priority.HIGH);
+}
+
+// Test 4: Enum used in match
+enum Color { RED, GREEN, BLUE }
+var c = Color.GREEN;
+match (c) {
+    case 0 => say("FAIL: should be GREEN not RED");
+    case 1 => say("✓ Enum value works in match");
+    case 2 => say("FAIL: should be GREEN not BLUE");
+    default => say("FAIL");
+}
+
+// Test 5: Enum as object — can access all members
+enum Season { SPRING, SUMMER, AUTUMN, WINTER }
+var count = 0;
+for (var s in Season) {
+    count = count + 1;
+}
+if (count == 4) {
+    say("✓ Enum is iterable as object");
+}
+
+say("\n=== All enum tests passed ===");

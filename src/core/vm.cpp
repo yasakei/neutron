@@ -1109,6 +1109,10 @@ void VM::run(size_t minFrameDepth) {
         &&CASE_OP_ADD_LOCAL_CONST,
         &&CASE_DEFAULT,              // OP_TYPE_GUARD → nop
         &&CASE_DEFAULT,              // OP_LOOP_HINT → nop
+        &&CASE_OP_FOR_IN_INIT,
+        &&CASE_OP_FOR_IN_NEXT,
+        &&CASE_OP_OPTIONAL_CHAIN,
+        &&CASE_OP_SPREAD,
     };
     #define DISPATCH() goto *dispatch_table[READ_BYTE()]
     #define CASE(op) CASE_##op:
@@ -2057,6 +2061,111 @@ void VM::run(size_t minFrameDepth) {
             CASE_DEFAULT:
                 runtimeError(this, "Unknown opcode.", frames.empty() ? -1 : frames.back().currentLine);
 #endif
+
+            // ================================================================
+            // OP_FOR_IN_INIT: pops iterable, pushes iterable + index=0 + keys
+            // ================================================================
+            CASE(OP_FOR_IN_INIT) {
+                Value iterable = pop();
+                Array* keys = allocate<Array>();
+                
+                if (iterable.type == ValueType::OBJECT) {
+                    Object* obj = iterable.as.object;
+                    if (obj && obj->obj_type == ObjType::OBJ_JSON_OBJECT) {
+                        auto* jobj = static_cast<JsonObject*>(obj);
+                        for (const auto& kv : jobj->properties) {
+                            keys->push(Value(kv.first)); // kv.first is ObjString*
+                        }
+                    }
+                } else if (iterable.type == ValueType::ARRAY) {
+                    Array* arr = iterable.as.array;
+                    for (size_t i = 0; i < arr->size(); i++) {
+                        keys->push(Value((double)i));
+                    }
+                }
+                
+                push(iterable);
+                push(Value(0.0));
+                push(Value(keys));  // Array* constructor sets type=ARRAY correctly
+                DISPATCH();
+            }
+
+            // ================================================================
+            // OP_FOR_IN_NEXT <var_slot> <offset_hi> <offset_lo>
+            // ================================================================
+            CASE(OP_FOR_IN_NEXT) {
+                uint8_t baseSlot = READ_BYTE(); // slot of iterable (index=base+1, keys=base+2)
+                uint8_t varSlot  = READ_BYTE(); // slot of loop variable
+                uint8_t offsetHi = READ_BYTE();
+                uint8_t offsetLo = READ_BYTE();
+                uint16_t offset = (uint16_t)((offsetHi << 8) | offsetLo);
+
+                // Access iterator state via frame slots (not stack top)
+                Value& indexVal = stk[frame->slot_offset + baseSlot + 1];
+                Value& keysVal  = stk[frame->slot_offset + baseSlot + 2];
+
+                Array* keys = keysVal.as.array;
+                double idx = indexVal.as.number;
+
+                if (idx >= (double)keys->size()) {
+                    frame->ip += offset; // exit loop
+                } else {
+                    stk[frame->slot_offset + varSlot] = keys->at((size_t)idx);
+                    indexVal = Value(idx + 1.0);
+                }
+                DISPATCH();
+            }
+
+            // ================================================================
+            // OP_OPTIONAL_CHAIN <prop_constant>
+            // ================================================================
+            CASE(OP_OPTIONAL_CHAIN) {
+                ObjString* propName = READ_CONSTANT().as.obj_string;
+                Value& obj = stk.back();
+                
+                if (obj.type == ValueType::NIL) {
+                    DISPATCH(); // short-circuit: nil stays on stack
+                }
+                
+                if (obj.type == ValueType::INSTANCE) {
+                    Instance* inst = obj.as.instance;
+                    Value* fieldVal = inst->getField(propName);
+                    if (fieldVal) {
+                        stk.back() = *fieldVal;
+                    } else {
+                        auto methIt = inst->klass->methods.find(propName);
+                        stk.back() = (methIt != inst->klass->methods.end()) ? methIt->second : Value();
+                    }
+                } else if (obj.type == ValueType::OBJECT) {
+                    Object* rawObj = obj.as.object;
+                    if (rawObj && rawObj->obj_type == ObjType::OBJ_JSON_OBJECT) {
+                        auto* jobj = static_cast<JsonObject*>(rawObj);
+                        auto it = jobj->properties.find(propName);
+                        stk.back() = (it != jobj->properties.end()) ? it->second : Value();
+                    } else {
+                        stk.back() = Value();
+                    }
+                } else {
+                    stk.back() = Value();
+                }
+                DISPATCH();
+            }
+
+            // ================================================================
+            // OP_SPREAD: pops array, pushes each element individually
+            // ================================================================
+            CASE(OP_SPREAD) {
+                Value val = pop();
+                if (val.type == ValueType::ARRAY) {
+                    Array* arr = val.as.array;
+                    for (size_t i = 0; i < arr->size(); i++) {
+                        push(arr->at(i));
+                    }
+                } else {
+                    push(val);
+                }
+                DISPATCH();
+            }
             CASE(OP_INVOKE) {
                 // Optimized method call: combines GET_PROPERTY + CALL
                 // Encoding: OP_INVOKE <property_name_constant> <arg_count>
@@ -2565,6 +2674,27 @@ void VM::run(size_t minFrameDepth) {
                         CASE(OP_CALL) {
                                 uint8_t argCount = READ_BYTE();
                                 syncStack();
+                                
+                                // 0xFF = dynamic arg count (used when spread args are present)
+                                // Count actual args by finding the callee: scan back for a callable
+                                if (argCount == 0xFF) {
+                                    // The callee is somewhere below the expanded args on the stack.
+                                    // We need to find it. Strategy: scan from top until we find a callable.
+                                    // The callee was pushed first, then args (including spread-expanded ones).
+                                    // We count how many values above the callee are on the stack.
+                                    int dynamicCount = 0;
+                                    for (int i = 1; i <= (int)stk.size(); i++) {
+                                        Value& v = stk[stk.size() - i];
+                                        if (v.type == ValueType::CALLABLE || 
+                                            v.type == ValueType::CLASS ||
+                                            v.type == ValueType::INSTANCE) {
+                                            dynamicCount = i - 1;
+                                            break;
+                                        }
+                                    }
+                                    argCount = (uint8_t)dynamicCount;
+                                }
+                                
                                 Value callee = peek(argCount);
                                 
                                 // Fast path for class instantiation (most common in OOP loops)
@@ -2996,6 +3126,20 @@ void VM::define_native(const std::string& name, Callable* function) {
 
 void VM::add_module_search_path(const std::string& path) {
     module_search_paths.push_back(path);
+}
+
+// Extract the directory portion of a file path, handling both / and \ separators
+static std::string extractDirectory(const std::string& filepath) {
+    const size_t last_slash     = filepath.rfind('/');
+    const size_t last_backslash = filepath.rfind('\\');
+    size_t last_sep = std::string::npos;
+    if (last_slash != std::string::npos && last_backslash != std::string::npos)
+        last_sep = std::max(last_slash, last_backslash);
+    else if (last_slash != std::string::npos)
+        last_sep = last_slash;
+    else if (last_backslash != std::string::npos)
+        last_sep = last_backslash;
+    return (last_sep != std::string::npos) ? filepath.substr(0, last_sep) : "";
 }
 
 void VM::define_module(const std::string& name, Module* module) {
@@ -3607,7 +3751,15 @@ Module* VM::load_file_as_module(const std::string& filepath) {
     
     std::string previousFileName = currentFileName;
     currentFileName = filepath;
+    // Temporarily add the loaded file's directory to search paths
+    std::string fileDir = extractDirectory(filepath);
+    if (!fileDir.empty()) {
+        module_search_paths.push_back(fileDir);
+    }
     interpret_module(statements, module_env);
+    if (!fileDir.empty()) {
+        module_search_paths.pop_back();
+    }
     currentFileName = previousFileName;
     
     // Create the module

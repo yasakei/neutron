@@ -1,0 +1,52 @@
+// Test: Spread operator (...args)
+say("=== Spread Operator ===");
+
+// Test 1: Spread array into function call
+fun add3(a, b, c) {
+    return a + b + c;
+}
+var nums = [1, 2, 3];
+var result = add3(...nums);
+if (result == 6) {
+    say("✓ Spread array into function call works");
+} else {
+    say("FAIL: expected 6, got " + result);
+}
+
+// Test 2: Spread with leading args
+fun sum4(a, b, c, d) {
+    return a + b + c + d;
+}
+var rest = [3, 4];
+var r2 = sum4(1, 2, ...rest);
+if (r2 == 10) {
+    say("✓ Spread with leading args works");
+} else {
+    say("FAIL: expected 10, got " + r2);
+}
+
+// Test 3: Spread single-element array
+fun identity(x) {
+    return x;
+}
+var single = [99];
+var r3 = identity(...single);
+if (r3 == 99) {
+    say("✓ Spread single-element array works");
+} else {
+    say("FAIL: expected 99, got " + r3);
+}
+
+// Test 4: Spread strings array
+fun greet(first, last) {
+    return first + " " + last;
+}
+var parts = ["Hello", "World"];
+var r4 = greet(...parts);
+if (r4 == "Hello World") {
+    say("✓ Spread string array works");
+} else {
+    say("FAIL: expected 'Hello World', got " + r4);
+}
+
+say("\n=== All spread tests passed ===");

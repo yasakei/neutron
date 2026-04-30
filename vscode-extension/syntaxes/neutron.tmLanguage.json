@@ -74,7 +74,7 @@
 			"patterns": [
 				{
 					"name": "keyword.control.flow.neutron",
-					"match": "\\b(if|else|while|for|do|return|break|continue|match|case|default)\\b"
+					"match": "\\b(if|else|while|for|do|return|break|continue|match|case|default|in)\\b"
 				},
 				{
 					"name": "keyword.control.exception.neutron",
@@ -86,7 +86,7 @@
 				},
 				{
 					"name": "storage.type.neutron",
-					"match": "\\b(var|fun|class|static)\\b"
+					"match": "\\b(var|fun|class|static|enum)\\b"
 				},
 				{
 					"name": "storage.modifier.neutron",
@@ -192,7 +192,11 @@
 				},
 				{
 					"name": "keyword.operator.ternary.neutron",
-					"match": "\\?|:"
+					"match": "\\?\\.|\\?|:"
+				},
+				{
+					"name": "keyword.operator.spread.neutron",
+					"match": "\\.\\.\\."
 				}
 			]
 		},
