@@ -532,6 +532,9 @@ public:
     // Safe files have restricted permissions (no file I/O, no system calls, etc.)
     bool isSafeFile;
 
+    // Open upvalue linked list head (for closure support)
+    class UpValue* openUpvalues = nullptr;
+
 private:
     // Internal call methods - not for public consumption (like the kitchen in a restaurant)
     bool call(Function* function, int argCount);
@@ -568,6 +571,10 @@ public:
 private:
     // Module interpretation - internal use only
     void interpret_module(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> module_env);
+
+    // Upvalue management
+    class UpValue* captureUpvalue(Value* local);
+    void closeUpvalues(Value* last);
 
     // Exception handling internals
     bool handleException(const Value& exception);

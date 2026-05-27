@@ -11,6 +11,13 @@
 
 namespace neutron {
 
+enum class AotMode {
+    QBE,      // Bytecode -> QBE IR -> qbe -> .o (default, fastest)
+    CPP,      // C++ AOT backend
+    HYBRID,   // Hybrid QBE + C++
+    INTERP    // No AOT, use interpreter
+};
+
 class ProjectBuilder {
 public:
     // Build a project to a native executable
@@ -22,7 +29,8 @@ public:
         const std::string& neutronExecutablePath,
         bool bundleLibs = false,
         bool aotCompile = false,
-        const std::string& targetArch = ""  // Cross-compilation target (e.g., "aarch64-linux-gnu")
+        const std::string& targetArch = "",  // Cross-compilation target (e.g., "aarch64-linux-gnu")
+        AotMode aotMode = AotMode::QBE       // AOT backend selection
     );
     
 private:

@@ -15,6 +15,8 @@
  */
 
 #include "vm.h"
+#include "types/closure.h"
+#include "types/upvalue.h"
 #include "runtime/native_functions.h"
 #include "sys/native.h"
 #include "compiler/compiler.h"
@@ -581,6 +583,10 @@ bool VM::callValue(Value callee, int argCount) {
             Function* function = static_cast<Function*>(callable);
             return call(function, argCount);
         }
+        case ObjType::OBJ_CLOSURE: {
+            ObjClosure* closure = static_cast<ObjClosure*>(callable);
+            return call(closure->function, argCount);
+        }
         case ObjType::OBJ_NATIVE_FN: {
             NativeFn* native = static_cast<NativeFn*>(callable);
             if (native->arity() != -1 && native->arity() != argCount) {
@@ -1049,9 +1055,9 @@ void VM::run(size_t minFrameDepth) {
         &&CASE_OP_LOOP,
         &&CASE_OP_CALL,
         &&CASE_OP_CLOSURE,
-        &&CASE_DEFAULT, // OP_GET_UPVALUE
-        &&CASE_DEFAULT, // OP_SET_UPVALUE
-        &&CASE_DEFAULT, // OP_CLOSE_UPVALUE
+        &&CASE_OP_GET_UPVALUE,
+        &&CASE_OP_SET_UPVALUE,
+        &&CASE_OP_CLOSE_UPVALUE,
         &&CASE_OP_ARRAY,
         &&CASE_OP_OBJECT,
         &&CASE_OP_INDEX_GET,
@@ -1134,6 +1140,10 @@ void VM::run(size_t minFrameDepth) {
                 Value result = stk.back();
                 stk.pop_back();
                 size_t return_slot_offset = frame->slot_offset;
+                // Close all open upvalues for this frame's locals before stack cleanup
+                if (stk.size() > return_slot_offset) {
+                    closeUpvalues(&stk[return_slot_offset]);
+                }
                 bool was_bound_method = frame->isBoundMethod;
                 bool was_initializer = frame->isInitializer;
                 
@@ -1197,12 +1207,95 @@ void VM::run(size_t minFrameDepth) {
             }
             CASE(OP_CLOSURE) {
                 Value constant = READ_CONSTANT();
-                // The constant should be a Function
-                if (constant.type == ValueType::CALLABLE) {
-                    push(constant);
-                } else {
+                if (constant.type != ValueType::CALLABLE) {
                     runtimeError(this, "OP_CLOSURE constant must be a function.", frames.empty() ? -1 : frames.back().currentLine);
+                    DISPATCH();
                 }
+                Function* fn = static_cast<Function*>(constant.as.callable);
+                ObjClosure* closure = allocate<ObjClosure>(fn);
+                // Read upvalue table
+                uint16_t numUpvalues = READ_SHORT();
+                closure->upvalues.reserve(numUpvalues);
+                for (uint16_t i = 0; i < numUpvalues; i++) {
+                    uint8_t isLocal = READ_BYTE();
+                    uint8_t index = READ_BYTE();
+                    if (isLocal) {
+                        Value* slot = &stack[frame->slot_offset + index];
+                        closure->upvalues.push_back(captureUpvalue(slot));
+                    } else {
+                        // Get upvalue from enclosing closure
+                        // The enclosing closure is at frame->slot_offset - 1 in the stack
+                        // (the function value that was pushed)
+                        // For nested closures, we walk the frame chain
+                        if (!frames.empty()) {
+                            // The enclosing function compiled the closure and pushed it
+                            // The upvalues are on the stack from the inner function's perspective
+                            Value* slot = &stack[frame->slot_offset + index];
+                            UpValue* uv = captureUpvalue(slot);
+                            closure->upvalues.push_back(uv);
+                        } else {
+                            closure->upvalues.push_back(allocate<UpValue>(nullptr));
+                        }
+                    }
+                }
+                push(Value(static_cast<Callable*>(closure)));
+                DISPATCH();
+            }
+            CASE(OP_GET_UPVALUE) {
+                uint8_t slot = READ_BYTE();
+                if (!frames.empty()) {
+                    CallFrame* curFrame = &frames.back();
+                    // Regular calls: closure is at slot_offset - 1 (below args)
+                    // Bound methods: slot_offset points to receiver
+                    size_t closureSlot = curFrame->isBoundMethod
+                        ? curFrame->slot_offset
+                        : (curFrame->slot_offset > 0 ? curFrame->slot_offset - 1 : 0);
+                    if (closureSlot < stack.size()) {
+                        Value closureVal = stack[closureSlot];
+                        if (closureVal.type == ValueType::CALLABLE &&
+                            closureVal.as.callable->obj_type == ObjType::OBJ_CLOSURE) {
+                            ObjClosure* cl = static_cast<ObjClosure*>(closureVal.as.callable);
+                            if (slot < cl->upvalues.size() && cl->upvalues[slot]) {
+                                push(*cl->upvalues[slot]->location);
+                            } else {
+                                push(Value());
+                            }
+                        } else {
+                            push(Value());
+                        }
+                    } else {
+                        push(Value());
+                    }
+                } else {
+                    push(Value());
+                }
+                DISPATCH();
+            }
+            CASE(OP_SET_UPVALUE) {
+                uint8_t slot = READ_BYTE();
+                Value val = peek(0);
+                if (!frames.empty()) {
+                    CallFrame* curFrame = &frames.back();
+                    size_t closureSlot = curFrame->isBoundMethod
+                        ? curFrame->slot_offset
+                        : (curFrame->slot_offset > 0 ? curFrame->slot_offset - 1 : 0);
+                    if (closureSlot < stack.size()) {
+                        Value closureVal = stack[closureSlot];
+                        if (closureVal.type == ValueType::CALLABLE &&
+                            closureVal.as.callable->obj_type == ObjType::OBJ_CLOSURE) {
+                            ObjClosure* cl = static_cast<ObjClosure*>(closureVal.as.callable);
+                            if (slot < cl->upvalues.size() && cl->upvalues[slot]) {
+                                *cl->upvalues[slot]->location = val;
+                            }
+                        }
+                    }
+                }
+                DISPATCH();
+            }
+            CASE(OP_CLOSE_UPVALUE) {
+                Value* last = &stack.back();
+                closeUpvalues(last);
+                pop();
                 DISPATCH();
             }
             CASE(OP_NIL) {
@@ -3124,6 +3217,37 @@ void VM::define_native(const std::string& name, Callable* function) {
     globals[name] = Value(function);
 }
 
+UpValue* VM::captureUpvalue(Value* local) {
+    // If there's already an open upvalue pointing to this location, reuse it
+    UpValue* prev = nullptr;
+    UpValue* uv = openUpvalues;
+    while (uv != nullptr) {
+        if (uv->location == local) return uv;
+        if (uv->location < local) break;
+        prev = uv;
+        uv = uv->next;
+    }
+
+    // Create a new open upvalue
+    UpValue* created = allocate<UpValue>(local);
+    created->next = uv;
+    if (prev == nullptr) {
+        openUpvalues = created;
+    } else {
+        prev->next = created;
+    }
+    return created;
+}
+
+void VM::closeUpvalues(Value* last) {
+    while (openUpvalues != nullptr && openUpvalues->location >= last) {
+        UpValue* uv = openUpvalues;
+        uv->closed = *uv->location;
+        uv->location = &uv->closed;
+        openUpvalues = uv->next;
+    }
+}
+
 void VM::add_module_search_path(const std::string& path) {
     module_search_paths.push_back(path);
 }
@@ -3835,13 +3959,17 @@ void VM::markRoots() {
         markValue(pair.second);
     }
 
-    // Mark objects in call frame functions (only functions since closures are part of them)
-    for (const auto& frame : frames) {
-        if (frame.function) {
-            // Mark the function itself
-            markObject(frame.function);
-        }
-    }
+            // Mark objects in call frame functions
+            for (const auto& frame : frames) {
+                if (frame.function) {
+                    markObject(frame.function);
+                }
+            }
+
+            // Mark open upvalues
+            for (UpValue* uv = openUpvalues; uv; uv = uv->next) {
+                markObject(uv);
+            }
 
     // Mark temporary roots
     for (Object* obj : tempRoots) {
@@ -3909,6 +4037,19 @@ void VM::blackenObject(Object* obj) {
             if (func->chunk) {
                 for (const auto& constant : func->chunk->constants) markValue(constant);
             }
+            break;
+        }
+        case ObjType::OBJ_CLOSURE: {
+            auto* closure = static_cast<ObjClosure*>(obj);
+            if (closure->function) markObject(closure->function);
+            for (auto* uv : closure->upvalues) {
+                if (uv) markObject(uv);
+            }
+            break;
+        }
+        case ObjType::OBJ_UPVALUE: {
+            auto* uv = static_cast<UpValue*>(obj);
+            markValue(uv->closed);
             break;
         }
         case ObjType::OBJ_CLASS: {

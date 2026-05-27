@@ -6,6 +6,8 @@ import subprocess
 import time
 import io
 import shutil
+import tempfile
+import re
 
 # Force UTF-8 output on Windows
 if sys.platform == 'win32':
@@ -163,7 +165,7 @@ def run_benchmark(name, neutron_bin, neutron_file, python_file, js_file=None, ne
         }
 
     # Compare outputs and calculate performance
-    global neutron_faster, python_faster, js_faster, failed_benchmarks
+    global neutron_faster, python_faster, js_faster, failed_benchmarks, qbe_faster, interp_faster, internal_failed
     
     # Check if outputs match (only for successful runs)
     successful_runs = [k for k, v in results.items() if v['success']]
@@ -251,21 +253,186 @@ def run_benchmark(name, neutron_bin, neutron_file, python_file, js_file=None, ne
             for line in results[lang]['output'].splitlines():
                 print(f"      {line}")
 
-neutron_faster = 0
+def run_internal_benchmarks(bench_dir, root_dir):
+    global qbe_faster, interp_faster, internal_failed
+
+    neutron_bin = os.path.join(root_dir, "build", "neutron")
+    if not os.path.exists(neutron_bin):
+        neutron_bin = os.path.join(root_dir, "neutron")
+    if not os.path.exists(neutron_bin):
+        Colors.print("Neutron binary not found. Please build first.", Colors.RED)
+        sys.exit(1)
+
+    tmpdir = tempfile.mkdtemp(prefix="neutron_internal_bench_")
+
+    try:
+        ver_str = "unknown"
+        try:
+            r = subprocess.run([neutron_bin, '--version'], capture_output=True, text=True)
+            m = re.search(r'Neutron\s+([\d.\-\w]+)', r.stdout)
+            ver_str = m.group(1) if m else "unknown"
+        except: pass
+
+        bench_files = sorted(os.path.join(bench_dir, "neutron", f)
+                             for f in os.listdir(os.path.join(bench_dir, "neutron"))
+                             if f.endswith(".nt"))
+
+        Colors.print("┌" + "─" * 78 + "┐", Colors.CYAN)
+        Colors.print("│" + " " * 18 + "Neutron Internal Backend Benchmarks" + " " * 18 + "│", Colors.CYAN)
+        Colors.print("└" + "─" * 78 + "┘", Colors.CYAN)
+        print()
+        Colors.print(f"  Neutron: {ver_str}", Colors.BLUE)
+        print()
+
+        Colors.print("┌──────────────────────┬──────────┬──────────┬───────────────────────────┐", Colors.CYAN)
+        Colors.print("│ Benchmark            │ QBE AOT  │ Interp   │ Result                    │", Colors.CYAN)
+        Colors.print("├──────────────────────┼──────────┼──────────┼───────────────────────────┤", Colors.CYAN)
+
+        total = 0
+        for bf in bench_files:
+            name = os.path.splitext(os.path.basename(bf))[0]
+            total += 1
+
+            proj_dir = os.path.join(tmpdir, name)
+            os.makedirs(proj_dir, exist_ok=True)
+            shutil.copy2(bf, os.path.join(proj_dir, "main.nt"))
+            with open(os.path.join(proj_dir, ".quark"), 'w') as f:
+                f.write(f"[project]\nname=\"{name}\"\nversion=\"1.0.0\"\nentry=\"main.nt\"\n")
+
+            env = os.environ.copy()
+            libpath = os.path.join(root_dir, "build")
+            if not os.path.exists(os.path.join(libpath, "libneutron_shared.so")):
+                libpath = os.path.join(root_dir, "build_debug")
+            env["LD_LIBRARY_PATH"] = libpath + ":" + env.get("LD_LIBRARY_PATH", "")
+
+            # --- Build QBE AOT ---
+            shutil.rmtree(os.path.join(proj_dir, "build"), ignore_errors=True)
+            os.makedirs(os.path.join(proj_dir, "build"), exist_ok=True)
+            subprocess.run([neutron_bin, "build", "--aot-mode=qbe"],
+                           cwd=proj_dir, capture_output=True, text=True, encoding='utf-8', errors='replace', env=env)
+            qbe_bin = os.path.join(proj_dir, "build", name)
+            if os.path.exists(qbe_bin):
+                shutil.move(qbe_bin, qbe_bin + "_qbe")
+
+            results = {}
+
+            def time_run(path, key):
+                if not os.path.exists(path):
+                    results[key] = {'time': 0, 'success': False, 'display': 'FAILED'}
+                    return
+                for _ in range(3):
+                    try:
+                        t0 = time.time()
+                        r = subprocess.run([path], capture_output=True, text=True, encoding='utf-8', errors='replace', env=env, timeout=60)
+                        t = time.time() - t0
+                        if r.returncode == 0:
+                            results[key] = {'time': t, 'success': True, 'output': r.stdout.strip()}
+                            return
+                    except: pass
+                results[key] = {'time': 0, 'success': False, 'display': 'FAILED'}
+
+            time_run(qbe_bin + "_qbe", "qbe")
+
+            # Interpreter
+            for _ in range(3):
+                try:
+                    t0 = time.time()
+                    r = subprocess.run([neutron_bin, "main.nt", "--no-aot"],
+                                       cwd=proj_dir, capture_output=True, text=True, encoding='utf-8', errors='replace', env=env, timeout=60)
+                    t = time.time() - t0
+                    if r.returncode == 0:
+                        results['interp'] = {'time': t, 'success': True, 'output': r.stdout.strip()}
+                        break
+                except: pass
+            if 'interp' not in results:
+                results['interp'] = {'time': 0, 'success': False, 'display': 'FAILED'}
+
+            successful = [k for k, v in results.items() if v.get('success')]
+            ok = True
+            if len(successful) > 1:
+                base = results[successful[0]]['output']
+                for k in successful[1:]:
+                    if results[k]['output'] != base:
+                        ok = False
+                        break
+
+            fastest = None
+            ft = float('inf')
+            for k in successful:
+                if results[k]['time'] < ft:
+                    ft = results[k]['time']
+                    fastest = k
+
+            color = Colors.NC
+            if not ok and len(successful) > 1:
+                internal_failed += 1
+                result_str = "MISMATCH"
+                color = Colors.RED
+            elif len(successful) == 0:
+                internal_failed += 1
+                result_str = "ALL FAILED"
+                color = Colors.RED
+            elif fastest == 'qbe':
+                qbe_faster += 1
+                result_str = "QBE"
+                color = Colors.GREEN
+            else:
+                interp_faster += 1
+                result_str = "Interp"
+                color = Colors.CYAN
+
+            if fastest and len(successful) > 1:
+                ratios = []
+                for k in successful:
+                    if k != fastest and results[k]['time'] > 0:
+                        ratios.append(f"{results[k]['time']/ft:.1f}x")
+                if ratios:
+                    result_str += f" ({'/'.join(ratios)})"
+
+            d_qbe = results.get('qbe', {}).get('display', 'N/A')
+            if results.get('qbe', {}).get('success'):
+                d_qbe = f"{results['qbe']['time']:.3f}s"
+            d_int = results.get('interp', {}).get('display', 'N/A')
+            if results.get('interp', {}).get('success'):
+                d_int = f"{results['interp']['time']:.3f}s"
+
+            print(f"│ {name:<20} │ {d_qbe:<8} │ {d_int:<8} │ {result_str:<25} │")
+
+        Colors.print("└──────────────────────┴──────────┴──────────┴───────────────────────────┘", Colors.CYAN)
+        print()
+
+        Colors.print("INTERNAL BENCHMARK SUMMARY", Colors.CYAN)
+        print(f"Total: {total}")
+        print(f"  QBE:     {qbe_faster}")
+        print(f"  Interp:  {interp_faster}")
+        if internal_failed:
+            Colors.print(f"  Failed:  {internal_failed}", Colors.RED)
+
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
 python_faster = 0
 js_faster = 0
 failed_benchmarks = 0
+qbe_faster = 0
+interp_faster = 0
+internal_failed = 0
 
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Neutron Benchmark Suite")
     parser.add_argument('--no-jit', action='store_true', help='Disable JIT compilation for Neutron benchmarks')
+    parser.add_argument('--internal', action='store_true', help='Benchmark Neutron backends: QBE vs Interpreter')
     args = parser.parse_args()
 
     # Script lives in benchmarks/, root is one level up
     script_dir = os.path.dirname(os.path.abspath(__file__))
     root_dir = os.path.dirname(script_dir)
-    bench_dir = script_dir  # benchmark files are in the same folder as this script
+    bench_dir = script_dir
+
+    if args.internal:
+        run_internal_benchmarks(bench_dir, root_dir)
+        return
 
     # Find neutron binary
     exe_name = "neutron.exe" if platform.system() == "Windows" else "neutron"
@@ -293,7 +460,6 @@ def main():
     Colors.print("│" + " " * 25 + "Neutron Benchmark Suite v3.0" + " " * 24 + "│", Colors.CYAN)
     Colors.print("└" + "─" * 78 + "┘", Colors.CYAN)
     print()
-    import re
     try:
         ver_out = subprocess.run([neutron_bin, '--version'], capture_output=True, text=True)
         match = re.search(r'Neutron\s+([\d.\-\w]+)', ver_out.stdout)

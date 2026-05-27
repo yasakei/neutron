@@ -309,10 +309,10 @@ int main(int argc, char* argv[]) {
         }
         
         else if (arg == "run") {
-            // Check if we're in a Neutron project
-            std::string projectRoot = neutron::ProjectManager::findProjectRoot(".");
+            std::string projectPath = argc > 2 ? argv[2] : ".";
+            std::string projectRoot = neutron::ProjectManager::findProjectRoot(projectPath);
             if (projectRoot.empty()) {
-                std::cerr << "Error: Not in a Neutron project. Run './neutron init' to create one." << std::endl;
+                std::cerr << "Error: Not in a Neutron project at '" << projectPath << "'. Run './neutron init' to create one." << std::endl;
                 return 1;
             }
             
@@ -335,6 +335,8 @@ int main(int argc, char* argv[]) {
             bool bundleLibs = true;
             bool aotCompile = true;  // AOT is now the default
             std::string targetArch = "";  // Cross-compilation target
+            std::string projectPath = ".";  // Default to current directory
+            neutron::AotMode aotMode = neutron::AotMode::QBE;
 
             for (int i = 2; i < argc; i++) {
                 std::string flag = argv[i];
@@ -343,18 +345,41 @@ int main(int argc, char* argv[]) {
                 } else if (flag == "--aot" || flag == "-c") {
                     aotCompile = true;
                 } else if (flag == "--no-aot" || flag == "--interpret") {
-                    aotCompile = false;  // Allow fallback to interpreter mode
+                    aotCompile = false;
+                    aotMode = neutron::AotMode::INTERP;
                 } else if (flag == "--target" && i + 1 < argc) {
-                    targetArch = argv[++i];  // Cross-compilation target
+                    targetArch = argv[++i];
                 } else if (flag.find("--target=") == 0) {
-                    targetArch = flag.substr(9);  // --target=xxx format
+                    targetArch = flag.substr(9);
+                } else if (flag == "--aot-mode" && i + 1 < argc) {
+                    std::string mode = argv[++i];
+                    if (mode == "qbe") aotMode = neutron::AotMode::QBE;
+                    else if (mode == "cpp") aotMode = neutron::AotMode::CPP;
+                    else if (mode == "hybrid") aotMode = neutron::AotMode::HYBRID;
+                    else if (mode == "interp") { aotMode = neutron::AotMode::INTERP; aotCompile = false; }
+                    else {
+                        std::cerr << "Error: Unknown AOT mode '" << mode << "'. Valid modes: qbe, cpp, hybrid, interp" << std::endl;
+                        return 1;
+                    }
+                } else if (flag.find("--aot-mode=") == 0) {
+                    std::string mode = flag.substr(11);
+                    if (mode == "qbe") aotMode = neutron::AotMode::QBE;
+                    else if (mode == "cpp") aotMode = neutron::AotMode::CPP;
+                    else if (mode == "hybrid") aotMode = neutron::AotMode::HYBRID;
+                    else if (mode == "interp") { aotMode = neutron::AotMode::INTERP; aotCompile = false; }
+                    else {
+                        std::cerr << "Error: Unknown AOT mode '" << mode << "'. Valid modes: qbe, cpp, hybrid, interp" << std::endl;
+                        return 1;
+                    }
+                } else if (flag[0] != '-') {
+                    projectPath = flag;
                 }
             }
 
             // Check if we're in a Neutron project
-            std::string projectRoot = neutron::ProjectManager::findProjectRoot(".");
+            std::string projectRoot = neutron::ProjectManager::findProjectRoot(projectPath);
             if (projectRoot.empty()) {
-                std::cerr << "Error: Not in a Neutron project. Run './neutron init' to create one." << std::endl;
+                std::cerr << "Error: Not in a Neutron project at '" << projectPath << "'. Run './neutron init' to create one." << std::endl;
                 return 1;
             }
 
@@ -368,7 +393,14 @@ int main(int argc, char* argv[]) {
             std::string entryFile = projectRoot + "/" + config->entry;
 
             std::cout << "Building: " << config->name << std::endl;
-            std::cout << "  Mode: " << (aotCompile ? "AOT (native)" : "Interpreter") << std::endl;
+            if (aotCompile) {
+                if (aotMode == neutron::AotMode::QBE) {
+                    bool qbeAvail = (system("which qbe > /dev/null 2>&1") == 0);
+                    std::cout << "  Mode: AOT (QBE" << (qbeAvail ? "" : " [not found]") << ")" << std::endl;
+                }
+            } else {
+                std::cout << "  Mode: Interpreter" << std::endl;
+            }
             if (!targetArch.empty()) {
                 std::cout << "  Target: " << targetArch << " (cross-compilation)" << std::endl;
             }
@@ -377,8 +409,9 @@ int main(int argc, char* argv[]) {
             std::string buildDir = projectRoot + "/build";
             std::filesystem::create_directories(buildDir);
 
-            // Output executable name
-            std::string outputName = config->name;
+            // Output executable name — use project directory basename, not config name
+            std::string outputName = std::filesystem::weakly_canonical(projectRoot).filename().string();
+            if (outputName.empty()) outputName = "output";
 #ifdef _WIN32
             outputName += ".exe";
 #endif
@@ -410,7 +443,8 @@ int main(int argc, char* argv[]) {
                 neutron::platform::getExecutablePath(),
                 bundleLibs,
                 aotCompile,
-                targetArch
+                targetArch,
+                aotMode
             );
             
             return success ? 0 : 1;

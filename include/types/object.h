@@ -67,6 +67,8 @@ enum class ObjType : uint8_t {
     OBJ_JSON_ARRAY,       ///< JSON-style array [values]
     OBJ_MODULE,           ///< Loaded module
     OBJ_BUFFER,           ///< Binary data buffer
+    OBJ_CLOSURE,          ///< Function closure with upvalues
+    OBJ_UPVALUE,          ///< Captured variable for closure
 };
 
 /**

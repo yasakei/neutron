@@ -11,8 +11,8 @@ class Array : public Object {
 public:
     std::vector<Value> elements;
     
-    Array() = default;
-    Array(std::vector<Value> elements) : elements(std::move(elements)) {}
+    Array() { obj_type = ObjType::OBJ_ARRAY; }
+    Array(std::vector<Value> elements) : elements(std::move(elements)) { obj_type = ObjType::OBJ_ARRAY; }
     
     std::string toString() const override;
     

@@ -7,7 +7,8 @@
 #include "compiler/scanner.h"
 #include "compiler/parser.h"
 #include "compiler/compiler.h"
-#include "aot/aot_compiler.h"
+#include "aot/aot_builder.h"
+#include "aot/qbe_codegen.h"
 #include "core/vm.h"
 #include "types/value.h"
 #include <iostream>
@@ -138,6 +139,9 @@ std::vector<std::string> ProjectBuilder::getRuntimeSources() {
         "src/modules/module_registry.cpp",
         "src/modules/module_utils.cpp",
         
+        // AOT runtime sources
+        "src/aot/qbe_runtime.cpp",
+
         // Project system sources
         "src/project/project_config.cpp",
         "src/project/project_manager.cpp",
@@ -174,7 +178,8 @@ bool ProjectBuilder::buildProjectExecutable(
     const std::string& neutronExecutablePath,
     bool bundleLibs,
     bool aotCompile,
-    const std::string& targetArch
+    const std::string& targetArch,
+    AotMode aotMode
 ) {
     std::cout << "\n[1/4] Preparing build..." << std::endl;
 
@@ -268,6 +273,11 @@ bool ProjectBuilder::buildProjectExecutable(
         finalOutputPath += ".exe";
     }
     
+    // QBE AOT state
+    std::string qbeObjectPath;
+    bool qbeAot = false;
+    bool useHybrid = (aotMode == AotMode::HYBRID);
+
     // Create source file
     std::string tempSourcePath = finalOutputPath + "_main.cpp";
     std::ofstream srcFile(tempSourcePath);
@@ -283,7 +293,12 @@ bool ProjectBuilder::buildProjectExecutable(
     srcFile << "#include <string>\n";
     srcFile << "#include <vector>\n";
     srcFile << "#include <cstdint>\n";
-    srcFile << "#include <cmath>\n\n";
+    srcFile << "#include <cmath>\n";
+    srcFile << "#include \"core/vm.h\"\n";
+    srcFile << "#include \"compiler/scanner.h\"\n";
+    srcFile << "#include \"compiler/parser.h\"\n";
+    srcFile << "#include \"compiler/compiler.h\"\n";
+    srcFile << "#include \"types/function.h\"\n\n";
 
     // Find box modules
     auto boxModules = findBoxModules(projectRoot);
@@ -291,18 +306,16 @@ bool ProjectBuilder::buildProjectExecutable(
     // AOT compilation: only for pure Neutron code (no external/native modules)
     // OR when all external modules have static libraries (.a)
     bool aotSuccess = false;
+    std::vector<std::string> aotUsedModules;
+    std::set<std::string> nonAotModules = {
+        "http", "json", "sys", "time", "crypto", "process",
+        "arrays", "async", "regex"
+    };
     if (aotCompile) {
         std::cout << "[2/4] Analyzing dependencies..." << std::endl;
         
-        std::vector<std::string> aotUsedModules = getUsedModules(sourceCode);
+        aotUsedModules = getUsedModules(sourceCode);
         auto boxModules = findBoxModules(projectRoot);
-
-        // Modules that require interpreter (native code or external dependencies)
-        // Note: math, random, fmt, path have AOT-compatible implementations in aot_module.h
-        std::set<std::string> nonAotModules = {
-            "http", "json", "sys", "time", "crypto", "process",
-            "arrays", "async", "regex"
-        };
         
         bool canAot = true;
         bool hasStaticLibs = true;
@@ -331,7 +344,7 @@ bool ProjectBuilder::buildProjectExecutable(
         }
         
         if (canAot) {
-            std::cout << "      Compiling to native code..." << std::endl;
+            std::cout << "      Compiling to bytecode..." << std::endl;
             
             neutron::VM aotVm;
             neutron::Scanner aotScanner(sourceCode);
@@ -342,18 +355,65 @@ bool ProjectBuilder::buildProjectExecutable(
             neutron::Function* mainFunc = aotCompiler.compile(aotStatements);
             
             if (mainFunc && mainFunc->chunk) {
-                std::cout << "      Generated " << mainFunc->chunk->code.size() << " native instructions" << std::endl;
+                size_t instrCount = mainFunc->chunk->code.size();
+                std::cout << "      Generated " << instrCount << " bytecode instructions" << std::endl;
                 
-                srcFile << "// Auto-generated native code - no VM needed\n\n";
-                neutron::aot::AotCompiler aotGen(mainFunc->chunk);
-                srcFile << aotGen.generateCode("neutron_main");
-                srcFile << "\nint main() { return neutron_main(); }\n";
-                srcFile.close();
-                aotSuccess = true;
+                // Determine which backend to use based on AOT mode
+                bool useQbe = false;
+
+                switch (aotMode) {
+                    case AotMode::QBE:
+                        useQbe = neutron::aot::AotBuilder::detect_qbe();
+                        break;
+                    case AotMode::INTERP:
+                        // No AOT, use interpreter
+                        break;
+                }
+
+                if (useQbe) {
+                    std::cout << "      Using QBE backend..." << std::endl;
+
+                    std::string ssaPath = finalOutputPath + "_neutron_main.ssa";
+                    std::string objPath = finalOutputPath + "_neutron_main.o";
+
+                    if (neutron::aot::AotBuilder::write_qbe_ir(mainFunc->chunk, "neutron_main", ssaPath) &&
+                        neutron::aot::AotBuilder::assemble(ssaPath, objPath)) {
+
+                        qbeObjectPath = objPath;
+                        qbeAot = true;
+                        aotSuccess = true;
+                        std::cout << "      QBE assembly complete (SSA: " << ssaPath << ")" << std::endl;
+                    } else {
+                        std::cout << "      QBE failed, using interpreter fallback" << std::endl;
+                    }
+                }
             }
         }
     }
     
+    // For QBE AOT, generate minimal C wrapper
+    if (qbeAot) {
+        srcFile << "// Auto-generated QBE AOT wrapper\n";
+        srcFile << "extern \"C\" int neutron_main();\n";
+        srcFile << "extern \"C\" void rt_init(neutron::VM* vm);\n";
+        srcFile << "int main() {\n";
+        srcFile << "    neutron::VM vm;\n";
+        srcFile << "    rt_init(&vm);\n";
+
+        // Pre-load native modules that the source uses
+        for (const auto& mod : aotUsedModules) {
+            // Skip interpreter-only modules and source modules
+            if (nonAotModules.count(mod) > 0) {
+                continue;
+            }
+            srcFile << "    vm.load_module(\"" << mod << "\");\n";
+        }
+
+        srcFile << "    return neutron_main();\n";
+        srcFile << "}\n";
+        srcFile.close();
+    }
+
     // If AOT didn't succeed, embed source for interpreter mode
     if (!aotSuccess) {
         std::cout << "[2/4] Embedding source files..." << std::endl;
@@ -945,13 +1005,48 @@ bool ProjectBuilder::buildProjectExecutable(
     }
     
     // Add output and link flags
-    // For AOT builds with no external modules, skip unnecessary library links
-    if (aotSuccess) {
-        // Pure AOT build - no external libraries needed
-        if (isWindows && !isMingw) {
-            compileCommand += "/Fe:\"" + finalOutputPath + "\"";
+    if (aotSuccess && qbeAot) {
+        // QBE AOT - link with runtime library and .o
+        compileCommand += "\"" + qbeObjectPath + "\" ";
+        
+        // Link with runtime library
+        if (!runtimeLibPath.empty()) {
+            bool isShared = (runtimeLibPath.find(".so") != std::string::npos ||
+                            runtimeLibPath.find(".dylib") != std::string::npos ||
+                            runtimeLibPath.find(".dll") != std::string::npos);
+            if (isShared) {
+                std::string libDir = std::filesystem::path(runtimeLibPath).parent_path().string();
+                std::string libName = std::filesystem::path(runtimeLibPath).stem().string();
+                if (libName.find("lib") == 0) libName = libName.substr(3);
+                compileCommand += "-L\"" + libDir + "\" -l" + libName + " -Wl,-rpath,\"" + libDir + "\" ";
+            } else if (!isWindows && !isMacOS) {
+                compileCommand += "-Wl,--whole-archive \"" + runtimeLibPath + "\" -Wl,--no-whole-archive ";
+            } else {
+                compileCommand += "\"" + runtimeLibPath + "\" ";
+            }
         } else {
-            compileCommand += "-o \"" + finalOutputPath + "\"";
+            // Compile runtime sources from scratch
+            auto runtimeSources = getRuntimeSources();
+            for (const auto& src : runtimeSources) {
+                std::string fullPath = neutronSrcDir + "/" + src;
+                if (fileExists(fullPath)) {
+                    compileCommand += "\"" + fullPath + "\" ";
+                }
+            }
+            // Add built-in modules
+            auto builtinSources = getBuiltinModuleSources();
+            for (const auto& src : builtinSources) {
+                std::string fullPath = neutronSrcDir + "/" + src;
+                if (fileExists(fullPath)) {
+                    compileCommand += "\"" + fullPath + "\" ";
+                }
+            }
+        }
+        
+        if (isWindows && !isMingw) {
+            compileCommand += "/Fe:\"" + finalOutputPath + "\" " + linkFlags;
+        } else {
+            compileCommand += linkFlags + " -o \"" + finalOutputPath + "\"";
         }
     } else if (isWindows && !isMingw) {
         compileCommand += "/Fe:\"" + finalOutputPath + "\" " + linkFlags;
@@ -982,7 +1077,6 @@ bool ProjectBuilder::buildProjectExecutable(
     }
 
     std::cout << "[3/4] Compiling and linking..." << std::endl;
-    // std::cout << "Command: " << compileCommand << std::endl;  // DEBUG: Commented out for clean output
     
     int result;
     

@@ -19,6 +19,26 @@ endif()
 # =============================================================================
 # Build Options
 # =============================================================================
+
+# QBE backend detection (optional)
+find_program(QBE qbe)
+if(NOT QBE)
+    message(STATUS "QBE not found — AOT will fall back to C++ path")
+    add_compile_definitions(NEUTRON_NO_QBE)
+else()
+    message(STATUS "QBE found: ${QBE}")
+endif()
+
+# libclang for C++ FFI (optional)
+find_package(LLVM QUIET)
+if(LLVM_FOUND)
+    message(STATUS "LLVM found: ${LLVM_VERSION} — C++ FFI bridge enabled")
+    add_compile_definitions(NEUTRON_HAVE_LIBCLANG)
+    include_directories(${LLVM_INCLUDE_DIRS})
+else()
+    message(STATUS "LLVM not found — C++ FFI bridge will use manual declaration parsing")
+endif()
+
 # NEUTRON_UNSAFE_OPTIMIZATIONS: Enable aggressive performance optimizations that
 # may reduce security. Currently this disables MSVC stack buffer security checks
 # (/GS-). Only enable for benchmarking or performance-critical builds where the
@@ -226,7 +246,13 @@ set(NEUTRON_COMPILER_SOURCES
     src/jit/jit_tier1.cpp
     src/jit/jit_tier2.cpp
     src/jit/jit_tier2_arm64.cpp
-    src/aot/aot_compiler.cpp
+    src/aot/dependency_graph.cpp
+    src/aot/qbe_codegen.cpp
+    src/aot/qbe_runtime.cpp
+    src/aot/aot_builder.cpp
+    src/aot/ntm_metadata.cpp
+    src/aot/ffi_bridge.cpp
+    src/aot/cpp_stub_gen.cpp
 )
 
 # Type system source files
@@ -236,6 +262,8 @@ set(NEUTRON_TYPES_SOURCES
     src/types/buffer.cpp
     src/types/json_object.cpp
     src/types/json_array.cpp
+    src/types/closure.cpp
+    src/types/upvalue.cpp
     src/types/return.cpp
     src/types/version.cpp
     src/types/obj_string.cpp

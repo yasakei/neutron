@@ -95,6 +95,12 @@ struct Local {
     Token name;
     int depth;
     std::optional<Token> typeAnnotation;  ///< Optional type annotation for this local
+    bool isCaptured = false;  ///< Whether this local is captured by a closure
+};
+
+struct UpvalueDesc {
+    uint8_t index;
+    bool isLocal;
 };
 
 /**
@@ -175,6 +181,8 @@ public:
     void patchJump(int offset);                ///< Patch jump offset after target is known
     void emitLoop(int loopStart);              ///< Emit loop back-edge
     int resolveLocal(const Token& name);       ///< Resolve variable to local slot
+    int resolveUpvalue(const Token& name);     ///< Resolve variable as upvalue in enclosing scope
+    int addUpvalue(Compiler* enclosing, uint8_t index, bool isLocal);  ///< Register an upvalue
 
     // Type validation
     bool validateType(const std::optional<Token>& typeAnnotation, ValueType actualType);
@@ -234,6 +242,7 @@ public:
     int scopeDepth;           ///< Current lexical scope depth
     int currentLine;          ///< Current source line for debugging
     std::vector<Local> locals;  ///< Local variable symbol table
+    std::vector<UpvalueDesc> upvalues;  ///< Upvalue descriptors for this function
 
     // Loop control - stacks for nested loops
     std::vector<int> loopStarts;  ///< Stack of loop start positions

@@ -44,7 +44,11 @@ void Compiler::beginScope() {
 void Compiler::endScope() {
     scopeDepth--;
     while (locals.size() > 0 && locals.back().depth > scopeDepth) {
-        emitByte((uint8_t)OpCode::OP_POP);
+        if (locals.back().isCaptured) {
+            emitByte((uint8_t)OpCode::OP_CLOSE_UPVALUE);
+        } else {
+            emitByte((uint8_t)OpCode::OP_POP);
+        }
         locals.pop_back();
     }
 }
@@ -137,6 +141,37 @@ int Compiler::resolveLocal(const Token& name) {
     }
 
     return -1;
+}
+
+int Compiler::resolveUpvalue(const Token& name) {
+    if (!enclosing) return -1;
+
+    // Try to find as a local in the enclosing function
+    int local = enclosing->resolveLocal(name);
+    if (local != -1) {
+        enclosing->locals[local].isCaptured = true;
+        return addUpvalue(enclosing, (uint8_t)local, true);
+    }
+
+    // Try to find as an upvalue in the enclosing function
+    int upvalue = enclosing->resolveUpvalue(name);
+    if (upvalue != -1) {
+        return addUpvalue(enclosing, (uint8_t)upvalue, false);
+    }
+
+    return -1;
+}
+
+int Compiler::addUpvalue(Compiler* enclosing, uint8_t index, bool isLocal) {
+    (void)enclosing;
+    // Check if already in upvalues
+    for (size_t i = 0; i < upvalues.size(); i++) {
+        if (upvalues[i].index == index && upvalues[i].isLocal == isLocal) {
+            return (int)i;
+        }
+    }
+    upvalues.push_back({index, isLocal});
+    return (int)(upvalues.size() - 1);
 }
 
 void Compiler::visitLiteralExpr(const LiteralExpr* expr) {
@@ -262,9 +297,14 @@ void Compiler::visitVariableExpr(const VariableExpr* expr) {
     int arg = resolveLocal(expr->name);
     if (arg != -1) {
         emitBytes((uint8_t)OpCode::OP_GET_LOCAL, arg);
-    } else {
-        emitBytes((uint8_t)OpCode::OP_GET_GLOBAL, makeConstant(Value(vm.internString(expr->name.lexeme))));
+        return;
     }
+    int upvalue = resolveUpvalue(expr->name);
+    if (upvalue != -1) {
+        emitBytes((uint8_t)OpCode::OP_GET_UPVALUE, (uint8_t)upvalue);
+        return;
+    }
+    emitBytes((uint8_t)OpCode::OP_GET_GLOBAL, makeConstant(Value(vm.internString(expr->name.lexeme))));
 }
 
 void Compiler::visitAssignExpr(const AssignExpr* expr) {
@@ -291,15 +331,21 @@ void Compiler::visitAssignExpr(const AssignExpr* expr) {
             compileExpression(expr->value.get());
             emitBytes((uint8_t)OpCode::OP_SET_LOCAL, arg);
         }
-    } else {
-        // For global variables, check if they have a type annotation stored in the VM
-        // The VM tracks global variable types in the globalTypes map
-        compileExpression(expr->value.get());
-        
-        // Always use the type-safe assignment for globals, which will check against
-        // stored type information at runtime (if any exists)
-        emitBytes((uint8_t)OpCode::OP_SET_GLOBAL_TYPED, makeConstant(Value(vm.internString(expr->name.lexeme))));
+        return;
     }
+    int upvalue = resolveUpvalue(expr->name);
+    if (upvalue != -1) {
+        compileExpression(expr->value.get());
+        emitBytes((uint8_t)OpCode::OP_SET_UPVALUE, (uint8_t)upvalue);
+        return;
+    }
+    // For global variables, check if they have a type annotation stored in the VM
+    // The VM tracks global variable types in the globalTypes map
+    compileExpression(expr->value.get());
+    
+    // Always use the type-safe assignment for globals, which will check against
+    // stored type information at runtime (if any exists)
+    emitBytes((uint8_t)OpCode::OP_SET_GLOBAL_TYPED, makeConstant(Value(vm.internString(expr->name.lexeme))));
 }
 
 void Compiler::visitExpressionStmt(const ExpressionStmt* stmt) {
@@ -307,6 +353,8 @@ void Compiler::visitExpressionStmt(const ExpressionStmt* stmt) {
     if (stmt->expression->type == ExprType::ASSIGN) {
         const AssignExpr* assign = static_cast<const AssignExpr*>(stmt->expression.get());
         int slot = resolveLocal(assign->name);
+        int upvalueSlot = resolveUpvalue(assign->name);
+        bool isUpvalue = (upvalueSlot != -1);
         if (assign->value->type == ExprType::BINARY) {
             const BinaryExpr* bin = static_cast<const BinaryExpr*>(assign->value.get());
             // Check pattern: x + 1, x - 1, 1 + x
@@ -326,6 +374,8 @@ void Compiler::visitExpressionStmt(const ExpressionStmt* stmt) {
                     if (slot != -1) {
                         emitBytes((uint8_t)OpCode::OP_INCREMENT_LOCAL, (uint8_t)slot);
                         return;
+                    } else if (isUpvalue) {
+                        // Upvalue — fall through to normal compilation
                     } else {
                         // Global increment
                         emitBytes((uint8_t)OpCode::OP_INCREMENT_GLOBAL, makeConstant(Value(vm.internString(assign->name.lexeme))));
@@ -337,7 +387,7 @@ void Compiler::visitExpressionStmt(const ExpressionStmt* stmt) {
                         emitBytes((uint8_t)OpCode::OP_DECREMENT_LOCAL, (uint8_t)slot);
                         return;
                     }
-                    // No global decrement opcode — fall through to normal compilation
+                    // Upvalue or global — fall through to normal compilation
                 }
                 // Also check: 1 + x pattern (commutative)
                 if (bin->op.type == TokenType::PLUS && !leftIsVar) {
@@ -355,6 +405,8 @@ void Compiler::visitExpressionStmt(const ExpressionStmt* stmt) {
                         if (slot != -1) {
                             emitBytes((uint8_t)OpCode::OP_INCREMENT_LOCAL, (uint8_t)slot);
                             return;
+                        } else if (isUpvalue) {
+                            // Upvalue — fall through to normal compilation
                         } else {
                             emitBytes((uint8_t)OpCode::OP_INCREMENT_GLOBAL, makeConstant(Value(vm.internString(assign->name.lexeme))));
                             return;
@@ -432,7 +484,7 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
         } else {
             emitByte((uint8_t)OpCode::OP_NIL);
         }
-        // No need to emit a define instruction for locals
+        emitBytes((uint8_t)OpCode::OP_SET_LOCAL, locals.size() - 1);
         return;
     }
 
@@ -877,8 +929,19 @@ void Compiler::visitFunctionStmt(const FunctionStmt* stmt) {
     // Add the compiled function as a constant in the current (enclosing) compiler
     uint8_t constant = makeConstant(Value(compiler.function));
     
-    // Emit the function constant
-    emitBytes((uint8_t)OpCode::OP_CONSTANT, constant);
+    if (compiler.upvalues.empty()) {
+        // No upvalues — emit as simple constant (backward compatible)
+        emitBytes((uint8_t)OpCode::OP_CONSTANT, constant);
+    } else {
+        // Has upvalues — emit OP_CLOSURE with upvalue table
+        emitBytes((uint8_t)OpCode::OP_CLOSURE, constant);
+        emitByte((uint8_t)(compiler.upvalues.size() >> 8));
+        emitByte((uint8_t)(compiler.upvalues.size() & 0xff));
+        for (const auto& uv : compiler.upvalues) {
+            emitByte(uv.isLocal ? 1 : 0);
+            emitByte(uv.index);
+        }
+    }
     
     // If we're in a safe block, emit validation instruction
     if (inSafeBlock) {
@@ -1059,7 +1122,15 @@ void Compiler::visitFunctionExpr(const FunctionExpr* expr) {
     compiler.emitReturn();
     
     // Create a closure for the lambda
-    emitBytes((uint8_t)OpCode::OP_CLOSURE, makeConstant(Value(compiler.function)));
+    uint8_t constant = makeConstant(Value(compiler.function));
+    emitBytes((uint8_t)OpCode::OP_CLOSURE, constant);
+    // Emit upvalue table
+    emitByte((uint8_t)(compiler.upvalues.size() >> 8));
+    emitByte((uint8_t)(compiler.upvalues.size() & 0xff));
+    for (const auto& uv : compiler.upvalues) {
+        emitByte(uv.isLocal ? 1 : 0);
+        emitByte(uv.index);
+    }
 }
 
 void Compiler::visitTernaryExpr(const TernaryExpr* expr) {
