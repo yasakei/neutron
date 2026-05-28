@@ -41,6 +41,7 @@ libneutron_runtime.a
 *.swo
 .vs/
 *.txt
+!proton/CMakeLists.txt
 tools/
 
 # OS files
