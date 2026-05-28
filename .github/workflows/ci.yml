@@ -1,15 +1,15 @@
 name: CI
 
-env:
-  # Toggle this to 'false' to temporarily skip Windows CI for faster iteration
-  BUILD_WINDOWS: 'true'
-
 on:
   push:
     branches: [ main, release, develop ]
   pull_request:
     branches: [ main, release, develop ]
   workflow_dispatch:
+
+env:
+  # Toggle to 'false' to temporarily skip Windows CI for faster iteration
+  BUILD_WINDOWS: 'false'
 
 jobs:
   build-linux:
