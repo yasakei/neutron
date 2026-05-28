@@ -293,7 +293,7 @@ def run_box_test(neutron_bin, root_dir):
         print(f"    {str(e)}")
         return 0, 1
 
-def run_aot_tests(neutron_bin, root_dir):
+def run_aot_tests(neutron_bin, root_dir, aot_mode="qbe"):
     """Run AOT compilation tests"""
     aot_test_dir = os.path.join(root_dir, "tests", "aot")
     
@@ -337,8 +337,11 @@ def run_aot_tests(neutron_bin, root_dir):
             
             try:
                 # Build with AOT
+                aot_args = [neutron_bin, "build", "--aot"]
+                if aot_mode and aot_mode != "default":
+                    aot_args.append(f"--aot-mode={aot_mode}")
                 build_result = subprocess.run(
-                    [neutron_bin, "build", "--aot"],
+                    aot_args,
                     cwd=test_project_dir,
                     capture_output=True,
                     text=True,
@@ -489,6 +492,17 @@ def main():
     # Parse command line arguments
     run_aot = "--aot" in sys.argv
     
+    # Extract AOT mode
+    aot_mode = "qbe"
+    aot_mode_flag = None
+    for i, arg in enumerate(sys.argv):
+        if arg == "--aot-mode" and i + 1 < len(sys.argv):
+            aot_mode_flag = sys.argv[i + 1]
+        elif arg.startswith("--aot-mode="):
+            aot_mode_flag = arg.split("=", 1)[1]
+    if aot_mode_flag:
+        aot_mode = aot_mode_flag
+    
     # Script lives in tests/, root is one level up
     script_dir = os.path.dirname(os.path.abspath(__file__))
     root_dir = os.path.dirname(script_dir)
@@ -504,8 +518,8 @@ def main():
     
     # If --aot flag is passed, only run AOT tests
     if run_aot:
-        Colors.print("\n=== Running AOT Tests Only ===", Colors.CYAN)
-        aot_passed, aot_failed, aot_failed_tests = run_aot_tests(neutron_bin, root_dir)
+        Colors.print(f"\n=== Running AOT Tests Only (mode: {aot_mode}) ===", Colors.CYAN)
+        aot_passed, aot_failed, aot_failed_tests = run_aot_tests(neutron_bin, root_dir, aot_mode)
         
         if aot_failed > 0:
             Colors.print("==== AOT TESTS FAILED ====", Colors.RED)

@@ -1,0 +1,24 @@
+// AOT test: Math operations
+var a = 42;
+var b = 58;
+var sum = a + b;
+if (sum != 100) {
+    say("FAIL: sum expected 100 got " + sum);
+}
+
+var diff = a - b;
+if (diff != -16) {
+    say("FAIL: diff expected -16 got " + diff);
+}
+
+var prod = a * b;
+if (prod != 2436) {
+    say("FAIL: prod expected 2436 got " + prod);
+}
+
+var quot = b / a;
+if (quot != 1) {
+    say("FAIL: quot expected 1 got " + quot);
+}
+
+say("Math AOT test passed");

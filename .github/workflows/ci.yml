@@ -87,6 +87,24 @@ jobs:
         # Install include files needed for neutron build
         sudo cp -r include /usr/local/
         
+        # Install proton headers (QBE AOT backend)
+        if [ -d "proton" ]; then
+          sudo mkdir -p /usr/local/include/proton
+          sudo cp -r proton/*.h /usr/local/include/proton/
+          if [ -d "proton/amd64" ]; then
+            sudo mkdir -p /usr/local/include/proton/amd64
+            sudo cp proton/amd64/*.h /usr/local/include/proton/amd64/
+          fi
+          if [ -d "proton/arm64" ]; then
+            sudo mkdir -p /usr/local/include/proton/arm64
+            sudo cp proton/arm64/*.h /usr/local/include/proton/arm64/
+          fi
+          if [ -d "proton/rv64" ]; then
+            sudo mkdir -p /usr/local/include/proton/rv64
+            sudo cp proton/rv64/*.h /usr/local/include/proton/rv64/
+          fi
+        fi
+        
         # Install source files needed for runtime compilation  
         sudo cp -r src /usr/local/
         sudo cp -r libs /usr/local/
@@ -230,6 +248,24 @@ jobs:
 
         # Install include files needed for neutron build
         sudo cp -r include /usr/local/
+
+        # Install proton headers (QBE AOT backend)
+        if [ -d "proton" ]; then
+          sudo mkdir -p /usr/local/include/proton
+          sudo cp -r proton/*.h /usr/local/include/proton/
+          if [ -d "proton/amd64" ]; then
+            sudo mkdir -p /usr/local/include/proton/amd64
+            sudo cp proton/amd64/*.h /usr/local/include/proton/amd64/
+          fi
+          if [ -d "proton/arm64" ]; then
+            sudo mkdir -p /usr/local/include/proton/arm64
+            sudo cp proton/arm64/*.h /usr/local/include/proton/arm64/
+          fi
+          if [ -d "proton/rv64" ]; then
+            sudo mkdir -p /usr/local/include/proton/rv64
+            sudo cp proton/rv64/*.h /usr/local/include/proton/rv64/
+          fi
+        fi
 
         # Install source files needed for runtime compilation
         sudo cp -r src /usr/local/

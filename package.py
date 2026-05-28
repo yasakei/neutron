@@ -1274,9 +1274,15 @@ def main():
          for lib_file in glob.glob(os.path.join(build_dir, "Release", "*.lib")):
              shutil.copy2(lib_file, root_dir)
              lib_count += 1
-         Colors.print(f"Copied {lib_count} LIB files", Colors.GREEN)
+          Colors.print(f"Copied {lib_count} LIB files", Colors.GREEN)
+          
+          # Copy proton directory for AOT headers (needed by NSIS for installing)
+          proton_dir = os.path.join(root_dir, "proton")
+          if os.path.isdir("proton") and not os.path.isdir(proton_dir):
+              shutil.copytree("proton", proton_dir, ignore=shutil.ignore_patterns("*.o", "*.obj"))
+              Colors.print("Copied proton directory for NSIS installer", Colors.GREEN)
 
-         # Sanitize installer.nsi by commenting out File lines that glob to nothing
+          # Sanitize installer.nsi by commenting out File lines that glob to nothing
          temp_nsi = "installer.temp.nsi"
          try:
              changed = sanitize_nsi_for_globs("installer.nsi", temp_nsi, root_dir)

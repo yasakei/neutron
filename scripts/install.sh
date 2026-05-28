@@ -250,11 +250,30 @@ if [ -d "./include/core" ]; then
     sudo cp -r "./include/core/." "$INCLUDE_DIR/core/"
 fi
 
+# Install proton headers (QBE AOT backend)
+if [ -d "./proton" ]; then
+    echo "Installing proton headers..."
+    sudo mkdir -p "$INCLUDE_DIR/proton"
+    sudo cp -r "./proton/." "$INCLUDE_DIR/proton/"
+fi
+
 # Install library files (runtime libraries and other library files)
 echo "Installing library files..."
 # Copy static runtime library
 if [ -f "./libneutron_runtime.a" ]; then
     sudo cp "./libneutron_runtime.a" "$LIB_DIR/"
+fi
+
+# Copy proton library (QBE AOT backend)
+if [ -f "./libproton.a" ]; then
+    sudo cp "./libproton.a" "$LIB_DIR/"
+    echo "Copied libproton.a"
+elif [ -f "./build/libproton.a" ]; then
+    sudo cp "./build/libproton.a" "$LIB_DIR/"
+    echo "Copied libproton.a from build/"
+elif [ -f "./build/proton/libproton.a" ]; then
+    sudo cp "./build/proton/libproton.a" "$LIB_DIR/"
+    echo "Copied libproton.a from build/proton/"
 fi
 
 # Copy any shared runtime library files (handling different extensions)
@@ -355,6 +374,9 @@ if [ -f "$BIN_DIR/neutron-lsp" ]; then
 fi
 echo "  Headers: $INCLUDE_DIR/"
 echo "  Libraries: $LIB_DIR/libneutron_runtime.*"
+if [ -f "$LIB_DIR/libproton.a" ]; then
+    echo "  Proton AOT: $LIB_DIR/libproton.a"
+fi
 if [ -d "$BIN_DIR/nt-box" ]; then
     echo "  Box components: $BIN_DIR/nt-box/"
 fi

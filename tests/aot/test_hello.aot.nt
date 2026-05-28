@@ -1,0 +1,5 @@
+// AOT test: Hello World
+say("Hello, AOT!");
+
+var result = "AOT compilation works!";
+say(result);

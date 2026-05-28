@@ -1,0 +1,23 @@
+// AOT test: Fibonacci (functions and loops)
+fun fib(n) {
+    if (n <= 1) {
+        return n;
+    }
+    var a = 0;
+    var b = 1;
+    var i = 2;
+    while (i <= n) {
+        var temp = a + b;
+        a = b;
+        b = temp;
+        i = i + 1;
+    }
+    return b;
+}
+
+var result = fib(20);
+if (result != 6765) {
+    say("FAIL: fib(20) expected 6765 got " + result);
+}
+
+say("Fibonacci AOT test passed");

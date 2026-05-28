@@ -1,0 +1,28 @@
+// AOT test: Type handling and truthiness
+var x = 42;
+var y = "hello";
+var z = true;
+
+if (x != 42) {
+    say("FAIL: integer type");
+}
+if (y != "hello") {
+    say("FAIL: string type");
+}
+if (z != true) {
+    say("FAIL: boolean type");
+}
+
+// Truthiness
+if (0) {
+    // 0 is truthy in Neutron
+} else {
+    say("FAIL: 0 should be truthy");
+}
+if ("") {
+    // empty string is truthy
+} else {
+    say("FAIL: empty string should be truthy");
+}
+
+say("Types AOT test passed");

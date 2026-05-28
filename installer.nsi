@@ -119,6 +119,14 @@ Section "Neutron Core" SecNeutron
   SetOutPath "$INSTDIR\include\cross-platfrom"
   File /nonfatal "include\cross-platfrom\dlfcn_compat.h"
   
+  ; Install proton QBE library (required for AOT compilation)
+  SetOutPath "$INSTDIR"
+  File "proton.lib"
+  
+  ; Install proton headers recursively
+  SetOutPath "$INSTDIR\proton"
+  File /r "proton\*.h"
+
   ; Install runtime library (required for neutron build) - copy to root like Linux
   SetOutPath "$INSTDIR"
   File "neutron_runtime.lib"
@@ -266,6 +274,9 @@ Section "Uninstall"
   Delete "$INSTDIR\lib\*.lib"
   Delete "$INSTDIR\lib\*.a"
   RMDir "$INSTDIR\lib"
+  
+  ; Remove proton directory
+  RMDir /r "$INSTDIR\proton"
   
   ; Remove headers
   RMDir /r "$INSTDIR\include"

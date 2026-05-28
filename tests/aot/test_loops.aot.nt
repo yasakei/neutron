@@ -1,0 +1,17 @@
+// AOT test: Loop operations
+fun sumRange(n) {
+    var total = 0;
+    var i = 0;
+    while (i <= n) {
+        total = total + i;
+        i = i + 1;
+    }
+    return total;
+}
+
+var result = sumRange(100);
+if (result != 5050) {
+    say("FAIL: sumRange(100) expected 5050 got " + result);
+}
+
+say("Loops AOT test passed");
