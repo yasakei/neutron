@@ -121,7 +121,7 @@ Section "Neutron Core" SecNeutron
   
   ; Install proton QBE library (required for AOT compilation)
   SetOutPath "$INSTDIR"
-  File "proton.lib"
+  File /nonfatal "proton.lib"
   
   ; Install proton headers recursively
   SetOutPath "$INSTDIR\proton"

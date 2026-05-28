@@ -246,6 +246,7 @@ jobs:
 
     - name: Install proton library for AOT (macOS)
       run: |
+        sudo mkdir -p /usr/local/lib
         if [ -f "build/proton/libproton.a" ]; then
           sudo cp build/proton/libproton.a /usr/local/lib/
         elif [ -f "build/libproton.a" ]; then
