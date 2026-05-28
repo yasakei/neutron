@@ -14,6 +14,15 @@ if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
+# Global counters
+neutron_faster = 0
+python_faster = 0
+js_faster = 0
+qbe_faster = 0
+interp_faster = 0
+failed_benchmarks = 0
+internal_failed = 0
+
 # Colors
 class Colors:
     RED = '\033[0;31m'
