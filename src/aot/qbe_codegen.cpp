@@ -1105,8 +1105,9 @@ void QbeCodegen::emit_call(uint8_t arg_count) {
     }
 
     // Fallback: use runtime dispatcher $rt_call
+    // Note: '...' tells QBE to emit Oargv, needed for Apple ARM64 va_start
     ir_ << "    call $rt_call(w " << callee.tag << ", l " << callee.data
-        << ", w " << static_cast<int>(arg_count);
+        << ", w " << static_cast<int>(arg_count) << ", ...";
     for (const auto& arg : args) {
         ir_ << ", w " << arg.tag << ", l " << arg.data;
     }
@@ -1148,7 +1149,7 @@ void QbeCodegen::emit_closure(uint8_t func_idx) {
     // Call rt_closure(func_data, n_up, tag_0, data_0, ...)
     ValuePair result = {T(), T()};
     ir_ << "    call $rt_closure(l " << func_val.data
-        << ", w " << static_cast<int>(n_up);
+        << ", w " << static_cast<int>(n_up) << ", ...";
     for (const auto& uv : upvalue_values) {
         ir_ << ", w " << uv.tag << ", l " << uv.data;
     }
@@ -1191,8 +1192,8 @@ void QbeCodegen::emit_array(uint8_t size) {
 
     ValuePair result = {T(), T()};
 
-    // Call runtime $rt_array(size, tag_0, data_0, tag_1, data_1, ...)
-    ir_ << "    call $rt_array(w " << static_cast<int>(size);
+    // Call runtime $rt_array(size, tag_0, data_0, ...)
+    ir_ << "    call $rt_array(w " << static_cast<int>(size) << ", ...";
     for (const auto& elem : elements) {
         ir_ << ", w " << elem.tag << ", l " << elem.data;
     }
@@ -1215,7 +1216,7 @@ void QbeCodegen::emit_object(uint8_t prop_count) {
     std::reverse(pairs.begin(), pairs.end());
 
     ValuePair result = {T(), T()};
-    ir_ << "    call $rt_obj(w " << static_cast<int>(prop_count);
+    ir_ << "    call $rt_obj(w " << static_cast<int>(prop_count) << ", ...";
     for (const auto& p : pairs) {
         ir_ << ", w " << p.tag << ", l " << p.data;
     }
@@ -1292,7 +1293,7 @@ void QbeCodegen::emit_invoke(uint8_t name_idx, uint8_t arg_count) {
     ValuePair result = {T(), T()};
     ir_ << "    call $rt_invoke(l " << obj.data
         << ", l $" << const_syms_[name_idx] << "_str"
-        << ", w " << static_cast<int>(arg_count);
+        << ", w " << static_cast<int>(arg_count) << ", ...";
     for (const auto& arg : args) {
         ir_ << ", w " << arg.tag << ", l " << arg.data;
     }
