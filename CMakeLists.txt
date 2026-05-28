@@ -20,14 +20,8 @@ endif()
 # Build Options
 # =============================================================================
 
-# QBE backend detection (optional)
-find_program(QBE qbe)
-if(NOT QBE)
-    message(STATUS "QBE not found — AOT will fall back to C++ path")
-    add_compile_definitions(NEUTRON_NO_QBE)
-else()
-    message(STATUS "QBE found: ${QBE}")
-endif()
+# QBE is embedded via Proton — always available
+message(STATUS "Proton (QBE backend) embedded")
 
 # libclang for C++ FFI (optional)
 find_package(LLVM QUIET)
@@ -109,6 +103,9 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/include/aot
     ${CMAKE_SOURCE_DIR}/libs
 )
+
+# Proton (embedded QBE backend)
+add_subdirectory(proton)
 
 # Dependencies
 include(FetchContent)
@@ -414,6 +411,7 @@ if(NOT WIN32)
 endif()
 
 target_link_libraries(neutron_runtime
+    proton
     ${JSONCPP_LIBRARIES}
     ${DLFCN_WIN}
     Threads::Threads
@@ -457,6 +455,7 @@ add_library(neutron_shared SHARED
 )
 
 target_link_libraries(neutron_shared
+    proton
     ${JSONCPP_LIBRARIES}
     ${DLFCN_WIN}
 )

@@ -101,6 +101,12 @@ static int getInstructionSize(uint8_t opcode) {
         case OpCode::OP_LESS_INT:
         case OpCode::OP_GREATER_INT:
         case OpCode::OP_EQUAL_INT:
+        case OpCode::OP_BITWISE_AND_INT:
+        case OpCode::OP_BITWISE_OR_INT:
+        case OpCode::OP_BITWISE_XOR_INT:
+        case OpCode::OP_BITWISE_NOT_INT:
+        case OpCode::OP_LEFT_SHIFT_INT:
+        case OpCode::OP_RIGHT_SHIFT_INT:
         case OpCode::OP_LOOP_HINT:
         case OpCode::OP_COUNT:
         default:
@@ -1855,21 +1861,27 @@ Tier2Compiler::convertToIR(const Chunk& bytecode, uint64_t start_pc, uint64_t en
                 break;
             
             // Bitwise operations
+            case OpCode::OP_BITWISE_AND_INT:
             case OpCode::OP_BITWISE_AND:
                 instr.opcode = IRInstruction::Opcode::BITWISE_AND;
                 break;
+            case OpCode::OP_BITWISE_OR_INT:
             case OpCode::OP_BITWISE_OR:
                 instr.opcode = IRInstruction::Opcode::BITWISE_OR;
                 break;
+            case OpCode::OP_BITWISE_XOR_INT:
             case OpCode::OP_BITWISE_XOR:
                 instr.opcode = IRInstruction::Opcode::BITWISE_XOR;
                 break;
+            case OpCode::OP_BITWISE_NOT_INT:
             case OpCode::OP_BITWISE_NOT:
                 instr.opcode = IRInstruction::Opcode::BITWISE_NOT;
                 break;
+            case OpCode::OP_LEFT_SHIFT_INT:
             case OpCode::OP_LEFT_SHIFT:
                 instr.opcode = IRInstruction::Opcode::LEFT_SHIFT;
                 break;
+            case OpCode::OP_RIGHT_SHIFT_INT:
             case OpCode::OP_RIGHT_SHIFT:
                 instr.opcode = IRInstruction::Opcode::RIGHT_SHIFT;
                 break;

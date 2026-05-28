@@ -371,20 +371,24 @@ bool ProjectBuilder::buildProjectExecutable(
                 }
 
                 if (useQbe) {
-                    std::cout << "      Using QBE backend..." << std::endl;
+                    std::cout << "      Using Proton (QBE) backend..." << std::endl;
 
-                    std::string ssaPath = finalOutputPath + "_neutron_main.ssa";
                     std::string objPath = finalOutputPath + "_neutron_main.o";
+                    std::string ir = neutron::aot::AotBuilder::generate_qbe_ir(mainFunc->chunk, "neutron_main");
 
-                    if (neutron::aot::AotBuilder::write_qbe_ir(mainFunc->chunk, "neutron_main", ssaPath) &&
-                        neutron::aot::AotBuilder::assemble(ssaPath, objPath)) {
+                    // DEBUG: dump SSA
+                    {
+                        std::ofstream ssaFile(finalOutputPath + "_dump.ssa");
+                        ssaFile << ir;
+                    }
 
+                    if (!ir.empty() && neutron::aot::AotBuilder::compile_ssa(ir, objPath)) {
                         qbeObjectPath = objPath;
                         qbeAot = true;
                         aotSuccess = true;
-                        std::cout << "      QBE assembly complete (SSA: " << ssaPath << ")" << std::endl;
+                        std::cout << "      Proton compilation complete" << std::endl;
                     } else {
-                        std::cout << "      QBE failed, using interpreter fallback" << std::endl;
+                        std::cout << "      Proton failed, using interpreter fallback" << std::endl;
                     }
                 }
             }
@@ -396,6 +400,16 @@ bool ProjectBuilder::buildProjectExecutable(
         srcFile << "// Auto-generated QBE AOT wrapper\n";
         srcFile << "extern \"C\" int neutron_main();\n";
         srcFile << "extern \"C\" void rt_init(neutron::VM* vm);\n";
+        // Declare QBE globals for module imports so the runtime can sync them
+        for (const auto& mod : aotUsedModules) {
+            if (nonAotModules.count(mod) > 0) continue;
+            std::string safeName = "g_";
+            for (char c : mod) {
+                if (isalnum(c) || c == '_') safeName += c;
+                else safeName += '_';
+            }
+            srcFile << "extern \"C\" uint64_t " << safeName << "[2];\n";
+        }
         srcFile << "int main() {\n";
         srcFile << "    neutron::VM vm;\n";
         srcFile << "    rt_init(&vm);\n";
@@ -407,6 +421,17 @@ bool ProjectBuilder::buildProjectExecutable(
                 continue;
             }
             srcFile << "    vm.load_module(\"" << mod << "\");\n";
+            // Sync module value to QBE global so QBE code sees the loaded module
+            std::string safeName = "g_";
+            for (char c : mod) {
+                if (isalnum(c) || c == '_') safeName += c;
+                else safeName += '_';
+            }
+            srcFile << "    { auto _it = vm.globals.find(\"" << mod << "\");\n";
+            srcFile << "      if (_it != vm.globals.end()) {\n";
+            srcFile << "          " << safeName << "[0] = 6;\n";
+            srcFile << "          " << safeName << "[1] = reinterpret_cast<uint64_t>(_it->second.as.module);\n";
+            srcFile << "      } }\n";
         }
 
         srcFile << "    return neutron_main();\n";

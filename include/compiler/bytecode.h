@@ -214,6 +214,14 @@ enum class OpCode : uint8_t {
     OP_INC_LOCAL_INT,    ///< Increment local by 1 (integer fast path)
     OP_DEC_LOCAL_INT,    ///< Decrement local by 1 (integer fast path)
     
+    // === Integer-specialized bitwise (skip tag checks) ===
+    OP_BITWISE_AND_INT,  ///< Integer bitwise AND
+    OP_BITWISE_OR_INT,   ///< Integer bitwise OR
+    OP_BITWISE_XOR_INT,  ///< Integer bitwise XOR
+    OP_BITWISE_NOT_INT,  ///< Integer bitwise NOT
+    OP_LEFT_SHIFT_INT,   ///< Integer left shift
+    OP_RIGHT_SHIFT_INT,  ///< Integer right shift
+    
     // === Fused comparison+jump (reduces branch instructions) ===
     OP_LESS_JUMP,        ///< Fused: OP_LESS + OP_JUMP_IF_FALSE
     OP_GREATER_JUMP,     ///< Fused: OP_GREATER + OP_JUMP_IF_FALSE

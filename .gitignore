@@ -1,6 +1,7 @@
 # Build directories
 .kiro/
 build/
+build_*/
 bin/
 obj/
 out/

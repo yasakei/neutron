@@ -311,6 +311,12 @@ void BytecodeOptimizer::optimizeIntegerArithmetic(Chunk& chunk) {
                 case OpCode::OP_EQUAL:
                 case OpCode::OP_NOT_EQUAL:
                 case OpCode::OP_NEGATE:
+                case OpCode::OP_BITWISE_AND:
+                case OpCode::OP_BITWISE_OR:
+                case OpCode::OP_BITWISE_XOR:
+                case OpCode::OP_BITWISE_NOT:
+                case OpCode::OP_LEFT_SHIFT:
+                case OpCode::OP_RIGHT_SHIFT:
                     hasArithmetic = true;
                     break;
                     
@@ -383,6 +389,30 @@ void BytecodeOptimizer::optimizeIntegerArithmetic(Chunk& chunk) {
                         break;
                     case OpCode::OP_NEGATE:
                         chunk.code[i] = (uint8_t)OpCode::OP_NEGATE_INT;
+                        stats_.int_specializations++;
+                        break;
+                    case OpCode::OP_BITWISE_AND:
+                        chunk.code[i] = (uint8_t)OpCode::OP_BITWISE_AND_INT;
+                        stats_.int_specializations++;
+                        break;
+                    case OpCode::OP_BITWISE_OR:
+                        chunk.code[i] = (uint8_t)OpCode::OP_BITWISE_OR_INT;
+                        stats_.int_specializations++;
+                        break;
+                    case OpCode::OP_BITWISE_XOR:
+                        chunk.code[i] = (uint8_t)OpCode::OP_BITWISE_XOR_INT;
+                        stats_.int_specializations++;
+                        break;
+                    case OpCode::OP_BITWISE_NOT:
+                        chunk.code[i] = (uint8_t)OpCode::OP_BITWISE_NOT_INT;
+                        stats_.int_specializations++;
+                        break;
+                    case OpCode::OP_LEFT_SHIFT:
+                        chunk.code[i] = (uint8_t)OpCode::OP_LEFT_SHIFT_INT;
+                        stats_.int_specializations++;
+                        break;
+                    case OpCode::OP_RIGHT_SHIFT:
+                        chunk.code[i] = (uint8_t)OpCode::OP_RIGHT_SHIFT_INT;
                         stats_.int_specializations++;
                         break;
                     default:

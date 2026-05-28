@@ -1109,6 +1109,12 @@ void VM::run(size_t minFrameDepth) {
         &&CASE_OP_EQUAL_INT,
         &&CASE_OP_INC_LOCAL_INT,
         &&CASE_OP_DEC_LOCAL_INT,
+        &&CASE_OP_BITWISE_AND_INT,
+        &&CASE_OP_BITWISE_OR_INT,
+        &&CASE_OP_BITWISE_XOR_INT,
+        &&CASE_OP_BITWISE_NOT_INT,
+        &&CASE_OP_LEFT_SHIFT_INT,
+        &&CASE_OP_RIGHT_SHIFT_INT,
         &&CASE_OP_LESS_JUMP,
         &&CASE_OP_GREATER_JUMP,
         &&CASE_OP_EQUAL_JUMP,
@@ -2072,6 +2078,7 @@ void VM::run(size_t minFrameDepth) {
                 }
                 DISPATCH();
             }
+            CASE(OP_BITWISE_AND_INT)
             CASE(OP_BITWISE_AND) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
@@ -2086,6 +2093,7 @@ void VM::run(size_t minFrameDepth) {
                 }
                 DISPATCH();
             }
+            CASE(OP_BITWISE_OR_INT)
             CASE(OP_BITWISE_OR) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
@@ -2100,6 +2108,7 @@ void VM::run(size_t minFrameDepth) {
                 }
                 DISPATCH();
             }
+            CASE(OP_BITWISE_XOR_INT)
             CASE(OP_BITWISE_XOR) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
@@ -2114,6 +2123,7 @@ void VM::run(size_t minFrameDepth) {
                 }
                 DISPATCH();
             }
+            CASE(OP_BITWISE_NOT_INT)
             CASE(OP_BITWISE_NOT) {
                 Value& value = stk.back();
                 if (NEUTRON_LIKELY(value.type == ValueType::NUMBER)) {
@@ -2123,6 +2133,7 @@ void VM::run(size_t minFrameDepth) {
                 }
                 DISPATCH();
             }
+            CASE(OP_LEFT_SHIFT_INT)
             CASE(OP_LEFT_SHIFT) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];
@@ -2135,6 +2146,7 @@ void VM::run(size_t minFrameDepth) {
                 }
                 DISPATCH();
             }
+            CASE(OP_RIGHT_SHIFT_INT)
             CASE(OP_RIGHT_SHIFT) {
                 size_t sz = stk.size();
                 Value& b = stk[sz - 1];

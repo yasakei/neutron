@@ -395,8 +395,7 @@ int main(int argc, char* argv[]) {
             std::cout << "Building: " << config->name << std::endl;
             if (aotCompile) {
                 if (aotMode == neutron::AotMode::QBE) {
-                    bool qbeAvail = (system("which qbe > /dev/null 2>&1") == 0);
-                    std::cout << "  Mode: AOT (QBE" << (qbeAvail ? "" : " [not found]") << ")" << std::endl;
+                    std::cout << "  Mode: AOT (Proton)" << std::endl;
                 }
             } else {
                 std::cout << "  Mode: Interpreter" << std::endl;
