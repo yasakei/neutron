@@ -113,6 +113,13 @@ bool AotBuilder::link(const std::string& obj_path, const std::string& output_pat
         compiler = "clang++";
     }
     link_flags = "-lproton -lcurl -ljsoncpp -framework CoreFoundation";
+    // Add Homebrew library paths so linker can find jsoncpp/curl
+    if (std::filesystem::exists("/opt/homebrew/lib")) {
+        link_flags = "-L/opt/homebrew/lib " + link_flags;
+    }
+    if (std::filesystem::exists("/usr/local/lib")) {
+        link_flags = "-L/usr/local/lib " + link_flags;
+    }
 #else
     link_flags = "-lproton -lcurl -ljsoncpp -ldl -lpthread";
 #endif

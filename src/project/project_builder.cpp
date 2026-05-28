@@ -735,6 +735,13 @@ bool ProjectBuilder::buildProjectExecutable(
                 compiler = "g++";  // Fallback if gcc is installed via Homebrew
             }
             linkFlags = "-lproton -lcurl -ljsoncpp -framework CoreFoundation";
+            // Add Homebrew library paths so linker can find jsoncpp/curl
+            if (std::filesystem::exists("/opt/homebrew/lib")) {
+                linkFlags = "-L/opt/homebrew/lib " + linkFlags;
+            }
+            if (std::filesystem::exists("/usr/local/lib")) {
+                linkFlags = "-L/usr/local/lib " + linkFlags;
+            }
         } else {
             // Linux: default to g++
             compiler = "g++";
