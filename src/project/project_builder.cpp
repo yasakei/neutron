@@ -855,6 +855,25 @@ bool ProjectBuilder::buildProjectExecutable(
         useStaticLib = false;
     }
 
+    // Try to find proton library (QBE AOT backend) and add -L paths
+    if (!crossCompile || crossCompiler.empty()) {
+        std::vector<std::string> protonLibCandidates = {
+            executableDir + "/../lib/libproton.a",
+            executableDir + "/libproton.a",
+            executableDir + "/proton/libproton.a",
+            neutronSrcDir + "/build/proton/libproton.a",
+            neutronSrcDir + "/build/libproton.a",
+            neutronSrcDir + "/lib/libproton.a"
+        };
+        for (const auto& path : protonLibCandidates) {
+            std::string dir = std::filesystem::path(path).parent_path().string();
+            if (std::filesystem::exists(path)) {
+                linkFlags = "-L\"" + dir + "\" " + linkFlags;
+                break;
+            }
+        }
+    }
+
     // Build compile command
     std::string compileCommand;
     std::vector<std::string> objectFiles; // Track object files for Windows
