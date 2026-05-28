@@ -1,17 +1,15 @@
 name: CI
 
+env:
+  # Toggle this to 'false' to temporarily skip Windows CI for faster iteration
+  BUILD_WINDOWS: 'true'
+
 on:
   push:
     branches: [ main, release, develop ]
   pull_request:
     branches: [ main, release, develop ]
   workflow_dispatch:
-    inputs:
-      skip_windows:
-        description: 'Skip Windows CI for faster iteration'
-        type: boolean
-        required: false
-        default: false
 
 jobs:
   build-linux:
@@ -397,7 +395,7 @@ jobs:
 
   build-windows-msvc:
     name: Build on Windows (MSVC)
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.skip_windows != true }}
+    if: ${{ env.BUILD_WINDOWS == 'true' }}
     runs-on: windows-latest
     
     steps:
