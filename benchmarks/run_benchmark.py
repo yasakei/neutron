@@ -365,6 +365,13 @@ def run_internal_benchmarks(bench_dir, root_dir):
                         ok = False
                         break
 
+            if not ok:
+                name_colored = Colors.RED + name + Colors.NC
+                for k in successful:
+                    print(f"  [{k}] output:")
+                    for line in results[k]['output'].splitlines():
+                        print(f"    {line}")
+
             fastest = None
             ft = float('inf')
             for k in successful:
