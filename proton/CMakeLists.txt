@@ -54,6 +54,26 @@ add_library(proton STATIC
     ${PROTON_RV64_SRCS}
 )
 
+# Detect host architecture and select QBE target backend
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64|arm64")
+    if(APPLE)
+        target_compile_definitions(proton PRIVATE Deftgt=T_arm64_apple)
+    else()
+        target_compile_definitions(proton PRIVATE Deftgt=T_arm64)
+    endif()
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64|X86_64")
+    if(APPLE)
+        target_compile_definitions(proton PRIVATE Deftgt=T_amd64_apple)
+    else()
+        target_compile_definitions(proton PRIVATE Deftgt=T_amd64_sysv)
+    endif()
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "riscv64|RISCV64|rv64")
+    target_compile_definitions(proton PRIVATE Deftgt=T_rv64)
+else()
+    message(WARNING "Unknown architecture ${CMAKE_SYSTEM_PROCESSOR}, defaulting to amd64_sysv")
+    target_compile_definitions(proton PRIVATE Deftgt=T_amd64_sysv)
+endif()
+
 target_include_directories(proton PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )

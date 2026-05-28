@@ -1,5 +1,7 @@
 #include "all.h"
+#ifndef Deftgt
 #include "config.h"
+#endif
 
 extern Target T_amd64_sysv;
 extern Target T_amd64_apple;
