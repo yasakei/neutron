@@ -106,14 +106,14 @@ bool AotBuilder::link(const std::string& obj_path, const std::string& output_pat
     if (system("which clang++ > /dev/null 2>&1") == 0) {
         compiler = "clang++";
     }
-    link_flags = "-lcurl -ljsoncpp -framework CoreFoundation";
+    link_flags = "-lproton -lcurl -ljsoncpp -framework CoreFoundation";
 #else
-    link_flags = "-lcurl -ljsoncpp -ldl -lpthread";
+    link_flags = "-lproton -lcurl -ljsoncpp -ldl -lpthread";
 #endif
 
     if (is_windows) {
         compiler = "g++";
-        link_flags = "-lcurl -ljsoncpp -lws2_32 -lpthread";
+        link_flags = "-lproton -lcurl -ljsoncpp -lws2_32 -lpthread";
     }
 
     std::string cmd = compiler + " -o \"" + output_path + "\" \"" + obj_path + "\" ";

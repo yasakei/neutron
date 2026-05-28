@@ -93,10 +93,13 @@ jobs:
         
         # Create lib directory if it doesn't exist
         sudo mkdir -p /usr/local/lib
-        
+
         # Install runtime libraries (essential for linking)
         if [ -f "build/libneutron_runtime.a" ]; then
           sudo cp build/libneutron_runtime.a /usr/local/lib/
+        fi
+        if [ -f "build/libproton.a" ]; then
+          sudo cp build/libproton.a /usr/local/lib/
         fi
         if [ -f "build/libneutron_shared.so" ]; then
           sudo cp build/libneutron_shared.so /usr/local/lib/
@@ -104,18 +107,18 @@ jobs:
         if [ -f "build/libneutron_shared.dylib" ]; then
           sudo cp build/libneutron_shared.dylib /usr/local/lib/
         fi
-        
+
         # Update library cache on Linux
         if [[ "$OSTYPE" == "linux-gnu"* ]]; then
           sudo ldconfig
         fi
-        
+
         # Verify global installation
         which neutron
         which box
         neutron --version
         box --version
-        
+
     - name: Test Neutron Integration
       run: |
         # Create a temporary test directory
@@ -236,6 +239,9 @@ jobs:
         # Install runtime libraries (essential for linking)
         if [ -f "build/libneutron_runtime.a" ]; then
           sudo cp build/libneutron_runtime.a /usr/local/lib/
+        fi
+        if [ -f "build/libproton.a" ]; then
+          sudo cp build/libproton.a /usr/local/lib/
         fi
         if [ -f "build/libneutron_shared.so" ]; then
           sudo cp build/libneutron_shared.so /usr/local/lib/
@@ -417,6 +423,9 @@ jobs:
         }
         if (Test-Path "build\Release\neutron_shared.lib") {
             Copy-Item "build\Release\neutron_shared.lib" "$neutronBin\neutron_shared.lib"
+        }
+        if (Test-Path "build\Release\proton.lib") {
+            Copy-Item "build\Release\proton.lib" "$neutronBin\proton.lib"
         }
         
         # Copy vcpkg DLLs if available

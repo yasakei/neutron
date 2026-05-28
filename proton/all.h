@@ -5,6 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _MSC_VER
+#define __attribute__(x)
+#endif
+
 #define MAKESURE(what, x) typedef char make_sure_##what[(x)?1:-1]
 #define die(...) die_(__FILE__, __VA_ARGS__)
 

@@ -601,7 +601,7 @@ install(DIRECTORY include/ DESTINATION include/neutron
 )
 
 # Install libraries
-install(TARGETS neutron_runtime neutron_shared
+install(TARGETS proton neutron_runtime neutron_shared
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
