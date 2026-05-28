@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ main, release, develop ]
   workflow_dispatch:
+    inputs:
+      skip_windows:
+        description: 'Skip Windows CI for faster iteration'
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   build-linux:
@@ -391,6 +397,7 @@ jobs:
 
   build-windows-msvc:
     name: Build on Windows (MSVC)
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.skip_windows != true }}
     runs-on: windows-latest
     
     steps:
@@ -732,8 +739,8 @@ jobs:
         
     - name: Fail if any build failed
       if: |
-        needs.build-linux.result != 'success' || 
-        needs.build-macos-arm64.result != 'success' || 
-        needs.build-windows-msvc.result != 'success' ||
+        needs.build-linux.result != 'success' ||
+        needs.build-macos-arm64.result != 'success' ||
+        (needs.build-windows-msvc.result != 'success' && needs.build-windows-msvc.result != 'skipped') ||
         needs.build-vscode-extension.result != 'success'
       run: exit 1
