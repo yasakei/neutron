@@ -1,5 +1,7 @@
 #include "aot/aot_builder.h"
+#ifndef NEUTRON_NO_PROTON
 #include "proton.h"
+#endif
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
@@ -43,7 +45,11 @@ bool AotBuilder::compile_ssa(const std::string& ssa, const std::string& obj_path
     }
     std::ofstream _dssa("/tmp/ack_last.ssa");
     _dssa << ssa; _dssa.close();
+#ifndef NEUTRON_NO_PROTON
     int ret = proton_compile_ssa(ssa.c_str(), asf);
+#else
+    int ret = -1;
+#endif
     fclose(asf);
     if (ret != 0) {
         std::cerr << "Error: Proton compilation failed" << std::endl;

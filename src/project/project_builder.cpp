@@ -682,9 +682,9 @@ bool ProjectBuilder::buildProjectExecutable(
     if (crossCompile && !crossCompiler.empty()) {
         compiler = crossCompiler;
         if (isARM) {
-            linkFlags = "-lcurl -ljsoncpp -ldl -rdynamic";
+            linkFlags = "-lproton -lcurl -ljsoncpp -ldl -rdynamic";
         } else {
-            linkFlags = "-lcurl -ljsoncpp -ldl -rdynamic";
+            linkFlags = "-lproton -lcurl -ljsoncpp -ldl -rdynamic";
         }
         
         // Add sysroot if available
@@ -724,7 +724,7 @@ bool ProjectBuilder::buildProjectExecutable(
         }
     } else if (isWindows && isMingw) {
         compiler = "g++";
-        linkFlags = "-lcurl -ljsoncpp -lws2_32";
+        linkFlags = "-lproton -lcurl -ljsoncpp -lws2_32";
     } else {
         // Default to clang++ on macOS, g++ on Linux
         if (isMacOS) {
@@ -734,12 +734,12 @@ bool ProjectBuilder::buildProjectExecutable(
             } else {
                 compiler = "g++";  // Fallback if gcc is installed via Homebrew
             }
-            linkFlags = "-lcurl -ljsoncpp -framework CoreFoundation";
+            linkFlags = "-lproton -lcurl -ljsoncpp -framework CoreFoundation";
         } else {
             // Linux: default to g++
             compiler = "g++";
             // Linux: Add -rdynamic to export symbols for dlopen
-            linkFlags = "-lcurl -ljsoncpp -ldl -rdynamic";
+            linkFlags = "-lproton -lcurl -ljsoncpp -ldl -rdynamic";
         }
     }
     

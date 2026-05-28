@@ -105,7 +105,12 @@ include_directories(
 )
 
 # Proton (embedded QBE backend)
-add_subdirectory(proton)
+if(NOT MSVC OR MINGW)
+    add_subdirectory(proton)
+    set(WITH_PROTON ON)
+else()
+    add_compile_definitions(NEUTRON_NO_PROTON)
+endif()
 
 # Dependencies
 include(FetchContent)
@@ -251,6 +256,8 @@ set(NEUTRON_COMPILER_SOURCES
     src/aot/ffi_bridge.cpp
     src/aot/cpp_stub_gen.cpp
 )
+
+# Type system source files
 
 # Type system source files
 set(NEUTRON_TYPES_SOURCES
@@ -411,11 +418,14 @@ if(NOT WIN32)
 endif()
 
 target_link_libraries(neutron_runtime
-    proton
     ${JSONCPP_LIBRARIES}
     ${DLFCN_WIN}
     Threads::Threads
 )
+
+if(TARGET proton)
+    target_link_libraries(neutron_runtime proton)
+endif()
 
 # Windows-specific libraries for socket functions
 if(WIN32)
@@ -455,10 +465,13 @@ add_library(neutron_shared SHARED
 )
 
 target_link_libraries(neutron_shared
-    proton
     ${JSONCPP_LIBRARIES}
     ${DLFCN_WIN}
 )
+
+if(TARGET proton)
+    target_link_libraries(neutron_shared proton)
+endif()
 
 if(HAVE_CURL)
     if(TARGET CURL::libcurl)
@@ -601,7 +614,7 @@ install(DIRECTORY include/ DESTINATION include/neutron
 )
 
 # Install libraries
-install(TARGETS proton neutron_runtime neutron_shared
+install(TARGETS neutron_runtime neutron_shared
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

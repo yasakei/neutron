@@ -334,6 +334,9 @@ int main(int argc, char* argv[]) {
         else if (arg == "build") {
             bool bundleLibs = true;
             bool aotCompile = true;  // AOT is now the default
+#ifdef NEUTRON_NO_PROTON
+            aotCompile = false;
+#endif
             std::string targetArch = "";  // Cross-compilation target
             std::string projectPath = ".";  // Default to current directory
             neutron::AotMode aotMode = neutron::AotMode::QBE;

@@ -12,7 +12,13 @@ namespace aot {
 class AotBuilder {
 public:
     // Always available — QBE is embedded as Proton
-    static bool detect_qbe() { return true; }
+    static bool detect_qbe() {
+#ifndef NEUTRON_NO_PROTON
+        return true;
+#else
+        return false;
+#endif
+    }
 
     // Generate QBE IR from a chunk and return as string
     static std::string generate_qbe_ir(const Chunk* chunk, const std::string& func_name);
