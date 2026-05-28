@@ -179,6 +179,9 @@ jobs:
         echo ""
         echo "==========================================================="
       
+    - name: Run Internal Benchmarks (QBE vs Interpreter)
+      run: python3 benchmarks/run_benchmark.py --internal
+
     - name: Upload Benchmark Results
       uses: actions/upload-artifact@v4
       with:
@@ -369,6 +372,9 @@ jobs:
         python3 benchmarks/run_benchmark.py | tee benchmark-macos-arm64.txt
         echo ""
         echo "==========================================================="
+
+    - name: Run Internal Benchmarks (QBE vs Interpreter)
+      run: python3 benchmarks/run_benchmark.py --internal
 
     - name: Upload Benchmark Results
       uses: actions/upload-artifact@v4
