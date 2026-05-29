@@ -260,16 +260,16 @@ void QbeCodegen::analyze_bytecode() {
 // ============== Data section ==============
 
 void QbeCodegen::emit_data_section() {
-    // Tag constants as word literals (must match ValueType enum exactly)
-    TAG_NIL = "0";
-    TAG_BOOL = "1";
-    TAG_NUM = "2";
-    TAG_STR = "3";
-    TAG_ARRAY = "4";
-    TAG_OBJ = "5";
-    TAG_CLASS = "6";
-    TAG_INST = "7";
-    TAG_CALLABLE = "8";
+    // Tag constants must match ValueType exactly, including MODULE before CLASS.
+    TAG_NIL = std::to_string(static_cast<uint64_t>(ValueType::NIL));
+    TAG_BOOL = std::to_string(static_cast<uint64_t>(ValueType::BOOLEAN));
+    TAG_NUM = std::to_string(static_cast<uint64_t>(ValueType::NUMBER));
+    TAG_STR = std::to_string(static_cast<uint64_t>(ValueType::OBJ_STRING));
+    TAG_ARRAY = std::to_string(static_cast<uint64_t>(ValueType::ARRAY));
+    TAG_OBJ = std::to_string(static_cast<uint64_t>(ValueType::OBJECT));
+    TAG_CALLABLE = std::to_string(static_cast<uint64_t>(ValueType::CALLABLE));
+    TAG_CLASS = std::to_string(static_cast<uint64_t>(ValueType::CLASS));
+    TAG_INST = std::to_string(static_cast<uint64_t>(ValueType::INSTANCE));
 
     // Runtime constants (only emit once for the main function)
     if (is_main_) {

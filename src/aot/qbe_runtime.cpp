@@ -51,25 +51,36 @@ static uint64_t g_ret_data = 0;
 // The QBE codegen uses loadw/loadl from $rt_ret, which the assembler
 // resolves to our exported symbols. We define these with C linkage
 // matching the QBE naming: $rt_ret → asm rt_ret.
-extern "C" uint64_t rt_ret[2] = {1, 0}; // {tag, data}, default nil
+extern "C" uint64_t rt_ret[2] = {0, 0}; // {tag, data}, default nil
 
 // ============================================================
 // Value conversion helpers (internal, not exported to QBE)
 // ============================================================
 
-// QBE tag → ValueType mapping:
-//   1=NIL, 2=BOOL, 3=NUM, 4=STR, 5=ARRAY, 6=OBJ, 7=CLASS, 8=INST, 9=CALLABLE
+namespace {
+constexpr uint64_t QTAG_NIL = static_cast<uint64_t>(neutron::ValueType::NIL);
+constexpr uint64_t QTAG_BOOL = static_cast<uint64_t>(neutron::ValueType::BOOLEAN);
+constexpr uint64_t QTAG_NUM = static_cast<uint64_t>(neutron::ValueType::NUMBER);
+constexpr uint64_t QTAG_STR = static_cast<uint64_t>(neutron::ValueType::OBJ_STRING);
+constexpr uint64_t QTAG_ARRAY = static_cast<uint64_t>(neutron::ValueType::ARRAY);
+constexpr uint64_t QTAG_OBJ = static_cast<uint64_t>(neutron::ValueType::OBJECT);
+constexpr uint64_t QTAG_CALLABLE = static_cast<uint64_t>(neutron::ValueType::CALLABLE);
+constexpr uint64_t QTAG_MODULE = static_cast<uint64_t>(neutron::ValueType::MODULE);
+constexpr uint64_t QTAG_CLASS = static_cast<uint64_t>(neutron::ValueType::CLASS);
+constexpr uint64_t QTAG_INST = static_cast<uint64_t>(neutron::ValueType::INSTANCE);
+constexpr uint64_t QTAG_BUFFER = static_cast<uint64_t>(neutron::ValueType::BUFFER);
+}
 
 static neutron::Value make_qbe_value(uint64_t tag, uint64_t data) {
     switch (tag) {
-        case 1: return neutron::Value();
-        case 2: return neutron::Value(static_cast<bool>(data));
-        case 3: {
+        case QTAG_NIL: return neutron::Value();
+        case QTAG_BOOL: return neutron::Value(static_cast<bool>(data));
+        case QTAG_NUM: {
             double d;
             memcpy(&d, &data, sizeof(d));
             return neutron::Value(d);
         }
-        case 4: {
+        case QTAG_STR: {
             // data might be an ObjString* (from runtime) or const char* (from data section)
             neutron::Object* obj = reinterpret_cast<neutron::Object*>(data);
             if (obj && obj->obj_type == neutron::ObjType::OBJ_STRING) {
@@ -78,15 +89,23 @@ static neutron::Value make_qbe_value(uint64_t tag, uint64_t data) {
             const char* s = reinterpret_cast<const char*>(data);
             return neutron::Value(new neutron::ObjString(s ? s : ""));
         }
-        case 5: {
+        case QTAG_ARRAY: {
             neutron::Array* arr = reinterpret_cast<neutron::Array*>(data);
             return arr ? neutron::Value(arr) : neutron::Value();
         }
-        case 6: {
+        case QTAG_OBJ: {
             neutron::Object* obj = reinterpret_cast<neutron::Object*>(data);
             return obj ? neutron::Value(obj) : neutron::Value();
         }
-        case 7: {
+        case QTAG_CALLABLE: {
+            neutron::Callable* callable = reinterpret_cast<neutron::Callable*>(data);
+            return callable ? neutron::Value(callable) : neutron::Value();
+        }
+        case QTAG_MODULE: {
+            neutron::Module* module = reinterpret_cast<neutron::Module*>(data);
+            return module ? neutron::Value(module) : neutron::Value();
+        }
+        case QTAG_CLASS: {
             // AOT mode: data points to class name string in data section
             if (g_vm) {
                 const char* name = reinterpret_cast<const char*>(data);
@@ -105,13 +124,13 @@ static neutron::Value make_qbe_value(uint64_t tag, uint64_t data) {
             neutron::Class* klass = reinterpret_cast<neutron::Class*>(data);
             return klass ? neutron::Value(klass) : neutron::Value();
         }
-        case 8: {
+        case QTAG_INST: {
             neutron::Instance* inst = reinterpret_cast<neutron::Instance*>(data);
             return inst ? neutron::Value(inst) : neutron::Value();
         }
-        case 9: {
-            neutron::Callable* callable = reinterpret_cast<neutron::Callable*>(data);
-            return callable ? neutron::Value(callable) : neutron::Value();
+        case QTAG_BUFFER: {
+            neutron::Buffer* buffer = reinterpret_cast<neutron::Buffer*>(data);
+            return buffer ? neutron::Value(buffer) : neutron::Value();
         }
         default:
             return neutron::Value();
@@ -122,47 +141,51 @@ static void store_result(const neutron::Value& v) {
     // Update the local (static) ret values
     switch (v.type) {
         case neutron::ValueType::NIL:
-            g_ret_tag = 1;
+            g_ret_tag = QTAG_NIL;
             g_ret_data = 0;
             break;
         case neutron::ValueType::BOOLEAN:
-            g_ret_tag = 2;
+            g_ret_tag = QTAG_BOOL;
             g_ret_data = v.as.boolean ? 1 : 0;
             break;
         case neutron::ValueType::NUMBER:
-            g_ret_tag = 3;
+            g_ret_tag = QTAG_NUM;
             memcpy(&g_ret_data, &v.as.number, sizeof(double));
             break;
         case neutron::ValueType::OBJ_STRING:
-            g_ret_tag = 4;
+            g_ret_tag = QTAG_STR;
             g_ret_data = reinterpret_cast<uint64_t>(v.as.obj_string);
             break;
         case neutron::ValueType::ARRAY:
-            g_ret_tag = 5;
+            g_ret_tag = QTAG_ARRAY;
             g_ret_data = reinterpret_cast<uint64_t>(v.as.array);
             break;
         case neutron::ValueType::OBJECT:
-            g_ret_tag = 6;
+            g_ret_tag = QTAG_OBJ;
             g_ret_data = reinterpret_cast<uint64_t>(v.as.object);
             break;
-        case neutron::ValueType::CLASS:
-            g_ret_tag = 7;
-            g_ret_data = reinterpret_cast<uint64_t>(v.as.klass);
-            break;
-        case neutron::ValueType::INSTANCE:
-            g_ret_tag = 8;
-            g_ret_data = reinterpret_cast<uint64_t>(v.as.instance);
-            break;
         case neutron::ValueType::CALLABLE:
-            g_ret_tag = 9;
+            g_ret_tag = QTAG_CALLABLE;
             g_ret_data = reinterpret_cast<uint64_t>(v.as.callable);
             break;
         case neutron::ValueType::MODULE:
-            g_ret_tag = 6;
-            g_ret_data = reinterpret_cast<uint64_t>(v.as.object);
+            g_ret_tag = QTAG_MODULE;
+            g_ret_data = reinterpret_cast<uint64_t>(v.as.module);
+            break;
+        case neutron::ValueType::CLASS:
+            g_ret_tag = QTAG_CLASS;
+            g_ret_data = reinterpret_cast<uint64_t>(v.as.klass);
+            break;
+        case neutron::ValueType::INSTANCE:
+            g_ret_tag = QTAG_INST;
+            g_ret_data = reinterpret_cast<uint64_t>(v.as.instance);
+            break;
+        case neutron::ValueType::BUFFER:
+            g_ret_tag = QTAG_BUFFER;
+            g_ret_data = reinterpret_cast<uint64_t>(v.as.buffer);
             break;
         default:
-            g_ret_tag = 1;
+            g_ret_tag = QTAG_NIL;
             g_ret_data = 0;
             break;
     }
@@ -176,7 +199,7 @@ static void store_result(const neutron::Value& v) {
 // ============================================================
 
 extern "C" void rt_add(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
-    if (tag_a == 3 && tag_b == 3) {
+    if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
         memcpy(&b, &data_b, sizeof(double));
@@ -215,7 +238,7 @@ extern "C" void rt_add(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
 }
 
 extern "C" void rt_sub(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
-    if (tag_a == 3 && tag_b == 3) {
+    if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
         memcpy(&b, &data_b, sizeof(double));
@@ -226,7 +249,7 @@ extern "C" void rt_sub(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
 }
 
 extern "C" void rt_mul(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
-    if (tag_a == 3 && tag_b == 3) {
+    if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
         memcpy(&b, &data_b, sizeof(double));
@@ -237,7 +260,7 @@ extern "C" void rt_mul(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
 }
 
 extern "C" void rt_div(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
-    if (tag_a == 3 && tag_b == 3) {
+    if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
         memcpy(&b, &data_b, sizeof(double));
@@ -252,7 +275,7 @@ extern "C" void rt_div(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
 }
 
 extern "C" void rt_mod(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
-    if (tag_a == 3 && tag_b == 3) {
+    if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
         memcpy(&b, &data_b, sizeof(double));
@@ -263,7 +286,7 @@ extern "C" void rt_mod(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
 }
 
 extern "C" void rt_neg(uint64_t tag, uint64_t data) {
-    if (tag == 3) {
+    if (tag == QTAG_NUM) {
         double d;
         memcpy(&d, &data, sizeof(double));
         store_result(neutron::Value(-d));
@@ -274,12 +297,12 @@ extern "C" void rt_neg(uint64_t tag, uint64_t data) {
 
 // Comparison helpers
 extern "C" void rt_eq(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
-    if (tag_a == 3 && tag_b == 3) {
+    if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
         memcpy(&b, &data_b, sizeof(double));
         store_result(neutron::Value(a == b));
-    } else if (tag_a == 4 && tag_b == 4) {
+    } else if (tag_a == QTAG_STR && tag_b == QTAG_STR) {
         neutron::Value va = make_qbe_value(tag_a, data_a);
         neutron::Value vb = make_qbe_value(tag_b, data_b);
         store_result(neutron::Value(va.as.obj_string->chars == vb.as.obj_string->chars));
@@ -291,12 +314,12 @@ extern "C" void rt_eq(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t 
 }
 
 extern "C" void rt_neq(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
-    if (tag_a == 3 && tag_b == 3) {
+    if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
         memcpy(&b, &data_b, sizeof(double));
         store_result(neutron::Value(a != b));
-    } else if (tag_a == 4 && tag_b == 4) {
+    } else if (tag_a == QTAG_STR && tag_b == QTAG_STR) {
         neutron::Value va = make_qbe_value(tag_a, data_a);
         neutron::Value vb = make_qbe_value(tag_b, data_b);
         store_result(neutron::Value(va.as.obj_string->chars != vb.as.obj_string->chars));
@@ -308,7 +331,7 @@ extern "C" void rt_neq(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
 }
 
 extern "C" void rt_lt(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
-    if (tag_a == 3 && tag_b == 3) {
+    if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
         memcpy(&b, &data_b, sizeof(double));
@@ -319,7 +342,7 @@ extern "C" void rt_lt(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t 
 }
 
 extern "C" void rt_gt(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
-    if (tag_a == 3 && tag_b == 3) {
+    if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
         memcpy(&b, &data_b, sizeof(double));
@@ -337,7 +360,7 @@ static int64_t double_bits_to_int64(uint64_t bits) {
 }
 
 extern "C" void rt_band(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
-    if (tag_a == 3 && tag_b == 3) {
+    if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         int64_t a = double_bits_to_int64(data_a);
         int64_t b = double_bits_to_int64(data_b);
         store_result(neutron::Value(static_cast<double>(a & b)));
@@ -347,7 +370,7 @@ extern "C" void rt_band(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_
 }
 
 extern "C" void rt_bor(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
-    if (tag_a == 3 && tag_b == 3) {
+    if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         int64_t a = double_bits_to_int64(data_a);
         int64_t b = double_bits_to_int64(data_b);
         store_result(neutron::Value(static_cast<double>(a | b)));
@@ -357,7 +380,7 @@ extern "C" void rt_bor(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
 }
 
 extern "C" void rt_bxor(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
-    if (tag_a == 3 && tag_b == 3) {
+    if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         int64_t a = double_bits_to_int64(data_a);
         int64_t b = double_bits_to_int64(data_b);
         store_result(neutron::Value(static_cast<double>(a ^ b)));
@@ -367,7 +390,7 @@ extern "C" void rt_bxor(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_
 }
 
 extern "C" void rt_bnot(uint64_t tag, uint64_t data) {
-    if (tag == 3) {
+    if (tag == QTAG_NUM) {
         int64_t a = double_bits_to_int64(data);
         store_result(neutron::Value(static_cast<double>(~a)));
     } else {
@@ -376,7 +399,7 @@ extern "C" void rt_bnot(uint64_t tag, uint64_t data) {
 }
 
 extern "C" void rt_shl(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
-    if (tag_a == 3 && tag_b == 3) {
+    if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         int64_t a = double_bits_to_int64(data_a);
         int64_t b = double_bits_to_int64(data_b);
         store_result(neutron::Value(static_cast<double>(a << b)));
@@ -386,7 +409,7 @@ extern "C" void rt_shl(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
 }
 
 extern "C" void rt_shr(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
-    if (tag_a == 3 && tag_b == 3) {
+    if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         int64_t a = double_bits_to_int64(data_a);
         int64_t b = double_bits_to_int64(data_b);
         store_result(neutron::Value(static_cast<double>(a >> b)));
@@ -411,8 +434,7 @@ extern "C" void rt_get_global(uint64_t name_str_ptr, uint64_t data_section_ptr) 
     // First check the QBE data section for user variables
     if (data_section_ptr) {
         uint64_t qtag = *reinterpret_cast<const uint64_t*>(data_section_ptr);
-        // Check both tag 0 (rt_nil) and tag 1 (global nil) — both mean nil
-        if (qtag > 1) {
+        if (qtag != QTAG_NIL) {
             uint64_t qdata = *reinterpret_cast<const uint64_t*>(data_section_ptr + 8);
             g_ret_tag = qtag;
             g_ret_data = qdata;
@@ -759,7 +781,7 @@ extern "C" void rt_invoke(uint64_t data_obj, uint64_t data_method_name_ptr,
         return;
     }
 
-    neutron::Value receiver = make_qbe_value(6, data_obj); // try OBJECT first
+    neutron::Value receiver = make_qbe_value(QTAG_OBJ, data_obj); // try OBJECT first
     // Actually, receiver could be any type that has methods (array, string, etc.)
     // Try to reconstruct from the data pointer:
     neutron::Object* obj_ptr = reinterpret_cast<neutron::Object*>(data_obj);
@@ -1146,7 +1168,7 @@ extern "C" void rt_forin_next(uint64_t data_keys, uint64_t data_index) {
 // Spread: $rt_spread(data)
 // The QBE codegen handles individual element push; this just validates.
 extern "C" void rt_spread(uint64_t data) {
-    neutron::Value arr_val = make_qbe_value(5, data); // tag 5 = ARRAY
+    neutron::Value arr_val = make_qbe_value(QTAG_ARRAY, data);
     if (arr_val.type == neutron::ValueType::ARRAY && arr_val.as.array) {
         // QBE codegen pushes each element after this call
     }
@@ -1342,7 +1364,7 @@ extern "C" void rt_init_classes(uint64_t data_ptr) {
 // Add local const fallback: $rt_add_local_const(tag, data, const_tag, const_data)
 extern "C" void rt_add_local_const(uint64_t tag, uint64_t data,
                                     uint64_t const_tag, uint64_t const_data) {
-    if (tag == 3 && const_tag == 3) {
+    if (tag == QTAG_NUM && const_tag == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data, sizeof(double));
         memcpy(&b, &const_data, sizeof(double));
