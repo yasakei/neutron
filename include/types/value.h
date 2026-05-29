@@ -64,7 +64,7 @@ class Buffer;
  * This enum represents every type in the language. The JIT compiler
  * uses these for type specialization guards.
  */
-enum class ValueType : uint64_t {
+enum class ValueType : uint32_t {
     NIL,         ///< The absence of value (like null, but more existential)
     BOOLEAN,     ///< true or false - the building blocks of decision-making
     NUMBER,      ///< Double-precision floating point (because integers are overrated)

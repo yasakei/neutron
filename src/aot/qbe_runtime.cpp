@@ -71,7 +71,7 @@ constexpr uint64_t QTAG_INST = static_cast<uint64_t>(neutron::ValueType::INSTANC
 constexpr uint64_t QTAG_BUFFER = static_cast<uint64_t>(neutron::ValueType::BUFFER);
 }
 
-static neutron::Value make_qbe_value(uint64_t tag, uint64_t data) {
+static neutron::Value make_qbe_value(uint32_t tag, uint64_t data) {
     switch (tag) {
         case QTAG_NIL: return neutron::Value();
         case QTAG_BOOL: return neutron::Value(static_cast<bool>(data));
@@ -198,7 +198,7 @@ static void store_result(const neutron::Value& v) {
 // Simple runtime helpers — called with direct w/l args from QBE
 // ============================================================
 
-extern "C" void rt_add(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
+extern "C" void rt_add(uint32_t tag_a, uint64_t data_a, uint32_t tag_b, uint64_t data_b) {
     if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
@@ -237,7 +237,7 @@ extern "C" void rt_add(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
     }
 }
 
-extern "C" void rt_sub(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
+extern "C" void rt_sub(uint32_t tag_a, uint64_t data_a, uint32_t tag_b, uint64_t data_b) {
     if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
@@ -248,7 +248,7 @@ extern "C" void rt_sub(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
     }
 }
 
-extern "C" void rt_mul(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
+extern "C" void rt_mul(uint32_t tag_a, uint64_t data_a, uint32_t tag_b, uint64_t data_b) {
     if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
@@ -259,7 +259,7 @@ extern "C" void rt_mul(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
     }
 }
 
-extern "C" void rt_div(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
+extern "C" void rt_div(uint32_t tag_a, uint64_t data_a, uint32_t tag_b, uint64_t data_b) {
     if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
@@ -274,7 +274,7 @@ extern "C" void rt_div(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
     }
 }
 
-extern "C" void rt_mod(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
+extern "C" void rt_mod(uint32_t tag_a, uint64_t data_a, uint32_t tag_b, uint64_t data_b) {
     if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
@@ -285,7 +285,7 @@ extern "C" void rt_mod(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
     }
 }
 
-extern "C" void rt_neg(uint64_t tag, uint64_t data) {
+extern "C" void rt_neg(uint32_t tag, uint64_t data) {
     if (tag == QTAG_NUM) {
         double d;
         memcpy(&d, &data, sizeof(double));
@@ -296,7 +296,7 @@ extern "C" void rt_neg(uint64_t tag, uint64_t data) {
 }
 
 // Comparison helpers
-extern "C" void rt_eq(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
+extern "C" void rt_eq(uint32_t tag_a, uint64_t data_a, uint32_t tag_b, uint64_t data_b) {
     if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
@@ -313,7 +313,7 @@ extern "C" void rt_eq(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t 
     }
 }
 
-extern "C" void rt_neq(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
+extern "C" void rt_neq(uint32_t tag_a, uint64_t data_a, uint32_t tag_b, uint64_t data_b) {
     if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
@@ -330,7 +330,7 @@ extern "C" void rt_neq(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
     }
 }
 
-extern "C" void rt_lt(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
+extern "C" void rt_lt(uint32_t tag_a, uint64_t data_a, uint32_t tag_b, uint64_t data_b) {
     if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
@@ -341,7 +341,7 @@ extern "C" void rt_lt(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t 
     }
 }
 
-extern "C" void rt_gt(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
+extern "C" void rt_gt(uint32_t tag_a, uint64_t data_a, uint32_t tag_b, uint64_t data_b) {
     if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         double a, b;
         memcpy(&a, &data_a, sizeof(double));
@@ -359,7 +359,7 @@ static int64_t double_bits_to_int64(uint64_t bits) {
     return static_cast<int64_t>(d);
 }
 
-extern "C" void rt_band(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
+extern "C" void rt_band(uint32_t tag_a, uint64_t data_a, uint32_t tag_b, uint64_t data_b) {
     if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         int64_t a = double_bits_to_int64(data_a);
         int64_t b = double_bits_to_int64(data_b);
@@ -369,7 +369,7 @@ extern "C" void rt_band(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_
     }
 }
 
-extern "C" void rt_bor(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
+extern "C" void rt_bor(uint32_t tag_a, uint64_t data_a, uint32_t tag_b, uint64_t data_b) {
     if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         int64_t a = double_bits_to_int64(data_a);
         int64_t b = double_bits_to_int64(data_b);
@@ -379,7 +379,7 @@ extern "C" void rt_bor(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
     }
 }
 
-extern "C" void rt_bxor(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
+extern "C" void rt_bxor(uint32_t tag_a, uint64_t data_a, uint32_t tag_b, uint64_t data_b) {
     if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         int64_t a = double_bits_to_int64(data_a);
         int64_t b = double_bits_to_int64(data_b);
@@ -389,7 +389,7 @@ extern "C" void rt_bxor(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_
     }
 }
 
-extern "C" void rt_bnot(uint64_t tag, uint64_t data) {
+extern "C" void rt_bnot(uint32_t tag, uint64_t data) {
     if (tag == QTAG_NUM) {
         int64_t a = double_bits_to_int64(data);
         store_result(neutron::Value(static_cast<double>(~a)));
@@ -398,7 +398,7 @@ extern "C" void rt_bnot(uint64_t tag, uint64_t data) {
     }
 }
 
-extern "C" void rt_shl(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
+extern "C" void rt_shl(uint32_t tag_a, uint64_t data_a, uint32_t tag_b, uint64_t data_b) {
     if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         int64_t a = double_bits_to_int64(data_a);
         int64_t b = double_bits_to_int64(data_b);
@@ -408,7 +408,7 @@ extern "C" void rt_shl(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
     }
 }
 
-extern "C" void rt_shr(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t data_b) {
+extern "C" void rt_shr(uint32_t tag_a, uint64_t data_a, uint32_t tag_b, uint64_t data_b) {
     if (tag_a == QTAG_NUM && tag_b == QTAG_NUM) {
         int64_t a = double_bits_to_int64(data_a);
         int64_t b = double_bits_to_int64(data_b);
@@ -419,7 +419,7 @@ extern "C" void rt_shr(uint64_t tag_a, uint64_t data_a, uint64_t tag_b, uint64_t
 }
 
 // I/O
-extern "C" void rt_say(uint64_t tag, uint64_t data) {
+extern "C" void rt_say(uint32_t tag, uint64_t data) {
     neutron::Value v = make_qbe_value(tag, data);
     std::cout << v.toString() << std::endl;
 }
@@ -468,8 +468,8 @@ extern "C" void rt_get_global(uint64_t name_str_ptr, uint64_t data_section_ptr) 
 }
 
 // Call dispatch: $rt_call(callee_tag, callee_data, arg_count, tag_0, data_0, ...)
-extern "C" void rt_call(uint64_t tag_callee, uint64_t data_callee,
-                         uint64_t arg_count, ...) {
+extern "C" void rt_call(uint32_t tag_callee, uint64_t data_callee,
+                         uint32_t arg_count, ...) {
     if (!g_vm) {
         store_result(neutron::Value());
         return;
@@ -485,7 +485,7 @@ extern "C" void rt_call(uint64_t tag_callee, uint64_t data_callee,
         std::vector<neutron::Value> args;
         args.reserve(arg_count);
         for (uint64_t i = 0; i < arg_count; i++) {
-            uint64_t t = va_arg(va, uint64_t);
+            uint32_t t = va_arg(va, uint32_t);
             uint64_t d = va_arg(va, uint64_t);
             args.push_back(make_qbe_value(t, d));
         }
@@ -528,7 +528,7 @@ extern "C" void rt_call(uint64_t tag_callee, uint64_t data_callee,
     std::vector<neutron::Value> args;
     args.reserve(arg_count);
     for (uint64_t i = 0; i < arg_count; i++) {
-        uint64_t t = va_arg(va, uint64_t);
+        uint32_t t = va_arg(va, uint32_t);
         uint64_t d = va_arg(va, uint64_t);
         args.push_back(make_qbe_value(t, d));
     }
@@ -545,7 +545,7 @@ extern "C" void rt_call(uint64_t tag_callee, uint64_t data_callee,
 }
 
 // Array creation: $rt_array(size, tag_0, data_0, tag_1, data_1, ...)
-extern "C" void rt_array(uint64_t size, ...) {
+extern "C" void rt_array(uint32_t size, ...) {
     if (!g_vm) {
         store_result(neutron::Value());
         return;
@@ -557,7 +557,7 @@ extern "C" void rt_array(uint64_t size, ...) {
     auto* arr = g_vm->allocate<neutron::Array>();
     arr->elements.reserve(size);
     for (uint64_t i = 0; i < size; i++) {
-        uint64_t t = va_arg(va, uint64_t);
+        uint32_t t = va_arg(va, uint32_t);
         uint64_t d = va_arg(va, uint64_t);
         arr->elements.push_back(make_qbe_value(t, d));
     }
@@ -567,7 +567,7 @@ extern "C" void rt_array(uint64_t size, ...) {
 }
 
 // Object creation: $rt_obj(count, tag_k1, data_k1, tag_v1, data_v1, ...)
-extern "C" void rt_obj(uint64_t count, ...) {
+extern "C" void rt_obj(uint32_t count, ...) {
     if (!g_vm) {
         store_result(neutron::Value());
         return;
@@ -579,9 +579,9 @@ extern "C" void rt_obj(uint64_t count, ...) {
     va_list va;
     va_start(va, count);
     for (uint64_t i = 0; i < count; i++) {
-        uint64_t tag_k = va_arg(va, uint64_t);
+        uint32_t tag_k = va_arg(va, uint32_t);
         uint64_t data_k = va_arg(va, uint64_t);
-        uint64_t tag_v = va_arg(va, uint64_t);
+        uint32_t tag_v = va_arg(va, uint32_t);
         uint64_t data_v = va_arg(va, uint64_t);
         neutron::Value key = make_qbe_value(tag_k, data_k);
         neutron::Value val = make_qbe_value(tag_v, data_v);
@@ -595,8 +595,8 @@ extern "C" void rt_obj(uint64_t count, ...) {
 }
 
 // Index get: $rt_idx_r(tag_obj, data_obj, tag_idx, data_idx)
-extern "C" void rt_idx_r(uint64_t tag_obj, uint64_t data_obj,
-                          uint64_t tag_idx, uint64_t data_idx) {
+extern "C" void rt_idx_r(uint32_t tag_obj, uint64_t data_obj,
+                          uint32_t tag_idx, uint64_t data_idx) {
     neutron::Value obj = make_qbe_value(tag_obj, data_obj);
     neutron::Value idx = make_qbe_value(tag_idx, data_idx);
 
@@ -662,9 +662,9 @@ extern "C" void rt_idx_r(uint64_t tag_obj, uint64_t data_obj,
 }
 
 // Index set: $rt_idx_w(tag_obj, data_obj, tag_idx, data_idx, tag_val, data_val)
-extern "C" void rt_idx_w(uint64_t tag_obj, uint64_t data_obj,
-                          uint64_t tag_idx, uint64_t data_idx,
-                          uint64_t tag_val, uint64_t data_val) {
+extern "C" void rt_idx_w(uint32_t tag_obj, uint64_t data_obj,
+                          uint32_t tag_idx, uint64_t data_idx,
+                          uint32_t tag_val, uint64_t data_val) {
     neutron::Value obj = make_qbe_value(tag_obj, data_obj);
     neutron::Value idx = make_qbe_value(tag_idx, data_idx);
     neutron::Value val = make_qbe_value(tag_val, data_val);
@@ -699,7 +699,7 @@ extern "C" void rt_idx_w(uint64_t tag_obj, uint64_t data_obj,
 
 // Property get: $rt_getprop(data_obj, data_prop_name_sym)
 // data_prop_name_sym points to a constant string (from QBE data section)
-extern "C" void rt_getprop(uint64_t tag_obj, uint64_t data_obj, uint64_t data_prop_name_ptr) {
+extern "C" void rt_getprop(uint32_t tag_obj, uint64_t data_obj, uint64_t data_prop_name_ptr) {
     const char* prop_name = reinterpret_cast<const char*>(data_prop_name_ptr);
     if (!prop_name) {
         store_result(neutron::Value());
@@ -750,8 +750,8 @@ extern "C" void rt_getprop(uint64_t tag_obj, uint64_t data_obj, uint64_t data_pr
 }
 
 // Property set: $rt_setprop(data_obj, data_prop_name_ptr, tag_val, data_val)
-extern "C" void rt_setprop(uint64_t tag_obj, uint64_t data_obj, uint64_t data_prop_name_ptr,
-                            uint64_t tag_val, uint64_t data_val) {
+extern "C" void rt_setprop(uint32_t tag_obj, uint64_t data_obj, uint64_t data_prop_name_ptr,
+                            uint32_t tag_val, uint64_t data_val) {
     neutron::Value val = make_qbe_value(tag_val, data_val);
     const char* prop_name = reinterpret_cast<const char*>(data_prop_name_ptr);
     if (!prop_name) return;
@@ -775,7 +775,7 @@ extern "C" void rt_setprop(uint64_t tag_obj, uint64_t data_obj, uint64_t data_pr
 
 // Method invocation: $rt_invoke(data_obj, data_method_name_ptr, arg_count, tag_0, data_0, ...)
 extern "C" void rt_invoke(uint64_t data_obj, uint64_t data_method_name_ptr,
-                           uint64_t arg_count, ...) {
+                           uint32_t arg_count, ...) {
     if (!g_vm) {
         store_result(neutron::Value());
         return;
@@ -821,7 +821,7 @@ extern "C" void rt_invoke(uint64_t data_obj, uint64_t data_method_name_ptr,
     std::vector<neutron::Value> args;
     args.reserve(arg_count);
     for (uint64_t i = 0; i < arg_count; i++) {
-        uint64_t t = va_arg(va, uint64_t);
+        uint32_t t = va_arg(va, uint32_t);
         uint64_t d = va_arg(va, uint64_t);
         args.push_back(make_qbe_value(t, d));
     }
@@ -1063,7 +1063,7 @@ extern "C" void rt_invoke(uint64_t data_obj, uint64_t data_method_name_ptr,
 }
 
 // Exception
-extern "C" void rt_throw(uint64_t tag, uint64_t data) {
+extern "C" void rt_throw(uint32_t tag, uint64_t data) {
     neutron::Value v = make_qbe_value(tag, data);
     if (g_vm) {
         neutron::ErrorHandler::reportRuntimeError(v.toString());
@@ -1094,7 +1094,7 @@ extern "C" uint64_t rt_dec(uint64_t data) {
 // For-in iterator init: $rt_forin_init(tag, data)
 // For arrays, creates a keys array (indices). For objects, gets property names.
 // Pushes: keys_array (or nil if unsupported), index (0)
-extern "C" void rt_forin_init(uint64_t tag, uint64_t data) {
+extern "C" void rt_forin_init(uint32_t tag, uint64_t data) {
     if (!g_vm) {
         store_result(neutron::Value());
         return;
@@ -1188,7 +1188,7 @@ static thread_local neutron::ObjClosure* g_current_closure = nullptr;
 // Captures upvalues BY VALUE at closure creation time.
 // This is a simplified approach — upvalues are closed immediately.
 // Returns the closure as a tagged Value in rt_ret.
-extern "C" void rt_closure(uint64_t func_data, uint64_t num_upvalues, ...) {
+extern "C" void rt_closure(uint64_t func_data, uint32_t num_upvalues, ...) {
     if (!g_vm) {
         store_result(neutron::Value());
         return;
@@ -1206,7 +1206,7 @@ extern "C" void rt_closure(uint64_t func_data, uint64_t num_upvalues, ...) {
     va_start(va, num_upvalues);
 
     for (uint64_t i = 0; i < num_upvalues; i++) {
-        uint64_t t = va_arg(va, uint64_t);
+        uint32_t t = va_arg(va, uint32_t);
         uint64_t d = va_arg(va, uint64_t);
         // Create a closed upvalue (nullptr location = already closed)
         neutron::UpValue* uv = g_vm->allocate<neutron::UpValue>(nullptr);
@@ -1245,7 +1245,7 @@ extern "C" void rt_get_upvalue(uint64_t slot) {
 
 // Set upvalue: $rt_set_upvalue(slot, tag, data)
 // Writes to the current closure's captured upvalues.
-extern "C" void rt_set_upvalue(uint64_t slot, uint64_t tag, uint64_t data) {
+extern "C" void rt_set_upvalue(uint64_t slot, uint32_t tag, uint64_t data) {
     if (!g_current_closure || slot >= g_current_closure->upvalues.size()) {
         return;
     }
@@ -1268,7 +1268,7 @@ extern "C" void rt_close_upvalue(uint64_t slot) {
 }
 
 // Truthiness check
-extern "C" int rt_istruthy(uint64_t tag, uint64_t data) {
+extern "C" int rt_istruthy(uint32_t tag, uint64_t data) {
     switch (tag) {
         case 1:  return 0; // nil = falsy
         case 2:  return data != 0; // bool
@@ -1362,7 +1362,7 @@ extern "C" void rt_init_classes(uint64_t data_ptr) {
 }
 
 // Add local const fallback: $rt_add_local_const(tag, data, const_tag, const_data)
-extern "C" void rt_add_local_const(uint64_t tag, uint64_t data,
+extern "C" void rt_add_local_const(uint32_t tag, uint64_t data,
                                     uint64_t const_tag, uint64_t const_data) {
     if (tag == QTAG_NUM && const_tag == QTAG_NUM) {
         double a, b;
