@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 /*
  * Code Documentation: Value Type System (value.h)
  * ===============================================
