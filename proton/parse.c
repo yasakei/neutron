@@ -16,6 +16,7 @@ enum {
 
 #ifdef _MSC_VER
 Op optab[NOp] = {0};
+static char *kwmap[Ntok] = {0};
 
 static int optab_inited;
 static void init_optab(void)
@@ -50,6 +51,48 @@ static void init_optab(void)
 #undef F
 #undef T
 #undef O
+}
+
+static int kwmap_inited;
+static void init_kwmap(void)
+{
+	if (kwmap_inited) return;
+	kwmap_inited = 1;
+	kwmap[Tloadw] = "loadw";
+	kwmap[Tloadl] = "loadl";
+	kwmap[Tloads] = "loads";
+	kwmap[Tloadd] = "loadd";
+	kwmap[Talloc1] = "alloc1";
+	kwmap[Talloc2] = "alloc2";
+	kwmap[Tblit] = "blit";
+	kwmap[Tcall] = "call";
+	kwmap[Tenv] = "env";
+	kwmap[Tphi] = "phi";
+	kwmap[Tjmp] = "jmp";
+	kwmap[Tjnz] = "jnz";
+	kwmap[Tret] = "ret";
+	kwmap[Thlt] = "hlt";
+	kwmap[Texport] = "export";
+	kwmap[Tthread] = "thread";
+	kwmap[Tcommon] = "common";
+	kwmap[Tfunc] = "function";
+	kwmap[Ttype] = "type";
+	kwmap[Tdata] = "data";
+	kwmap[Tsection] = "section";
+	kwmap[Talign] = "align";
+	kwmap[Tdbgfile] = "dbgfile";
+	kwmap[Tsb] = "sb";
+	kwmap[Tub] = "ub";
+	kwmap[Tsh] = "sh";
+	kwmap[Tuh] = "uh";
+	kwmap[Tb] = "b";
+	kwmap[Th] = "h";
+	kwmap[Tw] = "w";
+	kwmap[Tl] = "l";
+	kwmap[Ts] = "s";
+	kwmap[Td] = "d";
+	kwmap[Tz] = "z";
+	kwmap[Tdots] = "...";
 }
 #else
 Op optab[NOp] = {
@@ -138,6 +181,7 @@ enum Token {
 	Ntok
 };
 
+#ifndef _MSC_VER
 static char *kwmap[Ntok] = {
 	[Tloadw] = "loadw",
 	[Tloadl] = "loadl",
@@ -175,6 +219,7 @@ static char *kwmap[Ntok] = {
 	[Tz] = "z",
 	[Tdots] = "...",
 };
+#endif
 
 enum {
 	NPred = 63,
@@ -407,6 +452,22 @@ nextnl()
 static void
 expect(int t)
 {
+#ifdef _MSC_VER
+	static char *ttoa[Ntok];
+	static int ttoa_inited;
+	if (!ttoa_inited) {
+		ttoa_inited = 1;
+		ttoa[Tlbl] = "label";
+		ttoa[Tcomma] = ",";
+		ttoa[Teq] = "=";
+		ttoa[Tnl] = "newline";
+		ttoa[Tlparen] = "(";
+		ttoa[Trparen] = ")";
+		ttoa[Tlbrace] = "{";
+		ttoa[Trbrace] = "}";
+		ttoa[Teof] = 0;
+	}
+#else
 	static char *ttoa[] = {
 		[Tlbl] = "label",
 		[Tcomma] = ",",
@@ -418,6 +479,7 @@ expect(int t)
 		[Trbrace] = "}",
 		[Teof] = 0,
 	};
+#endif
 	char buf[128], *s1, *s2;
 	int t1;
 
@@ -1250,6 +1312,7 @@ parse(FILE *f, char *path, void dbgfile(char *), void data(Dat *), void func(Fn 
 
 #ifdef _MSC_VER
 	init_optab();
+	init_kwmap();
 #endif
 	lexinit();
 	inf = f;

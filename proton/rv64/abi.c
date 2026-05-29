@@ -174,8 +174,10 @@ static void
 sttmps(Ref tmp[], int ntmp, Class *c, Ref mem, Fn *fn)
 {
 	static int st[] = {
-		[Kw] = Ostorew, [Kl] = Ostorel,
-		[Ks] = Ostores, [Kd] = Ostored
+		Ostorew,  /* [0] Kw */
+		Ostorel,  /* [1] Kl */
+		Ostores,  /* [2] Ks */
+		Ostored,  /* [3] Kd */
 	};
 	int i;
 	Ref r;

@@ -41,8 +41,10 @@ struct Params {
 static int gpreg[12] = {R0, R1, R2, R3, R4, R5, R6, R7};
 static int fpreg[12] = {V0, V1, V2, V3, V4, V5, V6, V7};
 static int store[] = {
-	[Kw] = Ostorew, [Kl] = Ostorel,
-	[Ks] = Ostores, [Kd] = Ostored
+	Ostorew,  /* [0] Kw */
+	Ostorel,  /* [1] Kl */
+	Ostores,  /* [2] Ks */
+	Ostored,  /* [3] Kd */
 };
 
 /* layout of call's second argument (RCall)

@@ -340,25 +340,24 @@ icpy(Ins *d, Ins *s, ulong n)
 }
 
 static int cmptab[][2] ={
-	             /* negation    swap */
-	[Ciule]      = {Ciugt,      Ciuge},
-	[Ciult]      = {Ciuge,      Ciugt},
-	[Ciugt]      = {Ciule,      Ciult},
-	[Ciuge]      = {Ciult,      Ciule},
-	[Cisle]      = {Cisgt,      Cisge},
-	[Cislt]      = {Cisge,      Cisgt},
-	[Cisgt]      = {Cisle,      Cislt},
-	[Cisge]      = {Cislt,      Cisle},
-	[Cieq]       = {Cine,       Cieq},
-	[Cine]       = {Cieq,       Cine},
-	[NCmpI+Cfle] = {NCmpI+Cfgt, NCmpI+Cfge},
-	[NCmpI+Cflt] = {NCmpI+Cfge, NCmpI+Cfgt},
-	[NCmpI+Cfgt] = {NCmpI+Cfle, NCmpI+Cflt},
-	[NCmpI+Cfge] = {NCmpI+Cflt, NCmpI+Cfle},
-	[NCmpI+Cfeq] = {NCmpI+Cfne, NCmpI+Cfeq},
-	[NCmpI+Cfne] = {NCmpI+Cfeq, NCmpI+Cfne},
-	[NCmpI+Cfo]  = {NCmpI+Cfuo, NCmpI+Cfo},
-	[NCmpI+Cfuo] = {NCmpI+Cfo,  NCmpI+Cfuo},
+	{Cine,       Cieq},        /* [0] Cieq */
+	{Cieq,       Cine},        /* [1] Cine */
+	{Cislt,      Cisle},       /* [2] Cisge */
+	{Cisle,      Cislt},       /* [3] Cisgt */
+	{Cisgt,      Cisge},       /* [4] Cisle */
+	{Cisge,      Cisgt},       /* [5] Cislt */
+	{Ciult,      Ciule},       /* [6] Ciuge */
+	{Ciule,      Ciult},       /* [7] Ciugt */
+	{Ciugt,      Ciuge},       /* [8] Ciule */
+	{Ciuge,      Ciugt},       /* [9] Ciult */
+	{NCmpI+Cfne, NCmpI+Cfeq},  /* [10] */
+	{NCmpI+Cflt, NCmpI+Cfle},  /* [11] */
+	{NCmpI+Cfle, NCmpI+Cflt},  /* [12] */
+	{NCmpI+Cfgt, NCmpI+Cfge},  /* [13] */
+	{NCmpI+Cfge, NCmpI+Cfgt},  /* [14] */
+	{NCmpI+Cfeq, NCmpI+Cfne},  /* [15] */
+	{NCmpI+Cfuo, NCmpI+Cfo},   /* [16] */
+	{NCmpI+Cfo,  NCmpI+Cfuo},  /* [17] */
 };
 
 int

@@ -734,15 +734,19 @@ refn(Ref r, Num *tn, Con *con)
 }
 
 static bits match[13] = {
-	[4] = BIT(Pob),
-	[5] = BIT(Pbi1),
-	[6] = BIT(Pob) | BIT(Pois),
-	[7] = BIT(Pob) | BIT(Pobi1),
-	[8] = BIT(Pbi1) | BIT(Pbis),
-	[9] = BIT(Pbi1) | BIT(Pobi1),
-	[10] = BIT(Pbi1) | BIT(Pbis) | BIT(Pobi1) | BIT(Pobis),
-	[11] = BIT(Pob) | BIT(Pobi1) | BIT(Pobis),
-	[12] = BIT(Pbi1) | BIT(Pobi1) | BIT(Pobis),
+	0,                                                /* [0-3] unused */
+	0,
+	0,
+	0,
+	BIT(Pob),                                         /* [4] */
+	BIT(Pbi1),                                        /* [5] */
+	BIT(Pob) | BIT(Pois),                             /* [6] */
+	BIT(Pob) | BIT(Pobi1),                            /* [7] */
+	BIT(Pbi1) | BIT(Pbis),                            /* [8] */
+	BIT(Pbi1) | BIT(Pobi1),                           /* [9] */
+	BIT(Pbi1) | BIT(Pbis) | BIT(Pobi1) | BIT(Pobis),  /* [10] */
+	BIT(Pob) | BIT(Pobi1) | BIT(Pobis),               /* [11] */
+	BIT(Pbi1) | BIT(Pobi1) | BIT(Pobis),              /* [12] */
 };
 
 static uchar matcher_pob[] = {1,3,0,3,1,0};

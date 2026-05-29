@@ -10,12 +10,8 @@ void
 emitlnk(char *n, Lnk *l, int s, FILE *f)
 {
 	static char *sec[2][3] = {
-		[0][SecText] = ".text",
-		[0][SecData] = ".data",
-		[0][SecBss] = ".bss",
-		[1][SecText] = ".abort \"unreachable\"",
-		[1][SecData] = ".section .tdata,\"awT\"",
-		[1][SecBss] = ".section .tbss,\"awT\"",
+		{ ".text", ".data", ".bss" },
+		{ ".abort \"unreachable\"", ".section .tdata,\"awT\"", ".section .tbss,\"awT\"" },
 	};
 	char *pfx, *sfx;
 
@@ -65,10 +61,12 @@ emitdat(Dat *d, FILE *f)
 		char decl[8];
 		int64_t mask;
 	} di[] = {
-		[DB] = {"\t.byte", 0xffL},
-		[DH] = {"\t.short", 0xffffL},
-		[DW] = {"\t.int", 0xffffffffL},
-		[DL] = {"\t.quad", -1L},
+		{0},                              /* [0] DStart - unused */
+		{0},                              /* [1] DEnd - unused */
+		{"\t.byte", 0xffL},              /* [2] DB */
+		{"\t.short", 0xffffL},           /* [3] DH */
+		{"\t.int", 0xffffffffL},         /* [4] DW */
+		{"\t.quad", -1L},                /* [5] DL */
 	};
 	static int64_t zero;
 	char *p;

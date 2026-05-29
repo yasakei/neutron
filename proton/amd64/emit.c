@@ -132,32 +132,44 @@ static struct {
 };
 
 static char cmov[][2][16] = {
-#define X(c, s0, s1) \
-	[c] = { \
-		"cmov" s0 " %0, %=", \
-		"cmov" s1 " %1, %=", \
-	},
-	CMP(X)
-#undef X
+	{"cmovz %0, %=",  "cmovnz %1, %="},   /* [0] Cieq */
+	{"cmovnz %0, %=", "cmovz %1, %="},    /* [1] Cine */
+	{"cmovge %0, %=", "cmovl %1, %="},    /* [2] Cisge */
+	{"cmovg %0, %=",  "cmovle %1, %="},   /* [3] Cisgt */
+	{"cmovle %0, %=", "cmovg %1, %="},    /* [4] Cisle */
+	{"cmovl %0, %=",  "cmovge %1, %="},   /* [5] Cislt */
+	{"cmovae %0, %=", "cmovb %1, %="},    /* [6] Ciuge */
+	{"cmova %0, %=",  "cmovbe %1, %="},   /* [7] Ciugt */
+	{"cmovbe %0, %=", "cmova %1, %="},    /* [8] Ciule */
+	{"cmovb %0, %=",  "cmovae %1, %="},   /* [9] Ciult */
+	{0},                                   /* [10] unused */
+	{"cmovae %0, %=", "cmovb %1, %="},    /* [11] */
+	{"cmova %0, %=",  "cmovbe %1, %="},   /* [12] */
+	{"cmovbe %0, %=", "cmova %1, %="},    /* [13] */
+	{"cmovb %0, %=",  "cmovae %1, %="},   /* [14] */
+	{0},                                   /* [15] unused */
+	{"cmovnp %0, %=", "cmovp %1, %="},    /* [16] Cfo */
+	{"cmovp %0, %=",  "cmovnp %1, %="},   /* [17] Cfuo */
 };
 
 static char *rname[][4] = {
-	[RAX] = {"rax", "eax", "ax", "al"},
-	[RBX] = {"rbx", "ebx", "bx", "bl"},
-	[RCX] = {"rcx", "ecx", "cx", "cl"},
-	[RDX] = {"rdx", "edx", "dx", "dl"},
-	[RSI] = {"rsi", "esi", "si", "sil"},
-	[RDI] = {"rdi", "edi", "di", "dil"},
-	[RBP] = {"rbp", "ebp", "bp", "bpl"},
-	[RSP] = {"rsp", "esp", "sp", "spl"},
-	[R8 ] = {"r8" , "r8d", "r8w", "r8b"},
-	[R9 ] = {"r9" , "r9d", "r9w", "r9b"},
-	[R10] = {"r10", "r10d", "r10w", "r10b"},
-	[R11] = {"r11", "r11d", "r11w", "r11b"},
-	[R12] = {"r12", "r12d", "r12w", "r12b"},
-	[R13] = {"r13", "r13d", "r13w", "r13b"},
-	[R14] = {"r14", "r14d", "r14w", "r14b"},
-	[R15] = {"r15", "r15d", "r15w", "r15b"},
+	{0},                              /* [0] RXX - unused */
+	{"rax", "eax", "ax", "al"},       /* [1] RAX */
+	{"rcx", "ecx", "cx", "cl"},       /* [2] RCX */
+	{"rdx", "edx", "dx", "dl"},       /* [3] RDX */
+	{"rsi", "esi", "si", "sil"},      /* [4] RSI */
+	{"rdi", "edi", "di", "dil"},      /* [5] RDI */
+	{"r8" , "r8d", "r8w", "r8b"},     /* [6] R8 */
+	{"r9" , "r9d", "r9w", "r9b"},     /* [7] R9 */
+	{"r10", "r10d", "r10w", "r10b"},  /* [8] R10 */
+	{"r11", "r11d", "r11w", "r11b"},  /* [9] R11 */
+	{"rbx", "ebx", "bx", "bl"},       /* [10] RBX */
+	{"r12", "r12d", "r12w", "r12b"},  /* [11] R12 */
+	{"r13", "r13d", "r13w", "r13b"},  /* [12] R13 */
+	{"r14", "r14d", "r14w", "r14b"},  /* [13] R14 */
+	{"r15", "r15d", "r15w", "r15b"},  /* [14] R15 */
+	{"rbp", "ebp", "bp", "bpl"},      /* [15] RBP */
+	{"rsp", "esp", "sp", "spl"},      /* [16] RSP */
 };
 
 
@@ -395,8 +407,10 @@ Next:
 }
 
 static bits negmask[4] = {
-	[Ks] = 0x80000000,
-	[Kd] = 0x8000000000000000,
+	0,                         /* [0] Kw */
+	0,                         /* [1] Kl */
+	0x80000000,                /* [2] Ks */
+	0x8000000000000000ULL,     /* [3] Kd */
 };
 
 static void

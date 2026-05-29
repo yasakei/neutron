@@ -268,13 +268,13 @@ copyref(Fn *fn, Blk *b, Ins *i)
 	/* which extensions are copies for a given
 	 * argument width */
 	static bits extcpy[] = {
-		[WFull] = 0,
-		[Wsb] = BIT(Wsb) | BIT(Wsh) | BIT(Wsw),
-		[Wub] = BIT(Wub) | BIT(Wuh) | BIT(Wuw),
-		[Wsh] = BIT(Wsh) | BIT(Wsw),
-		[Wuh] = BIT(Wuh) | BIT(Wuw),
-		[Wsw] = BIT(Wsw),
-		[Wuw] = BIT(Wuw),
+		0,                                          /* [0] WFull */
+		BIT(Wsb) | BIT(Wsh) | BIT(Wsw),             /* [1] Wsb */
+		BIT(Wub) | BIT(Wuh) | BIT(Wuw),             /* [2] Wub */
+		BIT(Wsh) | BIT(Wsw),                        /* [3] Wsh */
+		BIT(Wuh) | BIT(Wuw),                        /* [4] Wuh */
+		BIT(Wsw),                                   /* [5] Wsw */
+		BIT(Wuw),                                   /* [6] Wuw */
 	};
 	Ext e;
 	Tmp *t;

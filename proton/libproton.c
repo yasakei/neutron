@@ -16,6 +16,7 @@ static FILE *g_outf;
 
 #ifdef _MSC_VER
 extern void init_optab(void);
+extern void init_kwmap(void);
 extern void init_amd64_op(void);
 extern void init_rv64_op(void);
 #endif
@@ -121,6 +122,7 @@ proton_compile_ssa(const char *ssa, FILE *outf)
 
 #ifdef _MSC_VER
 	init_optab();
+	init_kwmap();
 	init_amd64_op();
 	init_rv64_op();
 #endif
