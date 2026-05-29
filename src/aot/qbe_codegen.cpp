@@ -930,50 +930,20 @@ void QbeCodegen::emit_jump_if_false(uint16_t offset) {
     if (lbl_taken.empty()) return;
 
     // Check truthiness: false and nil are falsy
+    std::string is_nil = T();
     std::string is_false_tag = T();
-    std::string is_nil_tag = T();
-    std::string is_falsy = T();
-    std::string check_false_val = T();
+    std::string check_val = T();
     std::string is_false_val = T();
-    std::string should_jump = T();
-
-    ir_ << "    " << is_nil_tag << " =w ceqw " << cond.tag << ", " << TAG_NIL << "\n";
-    ir_ << "    " << is_false_tag << " =w ceqw " << cond.tag << ", " << TAG_BOOL << "\n";
-    // Combine: (tag==NIL) OR (tag==BOOL AND data==0)
-    ir_ << "    " << check_false_val << " =w ceql " << cond.data << ", 0\n";
-    ir_ << "    " << is_false_val << " =w and " << is_false_tag << ", " << check_false_val << "\n";
-    ir_ << "    " << is_falsy << " =w or " << is_nil_tag << ", " << is_false_val << "\n";
-
-    // Detect AND/OR short-circuit pattern: JUMP_IF_FALSE followed by POP
-    // means this is part of an `and` or `or` expression. When the short-circuit
-    // fires, the left operand's value stays on the stack and we jump to the join
-    // point. But the join point's code (e.g., while JUMP_IF_FALSE) uses
-    // temporaries from the right operand path, which are undefined on the
-    // short-circuit path. Fix: jump directly to the exit target of the next
-    // JUMP_IF_FALSE at the join point, bypassing the SSA mismatch.
-    std::string exit_taken = lbl_taken;
-    if (ip_ < chunk_->code.size() &&
-        chunk_->code[ip_] == static_cast<uint8_t>(OpCode::OP_POP)) {
-        // This is an AND/OR pattern. Look at the join point (target).
-        if (target + 2 < chunk_->code.size()) {
-            uint8_t join_op = chunk_->code[target];
-            if (join_op == static_cast<uint8_t>(OpCode::OP_JUMP_IF_FALSE) ||
-                join_op == static_cast<uint8_t>(OpCode::OP_LESS_JUMP) ||
-                join_op == static_cast<uint8_t>(OpCode::OP_GREATER_JUMP) ||
-                join_op == static_cast<uint8_t>(OpCode::OP_EQUAL_JUMP)) {
-                uint16_t exit_offset = (chunk_->code[target + 1] << 8) | chunk_->code[target + 2];
-                size_t exit_target = target + 3 + exit_offset;
-                std::string l = label_at(exit_target);
-                if (!l.empty()) {
-                    exit_taken = l;
-                }
-            }
-        }
-    }
-
+    std::string is_falsy = T();
     std::string fallthrough = L();
-    ir_ << "    jnz " << is_falsy << ", " << exit_taken << ", " << fallthrough << "\n";
-    // Continue label (fallthrough)
+
+    ir_ << "    " << is_nil << " =w ceqw " << cond.tag << ", " << TAG_NIL << "\n";
+    ir_ << "    " << is_false_tag << " =w ceqw " << cond.tag << ", " << TAG_BOOL << "\n";
+    ir_ << "    " << check_val << " =w ceql " << cond.data << ", 0\n";
+    ir_ << "    " << is_false_val << " =w and " << is_false_tag << ", " << check_val << "\n";
+    ir_ << "    " << is_falsy << " =w or " << is_nil << ", " << is_false_val << "\n";
+
+    ir_ << "    jnz " << is_falsy << ", " << lbl_taken << ", " << fallthrough << "\n";
     ir_ << fallthrough << "\n";
 }
 
@@ -1642,7 +1612,7 @@ void QbeCodegen::find_jump_targets() {
 std::string QbeCodegen::emit_function(const std::string& name, int param_count, const std::vector<int>* outer_global_func_idx, const std::vector<GlobalVar>* outer_globals) {
     ir_.str("");
     ir_.clear();
-    temp_id_ = 1;
+    temp_id_ = 100; // Start at 100 to avoid any potential low-ID conflicts
     label_id_ = 1;
     ip_ = 0;
     stack_.clear();
