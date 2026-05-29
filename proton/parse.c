@@ -881,9 +881,9 @@ parseline(PState ps)
 		curi++;
 		return PIns;
 	default:
-		if (op >= NPubOp)
+		if (op >= NPubOp) {
 			err("invalid instruction");
-		;
+		}
 	Ins:
 		if (curi - insb >= NIns)
 			err("too many instructions");
