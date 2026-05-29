@@ -125,7 +125,7 @@ fixarg(Ref *r, int k, Ins *i, Fn *fn)
 		r1 = newtmp("isel", Kl, fn);
 		if (c->bits.i) {
 			r2 = newtmp("isel", Kl, fn);
-			cc = (Con){.type = CBits};
+			cc = con_bits(0);
 			cc.bits.i = c->bits.i;
 			r3 = newcon(&cc, fn);
 			emit(Oadd, Kl, r1, r2, r3);
@@ -553,7 +553,7 @@ selsel(Fn *fn, Blk *b, Ins *i, Num *tn)
 			gencmp = 1;
 			cr[0] = fi->arg[0];
 			cr[1] = fi->arg[1];
-			*fi = (Ins){.op = Onop};
+			*fi = ins_nop();
 		}
 	}
 	else if (fi->op == Oand && t->nuse == 1
@@ -586,7 +586,7 @@ selsel(Fn *fn, Blk *b, Ins *i, Num *tn)
 		selcmp(cr, k, swap, fn);
 	if (gencpy)
 		emit(Ocopy, Kw, R, r, R);
-	*isel0 = (Ins){.op = Onop};
+	*isel0 = ins_nop();
 	return isel0;
 }
 
@@ -615,7 +615,7 @@ seljmp(Blk *b, Fn *fn)
 	}
 	fi = flagi(b->ins, &b->ins[b->nins]);
 	if (!fi || !req(fi->to, r)) {
-		selcmp((Ref[2]){r, CON_Z}, Kw, 0, fn);
+		{ Ref _r2[2]; _r2[0]=r; _r2[1]=CON_Z; selcmp(_r2, Kw, 0, fn); }
 		b->jmp.type = Jjf + Cine;
 	}
 	else if (iscmp(fi->op, &k, &c)
@@ -626,7 +626,7 @@ seljmp(Blk *b, Fn *fn)
 			c = cmpop(c);
 		if (t->nuse == 1) {
 			selcmp(fi->arg, k, swap, fn);
-			*fi = (Ins){.op = Onop};
+			*fi = ins_nop();
 		}
 		b->jmp.type = Jjf + c;
 	}
@@ -745,31 +745,19 @@ static bits match[13] = {
 	[12] = BIT(Pbi1) | BIT(Pobi1) | BIT(Pobis),
 };
 
+static uchar matcher_pob[] = {1,3,0,3,1,0};
+static uchar matcher_pbis[] = {5,1,8,5,27,1,5,1,2,5,13,3,1,1,3,3,3,2,0,1,3,3,3,2,3,1,0,1,29};
+static uchar matcher_pois[] = {1,3,0,1,3,3,3,2,0};
+static uchar matcher_pobis[] = {5,2,10,7,11,19,49,1,1,3,3,3,2,1,3,0,3,1,0,1,3,0,5,1,8,5,25,1,5,1,2,5,13,3,1,1,3,3,3,2,0,1,3,3,3,2,26,1,51,1,5,1,6,5,9,1,3,0,51,3,1,1,3,0,45};
+static uchar matcher_pbi1[] = {1,3,1,3,2,0};
+static uchar matcher_pobi1[] = {5,3,9,9,10,33,12,35,45,1,5,3,11,9,7,9,4,9,17,1,3,0,3,1,3,2,0,3,1,1,3,0,34,1,37,1,5,2,5,7,2,7,8,37,29,1,3,0,1,32};
 static uchar *matcher[] = {
-	[Pbi1] = (uchar[]){
-		1,3,1,3,2,0
-	},
-	[Pbis] = (uchar[]){
-		5,1,8,5,27,1,5,1,2,5,13,3,1,1,3,3,3,2,0,1,
-		3,3,3,2,3,1,0,1,29
-	},
-	[Pob] = (uchar[]){
-		1,3,0,3,1,0
-	},
-	[Pobi1] = (uchar[]){
-		5,3,9,9,10,33,12,35,45,1,5,3,11,9,7,9,4,9,
-		17,1,3,0,3,1,3,2,0,3,1,1,3,0,34,1,37,1,5,2,
-		5,7,2,7,8,37,29,1,3,0,1,32
-	},
-	[Pobis] = (uchar[]){
-		5,2,10,7,11,19,49,1,1,3,3,3,2,1,3,0,3,1,0,
-		1,3,0,5,1,8,5,25,1,5,1,2,5,13,3,1,1,3,3,3,
-		2,0,1,3,3,3,2,26,1,51,1,5,1,6,5,9,1,3,0,51,
-		3,1,1,3,0,45
-	},
-	[Pois] = (uchar[]){
-		1,3,0,1,3,3,3,2,0
-	},
+	matcher_pob,
+	matcher_pbis,
+	matcher_pois,
+	matcher_pobis,
+	matcher_pbi1,
+	matcher_pobi1,
 };
 
 /* end of generated code */
@@ -855,7 +843,7 @@ amatch(Addr *a, Num *tn, Ref r, Fn *fn)
 		s = c->bits.i;
 	}
 	ri = adisp(&co, tn, ri, fn, s);
-	*a = (Addr){co, rb, ri, s};
+	*a = addr_make(co, rb, ri, s);
 
 	if (rtype(ri) == RTmp)
 	if (fn->tmp[ri.val].slot != -1) {
@@ -906,7 +894,7 @@ amd64_isel(Fn *fn)
 				fn->tmp[i->to.val].slot = fn->slot;
 				fn->slot += sz;
 				fn->salign = 2 + al - Oalloc;
-				*i = (Ins){.op = Onop};
+				*i = ins_nop();
 			}
 
 	/* process basic blocks */
@@ -914,7 +902,8 @@ amd64_isel(Fn *fn)
 	num = emalloc(n * sizeof num[0]);
 	for (b=fn->start; b; b=b->link) {
 		curi = &insb[NIns];
-		for (sb=(Blk*[3]){b->s1, b->s2, 0}; *sb; sb++)
+		Blk *_sb_arr[3]; _sb_arr[0]=b->s1; _sb_arr[1]=b->s2; _sb_arr[2]=0;
+		for (sb=_sb_arr; *sb; sb++)
 			for (p=(*sb)->phi; p; p=p->link) {
 				for (a=0; p->blk[a] != b; a++)
 					assert(a+1 < p->narg);

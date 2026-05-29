@@ -352,7 +352,7 @@ stkblob(Ref r, Class *c, Fn *fn, Insl **ilp)
 	if (al < 0)
 		al = 0;
 	sz = c->class & Cptr ? c->t->size : c->size;
-	il->i = (Ins){Oalloc+al, Kl, r, {getcon(sz, fn)}};
+	il->i = ins_make(Oalloc+al, Kl, r, getcon(sz, fn));
 	il->link = *ilp;
 	*ilp = il;
 }
@@ -531,11 +531,7 @@ selpar(Fn *fn, Ins *i0, Ins *i1)
 			emit(Ocopy, *c->cls, i->to, TMP(*c->reg), R);
 		}
 
-	return (Params){
-		.stk = align(off, 8),
-		.ngp = (cty >> 5) & 15,
-		.nfp = (cty >> 9) & 15
-	};
+	{ Params _p = {0}; _p.stk = align(off, 8); _p.ngp = (cty >> 5) & 15; _p.nfp = (cty >> 9) & 15; return _p; }
 }
 
 static Blk *
@@ -657,12 +653,15 @@ arm64_selvaarg(Fn *fn, Blk *b, Ins *i)
 	bstk->s1 = b0;
 
 	b0->phi = alloc(sizeof *b0->phi);
-	*b0->phi = (Phi){
-		.cls = Kl, .to = loc,
-		.narg = 2,
-		.blk = vnew(2, sizeof b0->phi->blk[0], PFn),
-		.arg = vnew(2, sizeof b0->phi->arg[0], PFn),
-	};
+	{
+		Phi _phi = {0};
+		_phi.cls = Kl;
+		_phi.to = loc;
+		_phi.narg = 2;
+		_phi.blk = vnew(2, sizeof b0->phi->blk[0], PFn);
+		_phi.arg = vnew(2, sizeof b0->phi->arg[0], PFn);
+		*b0->phi = _phi;
+	}
 	b0->phi->blk[0] = bstk;
 	b0->phi->blk[1] = breg;
 	b0->phi->arg[0] = lstk;

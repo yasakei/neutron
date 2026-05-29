@@ -10,10 +10,12 @@
 #define F(a,b,c,d,e,f,g,h,i,j)
 #endif
 
-#define T(a,b,c,d,e,f,g,h) {                          \
-	{[Kw]=K##a, [Kl]=K##b, [Ks]=K##c, [Kd]=K##d}, \
-	{[Kw]=K##e, [Kl]=K##f, [Ks]=K##g, [Kd]=K##h}  \
+#ifndef T
+#define T(a,b,c,d,e,f,g,h) { \
+	{K##a, K##b, K##c, K##d}, \
+	{K##e, K##f, K##g, K##h}  \
 }
+#endif
 
 /*********************/
 /* PUBLIC OPERATIONS */

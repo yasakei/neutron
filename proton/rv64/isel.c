@@ -46,7 +46,7 @@ fixarg(Ref *r, int k, Ins *i, Fn *fn)
 			vgrow(&fn->con, ++fn->ncon);
 			c = &fn->con[fn->ncon-1];
 			sprintf(buf, "\"%sfp%d\"", T.asloc, n);
-			*c = (Con){.type = CAddr};
+			{ Con _c = {0}; _c.type = CAddr; *c = _c; }
 			c->sym.id = intern(buf);
 			emit(Oload, k, r1, CON(c-fn->con), R);
 			break;
@@ -231,12 +231,13 @@ rv64_isel(Fn *fn)
 					die("alloc too large");
 				fn->tmp[i->to.val].slot = fn->slot;
 				fn->slot += sz;
-				*i = (Ins){.op = Onop};
+				*i = ins_nop();
 			}
 
 	for (b=fn->start; b; b=b->link) {
 		curi = &insb[NIns];
-		for (sb=(Blk*[3]){b->s1, b->s2, 0}; *sb; sb++)
+		Blk *_sb_arr[3]; _sb_arr[0]=b->s1; _sb_arr[1]=b->s2; _sb_arr[2]=0;
+		for (sb=_sb_arr; *sb; sb++)
 			for (p=(*sb)->phi; p; p=p->link) {
 				for (n=0; p->blk[n] != b; n++)
 					assert(n+1 < p->narg);

@@ -234,7 +234,7 @@ static void
 killins(Fn *fn, Ins *i, Ref r)
 {
 	replaceuses(fn, i->to, r);
-	*i = (Ins){.op = Onop};
+	*i = ins_nop();
 }
 
 static void
@@ -406,8 +406,8 @@ dedupjmp(Fn *fn, Blk *b)
 	propjnz0(fn, b, b->s2, b->s1, b->jmp.arg, Kw);
 	/* propagate cmp eq/ne 0 def of jmp arg as 0 */
 	if (cmpeqz(fn, b->jmp.arg, &arg, &cls, &eqval)) {
-		ps = (Blk*[]){b->s1, b->s2};
-		propjnz0(fn, b, ps[eqval^1], ps[eqval], arg, cls);
+		Blk *_ps[2]; _ps[0]=b->s1; _ps[1]=b->s2;
+		propjnz0(fn, b, _ps[eqval^1], _ps[eqval], arg, cls);
 	}
 
 	/* collapse trivial/constant jnz to jmp */

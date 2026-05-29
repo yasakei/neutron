@@ -1,10 +1,28 @@
 #include "all.h"
 
+#ifdef _MSC_VER
+Amd64Op amd64_op[NOp] = {0};
+
+void init_amd64_op(void)
+{
+	unsigned cur_op;
+#undef X
+#define X(nm, zf, lf) \
+	amd64_op[cur_op].nmem = nm; \
+	amd64_op[cur_op].zflag = zf; \
+	amd64_op[cur_op].lflag = lf;
+#define O(op, t, x) cur_op = O##op;
+	#include "../ops.h"
+#undef X
+#undef O
+}
+#else
 Amd64Op amd64_op[NOp] = {
 #define O(op, t, x) [O##op] =
 #define X(nm, zf, lf) { nm, zf, lf, },
 	#include "../ops.h"
 };
+#endif
 
 static int
 amd64_memargs(int op)

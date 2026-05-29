@@ -363,7 +363,7 @@ selcall(Fn *fn, Ins *i0, Ins *i1, RAlloc **rap)
 		ra = alloc(sizeof *ra);
 		/* specific to NAlign == 3 */
 		al = aret.align >= 2 ? aret.align - 2 : 0;
-		ra->i = (Ins){Oalloc+al, Kl, r1, {getcon(aret.size, fn)}};
+		ra->i = ins_make(Oalloc+al, Kl, r1, getcon(aret.size, fn));
 		ra->link = (*rap);
 		*rap = ra;
 	} else {
@@ -605,12 +605,15 @@ selvaarg(Fn *fn, Blk *b, Ins *i)
 	bstk->s1 = b0;
 
 	b0->phi = alloc(sizeof *b0->phi);
-	*b0->phi = (Phi){
-		.cls = Kl, .to = loc,
-		.narg = 2,
-		.blk = vnew(2, sizeof b0->phi->blk[0], PFn),
-		.arg = vnew(2, sizeof b0->phi->arg[0], PFn),
-	};
+	{
+		Phi _phi = {0};
+		_phi.cls = Kl;
+		_phi.to = loc;
+		_phi.narg = 2;
+		_phi.blk = vnew(2, sizeof b0->phi->blk[0], PFn);
+		_phi.arg = vnew(2, sizeof b0->phi->arg[0], PFn);
+		*b0->phi = _phi;
+	}
 	b0->phi->blk[0] = bstk;
 	b0->phi->blk[1] = breg;
 	b0->phi->arg[0] = lstk;

@@ -454,7 +454,7 @@ emitins(Ins i, E *e)
 		/* we have to use the negation trick to handle
 		 * some 3-address subtractions */
 		if (req(i.to, i.arg[1]) && !req(i.arg[0], i.to)) {
-			ineg = (Ins){Oneg, i.cls, i.to, {i.to}};
+			ineg = ins_make(Oneg, i.cls, i.to, i.to);
 			emitins(ineg, e);
 			emitf("add%k %0, %=", &i, e);
 			break;
@@ -634,9 +634,9 @@ amd64_emitfn(Fn *fn, FILE *f)
 	Ins *i, itmp;
 	int *r, c, o, n, lbl;
 	uint p;
-	E *e;
+	E _e0 = {0}, *e;
 
-	e = &(E){.f = f, .fn = fn};
+	_e0.f = f; _e0.fn = fn; e = &_e0;
 	emitfnlnk(fn->name, &fn->lnk, f);
 	fputs("\tendbr64\n", f);
 	if (!fn->leaf || fn->vararg || fn->dynalloc) {

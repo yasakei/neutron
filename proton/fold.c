@@ -147,7 +147,7 @@ foldint(Con *res, int op, int w, Con *cl, Con *cr)
 		else
 			die("unreachable");
 	}
-	*res = (Con){.type=typ, .sym=sym, .bits={.i=x}};
+	{ Con _c = {0}; _c.type = typ; _c.sym = sym; _c.bits.i = x; *res = _c; }
 	return 0;
 }
 
@@ -159,7 +159,7 @@ foldflt(Con *res, int op, int w, Con *cl, Con *cr)
 
 	if (cl->type != CBits || cr->type != CBits)
 		err("invalid address operand for '%s'", optab[op].name);
-	*res = (Con){.type = CBits};
+	*res = con_bits(0);
 	memset(&res->bits, 0, sizeof(res->bits));
 	if (w)  {
 		ld = cl->bits.d;

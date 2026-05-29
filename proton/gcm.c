@@ -303,7 +303,7 @@ gcmmove(Fn *fn)
 		assert(t == &fn->tmp[i->to.val]);
 		if (t->gcmbid != NOBID)
 			addins(&vins, &nins, i);
-		*i = (Ins){.op = Onop};
+		*i = ins_nop();
 	}
 	addgcmins(fn, vins, nins);
 }
@@ -328,7 +328,7 @@ schedins(Fn *fn, Blk *b, Ins *i, Ins **pvins, uint *pnins)
 		}
 	for (i=i0; i<i1; i++) {
 		addins(pvins, pnins, i);
-		*i = (Ins){.op = Onop};
+		*i = ins_nop();
 	}
 	return i1;
 }

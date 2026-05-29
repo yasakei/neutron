@@ -14,6 +14,44 @@ enum {
 	Km = Kl, /* memory pointer */
 };
 
+#ifdef _MSC_VER
+Op optab[NOp] = {0};
+
+static int optab_inited;
+static void init_optab(void)
+{
+	unsigned cur_op;
+	if (optab_inited) return;
+	optab_inited = 1;
+
+#undef F
+#define F(cf, hi, id, co, as, im, ic, lg, cv, pn) \
+	optab[cur_op].canfold = cf; \
+	optab[cur_op].hasid = hi; \
+	optab[cur_op].idval = id; \
+	optab[cur_op].commutes = co; \
+	optab[cur_op].assoc = as; \
+	optab[cur_op].idemp = im; \
+	optab[cur_op].cmpeqwl = ic; \
+	optab[cur_op].cmplgtewl = lg; \
+	optab[cur_op].eqval = cv; \
+	optab[cur_op].pinned = pn;
+#define T(a,b,c,d,e,f,g,h) \
+	{{K##a, K##b, K##c, K##d}, {K##e, K##f, K##g, K##h}}
+#define O(op, k, flags) \
+	do { \
+		cur_op = O##op; \
+		optab[cur_op].name = #op; \
+		flags \
+		{ short _t[2][4] = k; \
+		  memcpy(optab[cur_op].argcls, _t, sizeof(_t)); } \
+	} while(0)
+	#include "ops.h"
+#undef F
+#undef T
+#undef O
+}
+#else
 Op optab[NOp] = {
 #undef F
 #define F(cf, hi, id, co, as, im, ic, lg, cv, pn) \
@@ -27,6 +65,7 @@ Op optab[NOp] = {
 	#include "ops.h"
 #undef F
 };
+#endif
 
 typedef enum {
 	PXXX,
@@ -514,7 +553,7 @@ parserefl(int arg)
 				err("only one '...' allowed");
 			vararg = 1;
 			if (arg) {
-				*curi = (Ins){.op = Oargv};
+				*curi = ins_make(Oargv, 0, R, R);
 				curi++;
 			}
 			next();
@@ -539,24 +578,24 @@ parserefl(int arg)
 			err("invalid function parameter");
 		if (env)
 			if (arg)
-				*curi = (Ins){Oarge, k, R, {r}};
+				*curi = ins_make(Oarge, k, R, r);
 			else
-				*curi = (Ins){Opare, k, r, {R}};
+				*curi = ins_make(Opare, k, r, R);
 		else if (k == Kc)
 			if (arg)
-				*curi = (Ins){Oargc, Kl, R, {TYPE(ty), r}};
+				*curi = ins_make2(Oargc, Kl, R, TYPE(ty), r);
 			else
-				*curi = (Ins){Oparc, Kl, r, {TYPE(ty)}};
+				*curi = ins_make(Oparc, Kl, r, TYPE(ty));
 		else if (k >= Ksb)
 			if (arg)
-				*curi = (Ins){Oargsb+(k-Ksb), Kw, R, {r}};
+				*curi = ins_make(Oargsb+(k-Ksb), Kw, R, r);
 			else
-				*curi = (Ins){Oparsb+(k-Ksb), Kw, r, {R}};
+				*curi = ins_make(Oparsb+(k-Ksb), Kw, r, R);
 		else
 			if (arg)
-				*curi = (Ins){Oarg, k, R, {r}};
+				*curi = ins_make(Oarg, k, R, r);
 			else
-				*curi = (Ins){Opar, k, r, {R}};
+				*curi = ins_make(Opar, k, r, R);
 		curi++;
 	Next:
 		if (peek() == Trparen)
@@ -1209,6 +1248,9 @@ parse(FILE *f, char *path, void dbgfile(char *), void data(Dat *), void func(Fn 
 	Lnk lnk;
 	uint n;
 
+#ifdef _MSC_VER
+	init_optab();
+#endif
 	lexinit();
 	inf = f;
 	inpath = path;
@@ -1217,7 +1259,7 @@ parse(FILE *f, char *path, void dbgfile(char *), void data(Dat *), void func(Fn 
 	ntyp = 0;
 	typ = vnew(0, sizeof typ[0], PHeap);
 	for (;;) {
-		lnk = (Lnk){0};
+		memset(&lnk, 0, sizeof lnk);
 		switch (parselnk(&lnk)) {
 		default:
 			err("top-level definition expected");

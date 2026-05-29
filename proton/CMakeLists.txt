@@ -85,9 +85,6 @@ target_include_directories(proton PRIVATE
 )
 
 if(MSVC)
-    foreach(src ${PROTON_COMMON_SRCS} ${PROTON_AMD64_SRCS} ${PROTON_ARM64_SRCS} ${PROTON_RV64_SRCS} libproton.c)
-        set_source_files_properties(${src} PROPERTIES LANGUAGE CXX)
-    endforeach()
     target_compile_options(proton PRIVATE /W0)
 else()
     target_compile_options(proton PRIVATE -w)

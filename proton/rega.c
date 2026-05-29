@@ -256,7 +256,7 @@ pmgen()
 	assert(!npm || status[npm-1] == ToMove);
 	for (i=0; i<npm; i++)
 		if (status[i] == ToMove)
-			pmrec(status, i, (int[]){pm[i].cls});
+			{ int _cls[1]; _cls[0] = pm[i].cls; pmrec(status, i, _cls); }
 }
 
 static void
@@ -636,7 +636,12 @@ rega(Fn *fn)
 	/* 4. emit remaining copies in new blocks */
 	blist = 0;
 	for (b=fn->start;; b=b->link) {
-		ps = (Blk**[3]){&b->s1, &b->s2, (Blk*[1]){0}};
+		Blk *_ps_end = NULL;
+		Blk **_ps_arr[3];
+		_ps_arr[0] = &b->s1;
+		_ps_arr[1] = &b->s2;
+		_ps_arr[2] = &_ps_end;
+		ps = _ps_arr;
 		for (; (s=**ps); ps++) {
 			npm = 0;
 			for (p=s->phi; p; p=p->link) {

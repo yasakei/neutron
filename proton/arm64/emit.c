@@ -358,7 +358,7 @@ fixarg(Ref *pr, int sz, int t, E *e)
 		if (s > sz * 4095u) {
 			if (t < 0)
 				return 1;
-			i = &(Ins){Oaddr, Kl, TMP(t), {r}};
+			Ins _i = {0}; _i.op = Oaddr; _i.cls = Kl; _i.to = TMP(t); _i.arg[0] = r; i = &_i;
 			emitins(i, e);
 			*pr = TMP(t);
 		}
@@ -542,9 +542,9 @@ arm64_emitfn(Fn *fn, FILE *out)
 	uint64_t o;
 	Blk *b, *t;
 	Ins *i;
-	E *e;
+	E _e0 = {0}, *e;
 
-	e = &(E){.f = out, .fn = fn};
+	_e0.f = out; _e0.fn = fn; e = &_e0;
 	if (T.apple)
 		e->fn->lnk.align = 4;
 	emitfnlnk(e->fn->name, &e->fn->lnk, e->f);
@@ -589,9 +589,7 @@ arm64_emitfn(Fn *fn, FILE *out)
 	for (r=arm64_rclob; *r>=0; r++)
 		if (e->fn->reg & BIT(*r)) {
 			s -= 2;
-			i = &(Ins){.arg = {TMP(*r), SLOT(s)}};
-			i->op = *r >= V0 ? Ostored : Ostorel;
-			emitins(i, e);
+			Ins _i = {0}; _i.arg[0] = TMP(*r); _i.arg[1] = SLOT(s); _i.op = *r >= V0 ? Ostored : Ostorel; emitins(&_i, e);
 		}
 
 	for (lbl=0, b=e->fn->start; b; b=b->link) {
@@ -609,9 +607,7 @@ arm64_emitfn(Fn *fn, FILE *out)
 			for (r=arm64_rclob; *r>=0; r++)
 				if (e->fn->reg & BIT(*r)) {
 					s -= 2;
-					i = &(Ins){Oload, 0, TMP(*r), {SLOT(s)}};
-					i->cls = *r >= V0 ? Kd : Kl;
-					emitins(i, e);
+					Ins _i = {0}; _i.op = Oload; _i.cls = 0; _i.to = TMP(*r); _i.arg[0] = SLOT(s); _i.cls = *r >= V0 ? Kd : Kl; emitins(&_i, e);
 				}
 			if (e->fn->dynalloc)
 				fputs("\tmov sp, x29\n", e->f);

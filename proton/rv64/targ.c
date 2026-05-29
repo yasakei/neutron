@@ -1,10 +1,25 @@
 #include "all.h"
 
+#ifdef _MSC_VER
+Rv64Op rv64_op[NOp] = {0};
+
+void init_rv64_op(void)
+{
+	unsigned cur_op;
+#undef V
+#define V(imm) rv64_op[cur_op].imm = imm;
+#define O(op, t, x) cur_op = O##op;
+	#include "../ops.h"
+#undef V
+#undef O
+}
+#else
 Rv64Op rv64_op[NOp] = {
 #define O(op, t, x) [O##op] =
 #define V(imm) { imm },
 #include "../ops.h"
 };
+#endif
 
 int rv64_rsave[] = {
 	T0, T1, T2, T3, T4, T5,

@@ -246,7 +246,7 @@ narrowpars(Fn *fn)
 	for (i=b->ins; i<&b->ins[b->nins]; i++) {
 		if (!ispar(i->op))
 			break;
-		ext = (Ins){.op = Onop};
+		ext = ins_nop();
 		if (i->cls == Kw)
 		if (usewidthle(fn, i->to, 16)) {
 			ext.op = Oextuh;
@@ -390,7 +390,8 @@ phicopyref(Fn *fn, Blk *b, Phi *p)
 	|| !isw1(fn, d->jmp.arg))
 		return R;
 
-	s = (Blk*[]){0, 0};
+	Blk *_s_arr[2] = {0, 0};
+	s = _s_arr;
 	for (n=0; n<2; n++)
 		for (c=0; c<2; c++)
 			if (req(p->arg[n], con01[c]))

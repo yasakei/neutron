@@ -46,7 +46,7 @@ promote(Fn *fn)
 			goto Skip;
 		}
 		/* get rid of the alloc and replace uses */
-		*i = (Ins){.op = Onop};
+		*i = ins_nop();
 		t->ndef--;
 		ue = &t->use[t->nuse];
 		for (u=t->use; u!=ue; u++) {
@@ -128,7 +128,7 @@ static void
 radd(Range *r, int n)
 {
 	if (!r->b)
-		*r = (Range){n, n+1};
+		{ Range _rg = {0}; _rg.a = n; _rg.b = n+1; *r = _rg; }
 	else if (n < r->a)
 		r->a = n;
 	else if (n >= r->b)
@@ -310,8 +310,8 @@ coalesce(Fn *fn)
 			if (!rin(s->r, s->st[n].ip)) {
 				i = s->st[n].i;
 				if (i->op == Oblit0)
-					*(i+1) = (Ins){.op = Onop};
-				*i = (Ins){.op = Onop};
+					*(i+1) = ins_nop();
+				*i = ins_nop();
 			}
 
 	/* kill slots with an empty live range */
@@ -349,7 +349,7 @@ coalesce(Fn *fn)
 			i->arg[0] = UNDEF;
 			continue;
 		}
-		*i = (Ins){.op = Onop};
+		*i = ins_nop();
 		for (u=t->use; u<&t->use[t->nuse]; u++) {
 			if (u->type == UJmp) {
 				b = fn->rpo[u->bid];
@@ -369,8 +369,8 @@ coalesce(Fn *fn)
 				i->arg[1] = CON_Z;  /* crash */
 			} else {
 				if (i->op == Oblit0)
-					*(i+1) = (Ins){.op = Onop};
-				*i = (Ins){.op = Onop};
+					*(i+1) = ins_nop();
+				*i = ins_nop();
 			}
 		}
 	}
@@ -415,7 +415,7 @@ coalesce(Fn *fn)
 		assert(t->ndef == 1 && t->def);
 		if (s->s == s)
 			continue;
-		*t->def = (Ins){.op = Onop};
+		*t->def = ins_nop();
 		ts = &fn->tmp[s->s->t];
 		assert(t->bid == ts->bid);
 		if (t->def < ts->def) {
@@ -424,7 +424,7 @@ coalesce(Fn *fn)
 			 * dominates its new uses
 			 */
 			*t->def = *ts->def;
-			*ts->def = (Ins){.op = Onop};
+			*ts->def = ins_nop();
 			ts->def = t->def;
 		}
 		for (u=t->use; u<&t->use[t->nuse]; u++) {
@@ -453,8 +453,8 @@ coalesce(Fn *fn)
 				assert(sz >= 0);
 				(i+1)->arg[0] = INT(-sz);
 			} else if (off0 == off1) {
-				*i = (Ins){.op = Onop};
-				*(i+1) = (Ins){.op = Onop};
+				*i = ins_nop();
+				*(i+1) = ins_nop();
 			}
 		}
 	}

@@ -314,10 +314,7 @@ emit(int op, int k, Ref to, Ref arg0, Ref arg1)
 {
 	if (curi == insb)
 		die("emit, too many instructions");
-	*--curi = (Ins){
-		.op = op, .cls = k,
-		.to = to, .arg = {arg0, arg1}
-	};
+	*--curi = ins_make2(op, k, to, arg0, arg1);
 }
 
 void
@@ -499,7 +496,7 @@ getcon(int64_t val, Fn *fn)
 		&& fn->con[c].bits.i == val)
 			return CON(c);
 	vgrow(&fn->con, ++fn->ncon);
-	fn->con[c] = (Con){.type = CBits, .bits.i = val};
+	fn->con[c] = con_bits(val);
 	return CON(c);
 }
 
@@ -611,7 +608,7 @@ firstbit(bits b)
 		n += 4;
 		b >>= 4;
 	}
-	n += (char[16]){4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0}[b & 0xf];
+{ static const char _l[] = {4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0}; n += _l[b & 0xf]; }
 	return n;
 }
 

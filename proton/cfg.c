@@ -486,7 +486,7 @@ simplcfg(Fn *fn)
 		printfn(fn, stderr);
 	}
 
-	cpy = (Ins){.op = Ocopy};
+	cpy = ins_make(Ocopy, 0, R, R);
 	for (b=fn->start; b; b=b->link)
 		if (b->npred == 1) {
 			bb = b->pred[0];
@@ -525,7 +525,8 @@ simplcfg(Fn *fn)
 				addbins(&b->ins, &b->nins, j->s1);
 				empty[b->id] &= empty[j->s1->id];
 				jj = &jmp[j->s1->id];
-				pb = (Blk*[]){jj->s1, jj->s2, 0};
+				Blk *_pb_arr[3]; _pb_arr[0]=jj->s1; _pb_arr[1]=jj->s2; _pb_arr[2]=0;
+				pb = _pb_arr;
 				for (; (bb=*pb); pb++)
 					for (p=bb->phi; p; p=p->link) {
 						n = phiargn(p, j->s1);

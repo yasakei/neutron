@@ -330,7 +330,7 @@ stkblob(Ref r, Typ *t, Fn *fn, Insl **ilp)
 	if (al < 0)
 		al = 0;
 	sz = (t->size + 7) & ~7;
-	il->i = (Ins){Oalloc+al, Kl, r, {getcon(sz, fn)}};
+	il->i = ins_make(Oalloc+al, Kl, r, getcon(sz, fn));
 	il->link = *ilp;
 	*ilp = il;
 }
@@ -551,11 +551,7 @@ selpar(Fn *fn, Ins *i0, Ins *i1)
 			emit(Ocopy, *c->cls, i->to, TMP(*c->reg), R);
 		}
 
-	return (Params){
-		.stk = s,
-		.ngp = (cty >> 4) & 15,
-		.nfp = (cty >> 8) & 15,
-	};
+	{ Params _p = {0}; _p.stk = s; _p.ngp = (cty >> 4) & 15; _p.nfp = (cty >> 8) & 15; return _p; }
 }
 
 static void

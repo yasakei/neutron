@@ -107,6 +107,30 @@ enum {
 #define MEM(x)   (Ref){RMem, x}
 #define INT(x)   (Ref){RInt, (x)&0x1fffffff}
 
+#ifdef _MSC_VER
+static inline Ref ref_(uint type, uint val) { Ref r = {0}; r.type = type; r.val = val; return r; }
+#undef R
+#undef UNDEF
+#undef CON_Z
+#undef TMP
+#undef CON
+#undef SLOT
+#undef TYPE
+#undef CALL
+#undef MEM
+#undef INT
+#define R        ref_(RTmp, 0)
+#define UNDEF    ref_(RCon, 0)
+#define CON_Z    ref_(RCon, 1)
+#define TMP(x)   ref_(RTmp, (uint)(x))
+#define CON(x)   ref_(RCon, (uint)(x))
+#define SLOT(x)  ref_(RSlot, (uint)((x)&0x1fffffff))
+#define TYPE(x)  ref_(RType, (uint)(x))
+#define CALL(x)  ref_(RCall, (uint)(x))
+#define MEM(x)   ref_(RMem, (uint)(x))
+#define INT(x)   ref_(RInt, (uint)((x)&0x1fffffff))
+#endif
+
 static inline int req(Ref a, Ref b)
 {
 	return a.type == b.type && a.val == b.val;
@@ -240,6 +264,10 @@ struct Ins {
 	Ref to;
 	Ref arg[2];
 };
+
+static inline Ins ins_nop(void) { Ins i = {0}; i.op = Onop; return i; }
+static inline Ins ins_make(uint op, uint cls, Ref to, Ref a0) { Ins i = {0}; i.op = op; i.cls = cls; i.to = to; i.arg[0] = a0; return i; }
+static inline Ins ins_make2(uint op, uint cls, Ref to, Ref a0, Ref a1) { Ins i = {0}; i.op = op; i.cls = cls; i.to = to; i.arg[0] = a0; i.arg[1] = a1; return i; }
 
 struct Phi {
 	Ref to;
@@ -380,6 +408,8 @@ struct Con {
 	char flt; /* 1 to print as s, 2 to print as d */
 };
 
+static inline Con con_bits(int64_t val) { Con c = {0}; c.type = CBits; c.bits.i = val; return c; }
+
 typedef struct Addr Addr;
 
 struct Addr { /* amd64 addressing */
@@ -388,6 +418,8 @@ struct Addr { /* amd64 addressing */
 	Ref index;
 	int scale;
 };
+
+static inline Addr addr_make(Con offset, Ref base, Ref index, int scale) { Addr a = {0}; a.offset = offset; a.base = base; a.index = index; a.scale = scale; return a; }
 
 struct Lnk {
 	char export;

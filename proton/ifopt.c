@@ -66,13 +66,10 @@ convert(Blk *ifb, Blk *thenb, Blk *elseb, Blk *joinb)
 		addbins(&ins, &nins, elseb);
 	assert(joinb->npred == 2);
 	if (joinb->phi) {
-		sel = (Ins){
-			.op = Osel0, .cls = Kw,
-			.arg = {ifb->jmp.arg},
-		};
+		sel = ins_make(Osel0, Kw, R, ifb->jmp.arg);
 		addins(&ins, &nins, &sel);
 	}
-	sel = (Ins){.op = Osel1};
+	sel = ins_make(Osel1, 0, R, R);
 	for (p=joinb->phi; p; p=p->link) {
 		sel.to = p->to;
 		sel.cls = p->cls;

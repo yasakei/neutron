@@ -77,7 +77,7 @@ iins(int cls, int op, Ref a0, Ref a1, Loc *l)
 	ist->num = inum++;
 	ist->bid = l->blk->id;
 	ist->off = l->off;
-	ist->new.ins = (Ins){op, cls, R, {a0, a1}};
+	ist->new.ins = ins_make2(op, cls, R, a0, a1);
 	return ist->new.ins.to = newtmp("ld", cls, curf);
 }
 
@@ -121,12 +121,7 @@ load(Slice sl, bits msk, Loc *l)
 	int ld, cls, all;
 	Con c;
 
-	ld = (int[]){
-		[1] = Oloadub,
-		[2] = Oloaduh,
-		[4] = Oloaduw,
-		[8] = Oload
-	}[sl.sz];
+	switch (sl.sz) { case 1: ld = Oloadub; break; case 2: ld = Oloaduh; break; case 4: ld = Oloaduw; break; case 8: ld = Oload; break; default: ld = 0; break; }
 	all = msk == MASK(sl.sz);
 	if (all)
 		cls = sl.cls;
@@ -429,8 +424,8 @@ loadopt(Fn *fn)
 			if (!isload(i->op))
 				continue;
 			sz = loadsz(i);
-			sl = (Slice){i->arg[0], 0, sz, i->cls};
-			l = (Loc){LRoot, i-b->ins, b};
+			{ Slice _sl = {0}; _sl.ref = i->arg[0]; _sl.off = 0; _sl.sz = sz; _sl.cls = i->cls; sl = _sl; }
+			{ Loc _l = {0}; _l.type = LRoot; _l.off = i-b->ins; _l.blk = b; l = _l; }
 			i->arg[1] = def(sl, MASK(sz), b, i, &l);
 		}
 	qsort(ilog, nlog, sizeof ilog[0], icmp);
