@@ -328,22 +328,25 @@ def run_internal_benchmarks(bench_dir, root_dir):
 
             results = {}
 
-            def time_run(path, key):
+            def time_run(path, key, timeout=60):
                 if not os.path.exists(path):
                     results[key] = {'time': 0, 'success': False, 'display': 'FAILED'}
                     return
                 for _ in range(3):
                     try:
                         t0 = time.time()
-                        r = subprocess.run([path], capture_output=True, text=True, encoding='utf-8', errors='replace', env=env, timeout=60)
+                        r = subprocess.run([path], capture_output=True, text=True, encoding='utf-8', errors='replace', env=env, timeout=timeout)
                         t = time.time() - t0
                         if r.returncode == 0:
                             results[key] = {'time': t, 'success': True, 'output': r.stdout.strip()}
                             return
+                    except subprocess.TimeoutExpired:
+                        results[key] = {'time': 0, 'success': False, 'display': 'TIMEOUT'}
+                        return
                     except: pass
                 results[key] = {'time': 0, 'success': False, 'display': 'FAILED'}
 
-            time_run(qbe_bin + "_qbe", "qbe")
+            time_run(qbe_bin + "_qbe", "qbe", timeout=0.3)
 
             # Interpreter
             for _ in range(3):
@@ -355,6 +358,9 @@ def run_internal_benchmarks(bench_dir, root_dir):
                     if r.returncode == 0:
                         results['interp'] = {'time': t, 'success': True, 'output': r.stdout.strip()}
                         break
+                except subprocess.TimeoutExpired:
+                    results['interp'] = {'time': 0, 'success': False, 'display': 'TIMEOUT'}
+                    break
                 except: pass
             if 'interp' not in results:
                 results['interp'] = {'time': 0, 'success': False, 'display': 'FAILED'}
