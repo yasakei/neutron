@@ -45,7 +45,7 @@ static void init_optab(void)
 		flags \
 		{ short _t[2][4] = k; \
 		  memcpy(optab[cur_op].argcls, _t, sizeof(_t)); } \
-	} while(0)
+	} while(0);
 	#include "ops.h"
 #undef F
 #undef T
