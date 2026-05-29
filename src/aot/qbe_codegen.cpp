@@ -260,16 +260,16 @@ void QbeCodegen::analyze_bytecode() {
 // ============== Data section ==============
 
 void QbeCodegen::emit_data_section() {
-    // Tag constants as word literals
-    TAG_NIL = "1";          // value 0
-    TAG_BOOL = "2";
-    TAG_NUM = "3";
-    TAG_STR = "4";
-    TAG_ARRAY = "5";
-    TAG_OBJ = "6";
-    TAG_CLASS = "7";
-    TAG_INST = "8";
-    TAG_CALLABLE = "9";
+    // Tag constants as word literals (must match ValueType enum exactly)
+    TAG_NIL = "0";
+    TAG_BOOL = "1";
+    TAG_NUM = "2";
+    TAG_STR = "3";
+    TAG_ARRAY = "4";
+    TAG_OBJ = "5";
+    TAG_CLASS = "6";
+    TAG_INST = "7";
+    TAG_CALLABLE = "8";
 
     // Runtime constants (only emit once for the main function)
     if (is_main_) {
