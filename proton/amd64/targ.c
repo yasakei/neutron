@@ -7,6 +7,8 @@ void init_amd64_op(void)
 {
 	unsigned cur_op;
 #undef X
+#undef V
+#undef O
 #define X(nm, zf, lf) \
 	amd64_op[cur_op].nmem = nm; \
 	amd64_op[cur_op].zflag = zf; \
@@ -18,6 +20,8 @@ void init_amd64_op(void)
 }
 #else
 Amd64Op amd64_op[NOp] = {
+#undef X
+#undef O
 #define O(op, t, x) [O##op] =
 #define X(nm, zf, lf) { nm, zf, lf, },
 	#include "../ops.h"

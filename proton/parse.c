@@ -25,6 +25,10 @@ static void init_optab(void)
 	optab_inited = 1;
 
 #undef F
+#undef T
+#undef O
+#undef X
+#undef V
 #define F(cf, hi, id, co, as, im, ic, lg, cv, pn) \
 	optab[cur_op].canfold = cf; \
 	optab[cur_op].hasid = hi; \
@@ -54,6 +58,10 @@ static void init_optab(void)
 #else
 Op optab[NOp] = {
 #undef F
+#undef T
+#undef O
+#undef X
+#undef V
 #define F(cf, hi, id, co, as, im, ic, lg, cv, pn) \
 	.canfold = cf, \
 	.hasid = hi, .idval = id, \

@@ -1,3 +1,23 @@
+#ifdef _WIN32
+  /* Windows headers often define these as macros, which collide with our tokens */
+  #undef add
+  #undef sub
+  #undef and
+  #undef or
+  #undef xor
+  #undef cast
+  #undef load
+  #undef store
+  #undef copy
+  #undef neg
+  #undef div
+  #undef rem
+  #undef mul
+  #undef shl
+  #undef shr
+  #undef sar
+#endif
+
 #ifndef X /* amd64 */
 	#define X(NMemArgs, SetsZeroFlag, LeavesFlags)
 #endif

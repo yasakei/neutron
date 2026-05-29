@@ -177,6 +177,11 @@ enum CmpF {
 
 enum O {
 	Oxxx,
+#undef O
+#undef T
+#undef F
+#undef X
+#undef V
 #define O(op, x, y) O##op,
 	#include "ops.h"
 	NOp,
