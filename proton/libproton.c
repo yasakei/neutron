@@ -129,9 +129,17 @@ proton_compile_ssa(const char *ssa, FILE *outf)
 	g_outf = outf;
 	T = proton_host_target();
 
+#ifdef _MSC_VER
+	inf = tmpfile();
+	if (!inf)
+		return -1;
+	fwrite(ssa, 1, strlen(ssa), inf);
+	rewind(inf);
+#else
 	inf = fmemopen((void *)ssa, strlen(ssa), "r");
 	if (!inf)
 		return -1;
+#endif
 
 	parse(inf, "<ssa>", dbgfile_cb, data_cb, func_cb);
 	fclose(inf);

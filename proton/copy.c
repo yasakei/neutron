@@ -108,7 +108,7 @@ usewidthle(Fn *fn, Ref r, int w)
 }
 
 static int
-min(int v1, int v2)
+imin(int v1, int v2)
 {
 	return v1 < v2 ? v1 : v2;
 }
@@ -162,9 +162,9 @@ defwidthle(Fn *fn, Ref r, int w)
 				return 1;
 			if (w < 32) {
 				if (i->op == Osar)
-					w = min(31, w+v);
+					w = imin(31, w+v);
 				else
-					w = min(32, w+v);
+					w = imin(32, w+v);
 			}
 		}
 		return defwidthle(fn, i->arg[0], w);
@@ -186,7 +186,7 @@ defwidthle(Fn *fn, Ref r, int w)
 	if (ext(i, &e)) {
 		if (e.zext && e.usew <= w)
 			return 1;
-		w = min(w, e.nopw);
+		w = imin(w, e.nopw);
 		return defwidthle(fn, i->arg[0], w);
 	}
 

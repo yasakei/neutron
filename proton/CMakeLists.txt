@@ -85,7 +85,7 @@ target_include_directories(proton PRIVATE
 )
 
 if(MSVC)
-    target_compile_options(proton PRIVATE /W0)
+    target_compile_options(proton PRIVATE /W0 /Zc:preprocessor)
 else()
     target_compile_options(proton PRIVATE -w)
 endif()
