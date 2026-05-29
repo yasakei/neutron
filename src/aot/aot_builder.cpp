@@ -1,7 +1,6 @@
 #include "aot/aot_builder.h"
-#ifndef NEUTRON_NO_PROTON
 #include "proton.h"
-#endif
+#include "aot/proton_windows_bridge.h"
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
@@ -33,8 +32,11 @@ bool AotBuilder::write_qbe_ir(const Chunk* chunk, const std::string& func_name,
 
 bool AotBuilder::compile_ssa(const std::string& ssa, const std::string& obj_path) {
     std::string asm_path = obj_path;
-    if (asm_path.size() > 2 && asm_path.substr(asm_path.size() - 2) == ".o") {
-        asm_path = asm_path.substr(0, asm_path.size() - 2) + ".s";
+    size_t dot_pos = asm_path.rfind('.');
+    if (dot_pos != std::string::npos) {
+        asm_path = asm_path.substr(0, dot_pos) + ".s";
+    } else {
+        asm_path += ".s";
     }
 
     // Compile SSA to assembly using embedded Proton
@@ -43,13 +45,8 @@ bool AotBuilder::compile_ssa(const std::string& ssa, const std::string& obj_path
         std::cerr << "Error: Could not write assembly to " << asm_path << std::endl;
         return false;
     }
-    std::ofstream _dssa("/tmp/ack_last.ssa");
-    _dssa << ssa; _dssa.close();
-#ifndef NEUTRON_NO_PROTON
+
     int ret = proton_compile_ssa(ssa.c_str(), asf);
-#else
-    int ret = -1;
-#endif
     fclose(asf);
     if (ret != 0) {
         std::cerr << "Error: Proton compilation failed" << std::endl;
@@ -57,10 +54,8 @@ bool AotBuilder::compile_ssa(const std::string& ssa, const std::string& obj_path
         return false;
     }
 
-    // Assemble .s to .o using system assembler
-    std::string as_cmd = "as -o \"" + obj_path + "\" \"" + asm_path + "\"";
-    int result = system(as_cmd.c_str());
-    if (result != 0) {
+    // Assemble .s to object file using the platform bridge
+    if (!ProtonWindowsBridge::assemble_object(asm_path, obj_path)) {
         std::cerr << "Error: assembler failed for " << asm_path << std::endl;
         std::filesystem::remove(asm_path);
         return false;
@@ -72,8 +67,11 @@ bool AotBuilder::compile_ssa(const std::string& ssa, const std::string& obj_path
 
 bool AotBuilder::assemble(const std::string& ssa_path, const std::string& obj_path) {
     std::string asm_path = obj_path;
-    if (asm_path.size() > 2 && asm_path.substr(asm_path.size() - 2) == ".o") {
-        asm_path = asm_path.substr(0, asm_path.size() - 2) + ".s";
+    size_t dot_pos = asm_path.rfind('.');
+    if (dot_pos != std::string::npos) {
+        asm_path = asm_path.substr(0, dot_pos) + ".s";
+    } else {
+        asm_path += ".s";
     }
     std::string cmd = "qbe -o \"" + asm_path + "\" \"" + ssa_path + "\"";
     int result = system(cmd.c_str());
@@ -81,10 +79,9 @@ bool AotBuilder::assemble(const std::string& ssa_path, const std::string& obj_pa
         std::cerr << "Error: qbe assembly failed for " << ssa_path << std::endl;
         return false;
     }
-    std::string as_cmd = "as -o \"" + obj_path + "\" \"" + asm_path + "\"";
-    result = system(as_cmd.c_str());
+    result = system(("as -o \"" + obj_path + "\" \"" + asm_path + "\"").c_str());
     if (result != 0) {
-        std::cerr << "Error: assembler failed for " << asm_path << std::endl;
+        std::cerr << "Error: system assembler failed for " << asm_path << std::endl;
         return false;
     }
     return true;
@@ -95,7 +92,7 @@ std::string AotBuilder::compile_to_object(const Chunk* chunk, const std::string&
     std::string ir = generate_qbe_ir(chunk, func_name);
     if (ir.empty()) return "";
 
-    std::string obj_path = output_dir + "/" + func_name + ".o";
+    std::string obj_path = output_dir + "/" + func_name + ProtonWindowsBridge::object_extension();
 
     if (!compile_ssa(ir, obj_path)) {
         return "";
@@ -113,7 +110,6 @@ bool AotBuilder::link(const std::string& obj_path, const std::string& output_pat
         compiler = "clang++";
     }
     link_flags = "-lproton -lcurl -ljsoncpp -framework CoreFoundation";
-    // Add Homebrew library paths so linker can find jsoncpp/curl
     if (std::filesystem::exists("/opt/homebrew/lib")) {
         link_flags = "-L/opt/homebrew/lib " + link_flags;
     }
@@ -125,6 +121,22 @@ bool AotBuilder::link(const std::string& obj_path, const std::string& output_pat
 #endif
 
     if (is_windows) {
+#ifdef _WIN32
+        // On MSVC Windows, try cl.exe first
+        if (system("where cl >nul 2>&1") == 0) {
+            compiler = "cl";
+            link_flags = "/Fe:\"" + output_path + "\" /link /nologo "
+                         "proton.lib libcurl.lib jsoncpp.lib ws2_32.lib advapi32.lib";
+            std::string cmd = compiler + " \"" + obj_path + "\" \"" + runtime_lib_path + "\" " + link_flags;
+            int result = system(cmd.c_str());
+            if (result != 0) {
+                std::cerr << "Error: MSVC linking failed for " << obj_path << std::endl;
+                return false;
+            }
+            return true;
+        }
+#endif
+        // Fallback to MinGW-style linking
         compiler = "g++";
         link_flags = "-lproton -lcurl -ljsoncpp -lws2_32 -lpthread";
     }

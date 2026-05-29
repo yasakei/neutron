@@ -406,7 +406,6 @@ jobs:
 
   build-windows-msvc:
     name: Build on Windows (MSVC)
-    if: false
     runs-on: windows-latest
     
     steps:
@@ -470,8 +469,18 @@ jobs:
 
     - name: Install proton library for AOT (Windows)
       run: |
-        if (Test-Path "build\Release\proton.lib") {
-            Copy-Item "build\Release\proton.lib" "build\Release\libproton.a"
+        # Proton is now built as a CMake subdirectory
+        $protonLib = if (Test-Path "build\proton\Release\proton.lib") {
+            "build\proton\Release\proton.lib"
+        } elseif (Test-Path "build\Release\proton.lib") {
+            "build\Release\proton.lib"
+        } else { $null }
+        if ($protonLib) {
+            Write-Host "Found proton library at: $protonLib"
+            Copy-Item $protonLib "build\Release\libproton.a"
+            Copy-Item $protonLib "build\Release\proton.lib"
+        } else {
+            Write-Host "Proton library not found (AOT may fall back to interpreter)"
         }
 
     - name: Run AOT compilation tests
@@ -514,8 +523,13 @@ jobs:
         if (Test-Path "build\Release\neutron_shared.lib") {
             Copy-Item "build\Release\neutron_shared.lib" "$neutronBin\neutron_shared.lib"
         }
-        if (Test-Path "build\Release\proton.lib") {
-            Copy-Item "build\Release\proton.lib" "$neutronBin\proton.lib"
+        $protonLibSrc = if (Test-Path "build\proton\Release\proton.lib") {
+            "build\proton\Release\proton.lib"
+        } elseif (Test-Path "build\Release\proton.lib") {
+            "build\Release\proton.lib"
+        } else { $null }
+        if ($protonLibSrc) {
+            Copy-Item $protonLibSrc "$neutronBin\proton.lib"
         }
         
         # Copy vcpkg DLLs if available
@@ -597,6 +611,16 @@ jobs:
             Copy-Item "build\Release\neutron_shared.dll" "."
         }
         
+        # Copy proton library for installer
+        $protonLibInstaller = if (Test-Path "build\proton\Release\proton.lib") {
+            "build\proton\Release\proton.lib"
+        } elseif (Test-Path "build\Release\proton.lib") {
+            "build\Release\proton.lib"
+        } else { $null }
+        if ($protonLibInstaller -and (-not (Test-Path "proton.lib"))) {
+            Copy-Item $protonLibInstaller "proton.lib"
+        }
+        
         # Install NSIS
         choco install nsis -y
         
@@ -625,6 +649,9 @@ jobs:
         python benchmarks/run_benchmark.py | Tee-Object -FilePath benchmark-windows.txt
         Write-Host ""
         Write-Host "==========================================================="
+
+    - name: Run Internal Benchmarks (QBE vs Interpreter)
+      run: python benchmarks/run_benchmark.py --internal
       
     - name: Upload Benchmark Results
       uses: actions/upload-artifact@v4
@@ -755,6 +782,6 @@ jobs:
       if: |
         needs.build-linux.result != 'success' ||
         needs.build-macos-arm64.result != 'success' ||
-        (needs.build-windows-msvc.result != 'success' && needs.build-windows-msvc.result != 'skipped') ||
+        needs.build-windows-msvc.result != 'success' ||
         needs.build-vscode-extension.result != 'success'
       run: exit 1

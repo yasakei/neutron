@@ -104,13 +104,10 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/libs
 )
 
-# Proton (embedded QBE backend)
-if(NOT MSVC OR MINGW)
-    add_subdirectory(proton)
-    set(WITH_PROTON ON)
-else()
-    add_compile_definitions(NEUTRON_NO_PROTON)
-endif()
+# Proton (embedded QBE backend) — always available, even on MSVC
+# Proton's CMakeLists.txt handles MSVC by compiling C files as C++.
+add_subdirectory(proton)
+set(WITH_PROTON ON)
 
 # Dependencies
 include(FetchContent)
@@ -255,6 +252,7 @@ set(NEUTRON_COMPILER_SOURCES
     src/aot/ntm_metadata.cpp
     src/aot/ffi_bridge.cpp
     src/aot/cpp_stub_gen.cpp
+    src/aot/proton_windows_bridge.cpp
 )
 
 # Type system source files
