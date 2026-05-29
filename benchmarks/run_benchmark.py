@@ -317,8 +317,11 @@ def run_internal_benchmarks(bench_dir, root_dir):
             # --- Build QBE AOT ---
             shutil.rmtree(os.path.join(proj_dir, "build"), ignore_errors=True)
             os.makedirs(os.path.join(proj_dir, "build"), exist_ok=True)
-            subprocess.run([neutron_bin, "build", "--aot-mode=qbe"],
-                           cwd=proj_dir, capture_output=True, text=True, encoding='utf-8', errors='replace', env=env)
+            try:
+                subprocess.run([neutron_bin, "build", "--aot-mode=qbe"],
+                               cwd=proj_dir, capture_output=True, text=True, encoding='utf-8', errors='replace', env=env, timeout=300)
+            except subprocess.TimeoutExpired:
+                Colors.print(f"    AOT build timed out for {name}", Colors.YELLOW)
             qbe_bin = os.path.join(proj_dir, "build", name)
             if os.path.exists(qbe_bin):
                 shutil.move(qbe_bin, qbe_bin + "_qbe")
