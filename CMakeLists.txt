@@ -430,6 +430,9 @@ if(WIN32)
     target_link_libraries(neutron_runtime ws2_32)
 endif()
 
+# Define BUILDING_NEUTRON so C API functions are exported properly
+target_compile_definitions(neutron_runtime PRIVATE BUILDING_NEUTRON)
+
 if(HAVE_CURL)
     if(TARGET CURL::libcurl)
         target_link_libraries(neutron_runtime CURL::libcurl)
