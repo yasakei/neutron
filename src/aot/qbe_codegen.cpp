@@ -249,7 +249,7 @@ void QbeCodegen::analyze_bytecode() {
         }
     }
 
-    num_locals_ = max_local + 1;
+    num_locals_ = std::max(max_local + 1, param_count_);
     if (num_locals_ < 0) num_locals_ = 0;
 
     for (size_t i = 0; i < chunk_->constants.size(); i++) {
@@ -458,9 +458,12 @@ void QbeCodegen::emit_locals_init() {
     // Pre-allocate QBE temps for each local variable slot
     for (int i = 0; i < num_locals_; i++) {
         locals_.push_back({T(), T()}); // tag and data temps
-        // Initialize to nil
-        ir_ << "    " << locals_[i].tag << " =w copy " << TAG_NIL << "\n";
-        ir_ << "    " << locals_[i].data << " =l copy 0\n";
+        // Initialize to nil ONLY if NOT a parameter. 
+        // Parameters are initialized via copy from %p_t/d below.
+        if (i >= param_count_) {
+            ir_ << "    " << locals_[i].tag << " =w copy " << TAG_NIL << "\n";
+            ir_ << "    " << locals_[i].data << " =l copy 0\n";
+        }
     }
 }
 
@@ -1645,6 +1648,7 @@ std::string QbeCodegen::emit_function(const std::string& name, int param_count, 
     stack_.clear();
     stack_func_idx_.clear();
     locals_.clear();
+    param_count_ = param_count;
 
     // First pass: analyze bytecode to collect globals, locals, constants
     analyze_bytecode();

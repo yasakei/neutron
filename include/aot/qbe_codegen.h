@@ -68,6 +68,7 @@ private:
     // Local variable slots — pre-allocated temps
     std::vector<ValuePair> locals_;
     int num_locals_ = 0;
+    int param_count_ = 0;
 
     // Global variables — QBE data symbols
     std::vector<GlobalVar> globals_;
