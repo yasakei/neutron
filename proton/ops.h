@@ -16,6 +16,10 @@
   #undef shl
   #undef shr
   #undef sar
+  #undef T
+  #undef F
+  #undef X
+  #undef V
 #endif
 
 #ifndef X /* amd64 */

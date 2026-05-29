@@ -8,19 +8,33 @@ void init_rv64_op(void)
 	unsigned cur_op;
 #undef V
 #undef O
+#undef X
+#undef T
+#undef F
 #define V(imm) rv64_op[cur_op].imm = imm;
 #define O(op, t, x) cur_op = O##op;
 	#include "../ops.h"
 #undef V
 #undef O
+#undef X
+#undef T
+#undef F
 }
 #else
 Rv64Op rv64_op[NOp] = {
 #undef V
 #undef O
+#undef X
+#undef T
+#undef F
 #define O(op, t, x) [O##op] =
 #define V(imm) { imm },
 #include "../ops.h"
+#undef V
+#undef O
+#undef X
+#undef T
+#undef F
 };
 #endif
 

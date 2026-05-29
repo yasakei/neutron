@@ -54,6 +54,8 @@ static void init_optab(void)
 #undef F
 #undef T
 #undef O
+#undef X
+#undef V
 }
 #else
 Op optab[NOp] = {
@@ -72,6 +74,10 @@ Op optab[NOp] = {
 #define O(op, k, flags) [O##op]={.name = #op, .argcls = k, flags},
 	#include "ops.h"
 #undef F
+#undef T
+#undef O
+#undef X
+#undef V
 };
 #endif
 
