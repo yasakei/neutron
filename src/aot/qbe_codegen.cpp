@@ -37,7 +37,7 @@ ValuePair QbeCodegen::pop() {
 ValuePair QbeCodegen::peek(int depth) const {
     if (stack_.empty()) return {TAG_NIL, "0"};
     size_t idx = stack_.size() - 1 - depth;
-    if (idx >= stack_.size()) return {TAG_NIL, "$rt_nil"};
+    if (idx >= stack_.size()) return {TAG_NIL, "0"};
     return stack_[idx];
 }
 
