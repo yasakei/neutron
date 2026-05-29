@@ -34,7 +34,12 @@ jobs:
           pkgconf \
           curl \
           jsoncpp \
-          python
+          python \
+          unzip
+        
+        # Install Bun
+        curl -fsSL https://bun.sh/install | bash
+        echo "$HOME/.bun/bin" >> $GITHUB_PATH
         
         # Verify GCC version (should be 15.x)
         echo "Using GCC version:"
@@ -213,6 +218,10 @@ jobs:
       run: |
         brew install cmake jsoncpp
         
+        # Install Bun
+        curl -fsSL https://bun.sh/install | bash
+        echo "$HOME/.bun/bin" >> $GITHUB_PATH
+
         # macOS comes with clang by default (Xcode Command Line Tools)
         # Verify compiler availability
         echo "Checking for C++ compiler..."
@@ -417,6 +426,11 @@ jobs:
         echo "Checking vcpkg paths:"
         if (Test-Path "C:\vcpkg\scripts\buildsystems\vcpkg.cmake") { echo "Found at C:\vcpkg" }
         if (Test-Path "$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake") { echo "Found at VCPKG_ROOT" }
+        
+    - name: Install Bun
+      run: |
+        powershell -c "irm bun.sh/install.ps1 | iex"
+        echo "$env:USERPROFILE\.bun\bin" >> $env:GITHUB_PATH
       
     - name: Build Neutron Runtime
       run: |
