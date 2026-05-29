@@ -18,7 +18,7 @@ enum {
 Op optab[NOp] = {0};
 
 static int optab_inited;
-static void init_optab(void)
+void init_optab(void)
 {
 	unsigned cur_op;
 	if (optab_inited) return;
@@ -156,7 +156,7 @@ enum Token {
 static char *kwmap[Ntok] = {0};
 
 static int kwmap_inited;
-static void init_kwmap(void)
+void init_kwmap(void)
 {
 	if (kwmap_inited) return;
 	kwmap_inited = 1;
