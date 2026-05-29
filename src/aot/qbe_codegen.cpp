@@ -1612,7 +1612,7 @@ void QbeCodegen::find_jump_targets() {
 std::string QbeCodegen::emit_function(const std::string& name, int param_count, const std::vector<int>* outer_global_func_idx, const std::vector<GlobalVar>* outer_globals) {
     ir_.str("");
     ir_.clear();
-    temp_id_ = 100; // Start at 100 to avoid any potential low-ID conflicts
+    temp_id_ = 1; // Back to 1, but we will ensure definitions
     label_id_ = 1;
     ip_ = 0;
     stack_.clear();
@@ -1629,8 +1629,6 @@ std::string QbeCodegen::emit_function(const std::string& name, int param_count, 
     if (!is_main_ && outer_global_func_idx && outer_globals) {
         set_global_func_idx(*outer_global_func_idx, *outer_globals);
     }
-
-
 
     // Recursively compile inner functions (CALLABLE constants) first
     std::string inner_functions;
@@ -1672,20 +1670,18 @@ std::string QbeCodegen::emit_function(const std::string& name, int param_count, 
     // Emit function (with params if this is an inner function)
     emit_function_start(name, param_count);
 
-    // Initialize class definitions at runtime start
-    if (is_main_ && has_class_constants()) {
-        ir_ << "    call $rt_init_classes(l $rt_class_data)\n";
-    }
-
-    // Emit locals init AFTER any init calls
-
-    // Initialize local variables
+    // Initialize local variables AND parameters immediately at start
     emit_locals_init();
 
     // Map parameters to local slots (for inner functions)
     for (int i = 0; i < param_count && i < num_locals_; i++) {
         ir_ << "    " << locals_[i].tag << " =w copy %p" << i << "_t\n";
         ir_ << "    " << locals_[i].data << " =l copy %p" << i << "_d\n";
+    }
+
+    // Initialize class definitions at runtime start
+    if (is_main_ && has_class_constants()) {
+        ir_ << "    call $rt_init_classes(l $rt_class_data)\n";
     }
 
     // Emit all instructions
