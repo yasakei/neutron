@@ -15,6 +15,7 @@ char debug['Z'+1] = {0};
 static FILE *g_outf;
 
 #ifdef _MSC_VER
+#include <windows.h>
 extern void init_optab(void);
 extern void init_kwmap(void);
 extern void init_amd64_op(void);
@@ -130,11 +131,19 @@ proton_compile_ssa(const char *ssa, FILE *outf)
 	T = proton_host_target();
 
 #ifdef _MSC_VER
-	inf = tmpfile();
-	if (!inf)
-		return -1;
-	fwrite(ssa, 1, strlen(ssa), inf);
-	rewind(inf);
+	{
+		char tmp_path[MAX_PATH];
+		if (GetTempPathA(MAX_PATH, tmp_path) == 0)
+			return -1;
+		char tmp_name[MAX_PATH];
+		if (GetTempFileNameA(tmp_path, "qbe", 0, tmp_name) == 0)
+			return -1;
+		inf = fopen(tmp_name, "w+b");
+		if (!inf)
+			return -1;
+		fwrite(ssa, 1, strlen(ssa), inf);
+		rewind(inf);
+	}
 #else
 	inf = fmemopen((void *)ssa, strlen(ssa), "r");
 	if (!inf)

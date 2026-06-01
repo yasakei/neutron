@@ -515,6 +515,7 @@ jobs:
         # Install source files needed for runtime compilation
         Copy-Item -Recurse "src" "$neutronRoot\src"
         Copy-Item -Recurse "libs" "$neutronRoot\libs"
+        Copy-Item -Recurse "nt-box\src" "$neutronRoot\nt-box\src"
         
         # Copy runtime libraries to bin directory for linking
         if (Test-Path "build\Release\neutron_runtime.lib") {
