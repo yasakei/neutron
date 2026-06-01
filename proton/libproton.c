@@ -1,3 +1,9 @@
+#ifdef _MSC_VER
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
+
 #include "all.h"
 #ifndef Deftgt
 #include "config.h"
@@ -15,7 +21,6 @@ char debug['Z'+1] = {0};
 static FILE *g_outf;
 
 #ifdef _MSC_VER
-#include <windows.h>
 extern void init_optab(void);
 extern void init_kwmap(void);
 extern void init_amd64_op(void);
