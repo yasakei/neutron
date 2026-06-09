@@ -131,7 +131,6 @@ struct LlvmCodegenImpl {
                 case OpCode::OP_DEFINE_GLOBAL:
                 case OpCode::OP_GET_UPVALUE:
                 case OpCode::OP_SET_UPVALUE:
-                case OpCode::OP_CLOSE_UPVALUE:
                 case OpCode::OP_GET_PROPERTY:
                 case OpCode::OP_SET_PROPERTY:
                 case OpCode::OP_GET_GLOBAL_FAST:
@@ -143,8 +142,13 @@ struct LlvmCodegenImpl {
                 case OpCode::OP_CONST_INT8:
                 case OpCode::OP_CALL:
                 case OpCode::OP_CALL_FAST:
+                case OpCode::OP_TAIL_CALL:
                 case OpCode::OP_ARRAY:
-                case OpCode::OP_INVOKE:
+                case OpCode::OP_OBJECT:
+                case OpCode::OP_OPTIONAL_CHAIN:
+                case OpCode::OP_TYPE_GUARD:
+                case OpCode::OP_VALIDATE_SAFE_VARIABLE:
+                case OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE:
                 case OpCode::OP_SET_GLOBAL_TYPED:
                 case OpCode::OP_SET_LOCAL_TYPED:
                     skip1 = true;
@@ -153,6 +157,19 @@ struct LlvmCodegenImpl {
                 case OpCode::OP_ADD_LOCAL_CONST:
                 case OpCode::OP_INCREMENT_GLOBAL:
                     skip2 = true;
+                    break;
+                case OpCode::OP_INVOKE:
+                    scanIp += 2; // constIdx + argCount
+                    break;
+                case OpCode::OP_LOGICAL_AND:
+                case OpCode::OP_LOGICAL_OR:
+                    scanIp += 2; // short-circuit jump offset
+                    break;
+                case OpCode::OP_TRY:
+                    scanIp += 6; // tryEnd(2) + catchStart(2) + finallyStart(2)
+                    break;
+                case OpCode::OP_FOR_IN_NEXT:
+                    scanIp += 4; // baseSlot + varSlot + offsetHi + offsetLo
                     break;
                 case OpCode::OP_CLOSURE:
                     scanIp++;
@@ -351,6 +368,127 @@ struct LlvmCodegenImpl {
                     llvm::ConstantFP::get(doubleTy, data));
     }
 
+    // --- Global variable tracking ---
+    std::unordered_map<size_t, llvm::GlobalVariable*> globalVars;
+
+    // First pass: find all global variable declarations
+    void collectGlobals() {
+        size_t scanIp = 0;
+        while (scanIp < chunk->code.size()) {
+            uint8_t b = chunk->code[scanIp++];
+            OpCode op = static_cast<OpCode>(b);
+
+            if (op == OpCode::OP_DEFINE_GLOBAL || op == OpCode::OP_DEFINE_TYPED_GLOBAL) {
+                if (scanIp < chunk->code.size()) {
+                    uint8_t idx = chunk->code[scanIp];
+                    if (idx < chunk->constants.size()) {
+                        auto* gv = getOrCreateGlobal(idx);
+                        (void)gv;
+                    }
+                    scanIp++;
+                    if (op == OpCode::OP_DEFINE_TYPED_GLOBAL) scanIp++;
+                }
+            } else {
+                // Skip operands for other opcodes
+                bool skip1 = false, skip2 = false;
+                switch (op) {
+                    case OpCode::OP_CONSTANT:
+                    case OpCode::OP_GET_LOCAL:
+                    case OpCode::OP_SET_LOCAL:
+                    case OpCode::OP_GET_GLOBAL:
+                    case OpCode::OP_SET_GLOBAL:
+                    case OpCode::OP_SET_GLOBAL_TYPED:
+                    case OpCode::OP_SET_LOCAL_TYPED:
+                    case OpCode::OP_GET_GLOBAL_FAST:
+                    case OpCode::OP_SET_GLOBAL_FAST:
+                    case OpCode::OP_INCREMENT_GLOBAL:
+                    case OpCode::OP_GET_UPVALUE:
+                    case OpCode::OP_SET_UPVALUE:
+                    case OpCode::OP_GET_PROPERTY:
+                    case OpCode::OP_SET_PROPERTY:
+                    case OpCode::OP_INCREMENT_LOCAL:
+                    case OpCode::OP_DECREMENT_LOCAL:
+                    case OpCode::OP_INC_LOCAL_INT:
+                    case OpCode::OP_DEC_LOCAL_INT:
+                    case OpCode::OP_CONST_INT8:
+                    case OpCode::OP_CALL:
+                    case OpCode::OP_CALL_FAST:
+                    case OpCode::OP_TAIL_CALL:
+                    case OpCode::OP_ARRAY:
+                    case OpCode::OP_OBJECT:
+                    case OpCode::OP_OPTIONAL_CHAIN:
+                    case OpCode::OP_TYPE_GUARD:
+                    case OpCode::OP_VALIDATE_SAFE_VARIABLE:
+                    case OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE:
+                        skip1 = true;
+                        break;
+                    case OpCode::OP_CONSTANT_LONG:
+                    case OpCode::OP_ADD_LOCAL_CONST:
+                        skip2 = true;
+                        break;
+                    case OpCode::OP_INVOKE:
+                        scanIp += 2; // constIdx + argCount
+                        break;
+                    case OpCode::OP_LOGICAL_AND:
+                    case OpCode::OP_LOGICAL_OR:
+                        scanIp += 2; // short-circuit jump offset
+                        break;
+                    case OpCode::OP_TRY:
+                        scanIp += 6; // tryEnd(2) + catchStart(2) + finallyStart(2)
+                        break;
+                    case OpCode::OP_FOR_IN_NEXT:
+                        scanIp += 4; // baseSlot + varSlot + offsetHi + offsetLo
+                        break;
+                    case OpCode::OP_JUMP:
+                    case OpCode::OP_JUMP_IF_FALSE:
+                    case OpCode::OP_LOOP:
+                    case OpCode::OP_LESS_JUMP:
+                    case OpCode::OP_GREATER_JUMP:
+                    case OpCode::OP_EQUAL_JUMP:
+                        scanIp += 2;
+                        break;
+                    case OpCode::OP_LOOP_IF_LESS_LOCAL:
+                        scanIp += 5;
+                        break;
+                    case OpCode::OP_CLOSURE:
+                        scanIp++;
+                        if (scanIp + 1 < chunk->code.size()) {
+                            uint16_t n = (chunk->code[scanIp] << 8) | chunk->code[scanIp + 1];
+                            scanIp += 2 + n * 2;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                if (skip1) scanIp++;
+                if (skip2) scanIp += 2;
+            }
+        }
+    }
+
+    // Get or create an LLVM global variable for a given constant pool index
+    llvm::GlobalVariable* getOrCreateGlobal(size_t constIdx) {
+        auto it = globalVars.find(constIdx);
+        if (it != globalVars.end()) return it->second;
+        if (constIdx >= chunk->constants.size()) return nullptr;
+        const Value& nameVal = chunk->constants[constIdx];
+        if (nameVal.type != ValueType::OBJ_STRING) return nullptr;
+
+        std::string rawName = nameVal.as.obj_string->chars;
+        // Sanitize name for LLVM identifier
+        std::string safe;
+        safe.reserve(rawName.size());
+        for (char c : rawName) {
+            if (isalnum(c) || c == '_') safe += c;
+            else safe += '_';
+        }
+        auto* gv = new llvm::GlobalVariable(*module, valueTy, false,
+                                             llvm::GlobalValue::InternalLinkage,
+                                             constValue(TAG_NIL, 0.0), "global_" + safe);
+        globalVars[constIdx] = gv;
+        return gv;
+    }
+
     // --- Bytecode reading ---
     size_t ip = 0;
 
@@ -399,6 +537,8 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
 
     // Find all jump targets and branch from entry to first bytecode block
     impl->findJumpTargets();
+    // Find all global variables
+    impl->collectGlobals();
     auto* startBB = impl->getOrCreateBB(0, func);
     impl->builder->CreateBr(startBB);
     impl->builder->SetInsertPoint(startBB);
@@ -849,6 +989,284 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 break;
             }
 
+            // === Globals ===
+            case OpCode::OP_GET_GLOBAL:
+            case OpCode::OP_GET_GLOBAL_FAST: {
+                uint8_t constIdx = impl->readByte();
+                auto* gv = impl->getOrCreateGlobal(constIdx);
+                if (gv) {
+                    auto* dest = impl->pushValue();
+                    auto* val = impl->builder->CreateLoad(impl->valueTy, gv, "global");
+                    impl->builder->CreateStore(val, dest);
+                } else {
+                    impl->pushValue();
+                    impl->emitConstStore(impl->peekValue(), TAG_NIL, 0.0);
+                }
+                break;
+            }
+
+            case OpCode::OP_SET_GLOBAL:
+            case OpCode::OP_SET_GLOBAL_FAST:
+            case OpCode::OP_SET_GLOBAL_TYPED:
+            case OpCode::OP_DEFINE_GLOBAL: {
+                uint8_t constIdx = impl->readByte();
+                auto* gv = impl->getOrCreateGlobal(constIdx);
+                if (gv) {
+                    auto* src = impl->popValue();
+                    auto* val = impl->builder->CreateLoad(impl->valueTy, src);
+                    impl->builder->CreateStore(val, gv);
+                } else {
+                    impl->popValue();
+                }
+                break;
+            }
+
+            case OpCode::OP_DEFINE_TYPED_GLOBAL: {
+                uint8_t constIdx = impl->readByte();
+                uint8_t typeByte = impl->readByte(); // skip type annotation
+                (void)typeByte;
+                auto* gv = impl->getOrCreateGlobal(constIdx);
+                if (gv) {
+                    auto* src = impl->popValue();
+                    auto* val = impl->builder->CreateLoad(impl->valueTy, src);
+                    impl->builder->CreateStore(val, gv);
+                } else {
+                    impl->popValue();
+                }
+                break;
+            }
+
+            case OpCode::OP_INCREMENT_GLOBAL: {
+                uint8_t constIdx = impl->readByte();
+                auto* gv = impl->getOrCreateGlobal(constIdx);
+                if (gv) {
+                    auto* dataPtr = impl->builder->CreateStructGEP(impl->valueTy, gv, 1, "g_inc_data");
+                    auto* data = impl->builder->CreateLoad(impl->doubleTy, dataPtr, "g_inc_val");
+                    auto* inc = impl->builder->CreateFAdd(data,
+                        llvm::ConstantFP::get(impl->doubleTy, 1.0), "inc_global");
+                    auto* tagPtr = impl->builder->CreateStructGEP(impl->valueTy, gv, 0);
+                    impl->builder->CreateStore(llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), tagPtr);
+                    impl->builder->CreateStore(inc, dataPtr);
+                }
+                break;
+            }
+
+            // === Functions & Calls ===
+            case OpCode::OP_CALL:
+            case OpCode::OP_CALL_FAST: {
+                uint8_t argCount = impl->readByte();
+                // Pop callee + args, push nil (interpreter fallback)
+                for (int i = 0; i <= argCount; i++) {
+                    impl->popValue();
+                }
+                auto* dest = impl->pushValue();
+                auto* nilVal = impl->constValue(TAG_NIL, 0.0);
+                impl->builder->CreateStore(nilVal, dest);
+                break;
+            }
+
+            case OpCode::OP_CLOSURE: {
+                uint8_t funcIdx = impl->readByte();
+                // Push function from constants (upvalues not supported yet)
+                auto* dest = impl->pushValue();
+                auto* src = impl->constantsGEP(llvm::ConstantInt::get(impl->i32Ty, funcIdx));
+                auto* val = impl->builder->CreateLoad(impl->valueTy, src, "closure");
+                impl->builder->CreateStore(val, dest);
+                break;
+            }
+
+            case OpCode::OP_GET_UPVALUE: {
+                uint8_t slot = impl->readByte();
+                (void)slot;
+                // Upvalues not supported — push nil
+                auto* dest = impl->pushValue();
+                auto* nilVal = impl->constValue(TAG_NIL, 0.0);
+                impl->builder->CreateStore(nilVal, dest);
+                break;
+            }
+
+            case OpCode::OP_SET_UPVALUE: {
+                uint8_t slot = impl->readByte();
+                (void)slot;
+                // Upvalues not supported — discard
+                impl->popValue();
+                break;
+            }
+
+            case OpCode::OP_CLOSE_UPVALUE: {
+                // Upvalues not supported — discard top of stack
+                impl->popValue();
+                break;
+            }
+
+            // === Arrays & Objects ===
+            case OpCode::OP_ARRAY: {
+                uint8_t count = impl->readByte();
+                for (int i = 0; i < count; i++) impl->popValue();
+                auto* d = impl->pushValue();
+                impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
+                break;
+            }
+
+            case OpCode::OP_OBJECT: {
+                uint8_t count = impl->readByte();
+                for (int i = 0; i < count * 2; i++) impl->popValue();
+                auto* d = impl->pushValue();
+                impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
+                break;
+            }
+
+            case OpCode::OP_INDEX_GET: {
+                impl->popValue(); // index
+                impl->popValue(); // object/array/string/buffer
+                auto* d = impl->pushValue();
+                impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
+                break;
+            }
+
+            case OpCode::OP_INDEX_SET: {
+                auto* val = impl->popValue();
+                impl->popValue(); // index
+                impl->popValue(); // object/array
+                // Push value back for chaining
+                auto* d = impl->pushValue();
+                auto* v = impl->builder->CreateLoad(impl->valueTy, val);
+                impl->builder->CreateStore(v, d);
+                break;
+            }
+
+            case OpCode::OP_GET_PROPERTY: {
+                uint8_t propIdx = impl->readByte();
+                (void)propIdx;
+                impl->popValue(); // object
+                auto* d = impl->pushValue();
+                impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
+                break;
+            }
+
+            case OpCode::OP_SET_PROPERTY: {
+                uint8_t propIdx = impl->readByte();
+                (void)propIdx;
+                auto* val = impl->popValue(); // value to set
+                impl->popValue(); // object
+                // Push value back for chaining
+                auto* d = impl->pushValue();
+                auto* v = impl->builder->CreateLoad(impl->valueTy, val);
+                impl->builder->CreateStore(v, d);
+                break;
+            }
+
+            case OpCode::OP_THIS: {
+                auto* d = impl->pushValue();
+                impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
+                break;
+            }
+
+            case OpCode::OP_INVOKE: {
+                uint8_t propIdx = impl->readByte();
+                uint8_t argCount = impl->readByte();
+                (void)propIdx;
+                for (int i = 0; i < argCount; i++) impl->popValue();
+                impl->popValue(); // receiver
+                auto* d = impl->pushValue();
+                impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
+                break;
+            }
+
+            case OpCode::OP_FOR_IN_INIT: {
+                impl->popValue(); // iterable
+                // Push 3 nils (iterable, index, keys)
+                for (int i = 0; i < 3; i++) {
+                    auto* d = impl->pushValue();
+                    impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
+                }
+                break;
+            }
+
+            case OpCode::OP_FOR_IN_NEXT: {
+                uint8_t baseSlot = impl->readByte();
+                uint8_t varSlot = impl->readByte();
+                (void)baseSlot; (void)varSlot;
+                uint8_t offsetHi = impl->readByte();
+                uint8_t offsetLo = impl->readByte();
+                // Simulate "no more items" — jump to exit
+                uint16_t offset = (static_cast<uint16_t>(offsetHi) << 8) | offsetLo;
+                impl->ip += offset;
+                break;
+            }
+
+            case OpCode::OP_OPTIONAL_CHAIN: {
+                uint8_t propIdx = impl->readByte();
+                (void)propIdx;
+                impl->popValue(); // object (or nil)
+                auto* d = impl->pushValue();
+                impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
+                break;
+            }
+
+            case OpCode::OP_SPREAD: {
+                impl->popValue(); // array
+                auto* d = impl->pushValue();
+                impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
+                break;
+            }
+
+            // === Extended opcodes (fallback handlers) ===
+            case OpCode::OP_TAIL_CALL: {
+                uint8_t argCount = impl->readByte();
+                for (int i = 0; i <= argCount; i++) impl->popValue();
+                auto* d = impl->pushValue();
+                impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
+                break;
+            }
+
+            case OpCode::OP_THROW: {
+                impl->popValue(); // exception value
+                auto* d = impl->pushValue();
+                impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
+                break;
+            }
+
+            case OpCode::OP_BREAK:
+            case OpCode::OP_CONTINUE:
+            case OpCode::OP_END_TRY:
+            case OpCode::OP_LOOP_HINT:
+            case OpCode::OP_VALIDATE_SAFE_FUNCTION:
+            case OpCode::OP_VALIDATE_SAFE_FILE_FUNCTION:
+                // No operands, no stack effect
+                break;
+
+            case OpCode::OP_TRY: {
+                // tryEnd(2) + catchStart(2) + finallyStart(2) — skip all operands
+                impl->readShort(); impl->readShort(); impl->readShort();
+                break;
+            }
+
+            case OpCode::OP_VALIDATE_SAFE_VARIABLE:
+            case OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE: {
+                // 1 byte constant index for variable name
+                impl->readByte();
+                break;
+            }
+
+            case OpCode::OP_TYPE_GUARD: {
+                // 1 byte type info operand
+                impl->readByte();
+                break;
+            }
+
+            case OpCode::OP_LOGICAL_AND:
+            case OpCode::OP_LOGICAL_OR: {
+                // 2-byte short-circuit jump offset: pop 2, push 1 result
+                uint16_t offset = impl->readShort();
+                (void)offset;
+                impl->popValue(); // b
+                impl->popValue(); // a
+                auto* d = impl->pushValue();
+                impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
+                break;
+            }
+
             case OpCode::OP_SAY: {
                 auto* a = impl->popValue();
                 auto* data = impl->loadData(a);
@@ -934,39 +1352,22 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             }
 
             default: {
-                // For now, skip unhandled opcodes. We'll implement them in Phase 2.
-                // Skip operands for opcodes with known operand widths
+                // Unhandled opcodes — skip their operands
                 bool skip1 = false, skip2 = false, skipShort = false;
                 switch (op) {
                     case OpCode::OP_CONSTANT:
                     case OpCode::OP_GET_LOCAL:
                     case OpCode::OP_SET_LOCAL:
-                    case OpCode::OP_GET_GLOBAL:
-                    case OpCode::OP_SET_GLOBAL:
-                    case OpCode::OP_DEFINE_GLOBAL:
-                    case OpCode::OP_GET_UPVALUE:
-                    case OpCode::OP_SET_UPVALUE:
-                    case OpCode::OP_CLOSE_UPVALUE:
-                    case OpCode::OP_GET_PROPERTY:
-                    case OpCode::OP_SET_PROPERTY:
-                    case OpCode::OP_GET_GLOBAL_FAST:
-                    case OpCode::OP_SET_GLOBAL_FAST:
                     case OpCode::OP_INCREMENT_LOCAL:
                     case OpCode::OP_DECREMENT_LOCAL:
                     case OpCode::OP_INC_LOCAL_INT:
                     case OpCode::OP_DEC_LOCAL_INT:
                     case OpCode::OP_CONST_INT8:
-                    case OpCode::OP_CALL:
-                    case OpCode::OP_CALL_FAST:
-                    case OpCode::OP_ARRAY:
-                    case OpCode::OP_INVOKE:
-                    case OpCode::OP_SET_GLOBAL_TYPED:
                     case OpCode::OP_SET_LOCAL_TYPED:
                         skip1 = true;
                         break;
                     case OpCode::OP_CONSTANT_LONG:
                     case OpCode::OP_ADD_LOCAL_CONST:
-                    case OpCode::OP_INCREMENT_GLOBAL:
                         skip2 = true;
                         break;
                     case OpCode::OP_JUMP:
@@ -980,14 +1381,6 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                     case OpCode::OP_LOOP_IF_LESS_LOCAL:
                         impl->ip += 3;
                         break;
-                    case OpCode::OP_CLOSURE: {
-                        impl->ip++;
-                        if (impl->ip + 1 < chunk->code.size()) {
-                            uint16_t n = (chunk->code[impl->ip] << 8) | chunk->code[impl->ip + 1];
-                            impl->ip += 2 + n * 2;
-                        }
-                        break;
-                    }
                     default:
                         break;
                 }
