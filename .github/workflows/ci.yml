@@ -52,12 +52,12 @@ jobs:
     - name: Build Neutron Runtime
       run: |
         cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-        cmake --build build
+        cmake --build build --parallel
       
     - name: Build Box Package Manager
       run: |
         cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
-        cmake --build nt-box/build
+        cmake --build nt-box/build --parallel
         cp nt-box/build/box .
       
     - name: Package
@@ -191,12 +191,12 @@ jobs:
     - name: Build Neutron Runtime
       run: |
         cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-        cmake --build build
+        cmake --build build --parallel
       
     - name: Build Box Package Manager
       run: |
         cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
-        cmake --build nt-box/build
+        cmake --build nt-box/build --parallel
         cp nt-box/build/box .
       
     - name: Package
@@ -335,42 +335,55 @@ jobs:
     runs-on: windows-latest
     
     steps:
-    - name: Checkout code
+    - name: Checkout code (skip vcpkg submodule — use system C:\vcpkg)
       uses: actions/checkout@v4
       with:
-        submodules: recursive
+        submodules: false
+        fetch-depth: 1
+
+    - name: Init needed submodules (nt-box)
+      run: git submodule update --init --depth 1 nt-box
         
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
 
+    - name: Use system vcpkg on runner
+      shell: pwsh
+      run: |
+        echo "VCPKG_ROOT=C:\vcpkg" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
+        & "C:\vcpkg\vcpkg" --version
+        if (Test-Path "C:\vcpkg\scripts\buildsystems\vcpkg.cmake") {
+          echo "System vcpkg toolchain found"
+        }
+
+    - name: Cache vcpkg packages
+      uses: actions/cache@v4
+      id: vcpkg-cache
+      with:
+        path: C:\vcpkg\packages
+        key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}
+        restore-keys: |
+          ${{ runner.os }}-vcpkg-
+
     - name: Install dependencies (vcpkg)
       run: |
-        vcpkg install jsoncpp:x64-windows curl:x64-windows
-        vcpkg integrate install
-        echo "VCPKG_ROOT: $env:VCPKG_ROOT"
-        echo "Checking vcpkg paths:"
-        if (Test-Path "C:\vcpkg\scripts\buildsystems\vcpkg.cmake") { echo "Found at C:\vcpkg" }
-        if (Test-Path "$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake") { echo "Found at VCPKG_ROOT" }
+        vcpkg install --no-print-usage
       
     - name: Build Neutron Runtime
       run: |
-        $vcpkgPath = if (Test-Path "C:\vcpkg\scripts\buildsystems\vcpkg.cmake") { "C:\vcpkg\scripts\buildsystems\vcpkg.cmake" } else { "$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" }
-        echo "Using vcpkg toolchain: $vcpkgPath"
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="$vcpkgPath"
-        # Build: capture output, show only errors, but preserve exit code
-        $buildOutput = cmake --build build --config Release 2>&1
-        $exitCode = $LASTEXITCODE
-        $buildOutput | Where-Object { $_ -match ': error C|: fatal error|cmake.*Error|FAILED|Build FAILED' } | Select-Object -Unique
-        if ($exitCode -ne 0) { exit $exitCode }
+        cmake -B build -S . `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
+          -G Ninja
+        cmake --build build --parallel 2>&1 | Where-Object { $_ -match ': error C|: fatal error|FAILED|Build FAILED' } | Select-Object -Unique
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       
     - name: Build Box Package Manager
       run: |
-        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
-        $buildOutput = cmake --build nt-box/build --config Release 2>&1
-        $exitCode = $LASTEXITCODE
-        $buildOutput | Where-Object { $_ -match ': error C|: fatal error|cmake.*Error|FAILED|Build FAILED' } | Select-Object -Unique
-        if ($exitCode -ne 0) { exit $exitCode }
-        copy nt-box\build\Release\box.exe .
+        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release -G Ninja
+        cmake --build nt-box/build --parallel 2>&1 | Where-Object { $_ -match ': error C|: fatal error|FAILED|Build FAILED' } | Select-Object -Unique
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        copy nt-box\build\box.exe .
       
     - name: Package
       run: python package.py --output neutron-windows-x64 --skip-build
@@ -380,9 +393,9 @@ jobs:
       
     - name: Verify binaries
       run: |
-        dir build\Release\neutron.exe
+        dir build\neutron.exe
         dir box.exe
-        .\build\Release\neutron.exe --version
+        .\build\neutron.exe --version
         .\box.exe --version
         
     - name: Run tests
@@ -390,136 +403,82 @@ jobs:
 
     - name: Run AOT compilation tests
       run: |
-        # AOT requires C++ compiler - MSVC is already set up
         Write-Host "Checking for C++ compiler..."
         cl.exe || echo "MSVC compiler not found"
         python tests/run_tests.py --aot
 
     - name: Install Neutron globally (Windows)
       run: |
-        # Create a proper directory structure that neutron expects
         $neutronRoot = "C:\neutron"
         $neutronBin = "$neutronRoot\bin"
         New-Item -ItemType Directory -Force -Path $neutronBin
-        
-        # Copy binaries to bin subdirectory
-        Copy-Item "build\Release\neutron.exe" "$neutronBin\neutron.exe"
+        Copy-Item "build\neutron.exe" "$neutronBin\neutron.exe"
         Copy-Item "box.exe" "$neutronBin\box.exe"
-        if (Test-Path "build\Release\neutron-lsp.exe") {
-            Copy-Item "build\Release\neutron-lsp.exe" "$neutronBin\neutron-lsp.exe"
+        if (Test-Path "build\neutron-lsp.exe") {
+            Copy-Item "build\neutron-lsp.exe" "$neutronBin\neutron-lsp.exe"
         }
-        
-        # Copy shared runtime DLL to bin directory (essential for neutron build)
-        if (Test-Path "build\Release\neutron_shared.dll") {
-            Copy-Item "build\Release\neutron_shared.dll" "$neutronBin\neutron_shared.dll"
+        if (Test-Path "build\neutron_shared.dll") {
+            Copy-Item "build\neutron_shared.dll" "$neutronBin\neutron_shared.dll"
         }
-        
-        # Install include files in the expected location (relative to bin/../include)
         Copy-Item -Recurse "include" "$neutronRoot\include"
-        
-        # Install source files needed for runtime compilation
         Copy-Item -Recurse "src" "$neutronRoot\src"
         Copy-Item -Recurse "libs" "$neutronRoot\libs"
-        
-        # Copy runtime libraries to bin directory for linking
-        if (Test-Path "build\Release\neutron_runtime.lib") {
-            Copy-Item "build\Release\neutron_runtime.lib" "$neutronBin\neutron_runtime.lib"
+        if (Test-Path "build\neutron_runtime.lib") {
+            Copy-Item "build\neutron_runtime.lib" "$neutronBin\neutron_runtime.lib"
         }
-        if (Test-Path "build\Release\neutron_shared.lib") {
-            Copy-Item "build\Release\neutron_shared.lib" "$neutronBin\neutron_shared.lib"
+        if (Test-Path "build\neutron_shared.lib") {
+            Copy-Item "build\neutron_shared.lib" "$neutronBin\neutron_shared.lib"
         }
-        
-        # Copy vcpkg DLLs if available
         $vcpkgBin = "build\vcpkg_installed\x64-windows\bin"
         if (Test-Path $vcpkgBin) {
-            Get-ChildItem "$vcpkgBin\*.dll" | ForEach-Object {
-                Copy-Item $_.FullName "$neutronBin\"
-            }
+            Get-ChildItem "$vcpkgBin\*.dll" | ForEach-Object { Copy-Item $_.FullName "$neutronBin\" }
         }
-        
-        # Copy vcpkg libs for linking
         $vcpkgLib = "build\vcpkg_installed\x64-windows\lib"
         if (Test-Path $vcpkgLib) {
-            Get-ChildItem "$vcpkgLib\*.lib" | ForEach-Object {
-                Copy-Item $_.FullName "$neutronBin\"
-            }
+            Get-ChildItem "$vcpkgLib\*.lib" | ForEach-Object { Copy-Item $_.FullName "$neutronBin\" }
         }
-        
-        # Add bin directory to PATH for this session
         $env:PATH = "$neutronBin;$env:PATH"
-        
-        # Verify installation
         neutron.exe --version
         box.exe --version
         
     - name: Test Neutron Integration (Windows)
       run: |
-        # Set PATH for this step
         $neutronBin = "C:\neutron\bin"
         $env:PATH = "$neutronBin;$env:PATH"
-        
-        # Create a temporary test directory
         $testDir = "C:\temp\neutron-integration-test\test-project"
         New-Item -ItemType Directory -Force -Path $testDir
         Set-Location $testDir
-        
-        Write-Host "Current directory: $(Get-Location)"
-        Write-Host "PATH: $env:PATH"
-        Write-Host "Checking if neutron.exe is accessible..."
         neutron.exe --version
-        
-        Write-Host "Testing neutron init..."
         neutron.exe init test
-        
-        Write-Host "Listing files after init..."
-        Get-ChildItem
-        
-        Write-Host "Testing box install base64..."
         box.exe install base64
-        
-        Write-Host "Testing neutron build..."
         neutron.exe build
-        
         Write-Host "Integration tests completed successfully!"
 
     - name: Create Windows Installer
+      if: github.event_name != 'pull_request'
       run: |
         Write-Host "Creating Windows installer..."
-        
-        # Copy binaries to root for installer (only if not already there)
-        if (-not (Test-Path "neutron.exe")) {
-            Copy-Item "build\Release\neutron.exe" "."
+        if (-not (Test-Path "neutron.exe")) { Copy-Item "build\neutron.exe" "." }
+        if (-not (Test-Path "box.exe")) { Copy-Item "box.exe" "." }
+        if ((Test-Path "build\neutron-lsp.exe") -and (-not (Test-Path "neutron-lsp.exe"))) {
+            Copy-Item "build\neutron-lsp.exe" "."
         }
-        if (-not (Test-Path "box.exe")) {
-            Copy-Item "box.exe" "."
+        if ((Test-Path "build\neutron_runtime.lib") -and (-not (Test-Path "neutron_runtime.lib"))) {
+            Copy-Item "build\neutron_runtime.lib" "."
         }
-        if ((Test-Path "build\Release\neutron-lsp.exe") -and (-not (Test-Path "neutron-lsp.exe"))) {
-            Copy-Item "build\Release\neutron-lsp.exe" "."
+        if ((Test-Path "build\neutron_shared.lib") -and (-not (Test-Path "neutron_shared.lib"))) {
+            Copy-Item "build\neutron_shared.lib" "."
         }
-        
-        # Copy runtime libraries for installer (only if not already there)
-        if ((Test-Path "build\Release\neutron_runtime.lib") -and (-not (Test-Path "neutron_runtime.lib"))) {
-            Copy-Item "build\Release\neutron_runtime.lib" "."
+        if ((Test-Path "build\neutron_shared.dll") -and (-not (Test-Path "neutron_shared.dll"))) {
+            Copy-Item "build\neutron_shared.dll" "."
         }
-        if ((Test-Path "build\Release\neutron_shared.lib") -and (-not (Test-Path "neutron_shared.lib"))) {
-            Copy-Item "build\Release\neutron_shared.lib" "."
-        }
-        if ((Test-Path "build\Release\neutron_shared.dll") -and (-not (Test-Path "neutron_shared.dll"))) {
-            Copy-Item "build\Release\neutron_shared.dll" "."
-        }
-        
-        # Install NSIS
         choco install nsis -y
-        
-        # Create installer
         & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
-        
         Write-Host "Windows installer created successfully!"
-        
-        # List created files
         Get-ChildItem "*.exe" | Where-Object { $_.Name -like "*installer*" -or $_.Name -like "*setup*" -or $_.Name -like "Neutron*" }
 
     - name: Upload Windows Installer
+      if: github.event_name != 'pull_request'
       uses: actions/upload-artifact@v4
       with:
         name: neutron-windows-installer
@@ -527,6 +486,7 @@ jobs:
         retention-days: 7
 
     - name: Run Performance Benchmarks
+      if: github.event_name != 'pull_request'
       run: |
         [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
         $env:PYTHONIOENCODING = "utf-8"
@@ -538,6 +498,7 @@ jobs:
         Write-Host "==========================================================="
       
     - name: Upload Benchmark Results
+      if: github.event_name != 'pull_request'
       uses: actions/upload-artifact@v4
       with:
         name: benchmark-windows
@@ -599,7 +560,7 @@ jobs:
     name: Performance Summary
     runs-on: ubuntu-latest
     needs: [build-linux, build-macos-arm64, build-windows-msvc]
-    if: always()
+    if: github.event_name != 'pull_request'
     
     steps:
     - name: Download all benchmark results
@@ -607,6 +568,7 @@ jobs:
       with:
         pattern: benchmark-*
         merge-multiple: true
+      continue-on-error: true
         
     - name: Generate Performance Summary
       run: |
