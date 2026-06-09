@@ -70,11 +70,11 @@ Section "Neutron Core" SecNeutron
   ; Shared runtime DLL (required for native modules)
   File "neutron_shared.dll"
   
-  ; Copy vcpkg DLLs (required dependencies)
-  File "build\vcpkg_installed\x64-windows\bin\jsoncpp.dll"
-  File "build\vcpkg_installed\x64-windows\bin\libcurl.dll"
-  File "build\vcpkg_installed\x64-windows\bin\zlib1.dll"
-  File "build\vcpkg_installed\x64-windows\bin\dl.dll"
+  ; Copy vcpkg DLLs (required dependencies, /nonfatal in case some are missing)
+  File /nonfatal "build\vcpkg_installed\x64-windows\bin\jsoncpp.dll"
+  File /nonfatal "build\vcpkg_installed\x64-windows\bin\libcurl.dll"
+  File /nonfatal "build\vcpkg_installed\x64-windows\bin\zlib1.dll"
+  File /nonfatal "build\vcpkg_installed\x64-windows\bin\dl.dll"
   
   ; Copy Visual C++ runtime DLLs if available
   File /nonfatal "vcruntime140.dll"
@@ -97,11 +97,11 @@ Section "Neutron Core" SecNeutron
   SetOutPath "$INSTDIR\vcpkg_installed\x64-windows\include\json"
   File /nonfatal "build\vcpkg_installed\x64-windows\include\json\*.h"
   
-  ; Install vcpkg libs to root directory for linking
+  ; Install vcpkg libs to root directory for linking (optional)
   SetOutPath "$INSTDIR"
-  File "build\vcpkg_installed\x64-windows\lib\libcurl.lib"
-  File "build\vcpkg_installed\x64-windows\lib\jsoncpp.lib"
-  File "build\vcpkg_installed\x64-windows\lib\dl.lib"
+  File /nonfatal "build\vcpkg_installed\x64-windows\lib\libcurl.lib"
+  File /nonfatal "build\vcpkg_installed\x64-windows\lib\jsoncpp.lib"
+  File /nonfatal "build\vcpkg_installed\x64-windows\lib\dl.lib"
   
   ; Install native shim (required for building native modules)
   SetOutPath "$INSTDIR\nt-box\src"
