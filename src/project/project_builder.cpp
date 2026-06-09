@@ -283,7 +283,14 @@ bool ProjectBuilder::buildProjectExecutable(
     srcFile << "#include <string>\n";
     srcFile << "#include <vector>\n";
     srcFile << "#include <cstdint>\n";
-    srcFile << "#include <cmath>\n\n";
+    srcFile << "#include <cmath>\n";
+    srcFile << "#include <memory>\n";
+    srcFile << "#include \"core/vm.h\"\n";
+    srcFile << "#include \"compiler/scanner.h\"\n";
+    srcFile << "#include \"compiler/parser.h\"\n";
+    srcFile << "#include \"compiler/compiler.h\"\n";
+    srcFile << "#include \"compiler/bytecode.h\"\n";
+    srcFile << "#include \"token.h\"\n\n";
 
     // Find box modules
     auto boxModules = findBoxModules(projectRoot);
