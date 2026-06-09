@@ -361,8 +361,12 @@ bool ProjectBuilder::buildProjectExecutable(
                         std::cerr << "      LLVM codegen failed, falling back to interpreter" << std::endl;
                     } else {
                         std::cout << "      LLVM object file: " << llvmObjectPath << std::endl;
-                        srcFile << "extern \"C\" int neutron_main();\n";
-                        srcFile << "int main() { return neutron_main(); }\n";
+                        srcFile << "#include \"core/vm.h\"\n";
+                        srcFile << "extern \"C\" int neutron_main(void* vm_ctx);\n";
+                        srcFile << "int main() {\n";
+                        srcFile << "    neutron::VM vm;\n";
+                        srcFile << "    return neutron_main(&vm);\n";
+                        srcFile << "}\n";
                         srcFile.close();
                         aotSuccess = true;
                     }
@@ -969,7 +973,20 @@ bool ProjectBuilder::buildProjectExecutable(
     if (aotSuccess) {
         // Add LLVM-generated object file for linking
         compileCommand += "\"" + llvmObjectPath + "\" ";
-        // Pure AOT build - no external libraries needed
+        // Link runtime library for helper functions (aot_getProperty, etc.)
+        if (!runtimeLibPath.empty()) {
+            bool isShared = (runtimeLibPath.find(".so") != std::string::npos || 
+                            runtimeLibPath.find(".dylib") != std::string::npos ||
+                            runtimeLibPath.find(".dll") != std::string::npos);
+            if (isShared) {
+                std::string libDir = std::filesystem::path(runtimeLibPath).parent_path().string();
+                std::string libName = std::filesystem::path(runtimeLibPath).stem().string();
+                if (libName.find("lib") == 0) libName = libName.substr(3);
+                compileCommand += "-L\"" + libDir + "\" -l" + libName + " ";
+            } else {
+                compileCommand += "\"" + runtimeLibPath + "\" ";
+            }
+        }
         if (isWindows && !isMingw) {
             compileCommand += "/Fe:\"" + finalOutputPath + "\"";
         } else {

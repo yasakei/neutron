@@ -11,6 +11,12 @@
 using namespace neutron;
 using namespace neutron::aot;
 
+// Must be set at compile time via -DBUILD_DIR=<path>
+// Default assumes running from build/tests/ or build/
+#ifndef BUILD_DIR
+#define BUILD_DIR "/home/yasakei/neutron/build"
+#endif
+
 static int tests = 0, passed = 0;
 
 void test(const char* name, Chunk& chunk, const char* expected) {
@@ -25,10 +31,20 @@ void test(const char* name, Chunk& chunk, const char* expected) {
     std::string binary = "/tmp/llvm_bin_" + std::string(name);
     {
         FILE* f = fopen(wrapper.c_str(), "w");
-        fprintf(f, "extern \"C\" int test_main(); int main() { return test_main(); }\n");
+        fprintf(f, "#include \"core/vm.h\"\n"
+                    "extern \"C\" int test_main(void*);\n"
+                    "int main() {\n"
+                    "    neutron::VM vm;\n"
+                    "    return test_main(&vm);\n"
+                    "}\n");
         fclose(f);
     }
-    std::string cmd = "g++ -no-pie -o " + binary + " " + path + " " + wrapper + " 2>&1";
+    // Compile wrapper with VM support and link against shared runtime library
+    std::string srcDir = std::string(BUILD_DIR) + "/..";
+    std::string cmd = "g++ -no-pie -I" + srcDir + "/include -I" + srcDir + "/include/core"
+        " -I" + srcDir + "/include/aot -I" + srcDir + "/libs"
+        " -o " + binary + " " + path + " " + wrapper +
+        " -L" BUILD_DIR " -Wl,-rpath," BUILD_DIR " -lneutron_shared 2>&1";
     int ret = system(cmd.c_str());
     if (ret != 0) {
         std::cout << "FAIL: " << name << " (link failed)\n";
@@ -360,7 +376,7 @@ int main() {
         c.write((uint8_t)OpCode::OP_ARRAY, 3); c.write((uint8_t)2, 3);
         c.write((uint8_t)OpCode::OP_SAY, 4);
         c.write((uint8_t)OpCode::OP_RETURN, 5);
-        test("array", c, "nil");
+        test("array", c, "[1, 2]");
     }
 
     // Test 17: OP_INDEX_GET (pops obj+idx, pushes nil)
@@ -427,7 +443,7 @@ int main() {
         c.write((uint8_t)OpCode::OP_OBJECT, 3); c.write((uint8_t)1, 3); // 1 pair
         c.write((uint8_t)OpCode::OP_SAY, 4);
         c.write((uint8_t)OpCode::OP_RETURN, 5);
-        test("object", c, "nil");
+        test("object", c, "{k:42}");
     }
 
     // Test 22: OP_INVOKE (pops args+receiver, pushes nil)

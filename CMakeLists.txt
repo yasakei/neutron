@@ -314,6 +314,7 @@ set(NEUTRON_CORE_SOURCES
     src/core/capi.cpp
     src/core/formatter.cpp
     src/token.cpp
+    src/aot/aot_runtime.cpp
     ${NEUTRON_COMPILER_SOURCES}
     ${NEUTRON_TYPES_SOURCES}
     ${NEUTRON_RUNTIME_SOURCES}
@@ -647,6 +648,7 @@ add_test(NAME functions_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/test_
 if(LLVM_FOUND)
   # LLVM codegen smoke test
   add_executable(llvm_test tests/llvm_test.cpp)
+  target_compile_definitions(llvm_test PRIVATE BUILD_DIR="${CMAKE_BINARY_DIR}")
   target_link_libraries(llvm_test neutron_runtime ${LLVM_LIBS})
   add_test(NAME llvm_codegen_test COMMAND llvm_test)
 endif()

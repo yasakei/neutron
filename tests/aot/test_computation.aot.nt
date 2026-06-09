@@ -15,7 +15,7 @@ while (i > 1) {
     f7 = f7 / i;
 }
 
-if (f5 == 1 && f7 == 1) {
+if (f5 == 5 && f7 == 7) {
     say("AOT computation test PASSED");
 } else {
     say("AOT computation test FAILED");

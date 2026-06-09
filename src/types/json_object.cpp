@@ -16,7 +16,7 @@ std::string JsonObject::toString() const {
         if (!first) {
             oss << ", ";
         }
-        oss << pair.first << ":" << pair.second.toString();
+        oss << pair.first->chars << ":" << pair.second.toString();
         first = false;
     }
     oss << "}";
