@@ -18,6 +18,8 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/Support/CodeGen.h>
+#include <llvm/Passes/PassBuilder.h>
+#include <llvm/Passes/StandardInstrumentations.h>
 
 #include <iostream>
 #include <cstdlib>
@@ -1424,6 +1426,24 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
 
     auto* tm = target->createTargetMachine(llvm::Triple(targetTriple), "generic", "", {}, llvm::Reloc::PIC_);
     impl->module->setDataLayout(tm->createDataLayout());
+
+    // Run LLVM optimization pipeline (O2)
+    {
+        llvm::LoopAnalysisManager LAM;
+        llvm::FunctionAnalysisManager FAM;
+        llvm::CGSCCAnalysisManager CGAM;
+        llvm::ModuleAnalysisManager MAM;
+
+        llvm::PassBuilder PB(tm);
+        PB.registerModuleAnalyses(MAM);
+        PB.registerCGSCCAnalyses(CGAM);
+        PB.registerFunctionAnalyses(FAM);
+        PB.registerLoopAnalyses(LAM);
+        PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+        llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
+        MPM.run(*impl->module, MAM);
+    }
 
     // Emit object file
     std::error_code ec;
