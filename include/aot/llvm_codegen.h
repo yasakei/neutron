@@ -1,8 +1,11 @@
 #ifndef NEUTRON_LLVM_CODEGEN_H
 #define NEUTRON_LLVM_CODEGEN_H
 
-#include "aot/aot_compiler.h"
+#include "aot/target_platform.h"
+#include "compiler/bytecode.h"
 #include <memory>
+#include <string>
+#include <unordered_map>
 
 namespace neutron {
 namespace aot {
@@ -22,7 +25,6 @@ public:
 
     const std::unordered_map<size_t, size_t>& getSourceMap() const { return sourceMap; }
 
-    // Convenience: generate to default path
     bool generateModule(const std::string& functionName = "neutron_main");
 
 private:

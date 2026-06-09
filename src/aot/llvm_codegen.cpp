@@ -137,6 +137,7 @@ struct LlvmCodegenImpl {
                 case OpCode::OP_SET_GLOBAL_FAST:
                 case OpCode::OP_INCREMENT_LOCAL:
                 case OpCode::OP_DECREMENT_LOCAL:
+                case OpCode::OP_INCREMENT_GLOBAL:
                 case OpCode::OP_INC_LOCAL_INT:
                 case OpCode::OP_DEC_LOCAL_INT:
                 case OpCode::OP_CONST_INT8:
@@ -155,7 +156,6 @@ struct LlvmCodegenImpl {
                     break;
                 case OpCode::OP_CONSTANT_LONG:
                 case OpCode::OP_ADD_LOCAL_CONST:
-                case OpCode::OP_INCREMENT_GLOBAL:
                     skip2 = true;
                     break;
                 case OpCode::OP_INVOKE:
@@ -369,7 +369,7 @@ struct LlvmCodegenImpl {
     }
 
     // --- Global variable tracking ---
-    std::unordered_map<size_t, llvm::GlobalVariable*> globalVars;
+    std::unordered_map<std::string, llvm::GlobalVariable*> globalVars;
 
     // First pass: find all global variable declarations
     void collectGlobals() {
@@ -468,8 +468,6 @@ struct LlvmCodegenImpl {
 
     // Get or create an LLVM global variable for a given constant pool index
     llvm::GlobalVariable* getOrCreateGlobal(size_t constIdx) {
-        auto it = globalVars.find(constIdx);
-        if (it != globalVars.end()) return it->second;
         if (constIdx >= chunk->constants.size()) return nullptr;
         const Value& nameVal = chunk->constants[constIdx];
         if (nameVal.type != ValueType::OBJ_STRING) return nullptr;
@@ -482,10 +480,16 @@ struct LlvmCodegenImpl {
             if (isalnum(c) || c == '_') safe += c;
             else safe += '_';
         }
+
+        // Key by name, not constIdx — the same variable may be referenced
+        // from different constant-pool indices
+        auto it = globalVars.find(safe);
+        if (it != globalVars.end()) return it->second;
+
         auto* gv = new llvm::GlobalVariable(*module, valueTy, false,
                                              llvm::GlobalValue::InternalLinkage,
                                              constValue(TAG_NIL, 0.0), "global_" + safe);
-        globalVars[constIdx] = gv;
+        globalVars[safe] = gv;
         return gv;
     }
 
@@ -1418,7 +1422,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
         return false;
     }
 
-    auto* tm = target->createTargetMachine(llvm::Triple(targetTriple), "generic", "", {}, {});
+    auto* tm = target->createTargetMachine(llvm::Triple(targetTriple), "generic", "", {}, llvm::Reloc::PIC_);
     impl->module->setDataLayout(tm->createDataLayout());
 
     // Emit object file

@@ -249,11 +249,16 @@ set(NEUTRON_COMPILER_SOURCES
     src/jit/jit_tier1.cpp
     src/jit/jit_tier2.cpp
     src/jit/jit_tier2_arm64.cpp
-    src/aot/aot_compiler.cpp
 )
 
+# LLVM codegen is compiled as a separate OBJECT library so it's
+# compiled once rather than in every target that includes it.
 if(LLVM_FOUND)
-    list(APPEND NEUTRON_COMPILER_SOURCES src/aot/llvm_codegen.cpp)
+    add_library(neutron_llvm OBJECT src/aot/llvm_codegen.cpp)
+    target_include_directories(neutron_llvm PRIVATE ${LLVM_INCLUDE_DIRS})
+    target_compile_definitions(neutron_llvm PRIVATE NEUTRON_HAVE_LLVM)
+else()
+    message(STATUS "LLVM not found — AOT compilation disabled")
 endif()
 
 # Type system source files
@@ -400,17 +405,69 @@ set(NEUTRON_LIBRARY_SOURCES
     ${NEUTRON_ALL_MODULE_SOURCES}
 )
 
-# Create static runtime library for executable linking
-add_library(neutron_runtime STATIC
-    ${NEUTRON_LIBRARY_SOURCES}
+# Compile ALL sources once into an OBJECT library, then create both
+# static and shared libraries from the same objects. This avoids
+# re-compiling every .cpp file for each target — critical on macOS
+# where LTO + -O3 makes duplicate compilation extremely slow.
+add_library(neutron_objects OBJECT ${NEUTRON_LIBRARY_SOURCES})
+
+# Position-independent code is needed for the shared library build.
+# On x86_64/AArch64 this is the default; set explicitly for safety.
+set_target_properties(neutron_objects PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# Compile definitions that were previously per-target on neutron_runtime
+# and neutron_shared must live on neutron_objects since it does the
+# actual compilation.
+target_compile_definitions(neutron_objects PRIVATE BUILDING_NEUTRON)
+
+if(HAVE_CURL)
+    target_compile_definitions(neutron_objects PRIVATE HAVE_CURL)
+    if(CURL_INCLUDE_DIRS)
+        target_include_directories(neutron_objects PRIVATE ${CURL_INCLUDE_DIRS})
+    endif()
+endif()
+
+# Shared library (public API for runtime module loading)
+add_library(neutron_shared SHARED $<TARGET_OBJECTS:neutron_objects>)
+
+target_link_libraries(neutron_shared
+    ${JSONCPP_LIBRARIES}
+    ${DLFCN_WIN}
+    ${LLVM_LIBS}
 )
 
-# On Unix-like systems, static libraries need -fPIC if they'll be linked into shared libraries
-if(NOT WIN32)
-    set_target_properties(neutron_runtime PROPERTIES
-        POSITION_INDEPENDENT_CODE ON
+if(HAVE_CURL)
+    if(TARGET CURL::libcurl)
+        target_link_libraries(neutron_shared CURL::libcurl)
+    elseif(TARGET PkgConfig::CURL)
+        target_link_libraries(neutron_shared PkgConfig::CURL)
+    elseif(CURL_FOUND)
+        target_link_libraries(neutron_shared ${CURL_LIBRARIES})
+    endif()
+endif()
+
+# Link threading library on all platforms
+target_link_libraries(neutron_shared Threads::Threads)
+
+# Windows-specific libraries for socket functions
+if(WIN32)
+    target_link_libraries(neutron_shared ws2_32)
+endif()
+
+# Set output names
+if(WIN32)
+    set_target_properties(neutron_shared PROPERTIES
+        OUTPUT_NAME neutron_shared
+    )
+else()
+    set_target_properties(neutron_shared PROPERTIES
+        OUTPUT_NAME neutron_shared
+        PREFIX "lib"
     )
 endif()
+
+# Static runtime library (from same OBJECTs — no recompilation)
+add_library(neutron_runtime STATIC $<TARGET_OBJECTS:neutron_objects>)
 
 target_link_libraries(neutron_runtime
     ${JSONCPP_LIBRARIES}
@@ -427,14 +484,10 @@ endif()
 if(HAVE_CURL)
     if(TARGET CURL::libcurl)
         target_link_libraries(neutron_runtime CURL::libcurl)
-        target_compile_definitions(neutron_runtime PRIVATE HAVE_CURL)
     elseif(TARGET PkgConfig::CURL)
         target_link_libraries(neutron_runtime PkgConfig::CURL)
-        target_compile_definitions(neutron_runtime PRIVATE HAVE_CURL)
     elseif(CURL_FOUND)
-        target_include_directories(neutron_runtime PRIVATE ${CURL_INCLUDE_DIRS})
         target_link_libraries(neutron_runtime ${CURL_LIBRARIES})
-        target_compile_definitions(neutron_runtime PRIVATE HAVE_CURL)
     endif()
 endif()
 
@@ -450,53 +503,12 @@ else()
     )
 endif()
 
-# Create shared library for modules to link against
-# This library contains the C API functions that external modules need
-add_library(neutron_shared SHARED
-    ${NEUTRON_LIBRARY_SOURCES}
-)
-
-target_link_libraries(neutron_shared
-    ${JSONCPP_LIBRARIES}
-    ${DLFCN_WIN}
-    ${LLVM_LIBS}
-)
-
-if(HAVE_CURL)
-    if(TARGET CURL::libcurl)
-        target_link_libraries(neutron_shared CURL::libcurl)
-        target_compile_definitions(neutron_shared PRIVATE HAVE_CURL)
-    elseif(TARGET PkgConfig::CURL)
-        target_link_libraries(neutron_shared PkgConfig::CURL)
-        target_compile_definitions(neutron_shared PRIVATE HAVE_CURL)
-    elseif(CURL_FOUND)
-        target_include_directories(neutron_shared PRIVATE ${CURL_INCLUDE_DIRS})
-        target_link_libraries(neutron_shared ${CURL_LIBRARIES})
-        target_compile_definitions(neutron_shared PRIVATE HAVE_CURL)
-    endif()
-endif()
-
-# Link threading library on all platforms
-target_link_libraries(neutron_shared Threads::Threads)
-
-# Windows-specific libraries for socket functions
-if(WIN32)
-    target_link_libraries(neutron_shared ws2_32)
-endif()
-
-# Define BUILDING_NEUTRON so C API functions are exported properly
-target_compile_definitions(neutron_shared PRIVATE BUILDING_NEUTRON)
-
-# Set output names
-if(WIN32)
-    set_target_properties(neutron_shared PROPERTIES
-        OUTPUT_NAME neutron_shared
-    )
-else()
-    set_target_properties(neutron_shared PROPERTIES
-        OUTPUT_NAME neutron_shared
-        PREFIX "lib"
-    )
+# LLVM codegen compiled once as its own OBJECT library.
+# Add objects directly on the final targets (target_sources with
+# $<TARGET_OBJECTS> doesn't propagate through OBJECT -> static lib).
+if(LLVM_FOUND)
+    target_sources(neutron_shared PRIVATE $<TARGET_OBJECTS:neutron_llvm>)
+    target_sources(neutron_runtime PRIVATE $<TARGET_OBJECTS:neutron_llvm>)
 endif()
 
 # Create executable

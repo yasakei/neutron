@@ -7,7 +7,7 @@
 #include "compiler/scanner.h"
 #include "compiler/parser.h"
 #include "compiler/compiler.h"
-#include "aot/aot_compiler.h"
+#include "aot/llvm_codegen.h"
 #include "core/vm.h"
 #include "types/value.h"
 #include <iostream>
@@ -291,6 +291,7 @@ bool ProjectBuilder::buildProjectExecutable(
     // AOT compilation: only for pure Neutron code (no external/native modules)
     // OR when all external modules have static libraries (.a)
     bool aotSuccess = false;
+    std::string llvmObjectPath;  // Path to LLVM-generated object file
     if (aotCompile) {
         std::cout << "[2/4] Analyzing dependencies..." << std::endl;
         
@@ -343,13 +344,25 @@ bool ProjectBuilder::buildProjectExecutable(
             
             if (mainFunc && mainFunc->chunk) {
                 std::cout << "      Generated " << mainFunc->chunk->code.size() << " native instructions" << std::endl;
-                
-                srcFile << "// Auto-generated native code - no VM needed\n\n";
-                neutron::aot::AotCompiler aotGen(mainFunc->chunk);
-                srcFile << aotGen.generateCode("neutron_main");
-                srcFile << "\nint main() { return neutron_main(); }\n";
-                srcFile.close();
-                aotSuccess = true;
+
+#ifdef NEUTRON_HAVE_LLVM
+                std::string objExt = (isWindows && !isMingw) ? ".obj" : ".o";
+                llvmObjectPath = finalOutputPath + "_neutron" + objExt;
+                {
+                    neutron::aot::LlvmCodegen llvmGen(mainFunc->chunk);
+                    if (!llvmGen.generateModule("neutron_main", llvmObjectPath)) {
+                        std::cerr << "      LLVM codegen failed, falling back to interpreter" << std::endl;
+                    } else {
+                        std::cout << "      LLVM object file: " << llvmObjectPath << std::endl;
+                        srcFile << "extern \"C\" int neutron_main();\n";
+                        srcFile << "int main() { return neutron_main(); }\n";
+                        srcFile.close();
+                        aotSuccess = true;
+                    }
+                }
+#else
+                std::cout << "      LLVM codegen not available (recompile with LLVM)" << std::endl;
+#endif
             }
         }
     }
@@ -947,6 +960,8 @@ bool ProjectBuilder::buildProjectExecutable(
     // Add output and link flags
     // For AOT builds with no external modules, skip unnecessary library links
     if (aotSuccess) {
+        // Add LLVM-generated object file for linking
+        compileCommand += "\"" + llvmObjectPath + "\" ";
         // Pure AOT build - no external libraries needed
         if (isWindows && !isMingw) {
             compileCommand += "/Fe:\"" + finalOutputPath + "\"";
@@ -1020,8 +1035,11 @@ bool ProjectBuilder::buildProjectExecutable(
     result = system(compileCommand.c_str());
     #endif
 
-    // Clean up temp file
+    // Clean up temp files
     std::filesystem::remove(tempSourcePath);
+    if (aotSuccess && !llvmObjectPath.empty()) {
+        std::filesystem::remove(llvmObjectPath);
+    }
 
     if (result == 0) {
         std::cout << "[4/4] Build complete!" << std::endl;
