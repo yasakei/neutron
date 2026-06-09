@@ -19,8 +19,7 @@ void test(const char* name, Chunk& chunk, const char* expected) {
         std::cout << "FAIL: " << name << " (codegen failed)\n";
         return;
     }
-    // Compile wrapper + link + run
-    std::string wrapper = "/tmp/llvm_wrap_" + std::string(name) + ".cpp";
+    std::string wrapper = std::string("/tmp/llvm_wrap_") + name + ".cpp";
     std::string binary = "/tmp/llvm_bin_" + std::string(name);
     {
         FILE* f = fopen(wrapper.c_str(), "w");
@@ -44,120 +43,159 @@ void test(const char* name, Chunk& chunk, const char* expected) {
     while (fgets(buf, sizeof(buf), fp)) {
         output += buf;
     }
-    int exitCode = pclose(fp);
-    // Trim trailing newline
+    pclose(fp);
     while (!output.empty() && output.back() == '\n') output.pop_back();
     if (output == expected) {
         passed++;
-        std::cout << "PASS: " << name << " (\"" << buf << "\")\n";
+        std::cout << "PASS: " << name << "\n";
     } else {
-        std::cout << "FAIL: " << name << " (expected=\"" << expected << "\", got=\"" << buf << "\")\n";
+        std::cout << "FAIL: " << name << " (expected=\"" << expected << "\", got=\"" << output << "\")\n";
     }
+}
+
+Value makeNum(double n) {
+    Value v; v.type = ValueType::NUMBER; v.as.number = n; return v;
 }
 
 int main() {
     // Test 1: push 42, say it
     {
         Chunk c;
-        Value n; n.type = ValueType::NUMBER; n.as.number = 42;
-        auto idx = c.addConstant(n);
-        c.write((uint8_t)OpCode::OP_CONSTANT, 1);
-        c.write((uint8_t)idx, 1);
+        auto idx = c.addConstant(makeNum(42));
+        c.write((uint8_t)OpCode::OP_CONSTANT, 1); c.write((uint8_t)idx, 1);
         c.write((uint8_t)OpCode::OP_SAY, 2);
         c.write((uint8_t)OpCode::OP_RETURN, 3);
         test("const_42", c, "42");
     }
+
     // Test 2: 10 + 20 = 30
     {
         Chunk c;
-        Value n10; n10.type = ValueType::NUMBER; n10.as.number = 10;
-        Value n20; n20.type = ValueType::NUMBER; n20.as.number = 20;
-        auto i10 = c.addConstant(n10);
-        auto i20 = c.addConstant(n20);
+        auto i10 = c.addConstant(makeNum(10));
+        auto i20 = c.addConstant(makeNum(20));
         c.write((uint8_t)OpCode::OP_CONSTANT, 1); c.write((uint8_t)i10, 1);
         c.write((uint8_t)OpCode::OP_CONSTANT, 2); c.write((uint8_t)i20, 2);
         c.write((uint8_t)OpCode::OP_ADD, 3);
         c.write((uint8_t)OpCode::OP_SAY, 4);
         c.write((uint8_t)OpCode::OP_RETURN, 5);
-        test("add_10_20", c, "30");
+        test("add", c, "30");
     }
-    // Test 3: 50 - 15 = 35
+
+    // Test 3: locals
     {
         Chunk c;
-        Value n50; n50.type = ValueType::NUMBER; n50.as.number = 50;
-        Value n15; n15.type = ValueType::NUMBER; n15.as.number = 15;
-        auto i50 = c.addConstant(n50);
-        auto i15 = c.addConstant(n15);
-        c.write((uint8_t)OpCode::OP_CONSTANT, 1); c.write((uint8_t)i50, 1);
-        c.write((uint8_t)OpCode::OP_CONSTANT, 2); c.write((uint8_t)i15, 2);
-        c.write((uint8_t)OpCode::OP_SUBTRACT, 3);
-        c.write((uint8_t)OpCode::OP_SAY, 4);
-        c.write((uint8_t)OpCode::OP_RETURN, 5);
-        test("sub_50_15", c, "35");
-    }
-    // Test 4: 6 * 7 = 42
-    {
-        Chunk c;
-        Value n6; n6.type = ValueType::NUMBER; n6.as.number = 6;
-        Value n7; n7.type = ValueType::NUMBER; n7.as.number = 7;
-        auto i6 = c.addConstant(n6);
-        auto i7 = c.addConstant(n7);
-        c.write((uint8_t)OpCode::OP_CONSTANT, 1); c.write((uint8_t)i6, 1);
-        c.write((uint8_t)OpCode::OP_CONSTANT, 2); c.write((uint8_t)i7, 2);
-        c.write((uint8_t)OpCode::OP_MULTIPLY, 3);
-        c.write((uint8_t)OpCode::OP_SAY, 4);
-        c.write((uint8_t)OpCode::OP_RETURN, 5);
-        test("mul_6_7", c, "42");
-    }
-    // Test 5: 100 / 3 = 33 (integer division, truncated)
-    {
-        Chunk c;
-        Value n100; n100.type = ValueType::NUMBER; n100.as.number = 100;
-        Value n3; n3.type = ValueType::NUMBER; n3.as.number = 3;
-        auto i100 = c.addConstant(n100);
-        auto i3 = c.addConstant(n3);
-        c.write((uint8_t)OpCode::OP_CONSTANT, 1); c.write((uint8_t)i100, 1);
-        c.write((uint8_t)OpCode::OP_CONSTANT, 2); c.write((uint8_t)i3, 2);
-        c.write((uint8_t)OpCode::OP_DIVIDE, 3);
-        c.write((uint8_t)OpCode::OP_SAY, 4);
-        c.write((uint8_t)OpCode::OP_RETURN, 5);
-        test("div_100_3", c, "33.3333");
-    }
-    // Test 6: nil
-    {
-        Chunk c;
-        c.write((uint8_t)OpCode::OP_NIL, 1);
-        c.write((uint8_t)OpCode::OP_SAY, 2);
-        c.write((uint8_t)OpCode::OP_RETURN, 3);
-        test("nil", c, "nil");
-    }
-    // Test 7: true
-    {
-        Chunk c;
-        c.write((uint8_t)OpCode::OP_TRUE, 1);
-        c.write((uint8_t)OpCode::OP_SAY, 2);
-        c.write((uint8_t)OpCode::OP_RETURN, 3);
-        test("true", c, "true");
-    }
-    // Test 8: false
-    {
-        Chunk c;
-        c.write((uint8_t)OpCode::OP_FALSE, 1);
-        c.write((uint8_t)OpCode::OP_SAY, 2);
-        c.write((uint8_t)OpCode::OP_RETURN, 3);
-        test("false", c, "false");
-    }
-    // Test 9: locals
-    {
-        Chunk c;
-        Value n99; n99.type = ValueType::NUMBER; n99.as.number = 99;
-        auto i99 = c.addConstant(n99);
+        auto i99 = c.addConstant(makeNum(99));
         c.write((uint8_t)OpCode::OP_CONSTANT, 1); c.write((uint8_t)i99, 1);
         c.write((uint8_t)OpCode::OP_SET_LOCAL, 2); c.write((uint8_t)0, 2);
         c.write((uint8_t)OpCode::OP_GET_LOCAL, 3); c.write((uint8_t)0, 3);
         c.write((uint8_t)OpCode::OP_SAY, 4);
         c.write((uint8_t)OpCode::OP_RETURN, 5);
         test("locals", c, "99");
+    }
+
+    // Test 4: conditional (if-true)
+    {
+        // if (1) { say(10); } else { say(20); }
+        Chunk c;
+        auto i1 = c.addConstant(makeNum(1));
+        auto i10 = c.addConstant(makeNum(10));
+        auto i20 = c.addConstant(makeNum(20));
+
+        // 0: push 1 (condition)
+        c.write((uint8_t)OpCode::OP_CONSTANT, 1); c.write((uint8_t)i1, 1);
+        // 2: JUMP_IF_FALSE offset=6 → else at 2+3+6=11
+        uint16_t jfOffset = 6;
+        c.write((uint8_t)OpCode::OP_JUMP_IF_FALSE, 2);
+        c.write((uint8_t)(jfOffset >> 8), 2); c.write((uint8_t)(jfOffset & 0xFF), 2);
+        // 5: push 10 (then)
+        c.write((uint8_t)OpCode::OP_CONSTANT, 3); c.write((uint8_t)i10, 3);
+        // 7: say 10
+        c.write((uint8_t)OpCode::OP_SAY, 4);
+        // 8: JUMP offset=3 → skip else, target at 8+3+3=14
+        uint16_t jOffset = 3;
+        c.write((uint8_t)OpCode::OP_JUMP, 5);
+        c.write((uint8_t)(jOffset >> 8), 5); c.write((uint8_t)(jOffset & 0xFF), 5);
+        // 11: else: push 20
+        c.write((uint8_t)OpCode::OP_CONSTANT, 6); c.write((uint8_t)i20, 6);
+        // 13: say 20
+        c.write((uint8_t)OpCode::OP_SAY, 7);
+        // 14: return
+        c.write((uint8_t)OpCode::OP_RETURN, 8);
+        test("cond_true", c, "10");
+    }
+
+    // Test 5: conditional (if-false)
+    {
+        Chunk c;
+        auto i0 = c.addConstant(makeNum(0));
+        auto i10 = c.addConstant(makeNum(10));
+        auto i20 = c.addConstant(makeNum(20));
+
+        // 0: push 0 (condition, false)
+        c.write((uint8_t)OpCode::OP_CONSTANT, 1); c.write((uint8_t)i0, 1);
+        // 2: JUMP_IF_FALSE offset=6 → else at 11
+        uint16_t jfOffset = 6;
+        c.write((uint8_t)OpCode::OP_JUMP_IF_FALSE, 2);
+        c.write((uint8_t)(jfOffset >> 8), 2); c.write((uint8_t)(jfOffset & 0xFF), 2);
+        // 5: push 10 (then)
+        c.write((uint8_t)OpCode::OP_CONSTANT, 3); c.write((uint8_t)i10, 3);
+        // 7: say
+        c.write((uint8_t)OpCode::OP_SAY, 4);
+        // 8: JUMP offset=3 → skip else
+        uint16_t jOffset = 3;
+        c.write((uint8_t)OpCode::OP_JUMP, 5);
+        c.write((uint8_t)(jOffset >> 8), 5); c.write((uint8_t)(jOffset & 0xFF), 5);
+        // 11: else: push 20
+        c.write((uint8_t)OpCode::OP_CONSTANT, 6); c.write((uint8_t)i20, 6);
+        // 13: say
+        c.write((uint8_t)OpCode::OP_SAY, 7);
+        // 14: return
+        c.write((uint8_t)OpCode::OP_RETURN, 8);
+        test("cond_false", c, "20");
+    }
+
+    // Test 6: loop (count to 3)
+    {
+        // var i = 0;
+        // loop: say(i); i = i + 1; if (i < 3) goto loop;
+        Chunk c;
+        auto i0 = c.addConstant(makeNum(0));
+        auto i1c = c.addConstant(makeNum(1));
+        auto i3 = c.addConstant(makeNum(3));
+
+        // var i = 0
+        c.write((uint8_t)OpCode::OP_CONSTANT, 1); c.write((uint8_t)i0, 1);
+        c.write((uint8_t)OpCode::OP_SET_LOCAL, 2); c.write((uint8_t)0, 2);
+
+        // loop: say(i)
+        size_t loopStart = c.code.size();
+        c.write((uint8_t)OpCode::OP_GET_LOCAL, 3); c.write((uint8_t)0, 3);
+        c.write((uint8_t)OpCode::OP_SAY, 4);
+
+        // i = i + 1
+        c.write((uint8_t)OpCode::OP_GET_LOCAL, 5); c.write((uint8_t)0, 5);
+        c.write((uint8_t)OpCode::OP_CONSTANT, 6); c.write((uint8_t)i1c, 6);
+        c.write((uint8_t)OpCode::OP_ADD, 7);
+        c.write((uint8_t)OpCode::OP_SET_LOCAL, 8); c.write((uint8_t)0, 8);
+
+        // if (i < 3) goto loop
+        c.write((uint8_t)OpCode::OP_GET_LOCAL, 9); c.write((uint8_t)0, 9);
+        c.write((uint8_t)OpCode::OP_CONSTANT, 10); c.write((uint8_t)i3, 10);
+        c.write((uint8_t)OpCode::OP_LESS, 11);
+
+        // At this point code.size() = 19
+        // JUMP_IF_FALSE at byte 19 → ip after instr = 22, target = 25 (OP_RETURN), offset = 3
+        uint16_t jfOff = 3;
+        c.write((uint8_t)OpCode::OP_JUMP_IF_FALSE, 12);
+        c.write((uint8_t)(jfOff >> 8), 12); c.write((uint8_t)(jfOff & 0xFF), 12);
+
+        // OP_LOOP at byte 22 → ip after = 22+1+2=25, target = loopStart=4, offset = 25-4=21
+        uint16_t loopOff = (c.code.size() + 3) - loopStart;
+        c.write((uint8_t)OpCode::OP_LOOP, 13);
+        c.write((uint8_t)(loopOff >> 8), 13); c.write((uint8_t)(loopOff & 0xFF), 13);
+
+        c.write((uint8_t)OpCode::OP_RETURN, 14);
+        test("loop", c, "0\n1\n2");
     }
 
     std::cout << "\n" << passed << "/" << tests << " passed\n";

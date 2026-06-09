@@ -60,7 +60,138 @@ struct LlvmCodegenImpl {
 
     const Chunk* chunk = nullptr;
 
+    // Control flow state
+    std::vector<bool> isJumpTarget;
+    std::unordered_map<size_t, llvm::BasicBlock*> bbMap;
+
     LlvmCodegenImpl() : builder(std::make_unique<llvm::IRBuilder<>>(context)) {}
+
+    // First pass: find all jump target bytecode offsets
+    void findJumpTargets() {
+        isJumpTarget.assign(chunk->code.size() + 1, false);
+        size_t scanIp = 0;
+        while (scanIp < chunk->code.size()) {
+            size_t instrStart = scanIp;
+            (void)instrStart;
+            uint8_t b = chunk->code[scanIp++];
+            OpCode op = static_cast<OpCode>(b);
+
+            auto scanSkip = [&](size_t n) { scanIp += n; };
+            bool handled = false;
+
+            switch (op) {
+                case OpCode::OP_JUMP:
+                case OpCode::OP_JUMP_IF_FALSE:
+                case OpCode::OP_LESS_JUMP:
+                case OpCode::OP_GREATER_JUMP:
+                case OpCode::OP_EQUAL_JUMP:
+                    if (scanIp + 1 < chunk->code.size()) {
+                        uint16_t offset = (chunk->code[scanIp] << 8) | chunk->code[scanIp + 1];
+                        scanIp += 2;
+                        size_t target = scanIp + offset;
+                        if (target < chunk->code.size()) isJumpTarget[target] = true;
+                    }
+                    handled = true;
+                    break;
+
+                case OpCode::OP_LOOP:
+                    if (scanIp + 1 < chunk->code.size()) {
+                        uint16_t offset = (chunk->code[scanIp] << 8) | chunk->code[scanIp + 1];
+                        scanIp += 2;
+                        size_t target = (scanIp > offset) ? (scanIp - offset) : 0;
+                        if (target < chunk->code.size()) isJumpTarget[target] = true;
+                    }
+                    handled = true;
+                    break;
+
+                case OpCode::OP_LOOP_IF_LESS_LOCAL:
+                    if (scanIp + 3 < chunk->code.size()) {
+                        scanIp += 3; // slot + const index
+                        uint16_t offset = (chunk->code[scanIp] << 8) | chunk->code[scanIp + 1];
+                        scanIp += 2;
+                        size_t target = scanIp + offset;
+                        if (target < chunk->code.size()) isJumpTarget[target] = true;
+                    }
+                    handled = true;
+                    break;
+
+                default: break;
+            }
+
+            if (handled) continue;
+
+            // Skip operands for opcodes that have them
+            bool skip1 = false, skip2 = false;
+            switch (op) {
+                case OpCode::OP_CONSTANT:
+                case OpCode::OP_GET_LOCAL:
+                case OpCode::OP_SET_LOCAL:
+                case OpCode::OP_GET_GLOBAL:
+                case OpCode::OP_SET_GLOBAL:
+                case OpCode::OP_DEFINE_GLOBAL:
+                case OpCode::OP_GET_UPVALUE:
+                case OpCode::OP_SET_UPVALUE:
+                case OpCode::OP_CLOSE_UPVALUE:
+                case OpCode::OP_GET_PROPERTY:
+                case OpCode::OP_SET_PROPERTY:
+                case OpCode::OP_GET_GLOBAL_FAST:
+                case OpCode::OP_SET_GLOBAL_FAST:
+                case OpCode::OP_INCREMENT_LOCAL:
+                case OpCode::OP_DECREMENT_LOCAL:
+                case OpCode::OP_INC_LOCAL_INT:
+                case OpCode::OP_DEC_LOCAL_INT:
+                case OpCode::OP_CONST_INT8:
+                case OpCode::OP_CALL:
+                case OpCode::OP_CALL_FAST:
+                case OpCode::OP_ARRAY:
+                case OpCode::OP_INVOKE:
+                case OpCode::OP_SET_GLOBAL_TYPED:
+                case OpCode::OP_SET_LOCAL_TYPED:
+                    skip1 = true;
+                    break;
+                case OpCode::OP_CONSTANT_LONG:
+                case OpCode::OP_ADD_LOCAL_CONST:
+                case OpCode::OP_INCREMENT_GLOBAL:
+                    skip2 = true;
+                    break;
+                case OpCode::OP_CLOSURE:
+                    scanIp++;
+                    if (scanIp + 1 < chunk->code.size()) {
+                        uint16_t n = (chunk->code[scanIp] << 8) | chunk->code[scanIp + 1];
+                        scanIp += 2 + n * 2;
+                    }
+                    break;
+                default:
+                    break;
+            }
+            if (skip1) scanIp++;
+            if (skip2) scanIp += 2;
+        }
+        isJumpTarget[0] = true;
+    }
+
+    // Get or create a basic block for a given bytecode offset
+    llvm::BasicBlock* getOrCreateBB(size_t offset, llvm::Function* f) {
+        auto it = bbMap.find(offset);
+        if (it != bbMap.end()) return it->second;
+        auto* bb = llvm::BasicBlock::Create(context, "bb_" + std::to_string(offset), f);
+        bbMap[offset] = bb;
+        return bb;
+    }
+
+    // Ensure we're in the right block for the current IP
+    void ensureBlock(size_t currentIp) {
+        auto* curBlock = builder->GetInsertBlock();
+        bool terminated = curBlock->getTerminator() != nullptr;
+
+        if (terminated || (isJumpTarget[currentIp] && currentIp != 0)) {
+            auto* targetBB = getOrCreateBB(currentIp, func);
+            if (!terminated) {
+                builder->CreateBr(targetBB);
+            }
+            builder->SetInsertPoint(targetBB);
+        }
+    }
 
     // Initialize LLVM types for Value struct
     void initTypes() {
@@ -266,12 +397,23 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
     impl->builder->SetInsertPoint(entry);
     impl->setupStackLocals(func);
 
+    // Find all jump targets and branch from entry to first bytecode block
+    impl->findJumpTargets();
+    auto* startBB = impl->getOrCreateBB(0, func);
+    impl->builder->CreateBr(startBB);
+    impl->builder->SetInsertPoint(startBB);
+
     // Walk bytecode and emit LLVM IR for each instruction
     impl->ip = 0;
     while (impl->ip < chunk->code.size()) {
+        // Ensure we're in the right basic block for this IP
+        impl->ensureBlock(impl->ip);
+
         uint8_t instr = impl->readByte();
         OpCode op = static_cast<OpCode>(instr);
 
+        // After a terminator, the switchToBlock at next iteration will create
+        // a new block for the fallthrough code
         switch (op) {
             case OpCode::OP_RETURN: {
                 // Pop return value (unused for now), return 0
@@ -620,6 +762,90 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* one = llvm::ConstantFP::get(impl->doubleTy, 1.0);
                 auto* dec = impl->builder->CreateFSub(data, one, "dec");
                 impl->storeValue(localPtr, llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), dec);
+                break;
+            }
+
+            // === Control flow ===
+            case OpCode::OP_JUMP: {
+                uint16_t offset = impl->readShort();
+                size_t target = impl->ip + offset;
+                auto* targetBB = impl->getOrCreateBB(target, func);
+                impl->builder->CreateBr(targetBB);
+                break;
+            }
+
+            case OpCode::OP_JUMP_IF_FALSE: {
+                uint16_t offset = impl->readShort();
+                size_t target = impl->ip + offset;
+
+                // Check truthiness: pop the condition value
+                auto* val = impl->popValue();
+                auto* tag = impl->loadTag(val);
+                auto* data = impl->loadData(val);
+                auto* zero = llvm::ConstantFP::get(impl->doubleTy, 0.0);
+                auto* isTrue = impl->builder->CreateFCmpONE(data, zero, "is_truthy");
+                // Nil is always false, bool false is 0.0
+                auto* notNil = impl->builder->CreateICmpNE(tag,
+                    llvm::ConstantInt::get(impl->i8Ty, TAG_NIL), "not_nil");
+                auto* truthy = impl->builder->CreateAnd(notNil, isTrue, "truthy");
+
+                auto* targetBB = impl->getOrCreateBB(target, func);
+                auto* contBB = llvm::BasicBlock::Create(ctx, "cont_jf", func);
+                impl->builder->CreateCondBr(truthy, contBB, targetBB);
+                impl->builder->SetInsertPoint(contBB);
+                break;
+            }
+
+            case OpCode::OP_LOOP: {
+                uint16_t offset = impl->readShort();
+                size_t target = (impl->ip > offset) ? (impl->ip - offset) : 0;
+                auto* targetBB = impl->getOrCreateBB(target, func);
+                impl->builder->CreateBr(targetBB);
+                break;
+            }
+
+            // Fused comparison+jump
+            case OpCode::OP_LESS_JUMP:
+            case OpCode::OP_GREATER_JUMP:
+            case OpCode::OP_EQUAL_JUMP: {
+                uint16_t offset = impl->readShort();
+                size_t target = impl->ip + offset;
+
+                auto* b = impl->popValue();
+                auto* a = impl->popValue();
+                auto* aData = impl->loadData(a);
+                auto* bData = impl->loadData(b);
+
+                llvm::CmpInst::Predicate pred;
+                if (op == OpCode::OP_LESS_JUMP) pred = llvm::CmpInst::FCMP_OLT;
+                else if (op == OpCode::OP_GREATER_JUMP) pred = llvm::CmpInst::FCMP_OGT;
+                else pred = llvm::CmpInst::FCMP_OEQ;
+                auto* cmp = impl->builder->CreateFCmp(pred, aData, bData, "fused_cmp");
+
+                auto* targetBB = impl->getOrCreateBB(target, func);
+                auto* contBB = llvm::BasicBlock::Create(ctx, "cont_fj", func);
+                impl->builder->CreateCondBr(cmp, contBB, targetBB);
+                impl->builder->SetInsertPoint(contBB);
+                break;
+            }
+
+            case OpCode::OP_LOOP_IF_LESS_LOCAL: {
+                uint8_t slot = impl->readByte();
+                uint8_t constIdx = impl->readByte();
+                uint16_t offset = impl->readShort();
+                size_t exitTarget = impl->ip + offset;
+
+                auto* localPtr = impl->localsGEP(llvm::ConstantInt::get(impl->i32Ty, slot));
+                auto* constPtr = impl->constantsGEP(llvm::ConstantInt::get(impl->i32Ty, constIdx));
+                auto* localData = impl->loadData(localPtr);
+                auto* constData = impl->loadData(constPtr);
+                auto* cond = impl->builder->CreateFCmpOLT(localData, constData, "loop_cond");
+
+                // Loop back to start of this instruction (before operands were read)
+                size_t loopTarget = impl->ip - 5; // 1(op) + 1(slot) + 1(const) + 2(offset)
+                auto* loopBB = impl->getOrCreateBB(loopTarget, func);
+                auto* exitBB = impl->getOrCreateBB(exitTarget, func);
+                impl->builder->CreateCondBr(cond, loopBB, exitBB);
                 break;
             }
 
