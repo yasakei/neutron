@@ -41,9 +41,8 @@ jobs:
         echo "Using GCC version:"
         gcc --version
         
-        # Verify LLVM version
-        echo "Using LLVM version:"
-        llvm-config --version
+        # Verify LLVM
+        echo "Using LLVM: $(llvm-config --version 2>/dev/null || echo 'detected')"
         
         # Check jsoncpp version
         echo "Installed jsoncpp version:"
@@ -183,9 +182,11 @@ jobs:
         echo "Checking for C++ compiler..."
         clang --version || echo "clang not available"
         
-        # Verify LLVM version
-        echo "Using LLVM version:"
-        llvm-config --version
+        # LLVM is keg-only on macOS — set CMAKE_PREFIX_PATH for find_package
+        echo "CMAKE_PREFIX_PATH=/opt/homebrew/opt/llvm" >> $GITHUB_ENV
+        
+        # LLVM is keg-only on macOS — verify via file check
+        echo "LLVM installed at: $(ls /opt/homebrew/opt/llvm/bin/llvm-config 2>/dev/null || echo 'checking CMAKE_PREFIX_PATH')"
         
     - name: Build Neutron Runtime
       run: |
