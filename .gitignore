@@ -50,11 +50,13 @@ __pycache__/
 
 # Temporary files
 .vs/
+todo.md
 *.tmp
 *.log
 *.bak
 *~
 *.swp
+test-*/
 
 # Environment files
 .env

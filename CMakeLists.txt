@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(Neutron VERSION 1.1.2 LANGUAGES CXX)
+project(Neutron VERSION 1.1.2 LANGUAGES C CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -95,6 +95,19 @@ include(FetchContent)
 
 # Threading support (required for process system)
 find_package(Threads REQUIRED)
+
+# LLVM (AOT backend)
+find_package(LLVM REQUIRED CONFIG)
+include_directories(${LLVM_INCLUDE_DIRS})
+if(LLVM_LINK_LLVM_DYLIB)
+  set(LLVM_LIBS LLVM)
+else()
+  llvm_map_components_to_libnames(LLVM_LIBS
+    core native support target mc object bitwriter passes
+  )
+endif()
+message(STATUS "LLVM version: ${LLVM_PACKAGE_VERSION}")
+message(STATUS "LLVM libraries: ${LLVM_LIBS}")
 
 # JSONCPP
 find_package(jsoncpp CONFIG QUIET)
@@ -227,6 +240,7 @@ set(NEUTRON_COMPILER_SOURCES
     src/jit/jit_tier2.cpp
     src/jit/jit_tier2_arm64.cpp
     src/aot/aot_compiler.cpp
+    src/aot/llvm_codegen.cpp
 )
 
 # Type system source files
@@ -388,6 +402,7 @@ endif()
 target_link_libraries(neutron_runtime
     ${JSONCPP_LIBRARIES}
     ${DLFCN_WIN}
+    ${LLVM_LIBS}
     Threads::Threads
 )
 
@@ -431,6 +446,7 @@ add_library(neutron_shared SHARED
 target_link_libraries(neutron_shared
     ${JSONCPP_LIBRARIES}
     ${DLFCN_WIN}
+    ${LLVM_LIBS}
 )
 
 if(HAVE_CURL)
@@ -602,6 +618,11 @@ add_test(NAME control_flow_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/te
 add_test(NAME operators_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/test_operators.nt)
 add_test(NAME arrays_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/test_arrays_objects.nt)
 add_test(NAME functions_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/test_functions_modules.nt)
+
+# LLVM codegen smoke test
+add_executable(llvm_test tests/llvm_test.cpp)
+target_link_libraries(llvm_test neutron_runtime ${LLVM_LIBS})
+add_test(NAME llvm_codegen_test COMMAND llvm_test)
 
 # --------------------------------------------------------
 # LSP Server
