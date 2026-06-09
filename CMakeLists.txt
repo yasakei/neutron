@@ -96,18 +96,28 @@ include(FetchContent)
 # Threading support (required for process system)
 find_package(Threads REQUIRED)
 
-# LLVM (AOT backend)
-find_package(LLVM REQUIRED CONFIG)
-include_directories(${LLVM_INCLUDE_DIRS})
-if(LLVM_LINK_LLVM_DYLIB)
-  set(LLVM_LIBS LLVM)
-else()
-  llvm_map_components_to_libnames(LLVM_LIBS
-    core native support target mc object bitwriter passes
-  )
+# LLVM (AOT backend) — optional; gate with NEUTRON_HAVE_LLVM
+# macOS Homebrew puts LLVM in a non-standard path
+if(APPLE)
+    list(APPEND CMAKE_PREFIX_PATH /opt/homebrew/opt/llvm /usr/local/opt/llvm)
 endif()
-message(STATUS "LLVM version: ${LLVM_PACKAGE_VERSION}")
-message(STATUS "LLVM libraries: ${LLVM_LIBS}")
+find_package(LLVM QUIET CONFIG)
+if(LLVM_FOUND)
+  include_directories(${LLVM_INCLUDE_DIRS})
+  if(LLVM_LINK_LLVM_DYLIB)
+    set(LLVM_LIBS LLVM)
+  else()
+    llvm_map_components_to_libnames(LLVM_LIBS
+      core native support target mc object bitwriter passes
+    )
+  endif()
+  message(STATUS "LLVM version: ${LLVM_PACKAGE_VERSION}")
+  message(STATUS "LLVM libraries: ${LLVM_LIBS}")
+  add_compile_definitions(NEUTRON_HAVE_LLVM)
+else()
+  message(STATUS "LLVM not found — LLVM AOT codegen disabled")
+  set(LLVM_LIBS "")
+endif()
 
 # JSONCPP
 find_package(jsoncpp CONFIG QUIET)
@@ -240,8 +250,11 @@ set(NEUTRON_COMPILER_SOURCES
     src/jit/jit_tier2.cpp
     src/jit/jit_tier2_arm64.cpp
     src/aot/aot_compiler.cpp
-    src/aot/llvm_codegen.cpp
 )
+
+if(LLVM_FOUND)
+    list(APPEND NEUTRON_COMPILER_SOURCES src/aot/llvm_codegen.cpp)
+endif()
 
 # Type system source files
 set(NEUTRON_TYPES_SOURCES
@@ -619,10 +632,12 @@ add_test(NAME operators_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/test_
 add_test(NAME arrays_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/test_arrays_objects.nt)
 add_test(NAME functions_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/test_functions_modules.nt)
 
-# LLVM codegen smoke test
-add_executable(llvm_test tests/llvm_test.cpp)
-target_link_libraries(llvm_test neutron_runtime ${LLVM_LIBS})
-add_test(NAME llvm_codegen_test COMMAND llvm_test)
+if(LLVM_FOUND)
+  # LLVM codegen smoke test
+  add_executable(llvm_test tests/llvm_test.cpp)
+  target_link_libraries(llvm_test neutron_runtime ${LLVM_LIBS})
+  add_test(NAME llvm_codegen_test COMMAND llvm_test)
+endif()
 
 # --------------------------------------------------------
 # LSP Server

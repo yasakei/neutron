@@ -31,6 +31,7 @@ jobs:
           base-devel \
           cmake \
           gcc \
+          llvm \
           pkgconf \
           curl \
           jsoncpp \
@@ -39,6 +40,10 @@ jobs:
         # Verify GCC version (should be 15.x)
         echo "Using GCC version:"
         gcc --version
+        
+        # Verify LLVM version
+        echo "Using LLVM version:"
+        llvm-config --version
         
         # Check jsoncpp version
         echo "Installed jsoncpp version:"
@@ -171,12 +176,16 @@ jobs:
       
     - name: Install dependencies
       run: |
-        brew install cmake jsoncpp
+        brew install cmake jsoncpp llvm
         
         # macOS comes with clang by default (Xcode Command Line Tools)
         # Verify compiler availability
         echo "Checking for C++ compiler..."
         clang --version || echo "clang not available"
+        
+        # Verify LLVM version
+        echo "Using LLVM version:"
+        llvm-config --version
         
     - name: Build Neutron Runtime
       run: |
@@ -335,7 +344,7 @@ jobs:
 
     - name: Install dependencies (vcpkg)
       run: |
-        vcpkg install jsoncpp:x64-windows curl:x64-windows
+        vcpkg install jsoncpp:x64-windows curl:x64-windows llvm:x64-windows
         vcpkg integrate install
         echo "VCPKG_ROOT: $env:VCPKG_ROOT"
         echo "Checking vcpkg paths:"
