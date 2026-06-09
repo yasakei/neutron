@@ -345,7 +345,7 @@ jobs:
 
     - name: Install dependencies (vcpkg)
       run: |
-        vcpkg install jsoncpp:x64-windows curl:x64-windows llvm:x64-windows
+        vcpkg install jsoncpp:x64-windows curl:x64-windows
         vcpkg integrate install
         echo "VCPKG_ROOT: $env:VCPKG_ROOT"
         echo "Checking vcpkg paths:"
