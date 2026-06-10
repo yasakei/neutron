@@ -108,11 +108,9 @@ void aot_runtimeError(void* vm_ctx, const char* message);
 // Safe-mode validation helpers
 void aot_validateSafeFunction(void* vm_ctx, uint64_t funcVal, int isSafeFile);
 void aot_validateSafeFileFunction(void* vm_ctx, uint64_t funcVal);
-void aot_validateSafeVariable(void* vm_ctx, const char* varName, int isSafeFile);
-void aot_validateSafeFileVariable(void* vm_ctx, const char* varName);
 
 // Typed set helpers
-void aot_setLocalTyped(void* vm_ctx, uint64_t val, uint64_t slotVal, uint8_t expectedType);
+void aot_reportTypeError(void* vm_ctx, uint8_t expectedType, uint64_t val);
 void aot_setGlobalTyped(void* vm_ctx, const char* name, uint64_t val);
 void aot_defineTypedGlobal(void* vm_ctx, const char* name, uint64_t val, uint8_t typeByte);
 

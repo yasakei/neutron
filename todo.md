@@ -1,9 +1,9 @@
 # LLVM AOT Backend Migration
 
 ## Status
-✅ **Phases 0–10, 12 complete** — All bytecode opcodes emit LLVM IR; user-defined functions compile to native IR and dispatch directly. Phases 7–10, 12 inline runtime helpers into pure IR (printing, property/array access, string interning, for-in/spread). 128/128 interpreter + 10/10 AOT tests pass.
+✅ **Phases 0–12, 14–15 complete** — All bytecode opcodes emit LLVM IR; user-defined functions compile to native IR and dispatch directly. Phases 7–10, 12, 14–15 inline runtime helpers into pure IR. 128/128 interpreter + 10/10 AOT tests pass.
 
-❌ **Phases 11, 13–17** — Remaining helpers (GC alloc, EH, typed assignments, safe mode, method invocation, module linking). See below.
+❌ **Phases 11, 13, 16–17** — Remaining helpers (GC alloc, EH, method invocation, module linking). See below.
 
 ---
 
@@ -91,29 +91,22 @@ GC allocation (`vm->allocate<T>()`) involves `new`, heap tracking, and GC thresh
 
 ---
 
-### Phase 14: Type-Annotated Assignments — EASY
+### ✅ Phase 14: Type-Annotated Assignments — EASY ✅
 
-| Helper | Lines | What it does | Inline approach |
-|--------|-------|-------------|-----------------|
-| `aot_setLocalTyped` | 1020 | Validate value type against expected type byte | Inline tag comparison against expected type — simple `icmp` on tag bits |
-| `aot_setGlobalTyped` | 1473 | Look up global type in `vm->globalTypes`, validate | Inline type lookup + `icmp` |
-| `aot_defineTypedGlobal` | 1503 | Store in `vm->globals` + `vm->globalTypes` | Currently stores in VM hashtable — hard to inline. Keep as helper. |
+**Done**: `OP_SET_LOCAL_TYPED` inlines tag comparison against expected type via `icmp` on tag bits. Error path (type mismatch) calls `aot_reportTypeError` helper (string generation). Global/define typed still call helpers (hash map access).
 
-**Remove**: `aotSetLocalTypedFunc`
-**Consider**: Keeping `aotSetGlobalTypedFunc`, `aotDefineTypedGlobalFunc` as helpers
+**Changed**: `aot_setLocalTyped` → `aot_reportTypeError` (error-only reporter, called only on fail path)
+**Removed**: `aotSetLocalTypedFunc` (replaced by `aotReportTypeErrorFunc`)
+**Kept**: `aotSetGlobalTypedFunc`, `aotDefineTypedGlobalFunc` (hash map lookup/store)
 
 ---
 
-### Phase 15: Safe Mode Validation — EASY
+### ✅ Phase 15: Safe Mode Validation — EASY ✅
 
-| Helper | Lines | What it does | Inline approach |
-|--------|-------|-------------|-----------------|
-| `aot_validateSafeFunction` | 2128 | Check function params/return have type annotations | Inline the checks — iterate param list, check `typeAnnotation.has_value()` |
-| `aot_validateSafeFileFunction` | 2136 | Same for `.ntsc` files | Same |
-| `aot_validateSafeVariable` | 2163 | Check variable has type annotation | Inline the check — already a simple conditional |
-| `aot_validateSafeFileVariable` | 2160 | Same for `.ntsc` files | Same |
+**Done**: Variable validation (`OP_VALIDATE_SAFE_VARIABLE` / `OP_VALIDATE_SAFE_FILE_VARIABLE`) inlined entirely — error message constructed at compile time and passed to `aotRuntimeErrorFunc` directly. Function validation helpers kept (iterate function declaration params — complex).
 
-**Remove**: All 4 validate function declarations + calls
+**Removed**: `aotValidateSafeVarFunc`, `aotValidateSafeFileVarFunc`
+**Kept**: `aotValidateSafeFuncFunc`, `aotValidateSafeFileFuncFunc` (param iteration is complex)
 
 ---
 
@@ -154,8 +147,8 @@ Compile each C++ module to LLVM bitcode (`-flto -emit-llvm -c`), emit direct `ex
 | 11 (Create) ⏸️ | — | `aotCreateArrayFunc`, `aotCreateObjectFunc` (deferred) |
 | 12 (For/Spread) ✅ | `aotForInNextFunc`, `aotSpreadFunc` | `aotForInInitFunc` |
 | 13 (EH) | `aotTryPushFunc`, `aotTryPopFunc`, `aotThrowErrorFunc` | — |
-| 14 (Typed) | `aotSetLocalTypedFunc` | `aotSetGlobalTypedFunc`, `aotDefineTypedGlobalFunc` |
-| 15 (Safe) | All 4 validate functions | — |
+| 14 (Typed) ✅ | `aotSetLocalTypedFunc` (+ added `aotReportTypeErrorFunc`) | `aotSetGlobalTypedFunc`, `aotDefineTypedGlobalFunc` |
+| 15 (Safe) ✅ | `aotValidateSafeVarFunc`, `aotValidateSafeFileVarFunc` | `aotValidateSafeFuncFunc`, `aotValidateSafeFileFuncFunc` |
 | 16 (Invoke) | `aotInvokeFunc` | — |
 | 17 (Module) | — | — (new code) |
 

@@ -113,9 +113,7 @@ struct LlvmCodegenImpl {
     llvm::Function* aotTryPopFunc = nullptr;
     llvm::Function* aotValidateSafeFuncFunc = nullptr;
     llvm::Function* aotValidateSafeFileFuncFunc = nullptr;
-    llvm::Function* aotValidateSafeVarFunc = nullptr;
-    llvm::Function* aotValidateSafeFileVarFunc = nullptr;
-    llvm::Function* aotSetLocalTypedFunc = nullptr;
+    llvm::Function* aotReportTypeErrorFunc = nullptr;
     llvm::Function* aotSetGlobalTypedFunc = nullptr;
     llvm::Function* aotDefineTypedGlobalFunc = nullptr;
 
@@ -459,20 +457,10 @@ struct LlvmCodegenImpl {
         aotValidateSafeFileFuncFunc = llvm::Function::Create(validateFileFnTy, llvm::Function::ExternalLinkage,
                                                                "aot_validateSafeFileFunction", module.get());
 
-        // void @aot_validateSafeVariable(i8* vm_ctx, i8* varName, i32 isSafeFile)
-        auto* validateVarTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i8PtrTy, i32Ty}, false);
-        aotValidateSafeVarFunc = llvm::Function::Create(validateVarTy, llvm::Function::ExternalLinkage,
-                                                          "aot_validateSafeVariable", module.get());
-
-        // void @aot_validateSafeFileVariable(i8* vm_ctx, i8* varName)
-        auto* validateFileVarTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i8PtrTy}, false);
-        aotValidateSafeFileVarFunc = llvm::Function::Create(validateFileVarTy, llvm::Function::ExternalLinkage,
-                                                              "aot_validateSafeFileVariable", module.get());
-
-        // void @aot_setLocalTyped(i8* vm_ctx, i64 val, i64 slotVal, i8 expectedType)
-        auto* setLocalTypedTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i64Ty, i64Ty, i8Ty}, false);
-        aotSetLocalTypedFunc = llvm::Function::Create(setLocalTypedTy, llvm::Function::ExternalLinkage,
-                                                        "aot_setLocalTyped", module.get());
+        // void @aot_reportTypeError(i8* vm_ctx, i8 expectedType, i64 val)
+        auto* reportTypeErrTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i8Ty, i64Ty}, false);
+        aotReportTypeErrorFunc = llvm::Function::Create(reportTypeErrTy, llvm::Function::ExternalLinkage,
+                                                          "aot_reportTypeError", module.get());
 
         // void @aot_setGlobalTyped(i8* vm_ctx, i8* name, i64 val)
         auto* setGlobalTypedTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i8PtrTy, i64Ty}, false);
@@ -1154,10 +1142,40 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 uint8_t typeByte = impl->readByte();
                 auto* src = impl->popValue();
                 auto* val = impl->builder->CreateLoad(impl->i64Ty, src);
-                impl->builder->CreateCall(impl->aotSetLocalTypedFunc,
-                    {impl->vmCtx, val,
-                     llvm::ConstantInt::get(impl->i64Ty, slot),
-                     llvm::ConstantInt::get(impl->i8Ty, typeByte)});
+                // Inline type validation: compare tag bits against expected type
+                auto* tlNanMask = llvm::ConstantInt::get(impl->i64Ty, NAN_MASK);
+                auto* tlNanBase = llvm::ConstantInt::get(impl->i64Ty, NAN_BASE);
+                auto* tlMasked = impl->builder->CreateAnd(val, tlNanMask, "tl_m");
+                auto* tlTagged = impl->builder->CreateICmpEQ(tlMasked, tlNanBase, "tl_tg");
+                llvm::Value* tlValid = nullptr;
+                if (typeByte == 83) { // TYPE_ANY
+                    tlValid = llvm::ConstantInt::get(llvm::Type::getInt1Ty(ctx), 1);
+                } else if (typeByte == 77 || typeByte == 78) { // TYPE_INT, TYPE_FLOAT → untagged number
+                    tlValid = impl->builder->CreateNot(tlTagged, "tl_num");
+                } else {
+                    // String(79)→tag2, Bool(80)→tag1, Array(81)→tag3, Object(82)→tag6
+                    uint64_t expectedTag = (typeByte == 79) ? 2 :
+                                           (typeByte == 80) ? 1 :
+                                           (typeByte == 81) ? 3 :
+                                           (typeByte == 82) ? 6 : 0;
+                    auto* tlShifted = impl->builder->CreateLShr(val,
+                        llvm::ConstantInt::get(impl->i64Ty, TAG_SHIFT), "tl_sh");
+                    auto* tlTagBits = impl->builder->CreateAnd(tlShifted,
+                        llvm::ConstantInt::get(impl->i64Ty, 0x7), "tl_tb");
+                    auto* tlTagMatch = impl->builder->CreateICmpEQ(tlTagBits,
+                        llvm::ConstantInt::get(impl->i64Ty, expectedTag), "tl_tm");
+                    tlValid = impl->builder->CreateAnd(tlTagged, tlTagMatch, "tl_v");
+                }
+                auto* tlPassBB = llvm::BasicBlock::Create(ctx, "tl_pass", impl->func);
+                auto* tlFailBB = llvm::BasicBlock::Create(ctx, "tl_fail", impl->func);
+                impl->builder->CreateCondBr(tlValid, tlPassBB, tlFailBB);
+                // Fail: report type error (helper generates message + calls runtimeError)
+                impl->builder->SetInsertPoint(tlFailBB);
+                impl->builder->CreateCall(impl->aotReportTypeErrorFunc,
+                    {impl->vmCtx, llvm::ConstantInt::get(impl->i8Ty, typeByte), val});
+                impl->builder->CreateUnreachable();
+                // Pass: store value to local slot
+                impl->builder->SetInsertPoint(tlPassBB);
                 auto* dest = impl->localsGEP(llvm::ConstantInt::get(impl->i32Ty, slot));
                 impl->builder->CreateStore(val, dest);
                 break;
@@ -2486,14 +2504,16 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 uint8_t constIdx = impl->readByte();
                 const Value& nameV = impl->chunk->constants[constIdx];
                 std::string varName = nameV.type == ValueType::OBJ_STRING ? nameV.as.obj_string->chars : "?";
-                auto* varNameStr = impl->builder->CreateGlobalStringPtr(varName, "var_name");
+                // Construct error message at compile time and call runtimeError directly
+                std::string errMsg;
                 if (op == OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE) {
-                    impl->builder->CreateCall(impl->aotValidateSafeFileVarFunc,
-                        {impl->vmCtx, varNameStr});
+                    errMsg = "Variable '" + varName + "' must have a type annotation in safe file (.ntsc).";
                 } else {
-                    impl->builder->CreateCall(impl->aotValidateSafeVarFunc,
-                        {impl->vmCtx, varNameStr, llvm::ConstantInt::get(impl->i32Ty, 0)});
+                    errMsg = "Variable '" + varName + "' must have a type annotation inside a safe block.";
                 }
+                auto* errStr = impl->builder->CreateGlobalStringPtr(errMsg, "safe_var_msg");
+                impl->builder->CreateCall(impl->aotRuntimeErrorFunc, {impl->vmCtx, errStr});
+                impl->builder->CreateUnreachable();
                 break;
             }
 

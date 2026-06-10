@@ -661,17 +661,6 @@ void aot_validateSafeFileFunction(void* vm_ctx, uint64_t funcVal) {
     }
 }
 
-void aot_validateSafeVariable(void* vm_ctx, const char* varName, int isSafeFile) {
-    std::string msg = std::string("Variable '") + varName + "' must have a type annotation" +
-        (isSafeFile ? " in .ntsc files (Neutron Safe Code)." : " inside a safe block.");
-    aot_runtimeError(vm_ctx, msg.c_str());
-}
-
-void aot_validateSafeFileVariable(void* vm_ctx, const char* varName) {
-    std::string msg = std::string("Variable '") + varName + "' must have a type annotation in safe file (.ntsc).";
-    aot_runtimeError(vm_ctx, msg.c_str());
-}
-
 // --- Typed set helpers ---
 // Type annotation byte values matching TokenType enum (token.h):
 // TYPE_INT=77, TYPE_FLOAT=78, TYPE_STRING=79, TYPE_BOOL=80,
@@ -690,8 +679,7 @@ static bool aot_validateType(uint8_t expectedType, Value value) {
     }
 }
 
-void aot_setLocalTyped(void* vm_ctx, uint64_t val, uint64_t slotVal, uint8_t expectedType) {
-    (void)slotVal;
+void aot_reportTypeError(void* vm_ctx, uint8_t expectedType, uint64_t val) {
     Value value = nanToValue(val);
     if (!aot_validateType(expectedType, value)) {
         std::string actualName = value.type == ValueType::NIL ? "nil" :
