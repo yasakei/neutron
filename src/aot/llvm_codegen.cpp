@@ -99,7 +99,7 @@ struct LlvmCodegenImpl {
     llvm::Function* aotSetPropCachedFunc = nullptr;
     llvm::Function* aotIndexGetFunc = nullptr;
     llvm::Function* aotIndexSetFunc = nullptr;
-    llvm::Function* aotCreateArrayFunc = nullptr;
+    llvm::Function* aotAllocArrayFunc = nullptr;
     llvm::Function* aotCreateObjectFunc = nullptr;
     llvm::Function* aotCallFunc = nullptr;
     llvm::Function* aotInvokeFunc = nullptr;
@@ -386,10 +386,10 @@ struct LlvmCodegenImpl {
         aotIndexSetFunc = llvm::Function::Create(indexSetTy, llvm::Function::ExternalLinkage,
                                                    "aot_indexSet", module.get());
 
-        // i64 @aot_createArray(i8* vm_ctx, i8* elements, i8 count)
-        auto* createArrTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i8PtrTy, i8Ty}, false);
-        aotCreateArrayFunc = llvm::Function::Create(createArrTy, llvm::Function::ExternalLinkage,
-                                                      "aot_createArray", module.get());
+        // i8* @aot_allocArray(i8* vm_ctx, i8 count)
+        auto* allocArrTy = llvm::FunctionType::get(i8PtrTy, {i8PtrTy, i8Ty}, false);
+        aotAllocArrayFunc = llvm::Function::Create(allocArrTy, llvm::Function::ExternalLinkage,
+                                                     "aot_allocArray", module.get());
 
         // i64 @aot_createObject(i8* vm_ctx, i8* keys, i8* values, i8 count)
         auto* createObjTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i8PtrTy, i8PtrTy, i8Ty}, false);
@@ -1756,32 +1756,35 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             // === Arrays & Objects ===
             case OpCode::OP_ARRAY: {
                 uint8_t count = impl->readByte();
+                auto* arrRaw = impl->builder->CreateCall(impl->aotAllocArrayFunc,
+                    {impl->vmCtx, llvm::ConstantInt::get(impl->i8Ty, count)}, "arr_raw");
                 if (count > 0) {
-                    // Allocate temporary array on stack to hold elements
-                    auto* arrTy = llvm::ArrayType::get(impl->i64Ty, count);
-                    auto* arrAlloca = impl->builder->CreateAlloca(arrTy, nullptr, "arr_elems");
+                    // Load _M_start (vector data pointer at offset 16)
+                    auto* startAddr = impl->builder->CreateConstGEP1_32(impl->i8Ty, arrRaw, 16);
+                    auto* startVal = impl->builder->CreateLoad(impl->i8PtrTy, startAddr, "arr_start");
+                    // Fill elements via emitNanToValue (converts NaN-boxed i64 → Value struct)
                     for (int i = count - 1; i >= 0; i--) {
                         auto* elemPtr = impl->popValue();
                         auto* elem = impl->builder->CreateLoad(impl->i64Ty, elemPtr);
-                        auto* gep = impl->builder->CreateGEP(arrTy, arrAlloca,
-                            {llvm::ConstantInt::get(impl->i32Ty, 0),
-                             llvm::ConstantInt::get(impl->i32Ty, i)});
-                        impl->builder->CreateStore(elem, gep);
+                        auto* elemAddr = impl->builder->CreateGEP(impl->i8Ty, startVal,
+                            llvm::ConstantInt::get(impl->i64Ty, i * 16), "arr_elem");
+                        impl->emitNanToValue(elem, elemAddr);
                     }
-                    auto* arrPtr = impl->builder->CreatePointerCast(arrAlloca, impl->i8PtrTy);
-                    auto* result = impl->builder->CreateCall(impl->aotCreateArrayFunc,
-                        {impl->vmCtx, arrPtr, llvm::ConstantInt::get(impl->i8Ty, count)},
-                        "arr_result");
-                    auto* dest = impl->pushValue();
-                    impl->builder->CreateStore(result, dest);
-                } else {
-                    // Empty array: pass nullptr
-                    auto* result = impl->builder->CreateCall(impl->aotCreateArrayFunc,
-                        {impl->vmCtx, llvm::ConstantPointerNull::get(impl->i8PtrTy),
-                         llvm::ConstantInt::get(impl->i8Ty, 0)}, "arr_result");
-                    auto* dest = impl->pushValue();
-                    impl->builder->CreateStore(result, dest);
+                    // Update _M_finish (offset 24) = _M_start + count * sizeof(Value)
+                    auto* finishAddr = impl->builder->CreateConstGEP1_32(impl->i8Ty, arrRaw, 24);
+                    auto* newFinish = impl->builder->CreateGEP(impl->i8Ty, startVal,
+                        llvm::ConstantInt::get(impl->i64Ty, count * 16), "arr_finish");
+                    impl->builder->CreateStore(newFinish, finishAddr);
                 }
+                // NaN-box the Array* pointer (tag=3)
+                auto* arrInt = impl->builder->CreatePtrToInt(arrRaw, impl->i64Ty);
+                auto* arrPayload = impl->builder->CreateAnd(arrInt,
+                    llvm::ConstantInt::get(impl->i64Ty, PAYLOAD_MASK), "arr_pay");
+                auto* arrTagged = impl->builder->CreateOr(
+                    llvm::ConstantInt::get(impl->i64Ty, NAN_BASE | (3ULL << TAG_SHIFT)),
+                    arrPayload, "arr_val");
+                auto* dest = impl->pushValue();
+                impl->builder->CreateStore(arrTagged, dest);
                 break;
             }
 

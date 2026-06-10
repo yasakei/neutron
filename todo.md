@@ -1,9 +1,9 @@
 # LLVM AOT Backend Migration
 
 ## Status
-✅ **Phases 0–12, 14–15 complete** — All bytecode opcodes emit LLVM IR; user-defined functions compile to native IR and dispatch directly. Phases 7–10, 12, 14–15 inline runtime helpers into pure IR. 128/128 interpreter + 10/10 AOT tests pass.
+✅ **Phases 0–15 complete** — All bytecode opcodes emit LLVM IR; user-defined functions compile to native IR and dispatch directly. 128/128 interpreter + 10/10 AOT tests pass.
 
-❌ **Phases 11, 13, 16–17** — Remaining helpers (GC alloc, EH, method invocation, module linking). See below.
+❌ **Phases 13, 16–17** — Remaining helpers (EH, method invocation, module linking). See below.
 
 ---
 
@@ -62,9 +62,13 @@ Every helper below is a C++ function called from LLVM IR. The goal is to inline 
 
 ---
 
-### ⏸️ Phase 11: Array/Object Creation (`OP_ARRAY` / `OP_OBJECT`) — MEDIUM (DEFERRED)
+### ✅ Phase 11: Array/Object Creation (`OP_ARRAY` / `OP_OBJECT`) — MEDIUM ✅
 
-GC allocation (`vm->allocate<T>()`) involves `new`, heap tracking, and GC threshold checks — too complex to inline without exposing VM internals. Keep `aotCreateArrayFunc` / `aotCreateObjectFunc` as short helpers.
+**Done**: `aot_createArray` replaced with `aot_allocArray` (alloc + reserve only). Element copy loop inlined in IR via `emitNanToValue` + vector `_M_finish` update. Avoids per-element `push_back` capacity checks and `nanToValue` dispatch.
+
+`aot_createObject` kept as helper (unordered_map insertion is too complex).
+
+**Changed**: `aotCreateArrayFunc` → `aotAllocArrayFunc` (returns raw Array* instead of NaN-boxed value)
 
 ---
 
@@ -144,7 +148,7 @@ Compile each C++ module to LLVM bitcode (`-flto -emit-llvm -c`), emit direct `ex
 | 8 (Prop cache) ✅ | `aotTryGetCachedPropFunc`, `aotTrySetCachedPropFunc` | `aotGetPropCachedFunc`, `aotSetPropCachedFunc` |
 | 9 (Array index) ✅ | `aotArrayGetCachedFunc`, `aotArraySetCachedFunc` | `aotIndexGetFunc`, `aotIndexSetFunc` |
 | 10 (String) ✅ | — | `aotInternFunc` (cache miss still calls it) |
-| 11 (Create) ⏸️ | — | `aotCreateArrayFunc`, `aotCreateObjectFunc` (deferred) |
+| 11 (Create) ✅ | `aotCreateArrayFunc` → `aotAllocArrayFunc` | `aotCreateObjectFunc` (deferred) |
 | 12 (For/Spread) ✅ | `aotForInNextFunc`, `aotSpreadFunc` | `aotForInInitFunc` |
 | 13 (EH) | `aotTryPushFunc`, `aotTryPopFunc`, `aotThrowErrorFunc` | — |
 | 14 (Typed) ✅ | `aotSetLocalTypedFunc` (+ added `aotReportTypeErrorFunc`) | `aotSetGlobalTypedFunc`, `aotDefineTypedGlobalFunc` |

@@ -355,13 +355,11 @@ void aot_indexSet(void* vm_ctx, uint64_t objVal, uint64_t indexVal, uint64_t val
     }
 }
 
-uint64_t aot_createArray(void* vm_ctx, const uint64_t* elements, uint8_t count) {
+void* aot_allocArray(void* vm_ctx, uint8_t count) {
     VM* vm = static_cast<VM*>(vm_ctx);
     Array* arr = vm->allocate<Array>();
-    for (uint8_t i = 0; i < count; i++) {
-        arr->push(nanToValue(elements[i]));
-    }
-    return valueToNan(Value(arr));
+    arr->elements.reserve(count);
+    return arr;
 }
 
 uint64_t aot_createObject(void* vm_ctx, const uint64_t* keys, const uint64_t* values, uint8_t count) {

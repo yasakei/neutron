@@ -81,8 +81,8 @@ uint64_t aot_indexGet(void* vm_ctx, uint64_t objVal, uint64_t indexVal);
 void     aot_indexSet(void* vm_ctx, uint64_t objVal, uint64_t indexVal, uint64_t val);
 
 // Array/Object creation
-// elements: pointer to array of count NaN-boxed uint64_t values
-uint64_t aot_createArray(void* vm_ctx, const uint64_t* elements, uint8_t count);
+// aot_allocArray: allocate Array, pre-reserve capacity, return raw Array* pointer
+void* aot_allocArray(void* vm_ctx, uint8_t count);
 // keys/values: interleaved NaN-boxed values from stack (key0, val0, ..., keyN, valN)
 uint64_t aot_createObject(void* vm_ctx, const uint64_t* keys, const uint64_t* values, uint8_t count);
 
