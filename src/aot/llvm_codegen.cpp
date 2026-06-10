@@ -899,7 +899,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* cmp = impl->builder->CreateFCmpOEQ(impl->loadData(a), impl->loadData(b), "eq");
                 auto* ext = impl->builder->CreateUIToFP(cmp, impl->doubleTy);
                 impl->storeValue(dest,
-                                  llvm::ConstantInt::get(impl->i8Ty, TAG_BOOL), ext);
+                                  llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), ext);
                 break;
             }
 
@@ -910,7 +910,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* cmp = impl->builder->CreateFCmpONE(impl->loadData(a), impl->loadData(b), "neq");
                 auto* ext = impl->builder->CreateUIToFP(cmp, impl->doubleTy);
                 impl->storeValue(dest,
-                                  llvm::ConstantInt::get(impl->i8Ty, TAG_BOOL), ext);
+                                  llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), ext);
                 break;
             }
 
@@ -921,7 +921,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* cmp = impl->builder->CreateFCmpOGT(impl->loadData(a), impl->loadData(b), "gt");
                 auto* ext = impl->builder->CreateUIToFP(cmp, impl->doubleTy);
                 impl->storeValue(dest,
-                                  llvm::ConstantInt::get(impl->i8Ty, TAG_BOOL), ext);
+                                  llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), ext);
                 break;
             }
 
@@ -932,7 +932,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* cmp = impl->builder->CreateFCmpOLT(impl->loadData(a), impl->loadData(b), "lt");
                 auto* ext = impl->builder->CreateUIToFP(cmp, impl->doubleTy);
                 impl->storeValue(dest,
-                                  llvm::ConstantInt::get(impl->i8Ty, TAG_BOOL), ext);
+                                  llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), ext);
                 break;
             }
 
@@ -943,7 +943,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* notTruthy = impl->builder->CreateNot(truthy, "not");
                 auto* ext = impl->builder->CreateUIToFP(notTruthy, impl->doubleTy);
                 impl->storeValue(dest,
-                                  llvm::ConstantInt::get(impl->i8Ty, TAG_BOOL), ext);
+                                  llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), ext);
                 break;
             }
 
@@ -1025,7 +1025,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 else pred = llvm::CmpInst::ICMP_SGT;
                 auto* cmp = impl->builder->CreateICmp(pred, aInt, bInt, "int_cmp");
                 auto* ext = impl->builder->CreateUIToFP(cmp, impl->doubleTy);
-                impl->storeValue(dest, llvm::ConstantInt::get(impl->i8Ty, TAG_BOOL), ext);
+                impl->storeValue(dest, llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), ext);
                 break;
             }
 
