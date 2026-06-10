@@ -923,7 +923,10 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* b = impl->popValue();
                 auto* a = impl->popValue();
                 auto* dest = impl->pushValue();
-                auto* result = impl->builder->CreateFAdd(impl->loadData(a), impl->loadData(b), "add_int");
+                auto* aInt = impl->builder->CreateFPToSI(impl->loadData(a), impl->i64Ty, "a_int");
+                auto* bInt = impl->builder->CreateFPToSI(impl->loadData(b), impl->i64Ty, "b_int");
+                auto* intResult = impl->builder->CreateAdd(aInt, bInt, "add_int");
+                auto* result = impl->builder->CreateSIToFP(intResult, impl->doubleTy, "add_int_f");
                 impl->storeValue(dest, llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), result);
                 break;
             }
@@ -931,7 +934,10 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* b = impl->popValue();
                 auto* a = impl->popValue();
                 auto* dest = impl->pushValue();
-                auto* result = impl->builder->CreateFSub(impl->loadData(a), impl->loadData(b), "sub_int");
+                auto* aInt = impl->builder->CreateFPToSI(impl->loadData(a), impl->i64Ty, "a_int");
+                auto* bInt = impl->builder->CreateFPToSI(impl->loadData(b), impl->i64Ty, "b_int");
+                auto* intResult = impl->builder->CreateSub(aInt, bInt, "sub_int");
+                auto* result = impl->builder->CreateSIToFP(intResult, impl->doubleTy, "sub_int_f");
                 impl->storeValue(dest, llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), result);
                 break;
             }
@@ -939,7 +945,10 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* b = impl->popValue();
                 auto* a = impl->popValue();
                 auto* dest = impl->pushValue();
-                auto* result = impl->builder->CreateFMul(impl->loadData(a), impl->loadData(b), "mul_int");
+                auto* aInt = impl->builder->CreateFPToSI(impl->loadData(a), impl->i64Ty, "a_int");
+                auto* bInt = impl->builder->CreateFPToSI(impl->loadData(b), impl->i64Ty, "b_int");
+                auto* intResult = impl->builder->CreateMul(aInt, bInt, "mul_int");
+                auto* result = impl->builder->CreateSIToFP(intResult, impl->doubleTy, "mul_int_f");
                 impl->storeValue(dest, llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), result);
                 break;
             }
@@ -947,7 +956,10 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* b = impl->popValue();
                 auto* a = impl->popValue();
                 auto* dest = impl->pushValue();
-                auto* result = impl->builder->CreateFDiv(impl->loadData(a), impl->loadData(b), "div_int");
+                auto* aInt = impl->builder->CreateFPToSI(impl->loadData(a), impl->i64Ty, "a_int");
+                auto* bInt = impl->builder->CreateFPToSI(impl->loadData(b), impl->i64Ty, "b_int");
+                auto* intResult = impl->builder->CreateSDiv(aInt, bInt, "div_int");
+                auto* result = impl->builder->CreateSIToFP(intResult, impl->doubleTy, "div_int_f");
                 impl->storeValue(dest, llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), result);
                 break;
             }
@@ -955,15 +967,20 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* b = impl->popValue();
                 auto* a = impl->popValue();
                 auto* dest = impl->pushValue();
-                auto* result = impl->builder->CreateFRem(impl->loadData(a), impl->loadData(b), "mod_int");
+                auto* aInt = impl->builder->CreateFPToSI(impl->loadData(a), impl->i64Ty, "a_int");
+                auto* bInt = impl->builder->CreateFPToSI(impl->loadData(b), impl->i64Ty, "b_int");
+                auto* intResult = impl->builder->CreateSRem(aInt, bInt, "mod_int");
+                auto* result = impl->builder->CreateSIToFP(intResult, impl->doubleTy, "mod_int_f");
                 impl->storeValue(dest, llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), result);
                 break;
             }
             case OpCode::OP_NEGATE_INT: {
                 auto* a = impl->popValue();
                 auto* dest = impl->pushValue();
-                auto* neg = impl->builder->CreateFNeg(impl->loadData(a), "neg_int");
-                impl->storeValue(dest, llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), neg);
+                auto* aInt = impl->builder->CreateFPToSI(impl->loadData(a), impl->i64Ty, "a_int");
+                auto* intResult = impl->builder->CreateNeg(aInt, "neg_int");
+                auto* result = impl->builder->CreateSIToFP(intResult, impl->doubleTy, "neg_int_f");
+                impl->storeValue(dest, llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), result);
                 break;
             }
             case OpCode::OP_EQUAL_INT:
@@ -972,13 +989,13 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* b = impl->popValue();
                 auto* a = impl->popValue();
                 auto* dest = impl->pushValue();
-                auto* aData = impl->loadData(a);
-                auto* bData = impl->loadData(b);
+                auto* aInt = impl->builder->CreateFPToSI(impl->loadData(a), impl->i64Ty, "a_int");
+                auto* bInt = impl->builder->CreateFPToSI(impl->loadData(b), impl->i64Ty, "b_int");
                 llvm::CmpInst::Predicate pred;
-                if (op == OpCode::OP_EQUAL_INT) pred = llvm::CmpInst::FCMP_OEQ;
-                else if (op == OpCode::OP_LESS_INT) pred = llvm::CmpInst::FCMP_OLT;
-                else pred = llvm::CmpInst::FCMP_OGT;
-                auto* cmp = impl->builder->CreateFCmp(pred, aData, bData, "int_cmp");
+                if (op == OpCode::OP_EQUAL_INT) pred = llvm::CmpInst::ICMP_EQ;
+                else if (op == OpCode::OP_LESS_INT) pred = llvm::CmpInst::ICMP_SLT;
+                else pred = llvm::CmpInst::ICMP_SGT;
+                auto* cmp = impl->builder->CreateICmp(pred, aInt, bInt, "int_cmp");
                 auto* ext = impl->builder->CreateUIToFP(cmp, impl->doubleTy);
                 impl->storeValue(dest, llvm::ConstantInt::get(impl->i8Ty, TAG_BOOL), ext);
                 break;
@@ -1063,20 +1080,36 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             case OpCode::OP_INC_LOCAL_INT: {
                 uint8_t slot = impl->readByte();
                 auto* localPtr = impl->localsGEP(llvm::ConstantInt::get(impl->i32Ty, slot));
-                auto* data = impl->loadData(localPtr);
-                auto* one = llvm::ConstantFP::get(impl->doubleTy, 1.0);
-                auto* inc = impl->builder->CreateFAdd(data, one, "inc");
-                impl->storeValue(localPtr, llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), inc);
+                if (op == OpCode::OP_INC_LOCAL_INT) {
+                    auto* dataInt = impl->builder->CreateFPToSI(impl->loadData(localPtr), impl->i64Ty, "data_int");
+                    auto* one = llvm::ConstantInt::get(impl->i64Ty, 1);
+                    auto* incInt = impl->builder->CreateAdd(dataInt, one, "inc_int");
+                    auto* inc = impl->builder->CreateSIToFP(incInt, impl->doubleTy, "inc_int_f");
+                    impl->storeValue(localPtr, llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), inc);
+                } else {
+                    auto* data = impl->loadData(localPtr);
+                    auto* one = llvm::ConstantFP::get(impl->doubleTy, 1.0);
+                    auto* inc = impl->builder->CreateFAdd(data, one, "inc");
+                    impl->storeValue(localPtr, llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), inc);
+                }
                 break;
             }
             case OpCode::OP_DECREMENT_LOCAL:
             case OpCode::OP_DEC_LOCAL_INT: {
                 uint8_t slot = impl->readByte();
                 auto* localPtr = impl->localsGEP(llvm::ConstantInt::get(impl->i32Ty, slot));
-                auto* data = impl->loadData(localPtr);
-                auto* one = llvm::ConstantFP::get(impl->doubleTy, 1.0);
-                auto* dec = impl->builder->CreateFSub(data, one, "dec");
-                impl->storeValue(localPtr, llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), dec);
+                if (op == OpCode::OP_DEC_LOCAL_INT) {
+                    auto* dataInt = impl->builder->CreateFPToSI(impl->loadData(localPtr), impl->i64Ty, "data_int");
+                    auto* one = llvm::ConstantInt::get(impl->i64Ty, 1);
+                    auto* decInt = impl->builder->CreateSub(dataInt, one, "dec_int");
+                    auto* dec = impl->builder->CreateSIToFP(decInt, impl->doubleTy, "dec_int_f");
+                    impl->storeValue(localPtr, llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), dec);
+                } else {
+                    auto* data = impl->loadData(localPtr);
+                    auto* one = llvm::ConstantFP::get(impl->doubleTy, 1.0);
+                    auto* dec = impl->builder->CreateFSub(data, one, "dec");
+                    impl->storeValue(localPtr, llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), dec);
+                }
                 break;
             }
 
@@ -1144,9 +1177,9 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
 
                 auto* localPtr = impl->localsGEP(llvm::ConstantInt::get(impl->i32Ty, slot));
                 auto* constPtr = impl->constantsGEP(llvm::ConstantInt::get(impl->i32Ty, constIdx));
-                auto* localData = impl->loadData(localPtr);
-                auto* constData = impl->loadData(constPtr);
-                auto* cond = impl->builder->CreateFCmpOLT(localData, constData, "loop_cond");
+                auto* localInt = impl->builder->CreateFPToSI(impl->loadData(localPtr), impl->i64Ty, "local_int");
+                auto* constInt = impl->builder->CreateFPToSI(impl->loadData(constPtr), impl->i64Ty, "const_int");
+                auto* cond = impl->builder->CreateICmpSLT(localInt, constInt, "loop_cond");
 
                 auto* exitBB = impl->getOrCreateBB(exitTarget, func);
                 auto* contBB = llvm::BasicBlock::Create(ctx, "cont_less", func);
