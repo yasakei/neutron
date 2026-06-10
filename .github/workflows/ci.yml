@@ -94,6 +94,7 @@ jobs:
         # Install source files needed for runtime compilation  
         sudo cp -r src /usr/local/
         sudo cp -r libs /usr/local/
+        sudo mkdir -p /usr/local/nt-box
         sudo cp -r nt-box/src /usr/local/nt-box/src/
         
         # Create lib directory if it doesn't exist
