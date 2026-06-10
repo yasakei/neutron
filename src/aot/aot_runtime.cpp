@@ -373,6 +373,26 @@ uint64_t aot_createObject(void* vm_ctx, const uint64_t* keys, const uint64_t* va
     return valueToNan(Value(obj));
 }
 
+uint64_t aot_call(void* vm_ctx, uint64_t callee, const uint64_t* args, uint8_t argCount) {
+    VM* vm = static_cast<VM*>(vm_ctx);
+    Value calleeVal = nanToValue(callee);
+
+    std::vector<Value> argVec;
+    argVec.reserve(argCount);
+    for (uint8_t i = 0; i < argCount; i++) {
+        argVec.push_back(nanToValue(args[i]));
+    }
+
+    try {
+        Value result = vm->call(calleeVal, argVec);
+        return valueToNan(result);
+    } catch (const Return& ret) {
+        return valueToNan(ret.value);
+    } catch (...) {
+        return valueToNan(Value());
+    }
+}
+
 uint64_t aot_invoke(void* vm_ctx, uint64_t receiver, const char* methodName,
                     const uint64_t* args, uint8_t argCount) {
     VM* vm = static_cast<VM*>(vm_ctx);

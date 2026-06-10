@@ -79,6 +79,9 @@ uint64_t aot_createArray(void* vm_ctx, const uint64_t* elements, uint8_t count);
 // keys/values: interleaved NaN-boxed values from stack (key0, val0, ..., keyN, valN)
 uint64_t aot_createObject(void* vm_ctx, const uint64_t* keys, const uint64_t* values, uint8_t count);
 
+// General function call (callee(args))
+uint64_t aot_call(void* vm_ctx, uint64_t callee, const uint64_t* args, uint8_t argCount);
+
 // Method invocation (receiver.method(args))
 uint64_t aot_invoke(void* vm_ctx, uint64_t receiver, const char* methodName,
                     const uint64_t* args, uint8_t argCount);

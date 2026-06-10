@@ -78,6 +78,10 @@ struct LlvmCodegenImpl {
     // Global constants array reference
     llvm::GlobalVariable* constantsGlobal = nullptr;
 
+    // Function table for runtime-resolved function closures
+    // Populated at startup by the C wrapper from the chunk's function-typed constants
+    llvm::GlobalVariable* funcTableGlobal = nullptr;
+
     // External function declarations
     llvm::Function* putsFunc = nullptr;
     llvm::Function* aotGetPropFunc = nullptr;
@@ -88,6 +92,7 @@ struct LlvmCodegenImpl {
     llvm::Function* aotIndexSetFunc = nullptr;
     llvm::Function* aotCreateArrayFunc = nullptr;
     llvm::Function* aotCreateObjectFunc = nullptr;
+    llvm::Function* aotCallFunc = nullptr;
     llvm::Function* aotInvokeFunc = nullptr;
     llvm::Function* aotPrintFunc = nullptr;
     llvm::Function* aotInternFunc = nullptr;
@@ -359,10 +364,15 @@ struct LlvmCodegenImpl {
         aotCreateObjectFunc = llvm::Function::Create(createObjTy, llvm::Function::ExternalLinkage,
                                                        "aot_createObject", module.get());
 
+        // i64 @aot_call(i8* vm_ctx, i64 callee, i8* args, i8 arg_count)
+        auto* callTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i64Ty, i8PtrTy, i8Ty}, false);
+        aotCallFunc = llvm::Function::Create(callTy, llvm::Function::ExternalLinkage,
+                                               "aot_call", module.get());
+
         // i64 @aot_invoke(i8* vm_ctx, i64 receiver, i8* method_name, i8* args, i8 arg_count)
         auto* invokeTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i64Ty, i8PtrTy, i8PtrTy, i8Ty}, false);
         aotInvokeFunc = llvm::Function::Create(invokeTy, llvm::Function::ExternalLinkage,
-                                                 "aot_invoke", module.get());
+                                                  "aot_invoke", module.get());
 
         // void @aot_printValue(i8* vm_ctx, i64 val)
         auto* printTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i64Ty}, false);
@@ -712,6 +722,14 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
     impl->initTypes();
     impl->declareExternals();
     impl->createConstants();
+
+    // Create externally-visible func table (populated at runtime by C wrapper)
+    {
+        auto* arrTy = llvm::ArrayType::get(impl->i64Ty, 256);
+        impl->funcTableGlobal = new llvm::GlobalVariable(*impl->module, arrTy, false,
+            llvm::GlobalValue::ExternalLinkage,
+            llvm::Constant::getNullValue(arrTy), "neutron_func_table");
+    }
 
     // Create main function: i32 @neutron_main(i8* %vm_ctx)
     auto* vmCtxTy = llvm::PointerType::get(impl->i8Ty, 0);
@@ -1281,20 +1299,47 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             case OpCode::OP_CALL:
             case OpCode::OP_CALL_FAST: {
                 uint8_t argCount = impl->readByte();
-                for (int i = 0; i <= argCount; i++) {
-                    impl->popValue();
+                if (argCount > 0) {
+                    auto* argsTy = llvm::ArrayType::get(impl->i64Ty, argCount);
+                    auto* argsAlloca = impl->builder->CreateAlloca(argsTy, nullptr, "call_args");
+                    for (int i = argCount - 1; i >= 0; i--) {
+                        auto* argPtr = impl->popValue();
+                        auto* arg = impl->builder->CreateLoad(impl->i64Ty, argPtr, "call_arg");
+                        auto* gep = impl->builder->CreateGEP(argsTy, argsAlloca,
+                            {llvm::ConstantInt::get(impl->i32Ty, 0),
+                             llvm::ConstantInt::get(impl->i32Ty, i)});
+                        impl->builder->CreateStore(arg, gep);
+                    }
+                    auto* calleePtr = impl->popValue();
+                    auto* callee = impl->builder->CreateLoad(impl->i64Ty, calleePtr, "callee");
+                    auto* argsPtr = impl->builder->CreatePointerCast(argsAlloca, impl->i8PtrTy);
+                    auto* result = impl->builder->CreateCall(impl->aotCallFunc,
+                        {impl->vmCtx, callee, argsPtr,
+                         llvm::ConstantInt::get(impl->i8Ty, argCount)}, "call_result");
+                    auto* dest = impl->pushValue();
+                    impl->builder->CreateStore(result, dest);
+                } else {
+                    auto* calleePtr = impl->popValue();
+                    auto* callee = impl->builder->CreateLoad(impl->i64Ty, calleePtr, "callee");
+                    auto* result = impl->builder->CreateCall(impl->aotCallFunc,
+                        {impl->vmCtx, callee,
+                         llvm::ConstantPointerNull::get(impl->i8PtrTy),
+                         llvm::ConstantInt::get(impl->i8Ty, 0)}, "call_result");
+                    auto* dest = impl->pushValue();
+                    impl->builder->CreateStore(result, dest);
                 }
-                auto* dest = impl->pushValue();
-                auto* nilVal = impl->constValue(TAG_NIL, 0.0);
-                impl->builder->CreateStore(nilVal, dest);
                 break;
             }
 
             case OpCode::OP_CLOSURE: {
                 uint8_t funcIdx = impl->readByte();
                 auto* dest = impl->pushValue();
-                auto* src = impl->constantsGEP(llvm::ConstantInt::get(impl->i32Ty, funcIdx));
-                auto* val = impl->builder->CreateLoad(impl->i64Ty, src, "closure");
+                auto* gep = impl->builder->CreateGEP(
+                    llvm::ArrayType::get(impl->i64Ty, 256),
+                    impl->funcTableGlobal,
+                    {llvm::ConstantInt::get(impl->i32Ty, 0),
+                     llvm::ConstantInt::get(impl->i32Ty, funcIdx)});
+                auto* val = impl->builder->CreateLoad(impl->i64Ty, gep, "func");
                 impl->builder->CreateStore(val, dest);
                 break;
             }
@@ -1580,9 +1625,35 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             // === Extended opcodes (fallback handlers) ===
             case OpCode::OP_TAIL_CALL: {
                 uint8_t argCount = impl->readByte();
-                for (int i = 0; i <= argCount; i++) impl->popValue();
-                auto* d = impl->pushValue();
-                impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
+                if (argCount > 0) {
+                    auto* argsTy = llvm::ArrayType::get(impl->i64Ty, argCount);
+                    auto* argsAlloca = impl->builder->CreateAlloca(argsTy, nullptr, "tcall_args");
+                    for (int i = argCount - 1; i >= 0; i--) {
+                        auto* argPtr = impl->popValue();
+                        auto* arg = impl->builder->CreateLoad(impl->i64Ty, argPtr, "tcall_arg");
+                        auto* gep = impl->builder->CreateGEP(argsTy, argsAlloca,
+                            {llvm::ConstantInt::get(impl->i32Ty, 0),
+                             llvm::ConstantInt::get(impl->i32Ty, i)});
+                        impl->builder->CreateStore(arg, gep);
+                    }
+                    auto* calleePtr = impl->popValue();
+                    auto* callee = impl->builder->CreateLoad(impl->i64Ty, calleePtr, "tcallee");
+                    auto* argsPtr = impl->builder->CreatePointerCast(argsAlloca, impl->i8PtrTy);
+                    auto* result = impl->builder->CreateCall(impl->aotCallFunc,
+                        {impl->vmCtx, callee, argsPtr,
+                         llvm::ConstantInt::get(impl->i8Ty, argCount)}, "tcall_result");
+                    auto* dest = impl->pushValue();
+                    impl->builder->CreateStore(result, dest);
+                } else {
+                    auto* calleePtr = impl->popValue();
+                    auto* callee = impl->builder->CreateLoad(impl->i64Ty, calleePtr, "tcallee");
+                    auto* result = impl->builder->CreateCall(impl->aotCallFunc,
+                        {impl->vmCtx, callee,
+                         llvm::ConstantPointerNull::get(impl->i8PtrTy),
+                         llvm::ConstantInt::get(impl->i8Ty, 0)}, "tcall_result");
+                    auto* dest = impl->pushValue();
+                    impl->builder->CreateStore(result, dest);
+                }
                 break;
             }
 
