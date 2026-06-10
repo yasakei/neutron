@@ -93,14 +93,9 @@ uint64_t aot_call(void* vm_ctx, uint64_t callee, const uint64_t* args, uint8_t a
 uint64_t aot_invoke(void* vm_ctx, uint64_t receiver, const char* methodName,
                     const uint64_t* args, uint8_t argCount);
 
-// For-in loop helpers
+// For-in loop helper
 // aot_forInInit: takes iterable, returns NaN-boxed keys array
 uint64_t aot_forInInit(void* vm_ctx, uint64_t iterableVal);
-// aot_forInNext: takes keys + index, returns next key or nil if done
-uint64_t aot_forInNext(void* vm_ctx, uint64_t keysVal, uint64_t indexVal);
-
-// Spread operator: writes elements to outBuf (up to maxCount), returns actual count
-uint8_t aot_spread(void* vm_ctx, uint64_t arrayVal, uint64_t* outBuf, uint8_t maxCount);
 
 // Exception handling (AOT stub: stores frame info for eventual use)
 void aot_tryPush(void* vm_ctx, uint16_t tryEnd, uint16_t catchStart, uint16_t finallyStart);

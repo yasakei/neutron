@@ -1,9 +1,9 @@
 # LLVM AOT Backend Migration
 
 ## Status
-✅ **Phases 0–6 complete** — All bytecode opcodes emit LLVM IR; user-defined functions compile to native IR and dispatch directly (no interpreter fallback for sub-function calls). 128/128 interpreter + 10/10 AOT tests pass.
+✅ **Phases 0–10, 12 complete** — All bytecode opcodes emit LLVM IR; user-defined functions compile to native IR and dispatch directly. Phases 7–10, 12 inline runtime helpers into pure IR (printing, property/array access, string interning, for-in/spread). 128/128 interpreter + 10/10 AOT tests pass.
 
-❌ **Phases 7–17** — Every non-trivial operation still calls a C++ runtime helper. The IR handles tag dispatch, control flow, arithmetic, and stack management; the actual work (hash lookups, GC allocation, bounds checks, printing) goes through `extern "C"` calls. See below for the breakdown.
+❌ **Phases 11, 13–17** — Remaining helpers (GC alloc, EH, typed assignments, safe mode, method invocation, module linking). See below.
 
 ---
 
@@ -27,84 +27,55 @@ Every helper below is a C++ function called from LLVM IR. The goal is to inline 
 
 ---
 
-### Phase 7: Value Printing (`OP_SAY`) — EASY
+### ✅ Phase 7: Value Printing (`OP_SAY`) — EASY ✅
 
-IR already does full tag dispatch (number / nil / true / false / string / fallback). Each branch calls a helper — inline them.
+**Done**: Inlined `aot_printDoubleNumber` and `aot_printStringObj` into direct `printf` calls in IR. `aot_printValue` kept as fallback for virtual `toString()` dispatch (tag ≥ 3: Array/Instance/Callable/Object).
 
-| Helper | Lines | What it does | Inline approach |
-|--------|-------|-------------|-----------------|
-| `aot_printDoubleNumber` | 2218 | `printf("%g\n")` on raw double bits | Call `printf` via `declare i32 @printf(i8*, ...)` directly in IR |
-| `aot_printStringObj` | 2260 | `fwrite(chars, 1, size, stdout)` | Extract ObjString data pointer + length, call `fwrite` |
-| `aot_printValue` (fallback) | 2264 | `toString()` + `puts` for Array/Instance/Callable/Object | Extract payload pointer, call `->toString()` virtual method, then `puts` |
-
-**Remove**: `aotPrintDoubleNumberFunc`, `aotPrintStringObjFunc`, `aotPrintFunc`
+**Removed from struct**: `aotPrintDoubleNumberFunc`, `aotPrintStringObjFunc`
+**Kept**: `aotPrintFunc` (fallback)
 
 ---
 
-### Phase 8: Property Access Inline Cache — EASY
+### ✅ Phase 8: Property Access Inline Cache — EASY ✅
 
-IR already checks `tag == Instance`, extracts `inst*` from payload, and calls the cached probe. The fast path (klass match) just does a GEP load/store — do that in IR.
+**Done**: Cache hit path emits `icmp eq` on klass pointers, `GEP` into `inlineFields[idx].value`, and `emitValueToNan`/`emitNanToValue` directly — no helper call.
 
-| Helper | Lines | What it does | Inline approach |
-|--------|-------|-------------|-----------------|
-| `aot_tryGetCachedProp` | 1791 | If `cache->klass == inst->klass`, return `inst->inlineFields[idx]` | Emit `icmp` on klass pointers, `GEP` into `inlineFields`, `load` directly |
-| `aot_trySetCachedProp` | 1844 | If klass matches, `inst->inlineFields[idx] = val`, return 1 | Same — `icmp` + `GEP` + `store` in IR |
-| `aot_getPropertyCached` (miss handler) | 1798, 1998 | Full hash lookup — scans klass field table, checks JsonObject, Array.length, etc. | Keep as helper call — only on cache miss |
-| `aot_setPropertyCached` (miss handler) | 1851 | Full set with cache update | Keep as helper call — only on cache miss |
-
-**Result**: Cache hit path has zero helper calls — pure `icmp` + `GEP` + `load`/`store`.
-**Remove**: `aotTryGetCachedPropFunc`, `aotTrySetCachedPropFunc`
-**Keep**: `aotGetPropCachedFunc`, `aotSetPropCachedFunc` (miss only)
+**Removed**: `aotTryGetCachedPropFunc`, `aotTrySetCachedPropFunc` (from struct + declareExternals)
+**Kept**: `aotGetPropCachedFunc`, `aotSetPropCachedFunc` (miss handler — full hash lookup)
 
 ---
 
-### Phase 9: Array Index Access (`OP_INDEX_GET` / `OP_INDEX_SET`) — EASY
+### ✅ Phase 9: Array Index Access (`OP_INDEX_GET` / `OP_INDEX_SET`) — EASY ✅
 
-IR already dispatches `tag == Array` vs fallback. The Array fast path does a bounds check + element load/store — inline it.
+**Done**: Array fast path (untagged check + bounds check + GEP + emitValueToNan/emitNanToValue) inlined directly in IR.
 
-| Helper | Lines | What it does | Inline approach |
-|--------|-------|-------------|-----------------|
-| `aot_arrayGetCached` | 1699 | Cast raw pointer to `Array*`, `nanToValue` on index, bounds check, `at(i)`, `valueToNan` | `GEP` into array data, `icmp` for bounds, `load` element directly |
-| `aot_arraySetCached` | 1745 | Same but `set(i, val)` | Same — `GEP` + bounds check + `store` |
-| `aot_indexGet` (fallback) | 1704 | Full dynamic: handles JsonObject key, ObjString charAt | Keep as helper call |
-| `aot_indexSet` (fallback) | 1750 | Full dynamic: handles JsonObject key | Keep as helper call |
-
-**Result**: Array index get/set has zero C++ calls on the fast path.
-**Remove**: `aotArrayGetCachedFunc`, `aotArraySetCachedFunc`
-**Keep**: `aotIndexGetFunc`, `aotIndexSetFunc` (fallback only)
+**Removed**: `aotArrayGetCachedFunc`, `aotArraySetCachedFunc`
+**Kept**: `aotIndexGetFunc`, `aotIndexSetFunc` (fallback — JsonObject key, ObjString charAt)
 
 ---
 
-### Phase 10: String Interning (`OP_CONSTANT` for strings) — MEDIUM
+### ✅ Phase 10: String Interning (`OP_CONSTANT` for strings) — MEDIUM ✅
 
-| Helper | Lines | What it does | Inline approach |
-|--------|-------|-------------|-----------------|
-| `aot_internString` | 941, 960 | `vm->internString(str)` — hash the string, look up in VM's string table, insert if new | Extract `vm->strings` hash table, inline hash + probe in IR, call `allocate<ObjString>` for insert |
+**Done**: Lazy intern cache approach — per-chunk global i64 array (`internCacheGlobal`). First access calls `aot_internString` helper + caches result; subsequent loads skip the call entirely. Phi merges cached vs fresh interned value.
 
-This requires exposing the VM's string table structure to LLVM IR (GEP into the `unordered_map` or custom hash table). Complexity depends on the hash table implementation.
-
-**Fallback**: If the table is too complex to inline, keep as helper call.
+**Kept**: `aotInternFunc` (still needed for first-time intern cache miss)
 
 ---
 
-### Phase 11: Array/Object Creation (`OP_ARRAY` / `OP_OBJECT`) — MEDIUM
+### ⏸️ Phase 11: Array/Object Creation (`OP_ARRAY` / `OP_OBJECT`) — MEDIUM (DEFERRED)
 
-| Helper | Lines | What it does | Inline approach |
-|--------|-------|-------------|-----------------|
-| `aot_createArray` | 1617, 1624 | `allocate<Array>()` + loop `push(elements[i])` | Inline GC `allocate` call (or `malloc` + constructor), then inline the element copy loop |
-| `aot_createObject` | 1657, 1663 | `allocate<JsonObject>()` + loop insert key/val pairs | Same approach — GC alloc + inline loop |
-
-Requires inlining `vm->allocate<T>()` which calls the GC. If GC is too complex, consider calling a simplified `aot_gc_alloc(size)` helper instead.
+GC allocation (`vm->allocate<T>()`) involves `new`, heap tracking, and GC threshold checks — too complex to inline without exposing VM internals. Keep `aotCreateArrayFunc` / `aotCreateObjectFunc` as short helpers.
 
 ---
 
-### Phase 12: For-In / Spread — MEDIUM
+### ✅ Phase 12: For-In / Spread — MEDIUM ✅
 
-| Helper | Lines | What it does | Inline approach |
-|--------|-------|-------------|-----------------|
-| `aot_forInInit` | 1913 | Create `Array` of keys from JsonObject or Array | Inline the key collection loop + `allocate<Array>` |
-| `aot_forInNext` | 1934 | Return `keys[i]` or nil if done | Inline Array access (reuse Phase 9) |
-| `aot_spread` | 2021 | Copy array elements to stack buffer, up to 256 | Inline the copy loop with bounds check |
+**Done**: `aot_forInNext` and `aot_spread` inlined into IR.
+- `aot_forInNext`: reused Phase 9's Array access pattern (untagged check + bounds check + GEP + `emitValueToNan`); nil fallback for non-array/non-number/OOB.
+- `aot_spread`: Array path copies up to 256 elements via inline loop with `emitValueToNan`; non-Array path stores the value directly (count=1).
+
+**Kept**: `aotForInInitFunc` (complex — JsonObject property iteration + GC alloc)
+**Removed**: `aotForInNextFunc`, `aotSpreadFunc` (from struct + declareExternals + C++ source)
 
 ---
 
@@ -176,12 +147,12 @@ Compile each C++ module to LLVM bitcode (`-flto -emit-llvm -c`), emit direct `ex
 
 | Phase | Helpers to remove | Helpers to keep |
 |-------|------------------|-----------------|
-| 7 (Print) | `aotPrintDoubleNumberFunc`, `aotPrintStringObjFunc`, `aotPrintFunc`, `putsFunc` | — |
-| 8 (Prop cache) | `aotTryGetCachedPropFunc`, `aotTrySetCachedPropFunc` | `aotGetPropCachedFunc`, `aotSetPropCachedFunc` |
-| 9 (Array index) | `aotArrayGetCachedFunc`, `aotArraySetCachedFunc` | `aotIndexGetFunc`, `aotIndexSetFunc` |
-| 10 (String) | `aotInternFunc` | — |
-| 11 (Create) | `aotCreateArrayFunc`, `aotCreateObjectFunc` | — |
-| 12 (For/Spread) | `aotForInInitFunc`, `aotForInNextFunc`, `aotSpreadFunc` | — |
+| 7 (Print) ✅ | `aotPrintDoubleNumberFunc`, `aotPrintStringObjFunc` | `aotPrintFunc` (fallback) |
+| 8 (Prop cache) ✅ | `aotTryGetCachedPropFunc`, `aotTrySetCachedPropFunc` | `aotGetPropCachedFunc`, `aotSetPropCachedFunc` |
+| 9 (Array index) ✅ | `aotArrayGetCachedFunc`, `aotArraySetCachedFunc` | `aotIndexGetFunc`, `aotIndexSetFunc` |
+| 10 (String) ✅ | — | `aotInternFunc` (cache miss still calls it) |
+| 11 (Create) ⏸️ | — | `aotCreateArrayFunc`, `aotCreateObjectFunc` (deferred) |
+| 12 (For/Spread) ✅ | `aotForInNextFunc`, `aotSpreadFunc` | `aotForInInitFunc` |
 | 13 (EH) | `aotTryPushFunc`, `aotTryPopFunc`, `aotThrowErrorFunc` | — |
 | 14 (Typed) | `aotSetLocalTypedFunc` | `aotSetGlobalTypedFunc`, `aotDefineTypedGlobalFunc` |
 | 15 (Safe) | All 4 validate functions | — |

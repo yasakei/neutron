@@ -557,46 +557,6 @@ uint64_t aot_forInInit(void* vm_ctx, uint64_t iterableVal) {
     return valueToNan(Value(keys));
 }
 
-uint64_t aot_forInNext(void* vm_ctx, uint64_t keysVal, uint64_t indexVal) {
-    (void)vm_ctx;
-    Value keysV = nanToValue(keysVal);
-    Value indexV = nanToValue(indexVal);
-
-    if (keysV.type != ValueType::ARRAY || indexV.type != ValueType::NUMBER) {
-        return valueToNan(Value()); // nil = done
-    }
-
-    Array* keys = keysV.as.array;
-    double idx = indexV.as.number;
-
-    if (idx >= static_cast<double>(keys->size())) {
-        return valueToNan(Value()); // nil = done
-    }
-
-    return valueToNan(keys->at(static_cast<size_t>(idx)));
-}
-
-// --- Spread operator ---
-
-uint8_t aot_spread(void* vm_ctx, uint64_t arrayVal, uint64_t* outBuf, uint8_t maxCount) {
-    (void)vm_ctx;
-    Value val = nanToValue(arrayVal);
-    if (val.type == ValueType::ARRAY) {
-        Array* arr = val.as.array;
-        uint8_t count = static_cast<uint8_t>(arr->size() < static_cast<size_t>(maxCount) ? arr->size() : maxCount);
-        for (uint8_t i = 0; i < count; i++) {
-            outBuf[i] = valueToNan(arr->at(i));
-        }
-        return count;
-    }
-    // Non-array: push the value as-is
-    if (maxCount > 0) {
-        outBuf[0] = arrayVal;
-        return 1;
-    }
-    return 0;
-}
-
 // --- Exception handling ---
 
 // Per-VM exception frames for AOT

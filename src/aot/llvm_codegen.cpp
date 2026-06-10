@@ -83,6 +83,9 @@ struct LlvmCodegenImpl {
     // Global constants array reference
     llvm::GlobalVariable* constantsGlobal = nullptr;
 
+    // Per-chunk cache of pre-interned strings (populated lazily on first access)
+    llvm::GlobalVariable* internCacheGlobal = nullptr;
+
     // Function table for runtime-resolved function closures
     // Populated at startup by the C wrapper from the chunk's function-typed constants
     llvm::GlobalVariable* funcTableGlobal = nullptr;
@@ -103,8 +106,6 @@ struct LlvmCodegenImpl {
     llvm::Function* aotPrintFunc = nullptr;
     llvm::Function* aotInternFunc = nullptr;
     llvm::Function* aotForInInitFunc = nullptr;
-    llvm::Function* aotForInNextFunc = nullptr;
-    llvm::Function* aotSpreadFunc = nullptr;
     llvm::Function* aotAddFunc = nullptr;
     llvm::Function* aotThrowErrorFunc = nullptr;
     llvm::Function* aotRuntimeErrorFunc = nullptr;
@@ -118,11 +119,6 @@ struct LlvmCodegenImpl {
     llvm::Function* aotSetGlobalTypedFunc = nullptr;
     llvm::Function* aotDefineTypedGlobalFunc = nullptr;
 
-    // Focused helpers (tag dispatch in IR → small C++ fast paths)
-    llvm::Function* aotTryGetCachedPropFunc = nullptr;
-    llvm::Function* aotTrySetCachedPropFunc = nullptr;
-    llvm::Function* aotArrayGetCachedFunc = nullptr;
-    llvm::Function* aotArraySetCachedFunc = nullptr;
     llvm::Function* aotStringCharAtFunc = nullptr;
 
     // Phase 6: Direct native call support
@@ -448,16 +444,6 @@ struct LlvmCodegenImpl {
         aotForInInitFunc = llvm::Function::Create(forInInitTy, llvm::Function::ExternalLinkage,
                                                     "aot_forInInit", module.get());
 
-        // i64 @aot_forInNext(i8* vm_ctx, i64 keys, i64 index)
-        auto* forInNextTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i64Ty, i64Ty}, false);
-        aotForInNextFunc = llvm::Function::Create(forInNextTy, llvm::Function::ExternalLinkage,
-                                                    "aot_forInNext", module.get());
-
-        // i8 @aot_spread(i8* vm_ctx, i64 array, i8* outBuf, i8 maxCount)
-        auto* spreadTy = llvm::FunctionType::get(i8Ty, {i8PtrTy, i64Ty, i8PtrTy, i8Ty}, false);
-        aotSpreadFunc = llvm::Function::Create(spreadTy, llvm::Function::ExternalLinkage,
-                                                 "aot_spread", module.get());
-
         // void @aot_throwError(i8* vm_ctx, i64 exception)
         auto* throwTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i64Ty}, false);
         aotThrowErrorFunc = llvm::Function::Create(throwTy, llvm::Function::ExternalLinkage,
@@ -498,28 +484,10 @@ struct LlvmCodegenImpl {
         aotDefineTypedGlobalFunc = llvm::Function::Create(defineTypedGlobalTy, llvm::Function::ExternalLinkage,
                                                             "aot_defineTypedGlobal", module.get());
 
-        // ---- Focused helpers ----
-
-        // i64 @aot_tryGetCachedProp(i8* inst, i8* cache)
-        auto* tryGetCachedTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i8PtrTy}, false);
-        aotTryGetCachedPropFunc = llvm::Function::Create(tryGetCachedTy, llvm::Function::ExternalLinkage,
-                                                           "aot_tryGetCachedProp", module.get());
-        // i8 @aot_trySetCachedProp(i8* inst, i8* cache, i64 val)
-        auto* trySetCachedTy = llvm::FunctionType::get(i8Ty, {i8PtrTy, i8PtrTy, i64Ty}, false);
-        aotTrySetCachedPropFunc = llvm::Function::Create(trySetCachedTy, llvm::Function::ExternalLinkage,
-                                                           "aot_trySetCachedProp", module.get());
-        // i64 @aot_arrayGetCached(i8* arr, i64 idxVal)
-        auto* arrayGetCachedTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i64Ty}, false);
-        aotArrayGetCachedFunc = llvm::Function::Create(arrayGetCachedTy, llvm::Function::ExternalLinkage,
-                                                         "aot_arrayGetCached", module.get());
-        // void @aot_arraySetCached(i8* arr, i64 idxVal, i64 val)
-        auto* arraySetCachedTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i64Ty, i64Ty}, false);
-        aotArraySetCachedFunc = llvm::Function::Create(arraySetCachedTy, llvm::Function::ExternalLinkage,
-                                                         "aot_arraySetCached", module.get());
         // i64 @aot_stringCharAt(i8* vm_ctx, i64 str_val, i64 idxVal)
         auto* stringCharAtTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i64Ty, i64Ty}, false);
         aotStringCharAtFunc = llvm::Function::Create(stringCharAtTy, llvm::Function::ExternalLinkage,
-                                                       "aot_stringCharAt", module.get());
+                                                        "aot_stringCharAt", module.get());
         // Phase 6: Direct native call support
         // i64 @aot_tryDirectCall(i8* vm_ctx, i64 callee, i8* args, i8 argCount)
         auto* tryDirectTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i64Ty, i8PtrTy, i8Ty}, false);
@@ -563,6 +531,15 @@ struct LlvmCodegenImpl {
 
     void createConstants() {
         constantsGlobal = createConstantsForChunk(chunk, "constants");
+    }
+
+    // Create a per-chunk cache array for lazily-interned string constants (all zeros = not interned)
+    void createInternCache() {
+        size_t n = chunk->constants.size();
+        auto* arrTy = llvm::ArrayType::get(i64Ty, n);
+        internCacheGlobal = new llvm::GlobalVariable(*module, arrTy, false,
+            llvm::GlobalValue::InternalLinkage,
+            llvm::Constant::getNullValue(arrTy), "intern_cache");
     }
 
     // --- Stack access helpers ---
@@ -713,6 +690,136 @@ struct LlvmCodegenImpl {
     // Create a constant NaN-boxed value and store it
     void emitConstStore(llvm::Value* ptr, ValueTag tag, double data) {
         builder->CreateStore(constValue(tag, data), ptr);
+    }
+
+    // Convert a C++ Value struct at valPtr (i8*) to NaN-boxed i64
+    // Value layout: [0] type (i32), [8] as (i64)
+    llvm::Value* emitValueToNan(llvm::Value* valPtr) {
+        auto* vType = builder->CreateLoad(i32Ty,
+            builder->CreateConstGEP1_32(i8Ty, valPtr, 0, "vt_addr"), "vt");
+        auto* vAs = builder->CreateLoad(i64Ty,
+            builder->CreateConstGEP1_32(i8Ty, valPtr, 8, "va_addr"), "va");
+        auto* nilBB = llvm::BasicBlock::Create(context, "v2n_nil", func);
+        auto* notNilBB = llvm::BasicBlock::Create(context, "v2n_nnil", func);
+        auto* boolBB = llvm::BasicBlock::Create(context, "v2n_bool", func);
+        auto* notBoolBB = llvm::BasicBlock::Create(context, "v2n_nbool", func);
+        auto* numBB = llvm::BasicBlock::Create(context, "v2n_num", func);
+        auto* notNumBB = llvm::BasicBlock::Create(context, "v2n_nnum", func);
+        auto* strBB = llvm::BasicBlock::Create(context, "v2n_str", func);
+        auto* notStrBB = llvm::BasicBlock::Create(context, "v2n_nstr", func);
+        auto* restBB = llvm::BasicBlock::Create(context, "v2n_rest", func);
+        auto* mgBB = llvm::BasicBlock::Create(context, "v2n_mg", func);
+        auto* isNil = builder->CreateICmpEQ(vType, llvm::ConstantInt::get(i32Ty, 0), "vt_nil");
+        builder->CreateCondBr(isNil, nilBB, notNilBB);
+        // nil
+        builder->SetInsertPoint(nilBB);
+        auto* nilRes = llvm::ConstantInt::get(i64Ty, NAN_BASE);
+        builder->CreateBr(mgBB);
+        // not nil: bool?
+        builder->SetInsertPoint(notNilBB);
+        auto* isBool = builder->CreateICmpEQ(vType, llvm::ConstantInt::get(i32Ty, 1), "vt_bool");
+        builder->CreateCondBr(isBool, boolBB, notBoolBB);
+        // bool
+        builder->SetInsertPoint(boolBB);
+        auto* boolPay = builder->CreateAnd(vAs, llvm::ConstantInt::get(i64Ty, 1), "bp");
+        auto* boolRes = builder->CreateOr(llvm::ConstantInt::get(i64Ty, NAN_BASE | (1ULL << TAG_SHIFT)), boolPay, "b_res");
+        builder->CreateBr(mgBB);
+        // not bool: number?
+        builder->SetInsertPoint(notBoolBB);
+        auto* isNum = builder->CreateICmpEQ(vType, llvm::ConstantInt::get(i32Ty, 2), "vt_num");
+        builder->CreateCondBr(isNum, numBB, notNumBB);
+        // number: raw double bits
+        builder->SetInsertPoint(numBB);
+        builder->CreateBr(mgBB); // vAs already holds the raw bits
+        // not number: string?
+        builder->SetInsertPoint(notNumBB);
+        auto* isStr = builder->CreateICmpEQ(vType, llvm::ConstantInt::get(i32Ty, 3), "vt_str");
+        builder->CreateCondBr(isStr, strBB, notStrBB);
+        // string
+        builder->SetInsertPoint(strBB);
+        auto* strPay = builder->CreateAnd(vAs, llvm::ConstantInt::get(i64Ty, PAYLOAD_MASK), "sp");
+        auto* strRes = builder->CreateOr(llvm::ConstantInt::get(i64Ty, NAN_BASE | (2ULL << TAG_SHIFT)), strPay, "s_res");
+        builder->CreateBr(mgBB);
+        // rest (array=4, object=5, callable=6, class=8, instance=9, ...)
+        builder->SetInsertPoint(notStrBB);
+        // Map ValueType to runtime tag:
+        // ARRAY(4)→3, OBJECT(5)→6, CALLABLE(6)→5, INSTANCE(9)→4, rest→NIL
+        auto* tagSel = builder->CreateSelect(
+            builder->CreateICmpEQ(vType, llvm::ConstantInt::get(i32Ty, 4)),
+            llvm::ConstantInt::get(i64Ty, 3),
+            builder->CreateSelect(
+                builder->CreateICmpEQ(vType, llvm::ConstantInt::get(i32Ty, 5)),
+                llvm::ConstantInt::get(i64Ty, 6),
+                builder->CreateSelect(
+                    builder->CreateICmpEQ(vType, llvm::ConstantInt::get(i32Ty, 6)),
+                    llvm::ConstantInt::get(i64Ty, 5),
+                    builder->CreateSelect(
+                        builder->CreateICmpEQ(vType, llvm::ConstantInt::get(i32Ty, 9)),
+                        llvm::ConstantInt::get(i64Ty, 4),
+                        llvm::ConstantInt::get(i64Ty, 0)))), "rt_tag");
+        auto* restPay = builder->CreateAnd(vAs, llvm::ConstantInt::get(i64Ty, PAYLOAD_MASK), "rp");
+        auto* tagged = builder->CreateOr(llvm::ConstantInt::get(i64Ty, NAN_BASE),
+            builder->CreateOr(builder->CreateShl(tagSel, llvm::ConstantInt::get(i64Ty, TAG_SHIFT), "ts"),
+                              restPay), "rest_res");
+        builder->CreateBr(mgBB);
+        // merge
+        builder->SetInsertPoint(mgBB);
+        auto* phi = builder->CreatePHI(i64Ty, 5, "v2n");
+        phi->addIncoming(nilRes, nilBB);
+        phi->addIncoming(boolRes, boolBB);
+        phi->addIncoming(vAs, numBB);    // raw double for number
+        phi->addIncoming(strRes, strBB);
+        phi->addIncoming(tagged, notStrBB);
+        return phi;
+    }
+
+    // Convert NaN-boxed i64 to a C++ Value struct at destPtr (i8*)
+    // Value layout: [0] type (i32), [8] as (i64)
+    void emitNanToValue(llvm::Value* nanVal, llvm::Value* destPtr) {
+        auto* nanMask = llvm::ConstantInt::get(i64Ty, NAN_MASK);
+        auto* nanBase = llvm::ConstantInt::get(i64Ty, NAN_BASE);
+        auto* masked = builder->CreateAnd(nanVal, nanMask, "n2v_msk");
+        auto* isTagged = builder->CreateICmpEQ(masked, nanBase, "n2v_tgd");
+        auto* numBB = llvm::BasicBlock::Create(context, "n2v_num", func);
+        auto* tagBB = llvm::BasicBlock::Create(context, "n2v_tag", func);
+        auto* mgBB = llvm::BasicBlock::Create(context, "n2v_mg", func);
+        builder->CreateCondBr(isTagged, tagBB, numBB);
+        // Untagged = number
+        builder->SetInsertPoint(numBB);
+        auto* numAddr = builder->CreateConstGEP1_32(i8Ty, destPtr, 8, "n2v_num_ua");
+        builder->CreateStore(llvm::ConstantInt::get(i32Ty, 2), // NUMBER = 2
+            builder->CreateConstGEP1_32(i8Ty, destPtr, 0, "n2v_num_ta"));
+        builder->CreateStore(nanVal, numAddr); // raw double bits
+        builder->CreateBr(mgBB);
+        // Tagged
+        builder->SetInsertPoint(tagBB);
+        auto* shifted = builder->CreateLShr(nanVal, llvm::ConstantInt::get(i64Ty, TAG_SHIFT), "n2v_sh");
+        auto* tagBits = builder->CreateAnd(shifted, llvm::ConstantInt::get(i64Ty, 0x7), "n2v_tag");
+        auto* payload = builder->CreateAnd(nanVal, llvm::ConstantInt::get(i64Ty, PAYLOAD_MASK), "n2v_pay");
+        // Build tag→ValueType mapping: 0→0(NIL),1→1(BOOL),2→3(OBJ_STRING),3→4(ARRAY),4→9(INSTANCE),5→6(CALLABLE),6→5(OBJECT)
+        // Using selects for each tag
+        auto* nilCmp = builder->CreateICmpEQ(tagBits, llvm::ConstantInt::get(i64Ty, 0));
+        auto* boolCmp = builder->CreateICmpEQ(tagBits, llvm::ConstantInt::get(i64Ty, 1));
+        auto* strCmp = builder->CreateICmpEQ(tagBits, llvm::ConstantInt::get(i64Ty, 2));
+        auto* arrCmp = builder->CreateICmpEQ(tagBits, llvm::ConstantInt::get(i64Ty, 3));
+        auto* instCmp = builder->CreateICmpEQ(tagBits, llvm::ConstantInt::get(i64Ty, 4));
+        auto* callCmp = builder->CreateICmpEQ(tagBits, llvm::ConstantInt::get(i64Ty, 5));
+        // store type (as i32)
+        auto* vt = builder->CreateSelect(nilCmp, llvm::ConstantInt::get(i32Ty, 0),
+            builder->CreateSelect(boolCmp, llvm::ConstantInt::get(i32Ty, 1),
+            builder->CreateSelect(strCmp, llvm::ConstantInt::get(i32Ty, 3),
+            builder->CreateSelect(arrCmp, llvm::ConstantInt::get(i32Ty, 4),
+            builder->CreateSelect(instCmp, llvm::ConstantInt::get(i32Ty, 9),
+            builder->CreateSelect(callCmp, llvm::ConstantInt::get(i32Ty, 6),
+                                  llvm::ConstantInt::get(i32Ty, 5)))))), "n2v_vt");
+        builder->CreateStore(vt, builder->CreateConstGEP1_32(i8Ty, destPtr, 0, "n2v_ta"));
+        // For bool: store payload & 1; for others: store payload as pointer bits
+        auto* boolPay = builder->CreateAnd(payload, llvm::ConstantInt::get(i64Ty, 1), "n2v_bp");
+        auto* storedVal = builder->CreateSelect(boolCmp, boolPay, payload, "n2v_val");
+        builder->CreateStore(storedVal, builder->CreateConstGEP1_32(i8Ty, destPtr, 8, "n2v_ua"));
+        builder->CreateBr(mgBB);
+        // merge (nothing to do)
+        builder->SetInsertPoint(mgBB);
     }
 
     // --- Global variable tracking ---
@@ -878,6 +985,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
     impl->initTypes();
     impl->declareExternals();
     impl->createConstants();
+    impl->createInternCache();
 
     // Create externally-visible func table (populated at runtime by C wrapper)
     {
@@ -927,15 +1035,32 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
 
             case OpCode::OP_CONSTANT: {
                 uint8_t index = impl->readByte();
-                // For string constants, intern at runtime via helper
                 if (index < impl->chunk->constants.size() &&
                     impl->chunk->constants[index].type == ValueType::OBJ_STRING) {
                     std::string strContent = impl->chunk->constants[index].as.obj_string->chars;
                     auto* strPtr = impl->builder->CreateGlobalStringPtr(strContent, "const_str");
+                    auto* arrTy = llvm::ArrayType::get(impl->i64Ty, impl->chunk->constants.size());
+                    auto* cacheSlot = impl->builder->CreateGEP(arrTy, impl->internCacheGlobal,
+                        {llvm::ConstantInt::get(impl->i32Ty, 0),
+                         llvm::ConstantInt::get(impl->i32Ty, index)}, "cs");
+                    auto* cached = impl->builder->CreateLoad(impl->i64Ty, cacheSlot, "cached_s");
+                    auto* isCached = impl->builder->CreateICmpNE(cached,
+                        llvm::ConstantInt::get(impl->i64Ty, 0), "is_cached");
+                    auto* internBB = llvm::BasicBlock::Create(ctx, "intern_s", impl->func);
+                    auto* doneIBB = llvm::BasicBlock::Create(ctx, "intern_done", impl->func);
+                    auto* curIBB = impl->builder->GetInsertBlock();
+                    impl->builder->CreateCondBr(isCached, doneIBB, internBB);
+                    impl->builder->SetInsertPoint(internBB);
                     auto* interned = impl->builder->CreateCall(impl->aotInternFunc,
                         {impl->vmCtx, strPtr}, "interned");
+                    impl->builder->CreateStore(interned, cacheSlot);
+                    impl->builder->CreateBr(doneIBB);
+                    impl->builder->SetInsertPoint(doneIBB);
+                    auto* sResult = impl->builder->CreatePHI(impl->i64Ty, 2, "s_val");
+                    sResult->addIncoming(cached, curIBB);
+                    sResult->addIncoming(interned, internBB);
                     auto* dest = impl->pushValue();
-                    impl->builder->CreateStore(interned, dest);
+                    impl->builder->CreateStore(sResult, dest);
                 } else {
                     auto* dest = impl->pushValue();
                     auto* src = impl->constantsGEP(llvm::ConstantInt::get(impl->i32Ty, index));
@@ -951,10 +1076,28 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                     impl->chunk->constants[index].type == ValueType::OBJ_STRING) {
                     std::string strContent = impl->chunk->constants[index].as.obj_string->chars;
                     auto* strPtr = impl->builder->CreateGlobalStringPtr(strContent, "const_str");
+                    auto* arrTy = llvm::ArrayType::get(impl->i64Ty, impl->chunk->constants.size());
+                    auto* cacheSlot = impl->builder->CreateGEP(arrTy, impl->internCacheGlobal,
+                        {llvm::ConstantInt::get(impl->i32Ty, 0),
+                         llvm::ConstantInt::get(impl->i32Ty, index)}, "cs_l");
+                    auto* cached = impl->builder->CreateLoad(impl->i64Ty, cacheSlot, "cached_s");
+                    auto* isCached = impl->builder->CreateICmpNE(cached,
+                        llvm::ConstantInt::get(impl->i64Ty, 0), "is_cached");
+                    auto* internBB = llvm::BasicBlock::Create(ctx, "intern_s_l", impl->func);
+                    auto* doneIBB = llvm::BasicBlock::Create(ctx, "intern_done_l", impl->func);
+                    auto* curIBB = impl->builder->GetInsertBlock();
+                    impl->builder->CreateCondBr(isCached, doneIBB, internBB);
+                    impl->builder->SetInsertPoint(internBB);
                     auto* interned = impl->builder->CreateCall(impl->aotInternFunc,
                         {impl->vmCtx, strPtr}, "interned");
+                    impl->builder->CreateStore(interned, cacheSlot);
+                    impl->builder->CreateBr(doneIBB);
+                    impl->builder->SetInsertPoint(doneIBB);
+                    auto* sResult = impl->builder->CreatePHI(impl->i64Ty, 2, "s_val");
+                    sResult->addIncoming(cached, curIBB);
+                    sResult->addIncoming(interned, internBB);
                     auto* dest = impl->pushValue();
-                    impl->builder->CreateStore(interned, dest);
+                    impl->builder->CreateStore(sResult, dest);
                 } else {
                     auto* dest = impl->pushValue();
                     auto* src = impl->constantsGEP(llvm::ConstantInt::get(impl->i32Ty, index));
@@ -1685,13 +1828,45 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* idxFbBB = llvm::BasicBlock::Create(ctx, "idx_fb", impl->func);
                 auto* idxMgBB = llvm::BasicBlock::Create(ctx, "idx_mg", impl->func);
                 impl->builder->CreateCondBr(isArr, idxArrBB, idxFbBB);
-                // Array fast path
+                // Array fast path: inline bounds check + GEP + emitValueToNan
                 impl->builder->SetInsertPoint(idxArrBB);
-                auto* payload = impl->builder->CreateAnd(objVal,
-                    llvm::ConstantInt::get(impl->i64Ty, PAYLOAD_MASK), "arr_pay");
-                auto* arrPtr = impl->builder->CreateIntToPtr(payload, impl->i8PtrTy, "arr_p");
-                auto* arrR = impl->builder->CreateCall(impl->aotArrayGetCachedFunc,
-                    {arrPtr, idxVal}, "arr_r");
+                auto* arrPtr = impl->builder->CreateIntToPtr(
+                    impl->builder->CreateAnd(objVal, llvm::ConstantInt::get(impl->i64Ty, PAYLOAD_MASK)),
+                    impl->i8PtrTy, "arr_p");
+                // Check idxVal is not tagged (numbers are raw doubles)
+                auto* idxNanMask = llvm::ConstantInt::get(impl->i64Ty, NAN_MASK);
+                auto* idxNanBase = llvm::ConstantInt::get(impl->i64Ty, NAN_BASE);
+                auto* idxMasked = impl->builder->CreateAnd(idxVal, idxNanMask, "idx_m");
+                auto* idxRaw = impl->builder->CreateICmpNE(idxMasked, idxNanBase, "idx_raw");
+                auto* idxNumBB = llvm::BasicBlock::Create(ctx, "idx_num", impl->func);
+                auto* idxBadBB = llvm::BasicBlock::Create(ctx, "idx_bad", impl->func);
+                impl->builder->CreateCondBr(idxRaw, idxNumBB, idxBadBB);
+                // Index is a number: bitcast to double, trunc to i64
+                impl->builder->SetInsertPoint(idxNumBB);
+                auto* idxDbl = impl->builder->CreateBitCast(idxVal, impl->doubleTy, "idx_d");
+                auto* idxI64 = impl->builder->CreateFPToSI(idxDbl, impl->i64Ty, "idx_i");
+                // Load vector start/finish from Array* (offset 16/24)
+                auto* vecStart = impl->builder->CreateLoad(impl->i8PtrTy,
+                    impl->builder->CreateConstGEP1_32(impl->i8Ty, arrPtr, 16), "vst");
+                auto* vecFinish = impl->builder->CreateLoad(impl->i8PtrTy,
+                    impl->builder->CreateConstGEP1_32(impl->i8Ty, arrPtr, 24), "vfn");
+                // count = (finish - start) / 16 (sizeof(Value) = 16)
+                auto* byteDiff = impl->builder->CreatePtrDiff(impl->i8Ty, vecFinish, vecStart, "bd");
+                auto* countVal = impl->builder->CreateAShr(byteDiff,
+                    llvm::ConstantInt::get(impl->i64Ty, 4), "cnt");
+                auto* inBounds = impl->builder->CreateICmpULT(idxI64, countVal, "ib");
+                auto* idxHitBB = llvm::BasicBlock::Create(ctx, "idx_hit", impl->func);
+                impl->builder->CreateCondBr(inBounds, idxHitBB, idxBadBB);
+                // In-bounds: GEP + emitValueToNan
+                impl->builder->SetInsertPoint(idxHitBB);
+                auto* elemOff = impl->builder->CreateMul(idxI64,
+                    llvm::ConstantInt::get(impl->i64Ty, 16), "eo");
+                auto* elemPtr = impl->builder->CreateGEP(impl->i8Ty, vecStart, elemOff, "ep");
+                auto* arrHitVal = impl->emitValueToNan(elemPtr);
+                impl->builder->CreateBr(idxMgBB);
+                // Index is tagged or OOB → nil
+                impl->builder->SetInsertPoint(idxBadBB);
+                auto* nilResArr = llvm::ConstantInt::get(impl->i64Ty, NAN_BASE);
                 impl->builder->CreateBr(idxMgBB);
                 // Fallback path
                 impl->builder->SetInsertPoint(idxFbBB);
@@ -1700,8 +1875,9 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 impl->builder->CreateBr(idxMgBB);
                 // Merge
                 impl->builder->SetInsertPoint(idxMgBB);
-                auto* phi = impl->builder->CreatePHI(impl->i64Ty, 2, "idx_r");
-                phi->addIncoming(arrR, idxArrBB);
+                auto* phi = impl->builder->CreatePHI(impl->i64Ty, 3, "idx_r");
+                phi->addIncoming(arrHitVal, idxHitBB);
+                phi->addIncoming(nilResArr, idxBadBB);
                 phi->addIncoming(fbR, idxFbBB);
                 auto* dest = impl->pushValue();
                 impl->builder->CreateStore(phi, dest);
@@ -1731,14 +1907,40 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* setFbBB = llvm::BasicBlock::Create(ctx, "set_fb", impl->func);
                 auto* setMgBB = llvm::BasicBlock::Create(ctx, "set_mg", impl->func);
                 impl->builder->CreateCondBr(isArr, setArrBB, setFbBB);
-                // Array fast path
+                // Array fast path: inline bounds check + GEP + emitNanToValue
                 impl->builder->SetInsertPoint(setArrBB);
-                auto* payload = impl->builder->CreateAnd(objVal,
-                    llvm::ConstantInt::get(impl->i64Ty, PAYLOAD_MASK), "set_pay");
-                auto* arrPtr = impl->builder->CreateIntToPtr(payload, impl->i8PtrTy, "set_p");
-                impl->builder->CreateCall(impl->aotArraySetCachedFunc,
-                    {arrPtr, idxVal, val});
+                auto* arrPtr = impl->builder->CreateIntToPtr(
+                    impl->builder->CreateAnd(objVal, llvm::ConstantInt::get(impl->i64Ty, PAYLOAD_MASK)),
+                    impl->i8PtrTy, "set_arr_p");
+                // Check idxVal not tagged
+                auto* idxNanMask = llvm::ConstantInt::get(impl->i64Ty, NAN_MASK);
+                auto* idxNanBase = llvm::ConstantInt::get(impl->i64Ty, NAN_BASE);
+                auto* idxMasked = impl->builder->CreateAnd(idxVal, idxNanMask, "set_m");
+                auto* idxRaw = impl->builder->CreateICmpNE(idxMasked, idxNanBase, "set_raw");
+                auto* setNumBB = llvm::BasicBlock::Create(ctx, "set_num", impl->func);
+                auto* setSkipBB = llvm::BasicBlock::Create(ctx, "set_skip", impl->func);
+                impl->builder->CreateCondBr(idxRaw, setNumBB, setSkipBB);
+                impl->builder->SetInsertPoint(setNumBB);
+                auto* idxDbl = impl->builder->CreateBitCast(idxVal, impl->doubleTy, "set_d");
+                auto* idxI64 = impl->builder->CreateFPToSI(idxDbl, impl->i64Ty, "set_i");
+                auto* vecStart = impl->builder->CreateLoad(impl->i8PtrTy,
+                    impl->builder->CreateConstGEP1_32(impl->i8Ty, arrPtr, 16), "vst_set");
+                auto* vecFinish = impl->builder->CreateLoad(impl->i8PtrTy,
+                    impl->builder->CreateConstGEP1_32(impl->i8Ty, arrPtr, 24), "vfn_set");
+                auto* byteDiff = impl->builder->CreatePtrDiff(impl->i8Ty, vecFinish, vecStart, "bd_set");
+                auto* countVal = impl->builder->CreateAShr(byteDiff,
+                    llvm::ConstantInt::get(impl->i64Ty, 4), "cnt_set");
+                auto* inBounds = impl->builder->CreateICmpULT(idxI64, countVal, "ib_set");
+                auto* setHitBB = llvm::BasicBlock::Create(ctx, "set_hit", impl->func);
+                impl->builder->CreateCondBr(inBounds, setHitBB, setSkipBB);
+                impl->builder->SetInsertPoint(setHitBB);
+                auto* elemOff = impl->builder->CreateMul(idxI64,
+                    llvm::ConstantInt::get(impl->i64Ty, 16), "eo_set");
+                auto* elemPtr = impl->builder->CreateGEP(impl->i8Ty, vecStart, elemOff, "ep_set");
+                impl->emitNanToValue(val, elemPtr);
                 impl->builder->CreateBr(setMgBB);
+                // Tagged or OOB: skip store
+                impl->builder->SetInsertPoint(setSkipBB);
                 // Fallback path
                 impl->builder->SetInsertPoint(setFbBB);
                 impl->builder->CreateCall(impl->aotIndexSetFunc,
@@ -1782,11 +1984,25 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* payload = impl->builder->CreateAnd(objVal,
                     llvm::ConstantInt::get(impl->i64Ty, PAYLOAD_MASK), "gp_pay");
                 auto* instPtr = impl->builder->CreateIntToPtr(payload, impl->i8PtrTy, "gp_i");
-                auto* tryR = impl->builder->CreateCall(impl->aotTryGetCachedPropFunc,
-                    {instPtr, cachePtr}, "gp_try_r");
-                auto* sentinel = llvm::ConstantInt::get(impl->i64Ty, AOT_SENTINEL);
-                auto* isMiss = impl->builder->CreateICmpEQ(tryR, sentinel, "gp_miss");
-                impl->builder->CreateCondBr(isMiss, gpFbBB, gpMgBB);
+                // Inline cache hit check: if cache->klass == inst->klass
+                auto* cacheKlass = impl->builder->CreateLoad(impl->i8PtrTy,
+                    impl->builder->CreateConstGEP1_32(impl->i8Ty, cachePtr, 0), "cklass");
+                auto* instKlass = impl->builder->CreateLoad(impl->i8PtrTy,
+                    impl->builder->CreateConstGEP1_32(impl->i8Ty, instPtr, 16), "iklass");
+                auto* klassMatch = impl->builder->CreateICmpEQ(cacheKlass, instKlass, "kl_match");
+                auto* gpHitBB = llvm::BasicBlock::Create(ctx, "gp_hit", impl->func);
+                impl->builder->CreateCondBr(klassMatch, gpHitBB, gpFbBB);
+                // Cache hit: GEP into inlineFields[cache->inlineIndex].value → emitValueToNan
+                impl->builder->SetInsertPoint(gpHitBB);
+                auto* inlineIdx = impl->builder->CreateLoad(impl->i8Ty,
+                    impl->builder->CreateConstGEP1_32(impl->i8Ty, cachePtr, 8), "fidx");
+                auto* idxExt = impl->builder->CreateZExt(inlineIdx, impl->i32Ty, "fidx_ext");
+                auto* fieldBase = impl->builder->CreateAdd(llvm::ConstantInt::get(impl->i32Ty, 24),
+                    impl->builder->CreateMul(idxExt, llvm::ConstantInt::get(impl->i32Ty, 24)), "fb");
+                auto* valStructPtr = impl->builder->CreateConstGEP1_32(impl->i8Ty,
+                    impl->builder->CreateGEP(impl->i8Ty, instPtr, fieldBase), 8, "fval");
+                auto* hitR = impl->emitValueToNan(valStructPtr);
+                impl->builder->CreateBr(gpMgBB);
                 // Fallback path (cache miss or non-Instance)
                 impl->builder->SetInsertPoint(gpFbBB);
                 auto* fbR = impl->builder->CreateCall(impl->aotGetPropCachedFunc,
@@ -1795,7 +2011,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 // Merge
                 impl->builder->SetInsertPoint(gpMgBB);
                 auto* gpPhi = impl->builder->CreatePHI(impl->i64Ty, 2, "gp_r");
-                gpPhi->addIncoming(tryR, gpTryBB);
+                gpPhi->addIncoming(hitR, gpHitBB);
                 gpPhi->addIncoming(fbR, gpFbBB);
                 auto* dest = impl->pushValue();
                 impl->builder->CreateStore(gpPhi, dest);
@@ -1830,16 +2046,29 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* spFbBB = llvm::BasicBlock::Create(ctx, "sp_fb", impl->func);
                 auto* spMgBB = llvm::BasicBlock::Create(ctx, "sp_mg", impl->func);
                 impl->builder->CreateCondBr(isInst, spTryBB, spFbBB);
-                // Try cache fast path
+                // Try cache fast path: inline klass check + GEP store
                 impl->builder->SetInsertPoint(spTryBB);
                 auto* payload = impl->builder->CreateAnd(objVal,
                     llvm::ConstantInt::get(impl->i64Ty, PAYLOAD_MASK), "sp_pay");
                 auto* instPtr = impl->builder->CreateIntToPtr(payload, impl->i8PtrTy, "sp_i");
-                auto* tryHit = impl->builder->CreateCall(impl->aotTrySetCachedPropFunc,
-                    {instPtr, cachePtr, val}, "sp_try");
-                auto* isZero = impl->builder->CreateICmpEQ(tryHit,
-                    llvm::ConstantInt::get(impl->i8Ty, 0), "sp_miss");
-                impl->builder->CreateCondBr(isZero, spFbBB, spMgBB);
+                auto* cacheKlass = impl->builder->CreateLoad(impl->i8PtrTy,
+                    impl->builder->CreateConstGEP1_32(impl->i8Ty, cachePtr, 0), "cklass_sp");
+                auto* instKlass = impl->builder->CreateLoad(impl->i8PtrTy,
+                    impl->builder->CreateConstGEP1_32(impl->i8Ty, instPtr, 16), "iklass_sp");
+                auto* klassMatch = impl->builder->CreateICmpEQ(cacheKlass, instKlass, "kl_match_sp");
+                auto* spHitBB = llvm::BasicBlock::Create(ctx, "sp_hit", impl->func);
+                impl->builder->CreateCondBr(klassMatch, spHitBB, spFbBB);
+                // Cache hit: GEP into inlineFields[idx].value, convert val to Value struct
+                impl->builder->SetInsertPoint(spHitBB);
+                auto* inlineIdx = impl->builder->CreateLoad(impl->i8Ty,
+                    impl->builder->CreateConstGEP1_32(impl->i8Ty, cachePtr, 8), "fidx_sp");
+                auto* idxExt = impl->builder->CreateZExt(inlineIdx, impl->i32Ty, "fidx_ext_sp");
+                auto* fieldBase = impl->builder->CreateAdd(llvm::ConstantInt::get(impl->i32Ty, 24),
+                    impl->builder->CreateMul(idxExt, llvm::ConstantInt::get(impl->i32Ty, 24)), "fb_sp");
+                auto* valStructPtr = impl->builder->CreateConstGEP1_32(impl->i8Ty,
+                    impl->builder->CreateGEP(impl->i8Ty, instPtr, fieldBase), 8, "fval_sp");
+                impl->emitNanToValue(val, valStructPtr);
+                impl->builder->CreateBr(spMgBB);
                 // Cache miss or non-Instance → call full helper
                 impl->builder->SetInsertPoint(spFbBB);
                 impl->builder->CreateCall(impl->aotSetPropCachedFunc,
@@ -1924,15 +2153,64 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* keysPtr = impl->stackGEP(llvm::ConstantInt::get(impl->i32Ty, baseSlot + 2));
                 auto* idxVal = impl->builder->CreateLoad(impl->i64Ty, idxPtr, "for_idx");
                 auto* keysVal = impl->builder->CreateLoad(impl->i64Ty, keysPtr, "for_keys");
-                // Call aot_forInNext(vm, keys, index) → returns next key or nil
-                auto* nextKey = impl->builder->CreateCall(impl->aotForInNextFunc,
-                    {impl->vmCtx, keysVal, idxVal}, "next_key");
+                // Inline aot_forInNext: check keys is Array, bounds check, GEP + emitValueToNan
+                auto* fnNanMask = llvm::ConstantInt::get(impl->i64Ty, NAN_MASK);
+                auto* fnNanBase = llvm::ConstantInt::get(impl->i64Ty, NAN_BASE);
+                auto* fnMasked = impl->builder->CreateAnd(keysVal, fnNanMask, "fn_m");
+                auto* fnTagged = impl->builder->CreateICmpEQ(fnMasked, fnNanBase, "fn_tgd");
+                auto* fnShifted = impl->builder->CreateLShr(keysVal,
+                    llvm::ConstantInt::get(impl->i64Ty, TAG_SHIFT), "fn_sh");
+                auto* fnTagBits = impl->builder->CreateAnd(fnShifted,
+                    llvm::ConstantInt::get(impl->i64Ty, 0x7), "fn_tag");
+                auto* fnIsArr = impl->builder->CreateAnd(fnTagged,
+                    impl->builder->CreateICmpEQ(fnTagBits, llvm::ConstantInt::get(impl->i64Ty, 4)), "fn_arr");
+                auto* fnArrBB = llvm::BasicBlock::Create(ctx, "fn_arr", impl->func);
+                auto* fnDoneBB = llvm::BasicBlock::Create(ctx, "fn_done", impl->func);
+                auto* fnNilBB = llvm::BasicBlock::Create(ctx, "fn_nil", impl->func);
+                impl->builder->CreateCondBr(fnIsArr, fnArrBB, fnNilBB);
+                // Array path: check index is number, bounds, GEP
+                impl->builder->SetInsertPoint(fnArrBB);
+                auto* fnIdxRaw = impl->builder->CreateICmpNE(
+                    impl->builder->CreateAnd(idxVal, fnNanMask), fnNanBase, "fn_idx_raw");
+                auto* fnIdxBB = llvm::BasicBlock::Create(ctx, "fn_idx", impl->func);
+                impl->builder->CreateCondBr(fnIdxRaw, fnIdxBB, fnNilBB);
+                impl->builder->SetInsertPoint(fnIdxBB);
+                auto* fnIdxDbl = impl->builder->CreateBitCast(idxVal, impl->doubleTy, "fn_d");
+                auto* fnIdxI64 = impl->builder->CreateFPToSI(fnIdxDbl, impl->i64Ty, "fn_i");
+                auto* fnPay = impl->builder->CreateAnd(keysVal,
+                    llvm::ConstantInt::get(impl->i64Ty, PAYLOAD_MASK), "fn_pay");
+                auto* fnArrPtr = impl->builder->CreateIntToPtr(fnPay, impl->i8PtrTy, "fn_a");
+                auto* fnVStart = impl->builder->CreateLoad(impl->i8PtrTy,
+                    impl->builder->CreateConstGEP1_32(impl->i8Ty, fnArrPtr, 16), "fn_vs");
+                auto* fnVFinish = impl->builder->CreateLoad(impl->i8PtrTy,
+                    impl->builder->CreateConstGEP1_32(impl->i8Ty, fnArrPtr, 24), "fn_vf");
+                auto* fnBDiff = impl->builder->CreatePtrDiff(impl->i8Ty, fnVFinish, fnVStart, "fn_bd");
+                auto* fnCnt = impl->builder->CreateAShr(fnBDiff,
+                    llvm::ConstantInt::get(impl->i64Ty, 4), "fn_cnt");
+                auto* fnIB = impl->builder->CreateICmpULT(fnIdxI64, fnCnt, "fn_ib");
+                auto* fnHitBB = llvm::BasicBlock::Create(ctx, "fn_hit", impl->func);
+                impl->builder->CreateCondBr(fnIB, fnHitBB, fnNilBB);
+                impl->builder->SetInsertPoint(fnHitBB);
+                auto* fnEOff = impl->builder->CreateMul(fnIdxI64,
+                    llvm::ConstantInt::get(impl->i64Ty, 16), "fn_eo");
+                auto* fnEPtr = impl->builder->CreateGEP(impl->i8Ty, fnVStart, fnEOff, "fn_ep");
+                auto* nextKey = impl->emitValueToNan(fnEPtr);
+                impl->builder->CreateBr(fnDoneBB);
+                // Nil path (non-array, non-number, or OOB)
+                impl->builder->SetInsertPoint(fnNilBB);
+                auto* fnNil = llvm::ConstantInt::get(impl->i64Ty, NAN_BASE);
+                impl->builder->CreateBr(fnDoneBB);
+                // Merge
+                impl->builder->SetInsertPoint(fnDoneBB);
+                auto* fnResult = impl->builder->CreatePHI(impl->i64Ty, 2, "fn_r");
+                fnResult->addIncoming(nextKey, fnHitBB);
+                fnResult->addIncoming(fnNil, fnNilBB);
                 // Check if nil (done)
-                auto* masked = impl->builder->CreateAnd(nextKey,
+                auto* masked = impl->builder->CreateAnd(fnResult,
                     llvm::ConstantInt::get(impl->i64Ty, NAN_MASK));
                 auto* isTagged = impl->builder->CreateICmpEQ(masked,
                     llvm::ConstantInt::get(impl->i64Ty, NAN_BASE), "is_tagged_fi");
-                auto* shifted = impl->builder->CreateLShr(nextKey,
+                auto* shifted = impl->builder->CreateLShr(fnResult,
                     llvm::ConstantInt::get(impl->i64Ty, TAG_SHIFT));
                 auto* tagBits = impl->builder->CreateAnd(shifted,
                     llvm::ConstantInt::get(impl->i64Ty, 0x7));
@@ -1946,7 +2224,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 // Loop body: assign key to varSlot, increment index
                 impl->builder->SetInsertPoint(loopBodyBB);
                 auto* varPtr = impl->stackGEP(llvm::ConstantInt::get(impl->i32Ty, varSlot));
-                impl->builder->CreateStore(nextKey, varPtr);
+                impl->builder->CreateStore(fnResult, varPtr);
                 // Increment index: index = index + 1.0 (NaN-boxed)
                 auto* oneConst = impl->constValue(TAG_NUMBER, 1.0);
                 // If index is a tagged NaN, we need to use fadd on the raw double
@@ -2008,12 +2286,71 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             case OpCode::OP_SPREAD: {
                 auto* valPtr = impl->popValue();
                 auto* val = impl->builder->CreateLoad(impl->i64Ty, valPtr, "spread_val");
-                // Allocate buffer on stack for up to 256 elements
+                // Inline aot_spread: if Array, copy elements to buffer; else copy single value
                 auto* bufTy = llvm::ArrayType::get(impl->i64Ty, 256);
                 auto* bufAlloca = impl->builder->CreateAlloca(bufTy, nullptr, "spread_buf");
-                auto* bufPtr = impl->builder->CreatePointerCast(bufAlloca, impl->i8PtrTy, "spread_buf_ptr");
-                auto* count = impl->builder->CreateCall(impl->aotSpreadFunc,
-                    {impl->vmCtx, val, bufPtr, llvm::ConstantInt::get(impl->i8Ty, 256)}, "spread_cnt");
+                auto* spNanMask = llvm::ConstantInt::get(impl->i64Ty, NAN_MASK);
+                auto* spNanBase = llvm::ConstantInt::get(impl->i64Ty, NAN_BASE);
+                auto* spMasked = impl->builder->CreateAnd(val, spNanMask, "sp_m");
+                auto* spTagged = impl->builder->CreateICmpEQ(spMasked, spNanBase, "sp_tg");
+                auto* spShifted = impl->builder->CreateLShr(val,
+                    llvm::ConstantInt::get(impl->i64Ty, TAG_SHIFT), "sp_sh");
+                auto* spTagBits = impl->builder->CreateAnd(spShifted,
+                    llvm::ConstantInt::get(impl->i64Ty, 0x7), "sp_tb");
+                auto* spIsArr = impl->builder->CreateAnd(spTagged,
+                    impl->builder->CreateICmpEQ(spTagBits, llvm::ConstantInt::get(impl->i64Ty, 4)), "sp_arr");
+                auto* spArrBB = llvm::BasicBlock::Create(ctx, "sp_arr", impl->func);
+                auto* spNonArrBB = llvm::BasicBlock::Create(ctx, "sp_non_arr", impl->func);
+                auto* spCountBB = llvm::BasicBlock::Create(ctx, "sp_cnt", impl->func);
+                impl->builder->CreateCondBr(spIsArr, spArrBB, spNonArrBB);
+                // Non-array: buf[0] = val, count = 1
+                impl->builder->SetInsertPoint(spNonArrBB);
+                auto* spNonGep = impl->builder->CreateGEP(bufTy, bufAlloca,
+                    {llvm::ConstantInt::get(impl->i32Ty, 0), llvm::ConstantInt::get(impl->i32Ty, 0)});
+                impl->builder->CreateStore(val, spNonGep);
+                impl->builder->CreateBr(spCountBB);
+                // Array: iterate elements with count = min(size, 256)
+                impl->builder->SetInsertPoint(spArrBB);
+                auto* spPayload = impl->builder->CreateAnd(val,
+                    llvm::ConstantInt::get(impl->i64Ty, PAYLOAD_MASK), "sp_pay");
+                auto* spArrPtr = impl->builder->CreateIntToPtr(spPayload, impl->i8PtrTy, "sp_a");
+                auto* spVStart = impl->builder->CreateLoad(impl->i8PtrTy,
+                    impl->builder->CreateConstGEP1_32(impl->i8Ty, spArrPtr, 16), "sp_vs");
+                auto* spVFinish = impl->builder->CreateLoad(impl->i8PtrTy,
+                    impl->builder->CreateConstGEP1_32(impl->i8Ty, spArrPtr, 24), "sp_vf");
+                auto* spBDiff = impl->builder->CreatePtrDiff(impl->i8Ty, spVFinish, spVStart, "sp_bd");
+                auto* spSize = impl->builder->CreateAShr(spBDiff,
+                    llvm::ConstantInt::get(impl->i64Ty, 4), "sp_sz");
+                auto* spMaxC = llvm::ConstantInt::get(impl->i64Ty, 256);
+                auto* spCmpL = impl->builder->CreateICmpULT(spSize, spMaxC, "sp_cmp");
+                auto* spArrCnt = impl->builder->CreateSelect(spCmpL, spSize, spMaxC, "sp_acnt");
+                auto* spLoopCheckBB = llvm::BasicBlock::Create(ctx, "sp_lchk", impl->func);
+                auto* spLoopBodyBB = llvm::BasicBlock::Create(ctx, "sp_lbody", impl->func);
+                auto* spLoopIdx = impl->builder->CreateAlloca(impl->i64Ty, nullptr, "sp_li");
+                impl->builder->CreateStore(llvm::ConstantInt::get(impl->i64Ty, 0), spLoopIdx);
+                impl->builder->CreateBr(spLoopCheckBB);
+                impl->builder->SetInsertPoint(spLoopCheckBB);
+                auto* spCurIx = impl->builder->CreateLoad(impl->i64Ty, spLoopIdx, "sp_cx");
+                auto* spCont = impl->builder->CreateICmpULT(spCurIx, spArrCnt, "sp_cont");
+                impl->builder->CreateCondBr(spCont, spLoopBodyBB, spCountBB);
+                impl->builder->SetInsertPoint(spLoopBodyBB);
+                auto* spBufGep = impl->builder->CreateGEP(bufTy, bufAlloca,
+                    {llvm::ConstantInt::get(impl->i32Ty, 0),
+                     impl->builder->CreateTrunc(spCurIx, impl->i32Ty, "sp_cx32")});
+                auto* spSrcPtr = impl->builder->CreateGEP(impl->i8Ty, spVStart,
+                    impl->builder->CreateMul(spCurIx,
+                        llvm::ConstantInt::get(impl->i64Ty, 16), "sp_off"), "sp_sp");
+                auto* spElem = impl->emitValueToNan(spSrcPtr);
+                impl->builder->CreateStore(spElem, spBufGep);
+                auto* spNextI = impl->builder->CreateAdd(spCurIx,
+                    llvm::ConstantInt::get(impl->i64Ty, 1), "sp_nx");
+                impl->builder->CreateStore(spNextI, spLoopIdx);
+                impl->builder->CreateBr(spLoopCheckBB);
+                // Merge counts
+                impl->builder->SetInsertPoint(spCountBB);
+                auto* spCntPHI = impl->builder->CreatePHI(impl->i8Ty, 2, "sp_cnt");
+                spCntPHI->addIncoming(llvm::ConstantInt::get(impl->i8Ty, 1), spNonArrBB);
+                spCntPHI->addIncoming(impl->builder->CreateTrunc(spArrCnt, impl->i8Ty, "sp_ac8"), spLoopCheckBB);
                 // Push each element from buffer onto stack
                 auto* spreadDoneBB = llvm::BasicBlock::Create(ctx, "spread_done", impl->func);
                 auto* spreadCheckBB = llvm::BasicBlock::Create(ctx, "spread_check", impl->func);
@@ -2023,7 +2360,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 impl->builder->CreateBr(spreadCheckBB);
                 impl->builder->SetInsertPoint(spreadCheckBB);
                 auto* curI = impl->builder->CreateLoad(impl->i8Ty, spreadIdx, "sp_i");
-                auto* done = impl->builder->CreateICmpULT(curI, count, "sp_done");
+                auto* done = impl->builder->CreateICmpULT(curI, spCntPHI, "sp_done");
                 impl->builder->CreateCondBr(done, spreadBodyBB, spreadDoneBB);
                 impl->builder->SetInsertPoint(spreadBodyBB);
                 auto* elemGep = impl->builder->CreateGEP(bufTy, bufAlloca,
@@ -2345,6 +2682,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                     auto* savedFunc = impl->func;
                     auto* savedChunk = impl->chunk;
                     auto* savedConstants = impl->constantsGlobal;
+                    auto* savedInternCache = impl->internCacheGlobal;
                     bool savedIsMain = impl->isMainFunc;
 
                     auto* subFnTy = llvm::FunctionType::get(impl->i64Ty, {
@@ -2363,6 +2701,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                     impl->chunk = fn->chunk;
                     impl->constantsGlobal = impl->createConstantsForChunk(fn->chunk,
                         "constants_" + std::to_string(funcIdx));
+                    impl->createInternCache();
                     impl->isMainFunc = false;
 
                     auto* subEntry = llvm::BasicBlock::Create(ctx, "entry", subLLVMFn);
@@ -2381,6 +2720,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                     impl->func = savedFunc;
                     impl->chunk = savedChunk;
                     impl->constantsGlobal = savedConstants;
+                    impl->internCacheGlobal = savedInternCache;
                     impl->isMainFunc = savedIsMain;
                 }
             }
