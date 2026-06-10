@@ -393,6 +393,10 @@ bool ProjectBuilder::buildProjectExecutable(
                     } else {
                         std::cout << "      LLVM object file: " << llvmObjectPath << std::endl;
                         srcFile << "#include \"aot/aot_runtime.h\"\n";
+                        srcFile << "#include \"core/vm.h\"\n";
+                        srcFile << "#include \"compiler/scanner.h\"\n";
+                        srcFile << "#include \"compiler/parser.h\"\n";
+                        srcFile << "#include \"compiler/compiler.h\"\n";
                         srcFile << "extern \"C\" int neutron_main(void* vm_ctx);\n";
                         srcFile << "extern \"C\" uint64_t neutron_func_table[256];\n";
                         srcFile << "const char* embedded_source = R\"neutron_source(\n";
@@ -1027,6 +1031,7 @@ bool ProjectBuilder::buildProjectExecutable(
         // Add LLVM-generated object file for linking
         compileCommand += "\"" + llvmObjectPath + "\" ";
         // Link runtime library for helper functions (aot_getProperty, etc.)
+        compileCommand += " " + linkFlags + " ";
         if (!runtimeLibPath.empty()) {
             bool isShared = (runtimeLibPath.find(".so") != std::string::npos || 
                             runtimeLibPath.find(".dylib") != std::string::npos ||

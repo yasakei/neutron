@@ -1,7 +1,6 @@
 #include "aot/aot_runtime.h"
 #include "core/vm.h"
 #include "compiler/compiler.h"
-#include "token.h"
 #include "types/json_object.h"
 #include "types/array.h"
 #include "types/instance.h"
@@ -714,37 +713,27 @@ void aot_validateSafeFileVariable(void* vm_ctx, const char* varName) {
 }
 
 // --- Typed set helpers ---
+// Type annotation byte values matching TokenType enum (token.h):
+// TYPE_INT=77, TYPE_FLOAT=78, TYPE_STRING=79, TYPE_BOOL=80,
+// TYPE_ARRAY=81, TYPE_OBJECT=82, TYPE_ANY=83.
+// Using integer constants instead of TokenType for MSVC portability.
+
+static bool aot_validateType(uint8_t expectedType, Value value) {
+    switch (expectedType) {
+        case 77: case 78: return value.type == ValueType::NUMBER;     // TYPE_INT, TYPE_FLOAT
+        case 79: return value.type == ValueType::OBJ_STRING;          // TYPE_STRING
+        case 80: return value.type == ValueType::BOOLEAN;             // TYPE_BOOL
+        case 81: return value.type == ValueType::ARRAY;               // TYPE_ARRAY
+        case 82: return value.type == ValueType::OBJECT;              // TYPE_OBJECT
+        case 83: return true;                                         // TYPE_ANY
+        default: return true;
+    }
+}
 
 void aot_setLocalTyped(void* vm_ctx, uint64_t val, uint64_t slotVal, uint8_t expectedType) {
     (void)slotVal;
     Value value = nanToValue(val);
-    TokenType tt = static_cast<TokenType>(expectedType);
-    bool isValid = false;
-    switch (tt) {
-        case TokenType::TYPE_INT:
-        case TokenType::TYPE_FLOAT:
-            isValid = value.type == ValueType::NUMBER;
-            break;
-        case TokenType::TYPE_STRING:
-            isValid = value.type == ValueType::OBJ_STRING;
-            break;
-        case TokenType::TYPE_BOOL:
-            isValid = value.type == ValueType::BOOLEAN;
-            break;
-        case TokenType::TYPE_ARRAY:
-            isValid = value.type == ValueType::ARRAY;
-            break;
-        case TokenType::TYPE_OBJECT:
-            isValid = value.type == ValueType::OBJECT;
-            break;
-        case TokenType::TYPE_ANY:
-            isValid = true;
-            break;
-        default:
-            isValid = true;
-            break;
-    }
-    if (!isValid) {
+    if (!aot_validateType(expectedType, value)) {
         std::string actualName = value.type == ValueType::NIL ? "nil" :
                                   value.type == ValueType::BOOLEAN ? "boolean" :
                                   value.type == ValueType::NUMBER ? "number" :
@@ -762,34 +751,8 @@ void aot_setGlobalTyped(void* vm_ctx, const char* name, uint64_t val) {
     std::string varName(name);
     auto typeIt = vm->globalTypes.find(varName);
     if (typeIt != vm->globalTypes.end()) {
-        TokenType expectedType = typeIt->second;
         Value value = nanToValue(val);
-        bool isValid = false;
-        switch (expectedType) {
-            case TokenType::TYPE_INT:
-            case TokenType::TYPE_FLOAT:
-                isValid = value.type == ValueType::NUMBER;
-                break;
-            case TokenType::TYPE_STRING:
-                isValid = value.type == ValueType::OBJ_STRING;
-                break;
-            case TokenType::TYPE_BOOL:
-                isValid = value.type == ValueType::BOOLEAN;
-                break;
-            case TokenType::TYPE_ARRAY:
-                isValid = value.type == ValueType::ARRAY;
-                break;
-            case TokenType::TYPE_OBJECT:
-                isValid = value.type == ValueType::OBJECT;
-                break;
-            case TokenType::TYPE_ANY:
-                isValid = true;
-                break;
-            default:
-                isValid = true;
-                break;
-        }
-        if (!isValid) {
+        if (!aot_validateType(static_cast<uint8_t>(typeIt->second), value)) {
             std::string actualName = value.type == ValueType::NIL ? "nil" :
                                       value.type == ValueType::BOOLEAN ? "boolean" :
                                       value.type == ValueType::NUMBER ? "number" :
@@ -808,7 +771,7 @@ void aot_defineTypedGlobal(void* vm_ctx, const char* name, uint64_t val, uint8_t
     VM* vm = static_cast<VM*>(vm_ctx);
     std::string varName(name);
     vm->globals[varName] = nanToValue(val);
-    vm->globalTypes[varName] = static_cast<TokenType>(typeByte);
+    vm->globalTypes[varName] = static_cast<decltype(vm->globalTypes)::mapped_type>(typeByte);
 }
 
 } // extern "C"
