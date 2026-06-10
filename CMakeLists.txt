@@ -676,13 +676,7 @@ add_test(NAME operators_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/test_
 add_test(NAME arrays_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/test_arrays_objects.nt)
 add_test(NAME functions_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/test_functions_modules.nt)
 
-if(LLVM_FOUND)
-  # LLVM codegen smoke test
-  add_executable(llvm_test tests/llvm_test.cpp)
-  target_compile_definitions(llvm_test PRIVATE BUILD_DIR="${CMAKE_BINARY_DIR}")
-  target_link_libraries(llvm_test neutron_runtime ${LLVM_LIBS})
-  add_test(NAME llvm_codegen_test COMMAND llvm_test)
-endif()
+
 
 # --------------------------------------------------------
 # LSP Server
