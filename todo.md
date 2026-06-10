@@ -5,7 +5,7 @@ Replace C++ string codegen (`src/aot/aot_compiler.cpp`) with direct LLVM IR emis
 
 ---
 
-> **Status**: Phases 0–5 complete ✅. Core stack/control-flow/function ops working. All 128 interpreter + 10 AOT tests pass. Remaining correctness items and Phase 6 (static module linking) below.
+> **Status**: Phases 0–5 complete ✅. All 24 AOT stub opcodes replaced with LLVM IR + C++ runtime helpers. All 128 interpreter + 10 AOT tests pass. Not yet "pure LLVM" — nearly every non-trivial operation calls a C++ helper; `aot_call` dispatches through interpreter bytecode loop; 8 modules force interpreter fallback. See "Remaining Work" below.
 
 ---
 
@@ -21,48 +21,77 @@ All foundational work is done:
 
 ---
 
-## Remaining AOT Fixes (correctness)
+## Remaining Work: "Pure LLVM" (no C++ runtime helpers)
 
-### `OP_ADD` with string operands
-- Currently emits `fadd` on NaN-boxed i64 values, producing garbage when one operand is a string.
-- **Fix**: Add `aot_add` runtime helper that checks tag bits → calls `Value::operator+` for string concatenation, else `fadd` for numbers.
-- Test: `"hello " + "world"`, `"result=" + 42`, etc. in AOT `.aot.nt` tests.
+### Summary
 
-### String constants in `@constants` array
-- `createConstants()` stores nil for strings (heap pointers invalid at compile time).
-- OP_CONSTANT for string literals pushes nil — currently `aot_internString` is only used for `say()` arguments.
-- **Fix**: Either (a) add `aot_getConstant` runtime helper for string constants, or (b) emit `aot_internString` calls for all string-typed OP_CONSTANT loads.
+The current AOT backend generates LLVM IR for the bytecode opcodes of the *entry function*, but nearly every non-trivial operation calls a C++ runtime helper via `extern "C"`. It is **not** pure LLVM — it's a hybrid where LLVM handles register allocation, control flow, and simple arithmetic, while everything else bounces through the C++ runtime.
 
-### `OP_TRY` / `OP_THROW` / `OP_END_TRY`
-- Currently exits via `fprintf`+`exit(1)` on throw.
-- **Fix**: Add `setjmp`/`longjmp`-based unwinding in AOT runtime, or proper LLVM `landingpad` EH. `OP_TRY` pushes a jmp_buf, `OP_THROW` longjmps back to the nearest catch point.
+### 1. Inline runtime helpers into LLVM IR
 
-### `OP_FOR_IN` edge cases
-- Runtime helpers work for basic cases but may leak iteration objects on early exit.
-- **Fix**: Ensure cleanup always runs (close iterable/keys on break/throw).
+Every operation below still calls a C++ function instead of generating native LLVM IR:
 
-### Validation opcodes (`OP_VALIDATE_SAFE_*`, `OP_TYPE_GUARD`, typed set ops)
-- Currently prints error + `exit(1)` on type mismatch.
-- **Fix**: Should throw a proper VM error (via `setjmp`/`longjmp` or by setting VM error state).
+| Helper | What it does | Why it matters |
+|--------|-------------|----------------|
+| ~~`aot_add`~~ | String concat or numeric `fadd` | ✅ **Done**: OP_ADD checks tag bits in LLVM IR — both numbers → direct `fadd`; otherwise → helper call |
+| `aot_getProperty` / `aot_setProperty` | Hash lookup on ObjString key | Inline hash + table probe |
+| `aot_getPropertyCached` / `aot_setPropertyCached` | Inline cache fast path | Emit `GEP` + klass check in IR (avoid call overhead) |
+| `aot_indexGet` / `aot_indexSet` | Array/ObjString index | Inline bounds check + element load |
+| `aot_createArray` / `aot_createObject` | Heap allocation | Inline `malloc` + init loop (or call GC helper) |
+| `aot_internString` | String interning | Inline `strlen` + hash + table insert |
+| `aot_forInInit` / `aot_forInNext` | Iterator protocol | Inline keys() call + index advance |
+| `aot_spread` | Spread operator | Inline array copy loop |
+| `aot_printValue` | Value printing | Inline type-dispatch on tag |
+| `aot_throwError` / `aot_runtimeError` | Error reporting | Inline `setjmp`/`longjmp` or `landingpad` |
 
-### Property inline caching — full LLVM IR inlining
-- Fast path still calls `aot_getPropertyCached` runtime helper (function call overhead).
-- **Fix**: Emit cached-path field access directly in LLVM IR (GEP + klass check + inline load).
+### 2. Replace `aot_call` with direct native calls
 
-### Miscellaneous
-- `OP_THIS` currently loads from merged stack+locals slot 0 — verify edge cases with nested closures.
-- `OP_BREAK`/`OP_CONTINUE`/`OP_LOGICAL_AND`/`OP_LOGICAL_OR` — compiler inlines these into `OP_JUMP`/`OP_LOOP`, but safety-net handlers should be verified.
-- `OP_ADD_LOCAL_CONST` uses `fadd` — int-specialized variant needed for consistency.
+- `aot_call` dispatches through **interpreter bytecode loop** (`vm->call(callee, args)`) — the AOT entry function calls back into the interpreter for every sub-function call.
+- **Fix**: Emit LLVM IR that directly calls the callee's compiled entry point. Requires:
+  - Compiling all user-defined functions to LLVM IR (not just the entry point)
+  - Building a function table mapping function index → `void(*)()` at JIT time
+  - Marshalling args in LLVM IR instead of stack buffer + `aot_call`
+  - Handling tail calls via `musttail`
+
+### 3. Remove `nonAotModules` set
+
+8 modules still force 100% interpreter fallback:
+
+| Module | Reason |
+|--------|--------|
+| `http` | Uses libcurl; needs bitcode compilation |
+| `json` | Uses jsoncpp; needs bitcode compilation |
+| `sys` | OS calls (file I/O, env, etc.) |
+| `time` | System clock calls |
+| `crypto` | OpenSSL/libcrypto |
+| `process` | Subprocess + signals |
+| `arrays` | Complex array manipulation |
+| `async` | Async/await state machine |
+| `regex` | PCRE2/libre |
+
+**Fix**: Phase 6 — compile each C++ module to LLVM bitcode (`.bc`), emit direct `extern "C"` calls in the LLVM IR, and LTO-link everything together.
+
+### 4. Exception handling via LLVM `landingpad`
+
+- `aot_tryPush` / `aot_tryPop` currently save/restore a `jmp_buf` on a VM-side frame stack.
+- `aot_throwError` calls `longjmp`, unwinding through C frames (losing LLVM `opt` visibility).
+- **Fix**: Use LLVM `landingpad` + `resume` instructions for native-quality EH, enabling cleanup landing pads and proper stack unwinding.
+
+### 5. Property inline caching — full IR inlining
+
+- `aot_getPropertyCached` still has function call overhead even on cache hit.
+- Cache is a module-level global `{klass*, inlineIndex}` → fast path is `load klass → icmp → gep inlineIndex → gep instance slots → load`.
+- **Fix**: Emit this sequence as inline IR in each callsite; only call the miss handler helper on cache miss.
 
 ---
 
-## Phase 6: Static Module Linking for AOT
+## Phase 6: Static Module Linking for AOT [⏳ NOT STARTED]
 
 ### 6.1 — Module interface audit [✅ DONE]
 - Listed all 16 built-in modules, their source files, and every exported function signature (~210 total).
 - Identified 4 modules with AOT stubs (`math` 11, `random` 3, `fmt` 2, `path` 3) and 12 without.
 - All modules use `Value(VM& vm, std::vector<Value> args)` calling convention.
-- Full audit saved in `docs/aot_module_audit.md`.
+- Full audit saved in `AOT_MODULE_AUDIT.md`.
 
 ### 6.2 — Compile C++ modules to LLVM bitcode
 - Add CMake option to build each module `.cpp` as a bitcode file (`.bc`):

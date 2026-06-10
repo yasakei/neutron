@@ -958,9 +958,41 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* dest = impl->pushValue();
                 auto* aVal = impl->builder->CreateLoad(impl->i64Ty, a, "add_a");
                 auto* bVal = impl->builder->CreateLoad(impl->i64Ty, b, "add_b");
-                auto* sum = impl->builder->CreateCall(impl->aotAddFunc,
-                    {impl->vmCtx, aVal, bVal}, "add_result");
-                impl->builder->CreateStore(sum, dest);
+
+                // Fast path: both values are numbers (untagged) → fadd
+                auto* nanMask = llvm::ConstantInt::get(impl->i64Ty, NAN_MASK);
+                auto* nanBase = llvm::ConstantInt::get(impl->i64Ty, NAN_BASE);
+                auto* aMasked = impl->builder->CreateAnd(aVal, nanMask, "add_a_masked");
+                auto* bMasked = impl->builder->CreateAnd(bVal, nanMask, "add_b_masked");
+                auto* aIsNum = impl->builder->CreateICmpNE(aMasked, nanBase, "add_a_is_num");
+                auto* bIsNum = impl->builder->CreateICmpNE(bMasked, nanBase, "add_b_is_num");
+                auto* bothNum = impl->builder->CreateAnd(aIsNum, bIsNum, "both_num");
+
+                auto* addNumBB = llvm::BasicBlock::Create(ctx, "add_num", func);
+                auto* addHelperBB = llvm::BasicBlock::Create(ctx, "add_helper", func);
+                auto* addMergeBB = llvm::BasicBlock::Create(ctx, "add_merge", func);
+                impl->builder->CreateCondBr(bothNum, addNumBB, addHelperBB);
+
+                // Number path: fadd
+                impl->builder->SetInsertPoint(addNumBB);
+                auto* aDouble = impl->builder->CreateBitCast(aVal, impl->doubleTy, "add_a_d");
+                auto* bDouble = impl->builder->CreateBitCast(bVal, impl->doubleTy, "add_b_d");
+                auto* numSum = impl->builder->CreateFAdd(aDouble, bDouble, "add_num");
+                auto* numVal = impl->builder->CreateBitCast(numSum, impl->i64Ty, "add_num_i64");
+                impl->builder->CreateBr(addMergeBB);
+
+                // Slow path: call aot_add (handles string concatenation)
+                impl->builder->SetInsertPoint(addHelperBB);
+                auto* helperResult = impl->builder->CreateCall(impl->aotAddFunc,
+                    {impl->vmCtx, aVal, bVal}, "add_slow");
+                impl->builder->CreateBr(addMergeBB);
+
+                // Merge
+                impl->builder->SetInsertPoint(addMergeBB);
+                auto* phi = impl->builder->CreatePHI(impl->i64Ty, 2, "add_result");
+                phi->addIncoming(numVal, addNumBB);
+                phi->addIncoming(helperResult, addHelperBB);
+                impl->builder->CreateStore(phi, dest);
                 break;
             }
 
