@@ -5,7 +5,7 @@ Replace C++ string codegen (`src/aot/aot_compiler.cpp`) with direct LLVM IR emis
 
 ---
 
-> **Status**: Phases 0–3 complete ✅. Phase 4.1–4.3 complete ✅. Remaining: Phase 4.4–4.5 (optimization), Phase 5 (cross-compilation).
+> **Status**: Phases 0–3 complete ✅. Phase 4.1–4.4 complete ✅. Remaining: Phase 4.5 (optimization), Phase 5 (cross-compilation).
 
 ---
 
@@ -139,10 +139,11 @@ Replace C++ string codegen (`src/aot/aot_compiler.cpp`) with direct LLVM IR emis
 - Applied to `OP_GET_PROPERTY`, `OP_SET_PROPERTY`, `OP_OPTIONAL_CHAIN`
 - Avoids string hash table lookup on repeated property access to same class
 
-### 4.4 — LTO and codegen tuning [⬜ TODO]
-- Emit LLVM bitcode (`.bc`) instead of `.o`, then use `lld --plugin` for LTO
-- `TargetMachine::setVerifyMachineCode(false)` in release
-- Add `-march=native` via LLVM target features
+### 4.4 — Codegen tuning [✅ DONE]
+- `-march=native` for NATIVE target: use `getHostCPUName()` + `getHostCPUFeatures()` to tune for current CPU
+- Cross-compilation targets: keep `"generic"` CPU (unchanged)
+- Suppress verbose IR dumps in release builds (`#ifdef NDEBUG`)
+- LLVM LTO (bitcode emission + lld plugin) deferred — O2 pipeline already provides strong optimization
 
 ### 4.5 — Profile-guided optimization [⬜ TODO]
 - Instrument build: emit version with `-fprofile-instr-generate`

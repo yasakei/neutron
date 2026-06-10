@@ -1700,13 +1700,33 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
         return false;
     }
 
-    auto* tm = target->createTargetMachine(llvm::Triple(targetTriple), "generic", "", {}, llvm::Reloc::PIC_);
+    // Select CPU and features: use host-native when targeting the current machine
+    std::string cpu = "generic";
+    std::string features;
+    if (targetPlatform == TargetPlatform::NATIVE) {
+        cpu = llvm::sys::getHostCPUName().str();
+        auto hostFeatures = llvm::sys::getHostCPUFeatures();
+        for (const auto& f : hostFeatures) {
+            if (f.second) features += "+";
+            else          features += "-";
+            features += f.first().str();
+            features += ",";
+        }
+        if (!features.empty()) features.pop_back(); // trailing comma
+    }
+
+    auto* tm = target->createTargetMachine(llvm::Triple(targetTriple), cpu, features,
+                                            {}, llvm::Reloc::PIC_);
     impl->module->setDataLayout(tm->createDataLayout());
 
     // Run LLVM optimization pipeline (O2)
     {
+#ifdef NDEBUG
+        llvm::errs() << "Optimizing with O2 (release)\n";
+#else
         llvm::errs() << "=== BEFORE OPT ===\n";
         impl->module->print(llvm::errs(), nullptr);
+#endif
         llvm::LoopAnalysisManager LAM;
         llvm::FunctionAnalysisManager FAM;
         llvm::CGSCCAnalysisManager CGAM;
@@ -1723,8 +1743,10 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
         MPM.run(*impl->module, MAM);
     }
 
+#ifndef NDEBUG
     llvm::errs() << "=== AFTER OPT ===\n";
     impl->module->print(llvm::errs(), nullptr);
+#endif
 
     // Emit object file
     std::error_code ec;
