@@ -65,6 +65,7 @@ struct LlvmCodegenImpl {
     // LLVM type handles
     llvm::Type* i64Ty = nullptr;
     llvm::Type* i8Ty = nullptr;
+    llvm::Type* i16Ty = nullptr;
     llvm::Type* i32Ty = nullptr;
     llvm::Type* doubleTy = nullptr;
     llvm::PointerType* i8PtrTy = nullptr;
@@ -96,6 +97,21 @@ struct LlvmCodegenImpl {
     llvm::Function* aotInvokeFunc = nullptr;
     llvm::Function* aotPrintFunc = nullptr;
     llvm::Function* aotInternFunc = nullptr;
+    llvm::Function* aotForInInitFunc = nullptr;
+    llvm::Function* aotForInNextFunc = nullptr;
+    llvm::Function* aotSpreadFunc = nullptr;
+    llvm::Function* aotAddFunc = nullptr;
+    llvm::Function* aotThrowErrorFunc = nullptr;
+    llvm::Function* aotRuntimeErrorFunc = nullptr;
+    llvm::Function* aotTryPushFunc = nullptr;
+    llvm::Function* aotTryPopFunc = nullptr;
+    llvm::Function* aotValidateSafeFuncFunc = nullptr;
+    llvm::Function* aotValidateSafeFileFuncFunc = nullptr;
+    llvm::Function* aotValidateSafeVarFunc = nullptr;
+    llvm::Function* aotValidateSafeFileVarFunc = nullptr;
+    llvm::Function* aotSetLocalTypedFunc = nullptr;
+    llvm::Function* aotSetGlobalTypedFunc = nullptr;
+    llvm::Function* aotDefineTypedGlobalFunc = nullptr;
 
     const Chunk* chunk = nullptr;
 
@@ -208,8 +224,10 @@ struct LlvmCodegenImpl {
                 case OpCode::OP_VALIDATE_SAFE_VARIABLE:
                 case OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE:
                 case OpCode::OP_SET_GLOBAL_TYPED:
-                case OpCode::OP_SET_LOCAL_TYPED:
                     skip1 = true;
+                    break;
+                case OpCode::OP_SET_LOCAL_TYPED:
+                    scanIp += 2; // slot + typeByte
                     break;
                 case OpCode::OP_CONSTANT_LONG:
                 case OpCode::OP_ADD_LOCAL_CONST:
@@ -229,11 +247,7 @@ struct LlvmCodegenImpl {
                     scanIp += 4; // baseSlot + varSlot + offsetHi + offsetLo
                     break;
                 case OpCode::OP_CLOSURE:
-                    scanIp++;
-                    if (scanIp + 1 < chunk->code.size()) {
-                        uint16_t n = (chunk->code[scanIp] << 8) | chunk->code[scanIp + 1];
-                        scanIp += 2 + n * 2;
-                    }
+                    scanIp++; // skip funcIdx byte only (compiler doesn't emit upvalue operands)
                     break;
                 default:
                     break;
@@ -270,6 +284,7 @@ struct LlvmCodegenImpl {
     // Initialize LLVM types
     void initTypes() {
         i8Ty = llvm::Type::getInt8Ty(context);
+        i16Ty = llvm::Type::getInt16Ty(context);
         i32Ty = llvm::Type::getInt32Ty(context);
         i64Ty = llvm::Type::getInt64Ty(context);
         doubleTy = llvm::Type::getDoubleTy(context);
@@ -382,7 +397,83 @@ struct LlvmCodegenImpl {
         // i64 @aot_internString(i8* vm_ctx, i8* str)
         auto* internTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i8PtrTy}, false);
         aotInternFunc = llvm::Function::Create(internTy, llvm::Function::ExternalLinkage,
-                                                 "aot_internString", module.get());
+                                                  "aot_internString", module.get());
+
+        // i64 @aot_add(i8* vm_ctx, i64 a, i64 b)
+        auto* addTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i64Ty, i64Ty}, false);
+        aotAddFunc = llvm::Function::Create(addTy, llvm::Function::ExternalLinkage,
+                                               "aot_add", module.get());
+
+        // void @aot_runtimeError(i8* vm_ctx, i8* message)
+        auto* runtimeErrTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i8PtrTy}, false);
+        aotRuntimeErrorFunc = llvm::Function::Create(runtimeErrTy, llvm::Function::ExternalLinkage,
+                                                      "aot_runtimeError", module.get());
+
+        // void @aot_tryPush(i8* vm_ctx, i16 tryEnd, i16 catchStart, i16 finallyStart)
+        auto* tryPushTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context),
+            {i8PtrTy, i16Ty, i16Ty, i16Ty}, false);
+        aotTryPushFunc = llvm::Function::Create(tryPushTy, llvm::Function::ExternalLinkage,
+                                                  "aot_tryPush", module.get());
+
+        // void @aot_tryPop(i8* vm_ctx)
+        auto* tryPopTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy}, false);
+        aotTryPopFunc = llvm::Function::Create(tryPopTy, llvm::Function::ExternalLinkage,
+                                                 "aot_tryPop", module.get());
+
+        // i64 @aot_forInInit(i8* vm_ctx, i64 iterable)
+        auto* forInInitTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i64Ty}, false);
+        aotForInInitFunc = llvm::Function::Create(forInInitTy, llvm::Function::ExternalLinkage,
+                                                    "aot_forInInit", module.get());
+
+        // i64 @aot_forInNext(i8* vm_ctx, i64 keys, i64 index)
+        auto* forInNextTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i64Ty, i64Ty}, false);
+        aotForInNextFunc = llvm::Function::Create(forInNextTy, llvm::Function::ExternalLinkage,
+                                                    "aot_forInNext", module.get());
+
+        // i8 @aot_spread(i8* vm_ctx, i64 array, i8* outBuf, i8 maxCount)
+        auto* spreadTy = llvm::FunctionType::get(i8Ty, {i8PtrTy, i64Ty, i8PtrTy, i8Ty}, false);
+        aotSpreadFunc = llvm::Function::Create(spreadTy, llvm::Function::ExternalLinkage,
+                                                 "aot_spread", module.get());
+
+        // void @aot_throwError(i8* vm_ctx, i64 exception)
+        auto* throwTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i64Ty}, false);
+        aotThrowErrorFunc = llvm::Function::Create(throwTy, llvm::Function::ExternalLinkage,
+                                                     "aot_throwError", module.get());
+
+        // void @aot_validateSafeFunction(i8* vm_ctx, i64 funcVal, i32 isSafeFile)
+        auto* validateFnTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i64Ty, i32Ty}, false);
+        aotValidateSafeFuncFunc = llvm::Function::Create(validateFnTy, llvm::Function::ExternalLinkage,
+                                                           "aot_validateSafeFunction", module.get());
+
+        // void @aot_validateSafeFileFunction(i8* vm_ctx, i64 funcVal)
+        auto* validateFileFnTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i64Ty}, false);
+        aotValidateSafeFileFuncFunc = llvm::Function::Create(validateFileFnTy, llvm::Function::ExternalLinkage,
+                                                               "aot_validateSafeFileFunction", module.get());
+
+        // void @aot_validateSafeVariable(i8* vm_ctx, i8* varName, i32 isSafeFile)
+        auto* validateVarTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i8PtrTy, i32Ty}, false);
+        aotValidateSafeVarFunc = llvm::Function::Create(validateVarTy, llvm::Function::ExternalLinkage,
+                                                          "aot_validateSafeVariable", module.get());
+
+        // void @aot_validateSafeFileVariable(i8* vm_ctx, i8* varName)
+        auto* validateFileVarTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i8PtrTy}, false);
+        aotValidateSafeFileVarFunc = llvm::Function::Create(validateFileVarTy, llvm::Function::ExternalLinkage,
+                                                              "aot_validateSafeFileVariable", module.get());
+
+        // void @aot_setLocalTyped(i8* vm_ctx, i64 val, i64 slotVal, i8 expectedType)
+        auto* setLocalTypedTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i64Ty, i64Ty, i8Ty}, false);
+        aotSetLocalTypedFunc = llvm::Function::Create(setLocalTypedTy, llvm::Function::ExternalLinkage,
+                                                        "aot_setLocalTyped", module.get());
+
+        // void @aot_setGlobalTyped(i8* vm_ctx, i8* name, i64 val)
+        auto* setGlobalTypedTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i8PtrTy, i64Ty}, false);
+        aotSetGlobalTypedFunc = llvm::Function::Create(setGlobalTypedTy, llvm::Function::ExternalLinkage,
+                                                         "aot_setGlobalTyped", module.get());
+
+        // void @aot_defineTypedGlobal(i8* vm_ctx, i8* name, i64 val, i8 typeByte)
+        auto* defineTypedGlobalTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i8PtrTy, i64Ty, i8Ty}, false);
+        aotDefineTypedGlobalFunc = llvm::Function::Create(defineTypedGlobalTy, llvm::Function::ExternalLinkage,
+                                                            "aot_defineTypedGlobal", module.get());
     }
 
     // Create the constants global array from chunk (as NaN-boxed i64 values)
@@ -847,15 +938,29 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 break;
             }
 
+            case OpCode::OP_SET_LOCAL_TYPED: {
+                uint8_t slot = impl->readByte();
+                uint8_t typeByte = impl->readByte();
+                auto* src = impl->popValue();
+                auto* val = impl->builder->CreateLoad(impl->i64Ty, src);
+                impl->builder->CreateCall(impl->aotSetLocalTypedFunc,
+                    {impl->vmCtx, val,
+                     llvm::ConstantInt::get(impl->i64Ty, slot),
+                     llvm::ConstantInt::get(impl->i8Ty, typeByte)});
+                auto* dest = impl->localsGEP(llvm::ConstantInt::get(impl->i32Ty, slot));
+                impl->builder->CreateStore(val, dest);
+                break;
+            }
+
             case OpCode::OP_ADD: {
                 auto* b = impl->popValue();
                 auto* a = impl->popValue();
                 auto* dest = impl->pushValue();
-                auto* bData = impl->loadData(b);
-                auto* aData = impl->loadData(a);
-                auto* sum = impl->builder->CreateFAdd(aData, bData, "add");
-                impl->storeValue(dest,
-                                  llvm::ConstantInt::get(impl->i8Ty, TAG_NUMBER), sum);
+                auto* aVal = impl->builder->CreateLoad(impl->i64Ty, a, "add_a");
+                auto* bVal = impl->builder->CreateLoad(impl->i64Ty, b, "add_b");
+                auto* sum = impl->builder->CreateCall(impl->aotAddFunc,
+                    {impl->vmCtx, aVal, bVal}, "add_result");
+                impl->builder->CreateStore(sum, dest);
                 break;
             }
 
@@ -1252,7 +1357,22 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
 
             case OpCode::OP_SET_GLOBAL:
             case OpCode::OP_SET_GLOBAL_FAST:
-            case OpCode::OP_SET_GLOBAL_TYPED:
+            case OpCode::OP_SET_GLOBAL_TYPED: {
+                uint8_t constIdx = impl->readByte();
+                const Value& nameV = impl->chunk->constants[constIdx];
+                std::string gName = nameV.type == ValueType::OBJ_STRING ? nameV.as.obj_string->chars : "?";
+                auto* gNameStr = impl->builder->CreateGlobalStringPtr(gName, "g_name");
+                auto* src = impl->popValue();
+                auto* val = impl->builder->CreateLoad(impl->i64Ty, src);
+                impl->builder->CreateCall(impl->aotSetGlobalTypedFunc,
+                    {impl->vmCtx, gNameStr, val});
+                auto* gv = impl->getOrCreateGlobal(constIdx);
+                if (gv) {
+                    impl->builder->CreateStore(val, gv);
+                }
+                break;
+            }
+
             case OpCode::OP_DEFINE_GLOBAL: {
                 uint8_t constIdx = impl->readByte();
                 auto* gv = impl->getOrCreateGlobal(constIdx);
@@ -1269,15 +1389,13 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             case OpCode::OP_DEFINE_TYPED_GLOBAL: {
                 uint8_t constIdx = impl->readByte();
                 uint8_t typeByte = impl->readByte();
-                (void)typeByte;
-                auto* gv = impl->getOrCreateGlobal(constIdx);
-                if (gv) {
-                    auto* src = impl->popValue();
-                    auto* val = impl->builder->CreateLoad(impl->i64Ty, src);
-                    impl->builder->CreateStore(val, gv);
-                } else {
-                    impl->popValue();
-                }
+                const Value& nameV = impl->chunk->constants[constIdx];
+                std::string gName = nameV.type == ValueType::OBJ_STRING ? nameV.as.obj_string->chars : "?";
+                auto* gNameStr = impl->builder->CreateGlobalStringPtr(gName, "g_name");
+                auto* src = impl->popValue();
+                auto* val = impl->builder->CreateLoad(impl->i64Ty, src);
+                impl->builder->CreateCall(impl->aotDefineTypedGlobalFunc,
+                    {impl->vmCtx, gNameStr, val, llvm::ConstantInt::get(impl->i8Ty, typeByte)});
                 break;
             }
 
@@ -1503,8 +1621,10 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             }
 
             case OpCode::OP_THIS: {
+                auto* src = impl->stackGEP(llvm::ConstantInt::get(impl->i32Ty, 0));
+                auto* val = impl->builder->CreateLoad(impl->i64Ty, src, "this");
                 auto* d = impl->pushValue();
-                impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
+                impl->builder->CreateStore(val, d);
                 break;
             }
 
@@ -1550,22 +1670,60 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             }
 
             case OpCode::OP_FOR_IN_INIT: {
-                impl->popValue();
-                for (int i = 0; i < 3; i++) {
-                    auto* d = impl->pushValue();
-                    impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
-                }
+                auto* iterablePtr = impl->popValue();
+                auto* iterable = impl->builder->CreateLoad(impl->i64Ty, iterablePtr, "iterable");
+                auto* keys = impl->builder->CreateCall(impl->aotForInInitFunc,
+                    {impl->vmCtx, iterable}, "keys");
+                // Push iterable, index=0.0, keys array
+                impl->builder->CreateStore(iterable, impl->pushValue());
+                impl->builder->CreateStore(impl->constValue(TAG_NUMBER, 0.0), impl->pushValue());
+                impl->builder->CreateStore(keys, impl->pushValue());
                 break;
             }
 
             case OpCode::OP_FOR_IN_NEXT: {
                 uint8_t baseSlot = impl->readByte();
                 uint8_t varSlot = impl->readByte();
-                (void)baseSlot; (void)varSlot;
                 uint8_t offsetHi = impl->readByte();
                 uint8_t offsetLo = impl->readByte();
                 uint16_t offset = (static_cast<uint16_t>(offsetHi) << 8) | offsetLo;
-                impl->ip += offset;
+                // Load index from baseSlot+1, keys from baseSlot+2
+                auto* idxPtr = impl->stackGEP(llvm::ConstantInt::get(impl->i32Ty, baseSlot + 1));
+                auto* keysPtr = impl->stackGEP(llvm::ConstantInt::get(impl->i32Ty, baseSlot + 2));
+                auto* idxVal = impl->builder->CreateLoad(impl->i64Ty, idxPtr, "for_idx");
+                auto* keysVal = impl->builder->CreateLoad(impl->i64Ty, keysPtr, "for_keys");
+                // Call aot_forInNext(vm, keys, index) → returns next key or nil
+                auto* nextKey = impl->builder->CreateCall(impl->aotForInNextFunc,
+                    {impl->vmCtx, keysVal, idxVal}, "next_key");
+                // Check if nil (done)
+                auto* masked = impl->builder->CreateAnd(nextKey,
+                    llvm::ConstantInt::get(impl->i64Ty, NAN_MASK));
+                auto* isTagged = impl->builder->CreateICmpEQ(masked,
+                    llvm::ConstantInt::get(impl->i64Ty, NAN_BASE), "is_tagged_fi");
+                auto* shifted = impl->builder->CreateLShr(nextKey,
+                    llvm::ConstantInt::get(impl->i64Ty, TAG_SHIFT));
+                auto* tagBits = impl->builder->CreateAnd(shifted,
+                    llvm::ConstantInt::get(impl->i64Ty, 0x7));
+                auto* isNil = impl->builder->CreateAnd(isTagged,
+                    impl->builder->CreateICmpEQ(tagBits,
+                        llvm::ConstantInt::get(impl->i64Ty, TAG_NIL)), "is_nil");
+                size_t exitTarget = impl->ip + offset;
+                auto* loopBodyBB = llvm::BasicBlock::Create(ctx, "for_body", func);
+                auto* exitBB = impl->getOrCreateBB(exitTarget, func);
+                impl->builder->CreateCondBr(isNil, exitBB, loopBodyBB);
+                // Loop body: assign key to varSlot, increment index
+                impl->builder->SetInsertPoint(loopBodyBB);
+                auto* varPtr = impl->stackGEP(llvm::ConstantInt::get(impl->i32Ty, varSlot));
+                impl->builder->CreateStore(nextKey, varPtr);
+                // Increment index: index = index + 1.0 (NaN-boxed)
+                auto* oneConst = impl->constValue(TAG_NUMBER, 1.0);
+                // If index is a tagged NaN, we need to use fadd on the raw double
+                // For simplicity, unpromote to double, add 1, re-box
+                auto* idxDouble = impl->builder->CreateBitCast(idxVal, impl->doubleTy, "idx_dbl");
+                auto* oneDouble = impl->builder->CreateBitCast(oneConst, impl->doubleTy, "one_dbl");
+                auto* sumDouble = impl->builder->CreateFAdd(idxDouble, oneDouble, "idx_inc");
+                auto* newIdx = impl->builder->CreateBitCast(sumDouble, impl->i64Ty, "new_idx");
+                impl->builder->CreateStore(newIdx, idxPtr);
                 break;
             }
 
@@ -1616,9 +1774,35 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             }
 
             case OpCode::OP_SPREAD: {
-                impl->popValue();
-                auto* d = impl->pushValue();
-                impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
+                auto* valPtr = impl->popValue();
+                auto* val = impl->builder->CreateLoad(impl->i64Ty, valPtr, "spread_val");
+                // Allocate buffer on stack for up to 256 elements
+                auto* bufTy = llvm::ArrayType::get(impl->i64Ty, 256);
+                auto* bufAlloca = impl->builder->CreateAlloca(bufTy, nullptr, "spread_buf");
+                auto* bufPtr = impl->builder->CreatePointerCast(bufAlloca, impl->i8PtrTy, "spread_buf_ptr");
+                auto* count = impl->builder->CreateCall(impl->aotSpreadFunc,
+                    {impl->vmCtx, val, bufPtr, llvm::ConstantInt::get(impl->i8Ty, 256)}, "spread_cnt");
+                // Push each element from buffer onto stack
+                auto* spreadDoneBB = llvm::BasicBlock::Create(ctx, "spread_done", func);
+                auto* spreadCheckBB = llvm::BasicBlock::Create(ctx, "spread_check", func);
+                auto* spreadBodyBB = llvm::BasicBlock::Create(ctx, "spread_body", func);
+                auto* spreadIdx = impl->builder->CreateAlloca(impl->i8Ty, nullptr, "spread_i");
+                impl->builder->CreateStore(llvm::ConstantInt::get(impl->i8Ty, 0), spreadIdx);
+                impl->builder->CreateBr(spreadCheckBB);
+                impl->builder->SetInsertPoint(spreadCheckBB);
+                auto* curI = impl->builder->CreateLoad(impl->i8Ty, spreadIdx, "sp_i");
+                auto* done = impl->builder->CreateICmpULT(curI, count, "sp_done");
+                impl->builder->CreateCondBr(done, spreadBodyBB, spreadDoneBB);
+                impl->builder->SetInsertPoint(spreadBodyBB);
+                auto* elemGep = impl->builder->CreateGEP(bufTy, bufAlloca,
+                    {llvm::ConstantInt::get(impl->i32Ty, 0),
+                     impl->builder->CreateZExt(curI, impl->i32Ty, "sp_i_ext")});
+                auto* elem = impl->builder->CreateLoad(impl->i64Ty, elemGep, "sp_elem");
+                impl->builder->CreateStore(elem, impl->pushValue());
+                auto* nextI = impl->builder->CreateAdd(curI, llvm::ConstantInt::get(impl->i8Ty, 1), "sp_next");
+                impl->builder->CreateStore(nextI, spreadIdx);
+                impl->builder->CreateBr(spreadCheckBB);
+                impl->builder->SetInsertPoint(spreadDoneBB);
                 break;
             }
 
@@ -1658,38 +1842,92 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             }
 
             case OpCode::OP_THROW: {
-                impl->popValue();
+                auto* excPtr = impl->popValue();
+                auto* excVal = impl->builder->CreateLoad(impl->i64Ty, excPtr, "exception");
+                impl->builder->CreateCall(impl->aotThrowErrorFunc, {impl->vmCtx, excVal});
+                // aot_throwError never returns (calls exit())
+                auto* unreachable = llvm::BasicBlock::Create(ctx, "throw_unreachable", func);
+                impl->builder->CreateUnreachable();
+                impl->builder->SetInsertPoint(unreachable);
                 auto* d = impl->pushValue();
                 impl->builder->CreateStore(impl->constValue(TAG_NIL, 0.0), d);
                 break;
             }
 
             case OpCode::OP_BREAK:
-            case OpCode::OP_CONTINUE:
-            case OpCode::OP_END_TRY:
-            case OpCode::OP_LOOP_HINT:
-            case OpCode::OP_VALIDATE_SAFE_FUNCTION:
-            case OpCode::OP_VALIDATE_SAFE_FILE_FUNCTION:
+            case OpCode::OP_CONTINUE: {
+                // Compiler transforms break/continue into OP_JUMP/OP_LOOP,
+                // so these should never appear in bytecode. Handle as jump for safety.
+                uint16_t offset = impl->readShort();
+                size_t target = impl->ip + offset;
+                impl->builder->CreateBr(impl->getOrCreateBB(target, func));
                 break;
+            }
+
+            case OpCode::OP_END_TRY: {
+                impl->builder->CreateCall(impl->aotTryPopFunc, {impl->vmCtx});
+                break;
+            }
+
+            case OpCode::OP_LOOP_HINT: {
+                // No-op: JIT hint only
+                break;
+            }
+
+            case OpCode::OP_VALIDATE_SAFE_FUNCTION: {
+                // Peek at top of stack (callable), validate
+                auto* topPtr = impl->peekValue();
+                auto* topVal = impl->builder->CreateLoad(impl->i64Ty, topPtr, "safe_fn");
+                impl->builder->CreateCall(impl->aotValidateSafeFuncFunc,
+                    {impl->vmCtx, topVal, llvm::ConstantInt::get(impl->i32Ty, 0)});
+                break;
+            }
+
+            case OpCode::OP_VALIDATE_SAFE_FILE_FUNCTION: {
+                auto* topPtr = impl->peekValue();
+                auto* topVal = impl->builder->CreateLoad(impl->i64Ty, topPtr, "safe_fn_f");
+                impl->builder->CreateCall(impl->aotValidateSafeFileFuncFunc,
+                    {impl->vmCtx, topVal});
+                break;
+            }
 
             case OpCode::OP_TRY: {
-                impl->readShort(); impl->readShort(); impl->readShort();
+                uint16_t tryEnd = impl->readShort();
+                uint16_t catchStart = impl->readShort();
+                uint16_t finallyStart = impl->readShort();
+                impl->builder->CreateCall(impl->aotTryPushFunc,
+                    {impl->vmCtx,
+                     llvm::ConstantInt::get(impl->i16Ty, tryEnd),
+                     llvm::ConstantInt::get(impl->i16Ty, catchStart),
+                     llvm::ConstantInt::get(impl->i16Ty, finallyStart)});
                 break;
             }
 
             case OpCode::OP_VALIDATE_SAFE_VARIABLE:
             case OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE: {
-                impl->readByte();
+                uint8_t constIdx = impl->readByte();
+                const Value& nameV = impl->chunk->constants[constIdx];
+                std::string varName = nameV.type == ValueType::OBJ_STRING ? nameV.as.obj_string->chars : "?";
+                auto* varNameStr = impl->builder->CreateGlobalStringPtr(varName, "var_name");
+                if (op == OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE) {
+                    impl->builder->CreateCall(impl->aotValidateSafeFileVarFunc,
+                        {impl->vmCtx, varNameStr});
+                } else {
+                    impl->builder->CreateCall(impl->aotValidateSafeVarFunc,
+                        {impl->vmCtx, varNameStr, llvm::ConstantInt::get(impl->i32Ty, 0)});
+                }
                 break;
             }
 
             case OpCode::OP_TYPE_GUARD: {
-                impl->readByte();
+                impl->readByte(); // skip operand (no-op in interpreter)
                 break;
             }
 
             case OpCode::OP_LOGICAL_AND:
             case OpCode::OP_LOGICAL_OR: {
+                // Compiler transforms logical AND/OR into OP_DUP + OP_JUMP_IF_FALSE + OP_POP patterns
+                // These should never appear in bytecode. Handle as operand skip + push nil for safety.
                 uint16_t offset = impl->readShort();
                 (void)offset;
                 impl->popValue();
@@ -1717,7 +1955,6 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                     case OpCode::OP_INC_LOCAL_INT:
                     case OpCode::OP_DEC_LOCAL_INT:
                     case OpCode::OP_CONST_INT8:
-                    case OpCode::OP_SET_LOCAL_TYPED:
                         skip1 = true;
                         break;
                     case OpCode::OP_CONSTANT_LONG:

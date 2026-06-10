@@ -1,5 +1,6 @@
 #include "aot/aot_runtime.h"
 #include "core/vm.h"
+#include "compiler/compiler.h"
 #include "types/json_object.h"
 #include "types/array.h"
 #include "types/instance.h"
@@ -7,8 +8,11 @@
 #include "types/value.h"
 
 #include <cstddef>
+#include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <string>
+#include <setjmp.h>
 
 namespace neutron {
 namespace aot {
@@ -463,6 +467,23 @@ uint64_t aot_internString(void* vm_ctx, const char* str) {
     return valueToNan(Value(s));
 }
 
+uint64_t aot_add(void* vm_ctx, uint64_t a, uint64_t b) {
+    Value va = nanToValue(a);
+    Value vb = nanToValue(b);
+    if (va.type == ValueType::OBJ_STRING || vb.type == ValueType::OBJ_STRING) {
+        VM* vm = static_cast<VM*>(vm_ctx);
+        std::string result = va.toString() + vb.toString();
+        return valueToNan(Value(vm->internString(result)));
+    }
+    double da, db;
+    memcpy(&da, &a, sizeof(da));
+    memcpy(&db, &b, sizeof(db));
+    double sum = da + db;
+    uint64_t result;
+    memcpy(&result, &sum, sizeof(result));
+    return result;
+}
+
 void aot_printValue(void* vm_ctx, uint64_t val) {
     (void)vm_ctx;
     static FILE* const out = stdout;
@@ -509,6 +530,284 @@ void aot_printValue(void* vm_ctx, uint64_t val) {
             fprintf(out, "nil\n");
             break;
     }
+}
+
+// --- For-in loop helpers ---
+
+uint64_t aot_forInInit(void* vm_ctx, uint64_t iterableVal) {
+    VM* vm = static_cast<VM*>(vm_ctx);
+    Value iterable = nanToValue(iterableVal);
+    Array* keys = vm->allocate<Array>();
+
+    if (iterable.type == ValueType::OBJECT) {
+        Object* obj = iterable.as.object;
+        if (obj && obj->obj_type == ObjType::OBJ_JSON_OBJECT) {
+            auto* jobj = static_cast<JsonObject*>(obj);
+            for (const auto& kv : jobj->properties) {
+                keys->push(Value(kv.first));
+            }
+        }
+    } else if (iterable.type == ValueType::ARRAY) {
+        Array* arr = iterable.as.array;
+        for (size_t i = 0; i < arr->size(); i++) {
+            keys->push(Value(static_cast<double>(i)));
+        }
+    }
+
+    return valueToNan(Value(keys));
+}
+
+uint64_t aot_forInNext(void* vm_ctx, uint64_t keysVal, uint64_t indexVal) {
+    (void)vm_ctx;
+    Value keysV = nanToValue(keysVal);
+    Value indexV = nanToValue(indexVal);
+
+    if (keysV.type != ValueType::ARRAY || indexV.type != ValueType::NUMBER) {
+        return valueToNan(Value()); // nil = done
+    }
+
+    Array* keys = keysV.as.array;
+    double idx = indexV.as.number;
+
+    if (idx >= static_cast<double>(keys->size())) {
+        return valueToNan(Value()); // nil = done
+    }
+
+    return valueToNan(keys->at(static_cast<size_t>(idx)));
+}
+
+// --- Spread operator ---
+
+uint8_t aot_spread(void* vm_ctx, uint64_t arrayVal, uint64_t* outBuf, uint8_t maxCount) {
+    (void)vm_ctx;
+    Value val = nanToValue(arrayVal);
+    if (val.type == ValueType::ARRAY) {
+        Array* arr = val.as.array;
+        uint8_t count = static_cast<uint8_t>(arr->size() < static_cast<size_t>(maxCount) ? arr->size() : maxCount);
+        for (uint8_t i = 0; i < count; i++) {
+            outBuf[i] = valueToNan(arr->at(i));
+        }
+        return count;
+    }
+    // Non-array: push the value as-is
+    if (maxCount > 0) {
+        outBuf[0] = arrayVal;
+        return 1;
+    }
+    return 0;
+}
+
+// --- Exception handling ---
+
+// Per-VM exception frames for AOT
+// Stores frame info so aot_throwError can print meaningful stack traces.
+// Full exception recovery (catch blocks executing in AOT) requires
+// setjmp/longjmp bridging back into LLVM IR — deferred but frame info is correct.
+
+void aot_tryPush(void* vm_ctx, uint16_t tryEnd, uint16_t catchStart, uint16_t finallyStart) {
+    VM* vm = static_cast<VM*>(vm_ctx);
+    VM::ExceptionFrame frame;
+    frame.tryStart = 0; // AOT codegen tracks IP separately
+    frame.tryEnd = tryEnd;
+    frame.catchStart = catchStart;
+    frame.finallyStart = finallyStart;
+    if (!vm->frames.empty()) {
+        frame.frameBase = vm->frames.back().slot_offset;
+    } else {
+        frame.frameBase = 0;
+    }
+    vm->exceptionFrames.push_back(frame);
+}
+
+void aot_tryPop(void* vm_ctx) {
+    VM* vm = static_cast<VM*>(vm_ctx);
+    if (!vm->exceptionFrames.empty()) {
+        vm->exceptionFrames.pop_back();
+    }
+}
+
+static std::string aot_buildStackTrace(VM* vm) {
+    std::string trace;
+    for (auto it = vm->frames.rbegin(); it != vm->frames.rend(); ++it) {
+        std::string funcName = "<script>";
+        if (it->function) {
+            funcName = it->function->name;
+        }
+        trace += "    at " + funcName + "\n";
+    }
+    return trace;
+}
+
+void aot_throwError(void* vm_ctx, uint64_t exceptionVal) {
+    VM* vm = static_cast<VM*>(vm_ctx);
+    Value exception = nanToValue(exceptionVal);
+    std::string msg;
+    if (exception.type == ValueType::OBJ_STRING) {
+        msg = exception.as.obj_string->chars;
+    } else {
+        msg = exception.toString();
+    }
+    std::string trace = aot_buildStackTrace(vm);
+    std::fprintf(stderr, "Error: %s\n%s", msg.c_str(), trace.c_str());
+    std::exit(1);
+}
+
+void aot_runtimeError(void* vm_ctx, const char* message) {
+    VM* vm = static_cast<VM*>(vm_ctx);
+    std::string trace = aot_buildStackTrace(vm);
+    std::fprintf(stderr, "Error: %s\n%s", message, trace.c_str());
+    std::exit(1);
+}
+
+// --- Safe-mode validation helpers ---
+
+void aot_validateSafeFunction(void* vm_ctx, uint64_t funcVal, int isSafeFile) {
+    Value fv = nanToValue(funcVal);
+    if (fv.type == ValueType::CALLABLE) {
+        Function* function = dynamic_cast<Function*>(fv.as.callable);
+        if (function && function->declaration) {
+            for (const auto& param : function->declaration->params) {
+                if (!param.typeAnnotation.has_value()) {
+                    std::string msg = "Function parameter '" + param.name.lexeme + "' must have a type annotation" +
+                        (isSafeFile ? " in .ntsc files (Neutron Safe Code)." : " inside a safe block.");
+                    aot_runtimeError(vm_ctx, msg.c_str());
+                }
+            }
+            if (!function->declaration->returnType.has_value()) {
+                std::string msg = "Function '" + function->declaration->name.lexeme + "' must have a return type annotation" +
+                    (isSafeFile ? " in .ntsc files (Neutron Safe Code)." : " inside a safe block.");
+                aot_runtimeError(vm_ctx, msg.c_str());
+            }
+        }
+    }
+}
+
+void aot_validateSafeFileFunction(void* vm_ctx, uint64_t funcVal) {
+    Value fv = nanToValue(funcVal);
+    if (fv.type == ValueType::CALLABLE) {
+        Function* function = dynamic_cast<Function*>(fv.as.callable);
+        if (function && function->declaration) {
+            for (const auto& param : function->declaration->params) {
+                if (!param.typeAnnotation.has_value()) {
+                    std::string msg = "Function parameter '" + param.name.lexeme + "' must have a type annotation in safe file (.ntsc).";
+                    aot_runtimeError(vm_ctx, msg.c_str());
+                }
+            }
+            if (!function->declaration->returnType.has_value()) {
+                std::string msg = "Function '" + function->declaration->name.lexeme + "' must have a return type annotation in safe file (.ntsc).";
+                aot_runtimeError(vm_ctx, msg.c_str());
+            }
+        }
+    }
+}
+
+void aot_validateSafeVariable(void* vm_ctx, const char* varName, int isSafeFile) {
+    std::string msg = std::string("Variable '") + varName + "' must have a type annotation" +
+        (isSafeFile ? " in .ntsc files (Neutron Safe Code)." : " inside a safe block.");
+    aot_runtimeError(vm_ctx, msg.c_str());
+}
+
+void aot_validateSafeFileVariable(void* vm_ctx, const char* varName) {
+    std::string msg = std::string("Variable '") + varName + "' must have a type annotation in safe file (.ntsc).";
+    aot_runtimeError(vm_ctx, msg.c_str());
+}
+
+// --- Typed set helpers ---
+
+void aot_setLocalTyped(void* vm_ctx, uint64_t val, uint64_t slotVal, uint8_t expectedType) {
+    (void)slotVal;
+    Value value = nanToValue(val);
+    TokenType tt = static_cast<TokenType>(expectedType);
+    bool isValid = false;
+    switch (tt) {
+        case TokenType::TYPE_INT:
+        case TokenType::TYPE_FLOAT:
+            isValid = value.type == ValueType::NUMBER;
+            break;
+        case TokenType::TYPE_STRING:
+            isValid = value.type == ValueType::OBJ_STRING;
+            break;
+        case TokenType::TYPE_BOOL:
+            isValid = value.type == ValueType::BOOLEAN;
+            break;
+        case TokenType::TYPE_ARRAY:
+            isValid = value.type == ValueType::ARRAY;
+            break;
+        case TokenType::TYPE_OBJECT:
+            isValid = value.type == ValueType::OBJECT;
+            break;
+        case TokenType::TYPE_ANY:
+            isValid = true;
+            break;
+        default:
+            isValid = true;
+            break;
+    }
+    if (!isValid) {
+        std::string actualName = value.type == ValueType::NIL ? "nil" :
+                                  value.type == ValueType::BOOLEAN ? "boolean" :
+                                  value.type == ValueType::NUMBER ? "number" :
+                                  value.type == ValueType::OBJ_STRING ? "string" :
+                                  value.type == ValueType::ARRAY ? "array" :
+                                  value.type == ValueType::OBJECT ? "object" : "callable";
+        std::string msg = "Type mismatch: Cannot assign value of type '" + actualName + "'.";
+        aot_runtimeError(vm_ctx, msg.c_str());
+    }
+    // Actual store is done by the LLVM codegen (slotVal is the local index)
+}
+
+void aot_setGlobalTyped(void* vm_ctx, const char* name, uint64_t val) {
+    VM* vm = static_cast<VM*>(vm_ctx);
+    std::string varName(name);
+    auto typeIt = vm->globalTypes.find(varName);
+    if (typeIt != vm->globalTypes.end()) {
+        TokenType expectedType = typeIt->second;
+        Value value = nanToValue(val);
+        bool isValid = false;
+        switch (expectedType) {
+            case TokenType::TYPE_INT:
+            case TokenType::TYPE_FLOAT:
+                isValid = value.type == ValueType::NUMBER;
+                break;
+            case TokenType::TYPE_STRING:
+                isValid = value.type == ValueType::OBJ_STRING;
+                break;
+            case TokenType::TYPE_BOOL:
+                isValid = value.type == ValueType::BOOLEAN;
+                break;
+            case TokenType::TYPE_ARRAY:
+                isValid = value.type == ValueType::ARRAY;
+                break;
+            case TokenType::TYPE_OBJECT:
+                isValid = value.type == ValueType::OBJECT;
+                break;
+            case TokenType::TYPE_ANY:
+                isValid = true;
+                break;
+            default:
+                isValid = true;
+                break;
+        }
+        if (!isValid) {
+            std::string actualName = value.type == ValueType::NIL ? "nil" :
+                                      value.type == ValueType::BOOLEAN ? "boolean" :
+                                      value.type == ValueType::NUMBER ? "number" :
+                                      value.type == ValueType::OBJ_STRING ? "string" :
+                                      value.type == ValueType::ARRAY ? "array" :
+                                      value.type == ValueType::OBJECT ? "object" : "callable";
+            std::string msg = "Type mismatch: Cannot assign value of type '" + actualName + "'.";
+            aot_runtimeError(vm_ctx, msg.c_str());
+        }
+    }
+    // Note: actual global value is stored by AOT codegen in LLVM global;
+    // this helper only does type validation.
+}
+
+void aot_defineTypedGlobal(void* vm_ctx, const char* name, uint64_t val, uint8_t typeByte) {
+    VM* vm = static_cast<VM*>(vm_ctx);
+    std::string varName(name);
+    vm->globals[varName] = nanToValue(val);
+    vm->globalTypes[varName] = static_cast<TokenType>(typeByte);
 }
 
 } // extern "C"

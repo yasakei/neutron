@@ -62,6 +62,9 @@ todo.md
 *.swp
 test-*/
 
+# AI agent guidelines (local config only)
+AGENTS.md
+
 # Environment files
 .env
 .env.local

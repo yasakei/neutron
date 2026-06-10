@@ -69,6 +69,9 @@ void    aot_setProperty(void* vm_ctx, uint64_t objVal, const char* propName, uin
 uint64_t aot_getPropertyCached(void* vm_ctx, uint64_t objVal, const char* propName, void* cachePtr);
 void    aot_setPropertyCached(void* vm_ctx, uint64_t objVal, const char* propName, uint64_t val, void* cachePtr);
 
+// Addition (handles both numeric and string concatenation)
+uint64_t aot_add(void* vm_ctx, uint64_t a, uint64_t b);
+
 // Index access
 uint64_t aot_indexGet(void* vm_ctx, uint64_t objVal, uint64_t indexVal);
 void     aot_indexSet(void* vm_ctx, uint64_t objVal, uint64_t indexVal, uint64_t val);
@@ -85,6 +88,34 @@ uint64_t aot_call(void* vm_ctx, uint64_t callee, const uint64_t* args, uint8_t a
 // Method invocation (receiver.method(args))
 uint64_t aot_invoke(void* vm_ctx, uint64_t receiver, const char* methodName,
                     const uint64_t* args, uint8_t argCount);
+
+// For-in loop helpers
+// aot_forInInit: takes iterable, returns NaN-boxed keys array
+uint64_t aot_forInInit(void* vm_ctx, uint64_t iterableVal);
+// aot_forInNext: takes keys + index, returns next key or nil if done
+uint64_t aot_forInNext(void* vm_ctx, uint64_t keysVal, uint64_t indexVal);
+
+// Spread operator: writes elements to outBuf (up to maxCount), returns actual count
+uint8_t aot_spread(void* vm_ctx, uint64_t arrayVal, uint64_t* outBuf, uint8_t maxCount);
+
+// Exception handling (AOT stub: stores frame info for eventual use)
+void aot_tryPush(void* vm_ctx, uint16_t tryEnd, uint16_t catchStart, uint16_t finallyStart);
+void aot_tryPop(void* vm_ctx);
+// Reports a runtime error from a NaN-boxed exception value (for OP_THROW)
+void aot_throwError(void* vm_ctx, uint64_t exceptionVal);
+// Reports a runtime error from a C string message
+void aot_runtimeError(void* vm_ctx, const char* message);
+
+// Safe-mode validation helpers
+void aot_validateSafeFunction(void* vm_ctx, uint64_t funcVal, int isSafeFile);
+void aot_validateSafeFileFunction(void* vm_ctx, uint64_t funcVal);
+void aot_validateSafeVariable(void* vm_ctx, const char* varName, int isSafeFile);
+void aot_validateSafeFileVariable(void* vm_ctx, const char* varName);
+
+// Typed set helpers
+void aot_setLocalTyped(void* vm_ctx, uint64_t val, uint64_t slotVal, uint8_t expectedType);
+void aot_setGlobalTyped(void* vm_ctx, const char* name, uint64_t val);
+void aot_defineTypedGlobal(void* vm_ctx, const char* name, uint64_t val, uint8_t typeByte);
 
 // Global variable access (via VM globals table for object types)
 uint64_t aot_getGlobal(void* vm_ctx, const char* name);
