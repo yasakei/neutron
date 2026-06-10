@@ -774,4 +774,85 @@ void aot_defineTypedGlobal(void* vm_ctx, const char* name, uint64_t val, uint8_t
     vm->globalTypes[varName] = static_cast<decltype(vm->globalTypes)::mapped_type>(typeByte);
 }
 
+// ---- Focused helpers ----
+
+uint64_t aot_tryGetCachedProp(void* inst, void* cache) {
+    Instance* i = static_cast<Instance*>(inst);
+    AotPropCache* c = static_cast<AotPropCache*>(cache);
+    if (c->klass != nullptr && i->klass == c->klass) {
+        return valueToNan(i->inlineFields[c->inlineIndex].value);
+    }
+    return AOT_SENTINEL;
+}
+
+uint8_t aot_trySetCachedProp(void* inst, void* cache, uint64_t val) {
+    Instance* i = static_cast<Instance*>(inst);
+    AotPropCache* c = static_cast<AotPropCache*>(cache);
+    if (c->klass != nullptr && i->klass == c->klass) {
+        i->inlineFields[c->inlineIndex].value = nanToValue(val);
+        return 1;
+    }
+    return 0;
+}
+
+uint64_t aot_arrayGetCached(void* arr, uint64_t idxVal) {
+    Array* a = static_cast<Array*>(arr);
+    Value idx = nanToValue(idxVal);
+    if (idx.type != ValueType::NUMBER) {
+        // Tag dispatch: if index is a number, extract it
+        // Otherwise return nil
+        uint64_t bits;
+        memcpy(&bits, &idx.as.number, sizeof(bits));
+        (void)bits;
+        return AOT_NAN_BASE | (AOT_NAN_NIL << 47);
+    }
+    size_t i = static_cast<size_t>(idx.as.number);
+    if (i < a->size()) {
+        return valueToNan(a->at(i));
+    }
+    return AOT_NAN_BASE | (AOT_NAN_NIL << 47);
+}
+
+void aot_arraySetCached(void* arr, uint64_t idxVal, uint64_t val) {
+    Array* a = static_cast<Array*>(arr);
+    Value idx = nanToValue(idxVal);
+    if (idx.type == ValueType::NUMBER) {
+        size_t i = static_cast<size_t>(idx.as.number);
+        if (i < a->size()) {
+            a->set(i, nanToValue(val));
+        }
+    }
+}
+
+uint64_t aot_stringCharAt(void* vm_ctx, uint64_t strVal, uint64_t idxVal) {
+    ObjString* s = reinterpret_cast<ObjString*>(static_cast<uintptr_t>(strVal & AOT_NAN_PAYLOAD_MASK));
+    Value idx = nanToValue(idxVal);
+    if (idx.type == ValueType::NUMBER) {
+        size_t i = static_cast<size_t>(idx.as.number);
+        if (i < s->chars.length()) {
+            VM* vm = static_cast<VM*>(vm_ctx);
+            std::string ch(1, s->chars[i]);
+            return valueToNan(Value(vm->internString(ch)));
+        }
+    }
+    return AOT_NAN_BASE | (AOT_NAN_NIL << 47);
+}
+
+void aot_printStringObj(void* str) {
+    ObjString* s = static_cast<ObjString*>(str);
+    fwrite(s->chars.data(), 1, s->chars.size(), stdout);
+    fputc('\n', stdout);
+}
+
+void aot_printDoubleNumber(uint64_t rawBits) {
+    double d;
+    memcpy(&d, &rawBits, sizeof(d));
+    int64_t truncated = static_cast<int64_t>(d);
+    if (static_cast<double>(truncated) == d) {
+        std::fprintf(stdout, "%lld\n", static_cast<long long>(truncated));
+    } else {
+        std::fprintf(stdout, "%g\n", d);
+    }
+}
+
 } // extern "C"

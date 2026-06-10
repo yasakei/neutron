@@ -53,6 +53,10 @@ static inline uint64_t aot_getTag(uint64_t val) {
     return (val >> 47) & 0x7;
 }
 
+// Sentinel for "cache miss" — tagged value with tag=7 (unused) and payload=0
+// No normal operation produces this value.
+static const uint64_t AOT_SENTINEL = 0x7FFE380000000000ULL;
+
 // Convert between NaN-boxed values and runtime Value structs
 // These are used by both the runtime helpers and the codegen
 
@@ -126,6 +130,29 @@ void aot_printValue(void* vm_ctx, uint64_t val);
 
 // Intern a string and return NaN-boxed value
 uint64_t aot_internString(void* vm_ctx, const char* str);
+
+// ---- Focused helpers (take raw pointers, avoid nanToValue dispatch) ----
+
+// Property cache: try fast path. Returns inline field value or AOT_SENTINEL.
+uint64_t aot_tryGetCachedProp(void* inst, void* cache);
+
+// Property set cache: try fast path. Returns 1 on hit, 0 on miss.
+uint8_t  aot_trySetCachedProp(void* inst, void* cache, uint64_t val);
+
+// Array index get: returns element or nil.
+uint64_t aot_arrayGetCached(void* arr, uint64_t idxVal);
+
+// Array index set: elements[idx] = val (no-op if out of bounds).
+void     aot_arraySetCached(void* arr, uint64_t idxVal, uint64_t val);
+
+// String char at: returns char as NaN-boxed string value, or nil if OOB.
+uint64_t aot_stringCharAt(void* vm_ctx, uint64_t strVal, uint64_t idxVal);
+
+// Print a string ObjString* (chars + newline to stdout).
+void     aot_printStringObj(void* str);
+
+// Print a raw double (extracted from NaN-boxed value, avoids nanToValue).
+void     aot_printDoubleNumber(uint64_t rawBits);
 
 #ifdef __cplusplus
 } // extern "C"
