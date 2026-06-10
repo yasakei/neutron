@@ -25,6 +25,16 @@ endif()
 # security trade-off is acceptable. Default: OFF
 option(NEUTRON_UNSAFE_OPTIMIZATIONS "Enable unsafe performance optimizations (disables /GS- security checks)" OFF)
 
+# NEUTRON_PGO: Profile-Guided Optimization.
+# Set to "GENERATE" to build an instrumented binary, or "USE=<path>" to consume
+# a profile data file. Requires Clang or GCC on Linux/macOS.
+# Workflow:
+#   1. cmake -B build-pgo -DNEUTRON_PGO=GENERATE && cmake --build build-pgo
+#   2. LLVM_PROFILE_FILE="default_%p.profraw" ./build-pgo/neutron <benchmark>
+#   3. llvm-profdata merge -output=pgo.profdata default_*.profraw
+#   4. cmake -B build-release -DNEUTRON_PGO=USE=pgo.profdata && cmake --build build-release
+set(NEUTRON_PGO "OFF" CACHE STRING "Profile-Guided Optimization: OFF, GENERATE, or USE=<path>")
+
 # Compiler options
 if(MSVC)
     # Set multithreaded runtime library (required for _beginthreadex and std::thread)
@@ -71,6 +81,27 @@ else()
     if((NOT CMAKE_OSX_ARCHITECTURES OR CMAKE_OSX_ARCHITECTURES STREQUAL "") AND NOT CMAKE_CROSSCOMPILING)
         add_compile_options(-march=native)
     endif()
+endif()
+
+# PGO: profile-generate or profile-use for GCC/Clang
+if(NEUTRON_PGO MATCHES "^USE=(.+)$")
+    set(NEUTRON_PGO_FILE "${CMAKE_MATCH_1}")
+    if(NOT EXISTS "${NEUTRON_PGO_FILE}")
+        message(FATAL_ERROR "PGO data file not found: ${NEUTRON_PGO_FILE}")
+    endif()
+    message(STATUS "PGO: using profile data from ${NEUTRON_PGO_FILE}")
+    add_compile_options(-fprofile-use="${NEUTRON_PGO_FILE}")
+    add_link_options(-fprofile-use="${NEUTRON_PGO_FILE}")
+elseif(NEUTRON_PGO STREQUAL "GENERATE")
+    set(NEUTRON_PGO_DIR "${CMAKE_BINARY_DIR}/pgo-profiles")
+    file(MAKE_DIRECTORY "${NEUTRON_PGO_DIR}")
+    message(STATUS "PGO: generating profiles in ${NEUTRON_PGO_DIR}")
+    add_compile_options(-fprofile-generate="${NEUTRON_PGO_DIR}")
+    add_link_options(-fprofile-generate="${NEUTRON_PGO_DIR}")
+elseif(NEUTRON_PGO STREQUAL "OFF")
+    # no PGO flags
+else()
+    message(FATAL_ERROR "NEUTRON_PGO must be OFF, GENERATE, or USE=<path>. Got: ${NEUTRON_PGO}")
 endif()
 
 # Enable Interprocedural Optimization (LTO/GL)

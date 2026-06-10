@@ -8,6 +8,10 @@ box-modules/
 vcpkg_installed/
 node_modules/
 
+# PGO profile data
+pgo.profdata
+build-pgo/
+
 # Compiled binaries and libraries
 neutronc
 /neutron

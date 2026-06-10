@@ -5,7 +5,7 @@ Replace C++ string codegen (`src/aot/aot_compiler.cpp`) with direct LLVM IR emis
 
 ---
 
-> **Status**: Phases 0–3 complete ✅. Phase 4.1–4.4 complete ✅. Remaining: Phase 4.5 (optimization), Phase 5 (cross-compilation).
+> **Status**: Phases 0–3 complete ✅. Phase 4.1–4.5 complete ✅. Remaining: Phase 5 (cross-compilation).
 
 ---
 
@@ -145,10 +145,12 @@ Replace C++ string codegen (`src/aot/aot_compiler.cpp`) with direct LLVM IR emis
 - Suppress verbose IR dumps in release builds (`#ifdef NDEBUG`)
 - LLVM LTO (bitcode emission + lld plugin) deferred — O2 pipeline already provides strong optimization
 
-### 4.5 — Profile-guided optimization [⬜ TODO]
-- Instrument build: emit version with `-fprofile-instr-generate`
-- Run benchmark, collect `.profraw`
-- Rebuild with `-fprofile-instr-use`
+### 4.5 — Profile-guided optimization [✅ DONE]
+- `NEUTRON_PGO` CMake option: `OFF` / `GENERATE` / `USE=<path>`
+- GENERATE: adds `-fprofile-generate=<dir>` to compile+link flags
+- USE: adds `-fprofile-use=<file>` to compile+link flags
+- `scripts/pgo_collect.sh`: automates build → run → merge workflow
+- `.gitignore`: `pgo.profdata`, `build-pgo/`
 
 ---
 
