@@ -5,7 +5,7 @@ Replace C++ string codegen (`src/aot/aot_compiler.cpp`) with direct LLVM IR emis
 
 ---
 
-> **Status**: Phases 0–3 complete ✅. Phase 4.1–4.5 complete ✅. Phase 5 complete ✅. Remaining: Phase 6 (future optimizations).
+> **Status**: Phases 0–5 complete ✅. Phase 6 (AOT module linking) in progress. Phase 7 (further optimization) planned.
 
 ---
 
@@ -166,6 +166,77 @@ Replace C++ string codegen (`src/aot/aot_compiler.cpp`) with direct LLVM IR emis
 - Calls `setTargetPlatform()` on `LlvmCodegen` before `generateModule()` for cross-compilation
 - Existing triple mapping (`llvm_codegen.cpp:1686-1693`) already handles all 6 non-native platforms
 - TargetRegistry::lookupTarget() already in use for backend auto-detection
+
+---
+
+## Phase 6: Static Module Linking for AOT [⬜ TODO]
+
+### 6.1 — Module interface audit [✅ DONE]
+- Listed all 16 built-in modules, their source files, and every exported function signature (~210 total)
+- Identified 4 modules with AOT stubs (`math` 11, `random` 3, `fmt` 2, `path` 3) and 12 without
+- All modules use the same calling convention: `Value(VM& vm, std::vector<Value> args)`
+- Full audit saved in `docs/aot_module_audit.md`
+
+### 6.2 — Compile C++ modules to LLVM bitcode
+- Add CMake option to build each module `.cpp` as a bitcode file (`.bc`):
+  - `-flto -emit-llvm -c` for each module source
+  - Or use `-save-temps` during normal build and collect `.bc` files
+- Install `.bc` files alongside the Neutron runtime library
+- Create a helper `getModuleBitcode(name)` that returns the precompiled bitcode module by name
+
+### 6.3 — Emit direct `extern "C"` calls in LLVM IR
+- Replace `aot_invoke` runtime dispatch with direct function declarations for known module functions:
+  ```llvm
+  declare i64 @math_sqrt(ptr %vm_ctx, i64 %x)
+  ```
+- Map each module call opcode (opcode + module name + function name) to the correct bitcode symbol
+- Handle argument marshalling: AOT stack slots → function parameters
+- Handle return value: function result → AOT stack slot
+
+### 6.4 — Thin wrapper generation
+- Not all module functions have the same signature (some take `int`, some take `double`, some take `string`)
+- Generate thin C wrappers per exported function that:
+  - Unpack tagged values from AOT calling convention
+  - Call the real module implementation
+  - Pack the result back into a tagged value
+- Alternative: declare the function directly in LLVM IR with tagged `i64` params, if the module already uses `Value` types
+
+### 6.5 — LTO linking pipeline
+- Replace system linker call with `lld` or `gcc -flto`:
+  - Neutron LLVM IR (`.o`) + module bitcode (`.bc`) + runtime (`.a`)
+  - Full LTO across all components
+- Ensure all module symbols are resolved at link time (no `dlopen`/`dlsym`)
+- Handle `main()` entry point: either emit it in LLVM IR or keep the C++ wrapper
+
+### 6.6 — Module dependency resolution
+- `project_builder.cpp` `nonAotModules` set → remove entries as they get AOT support
+- For each module, also link its transitive dependencies (e.g., `json` depends on `strings`)
+- Verify no circular dependencies in module graph
+
+### 6.7 — Test all 128 tests via AOT
+- Run `tests/run_tests.py --aot` with full module support
+- Module tests (`modules/` dir) should produce identical output to interpreter
+- Benchmark suites (`tests/neutron/`) should show performance improvement from direct calls + LTO
+
+---
+
+## Phase 7: Further Optimization [⬜ TODO]
+
+### 7.1 — LTO-based inlining
+- Enable ThinLTO or full LTO in the linker invocation
+- Allows inlining across Neutron ↔ module boundary (e.g., `math.sqrt` call becomes a single `fsqrt` instruction)
+
+### 7.2 — Profile-guided module compilation
+- Extend PGO to module bitcode: instrumented modules collect profile data too
+- Use `llvm-profdata` to merge module profiles with Neutron profiles
+
+### 7.3 — JIT fallback for dynamic modules
+- For modules that can't be statically linked (e.g., user-installed box modules), keep JIT/Interpreter fallback
+- The AOT binary spawns a lightweight VM for any code that imports non-AOT modules
+
+### 7.4 — Autodetect AOT-safe modules
+- Scan `package.box` dependencies and check for precompiled `.bc` files
+- Graceful degradation: interpret if bitcode unavailable
 
 ---
 
