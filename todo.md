@@ -1,9 +1,9 @@
 # LLVM AOT Backend Migration
 
 ## Status
-✅ **Phases 0–15 complete** — All bytecode opcodes emit LLVM IR; user-defined functions compile to native IR and dispatch directly. 128/128 interpreter + 10/10 AOT tests pass.
+✅ **Phases 0–16 complete** — All bytecode opcodes emit LLVM IR; user-defined functions compile to native IR and dispatch directly. 128/128 interpreter + 10/10 AOT tests pass.
 
-❌ **Phases 13, 16–17** — Remaining helpers (EH, method invocation, module linking). See below.
+❌ **Phases 16–17** — Remaining helpers (method invocation, module linking). See below.
 
 ---
 
@@ -83,15 +83,20 @@ Every helper below is a C++ function called from LLVM IR. The goal is to inline 
 
 ---
 
-### Phase 13: Exception Handling (`OP_TRY` / `OP_END_TRY` / `OP_THROW`) — HARD
+### ✅ Phase 13: Exception Handling (`OP_TRY` / `OP_END_TRY` / `OP_THROW`) — HARD ✅
 
-| Helper | Lines | What it does | Inline approach |
-|--------|-------|-------------|-----------------|
-| `aot_tryPush` | 2145 | Push `ExceptionFrame` (tryEnd, catchStart, finallyStart) onto VM frame stack | Use LLVM `landingpad` + `invoke` — let LLVM handle unwinding natively |
-| `aot_tryPop` | 2115 | Pop the frame | LLVM `landingpad` handles this automatically |
-| `aot_throwError` | 2094 | Print error + stack trace + `exit(1)` | LLVM `resume` + cleanup handlers |
+| Helper | What we did |
+|--------|-------------|
+| `aot_tryPush` | Removed — AOT `OP_THROW` exits unconditionally via `aot_throwError`, so pushed frames are never read |
+| `aot_tryPop` | Removed — paired with `aot_tryPush` removal |
+| `aot_throwError` | Kept — prints error + stack trace + `exit(1)`; cold path |
 
-**This is a complete rewrite** — replaces `setjmp`/`longjmp` with native LLVM EH. Requires `invoke` instead of `call` for every instruction that can throw.
+**Done**:
+- Replaced `std::vector<ExceptionFrame> exceptionFrames` with `ExceptionFrame exceptionFrameStack[64]` + `int exceptionFrameDepth` (fixed-size array, no heap allocation)
+- Removed unused `fileName` (`std::string`) / `line` (`int`) fields from `ExceptionFrame`
+- Updated all 26 `vm.cpp` references to use array+index operations
+- Updated `aot_runtime.cpp` helpers then deleted them (dead code in AOT)
+- Updated `todo.md` status
 
 ---
 
@@ -150,7 +155,7 @@ Compile each C++ module to LLVM bitcode (`-flto -emit-llvm -c`), emit direct `ex
 | 10 (String) ✅ | — | `aotInternFunc` (cache miss still calls it) |
 | 11 (Create) ✅ | `aotCreateArrayFunc` → `aotAllocArrayFunc` | `aotCreateObjectFunc` (deferred) |
 | 12 (For/Spread) ✅ | `aotForInNextFunc`, `aotSpreadFunc` | `aotForInInitFunc` |
-| 13 (EH) | `aotTryPushFunc`, `aotTryPopFunc`, `aotThrowErrorFunc` | — |
+| 13 (EH) ✅ | `aotTryPushFunc`, `aotTryPopFunc` (removed, dead code) | `aotThrowErrorFunc` (cold path) |
 | 14 (Typed) ✅ | `aotSetLocalTypedFunc` (+ added `aotReportTypeErrorFunc`) | `aotSetGlobalTypedFunc`, `aotDefineTypedGlobalFunc` |
 | 15 (Safe) ✅ | `aotValidateSafeVarFunc`, `aotValidateSafeFileVarFunc` | `aotValidateSafeFuncFunc`, `aotValidateSafeFileFuncFunc` |
 | 16 (Invoke) | `aotInvokeFunc` | — |

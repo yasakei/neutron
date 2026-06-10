@@ -97,9 +97,9 @@ struct VMException {
     // We need to search up the call stack
     
     // Iterate exception frames backwards (most recent first)
-    for (size_t idx = vm->exceptionFrames.size(); idx > 0; idx--) {
+    for (size_t idx = vm->exceptionFrameDepth; idx > 0; idx--) {
         size_t i = idx - 1;
-        VM::ExceptionFrame& handler = vm->exceptionFrames[i];
+        VM::ExceptionFrame& handler = vm->exceptionFrameStack[i];
         
         // Find the call frame that owns this handler
         // The handler belongs to the frame where frame->slot_offset == handler.frameBase
@@ -148,7 +148,7 @@ struct VMException {
                 
                 // Unwind exception frames
                 // Keep handlers up to this one (inclusive)
-                vm->exceptionFrames.resize(i + 1);
+                vm->exceptionFrameDepth = i + 1;
                 
                 // Throw VMException to be caught in VM::run
                 throw VMException(Value(message));
@@ -2949,21 +2949,19 @@ void VM::run(size_t minFrameDepth) {
                 ptrdiff_t currentIP = (frame->ip - 1) - frame->function->chunk->code.data(); // Position before reading shorts
                 size_t currentFrameBase = stack.size();
                 
-                exceptionFrames.emplace_back(
+                exceptionFrameStack[exceptionFrameDepth++] = ExceptionFrame(
                     static_cast<int>(currentIP), 
                     static_cast<int>(tryEnd), 
                     catchStart == 0xFFFF ? -1 : static_cast<int>(catchStart),  // 0xFFFF represents -1 (no handler)
                     finallyStart == 0xFFFF ? -1 : static_cast<int>(finallyStart), // 0xFFFF represents -1 (no handler)
-                    currentFrameBase,
-                    frame->getFileName(),
-                    frame->currentLine
+                    currentFrameBase
                 );
                 DISPATCH();
             }
             CASE(OP_END_TRY) {
                 // End of try block - remove the exception handler frame
-                if (!exceptionFrames.empty()) {
-                    exceptionFrames.pop_back();
+                if (exceptionFrameDepth > 0) {
+                    exceptionFrameDepth--;
                 }
                 
                 // For Neutron's exception handling semantics:
@@ -2985,9 +2983,9 @@ void VM::run(size_t minFrameDepth) {
                 
                 // Find the closest exception handler in the current call frame
                 ExceptionFrame* handler = nullptr;
-                for (size_t idx = exceptionFrames.size(); idx > 0; idx--) {
+                for (size_t idx = exceptionFrameDepth; idx > 0; idx--) {
                     size_t i = idx - 1;
-                    ExceptionFrame& frame_handler = exceptionFrames[i];
+                    ExceptionFrame& frame_handler = exceptionFrameStack[i];
                     ptrdiff_t current_pos = frame->ip - frame->function->chunk->code.data() - 1; // -1 to account for the read byte
                     if (current_pos >= frame_handler.tryStart && current_pos <= frame_handler.tryEnd) {
                         handler = &frame_handler;
@@ -3026,12 +3024,12 @@ void VM::run(size_t minFrameDepth) {
                 stack.resize(handler->frameBase);
                 
                 // Remove all exception frames up to and including this one
-                while (!exceptionFrames.empty() && 
-                       &exceptionFrames.back() != handler) {
-                    exceptionFrames.pop_back();
+                while (exceptionFrameDepth > 0 &&
+                       &exceptionFrameStack[exceptionFrameDepth - 1] != handler) {
+                    exceptionFrameDepth--;
                 }
-                if (!exceptionFrames.empty()) {
-                    exceptionFrames.pop_back(); // Remove the current handler
+                if (exceptionFrameDepth > 0) {
+                    exceptionFrameDepth--; // Remove the current handler
                 }
                 
                 // Handle the exception according to the available handlers
@@ -3066,15 +3064,15 @@ void VM::run(size_t minFrameDepth) {
         push(e.value); // Push exception value
         
         // We need to find the handler again because we unwound the C++ stack
-        // but the VM state (frames, exceptionFrames) is preserved.
+        // but the VM state (frames, exceptionFrameStack) is preserved.
         
         CallFrame* currentFrame = &frames.back();
         ptrdiff_t current_pos = currentFrame->ip - currentFrame->function->chunk->code.data() - 1;
         
         ExceptionFrame* handler = nullptr;
-        for (size_t idx = exceptionFrames.size(); idx > 0; idx--) {
+        for (size_t idx = exceptionFrameDepth; idx > 0; idx--) {
             size_t i = idx - 1;
-            ExceptionFrame& frame_handler = exceptionFrames[i];
+            ExceptionFrame& frame_handler = exceptionFrameStack[i];
             if (current_pos >= frame_handler.tryStart && current_pos <= frame_handler.tryEnd) {
                 handler = &frame_handler;
                 // Found handler, break to execute it
@@ -3087,10 +3085,10 @@ void VM::run(size_t minFrameDepth) {
             stack.resize(handler->frameBase);
             
             // Remove exception frames
-            while (!exceptionFrames.empty() && &exceptionFrames.back() != handler) {
-                exceptionFrames.pop_back();
+            while (exceptionFrameDepth > 0 && &exceptionFrameStack[exceptionFrameDepth - 1] != handler) {
+                exceptionFrameDepth--;
             }
-            exceptionFrames.pop_back(); // Remove handler itself
+            exceptionFrameDepth--; // Remove handler itself
             
             push(e.value); // Push exception again after resize
             
@@ -4002,9 +4000,9 @@ void VM::sweep() {
 bool VM::handleException(const Value& exception) {
     (void)exception; // May be unused in some paths
     // Find the most recent handler that covers the current IP position
-    for (size_t idx = exceptionFrames.size(); idx > 0; idx--) {
+    for (size_t idx = exceptionFrameDepth; idx > 0; idx--) {
         size_t i = idx - 1;
-        ExceptionFrame& handler = exceptionFrames[i];
+        ExceptionFrame& handler = exceptionFrameStack[i];
         CallFrame* frame = &frames.back();
         ptrdiff_t current_pos = frame->ip - frame->function->chunk->code.data() - 1; // -1 to account for the read byte
         
@@ -4015,12 +4013,12 @@ bool VM::handleException(const Value& exception) {
             stack.resize(handler.frameBase);
             
             // Remove all exception frames up to and including this one
-            while (!exceptionFrames.empty() && 
-                   &exceptionFrames.back() != &handler) {
-                exceptionFrames.pop_back();
+            while (exceptionFrameDepth > 0 &&
+                   &exceptionFrameStack[exceptionFrameDepth - 1] != &handler) {
+                exceptionFrameDepth--;
             }
-            if (!exceptionFrames.empty()) {
-                exceptionFrames.pop_back(); // Remove the current handler
+            if (exceptionFrameDepth > 0) {
+                exceptionFrameDepth--; // Remove the current handler
             }
             
             // Jump to the catch block if it exists

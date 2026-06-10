@@ -562,28 +562,6 @@ uint64_t aot_forInInit(void* vm_ctx, uint64_t iterableVal) {
 // Full exception recovery (catch blocks executing in AOT) requires
 // setjmp/longjmp bridging back into LLVM IR — deferred but frame info is correct.
 
-void aot_tryPush(void* vm_ctx, uint16_t tryEnd, uint16_t catchStart, uint16_t finallyStart) {
-    VM* vm = static_cast<VM*>(vm_ctx);
-    VM::ExceptionFrame frame;
-    frame.tryStart = 0; // AOT codegen tracks IP separately
-    frame.tryEnd = tryEnd;
-    frame.catchStart = catchStart;
-    frame.finallyStart = finallyStart;
-    if (!vm->frames.empty()) {
-        frame.frameBase = vm->frames.back().slot_offset;
-    } else {
-        frame.frameBase = 0;
-    }
-    vm->exceptionFrames.push_back(frame);
-}
-
-void aot_tryPop(void* vm_ctx) {
-    VM* vm = static_cast<VM*>(vm_ctx);
-    if (!vm->exceptionFrames.empty()) {
-        vm->exceptionFrames.pop_back();
-    }
-}
-
 static std::string aot_buildStackTrace(VM* vm) {
     std::string trace;
     for (auto it = vm->frames.rbegin(); it != vm->frames.rend(); ++it) {

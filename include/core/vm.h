@@ -51,7 +51,7 @@
  * - Do NOT modify the stack directly during execution (use push/pop)
  * - Do NOT bypass the garbage collector when allocating objects
  * - Do NOT call VM methods from multiple threads without proper locking
- * - Do NOT modify exceptionFrames without understanding stack unwinding
+ * - Do NOT modify exceptionFrameStack / exceptionFrameDepth without understanding stack unwinding
  * - Do NOT disable JIT mid-execution without resetting jitManager state
  * 
  * Performance Notes:
@@ -506,17 +506,17 @@ public:
         int catchStart;       ///< Start offset of catch block (-1 if no catch)
         int finallyStart;     ///< Start offset of finally block (-1 if no finally)
         size_t frameBase;     ///< Stack frame base when exception frame was created
-        std::string fileName; ///< Source file name for debugging
-        int line;             ///< Source line number for debugging
 
-        ExceptionFrame() : tryStart(0), tryEnd(0), catchStart(-1), finallyStart(-1), frameBase(0), fileName(""), line(-1) {}
+        ExceptionFrame() : tryStart(0), tryEnd(0), catchStart(-1), finallyStart(-1), frameBase(0) {}
 
-        ExceptionFrame(int tryStart, int tryEnd, int catchStart, int finallyStart, size_t frameBase, const std::string& fileName, int line)
+        ExceptionFrame(int tryStart, int tryEnd, int catchStart, int finallyStart, size_t frameBase)
             : tryStart(tryStart), tryEnd(tryEnd), catchStart(catchStart), finallyStart(finallyStart),
-              frameBase(frameBase), fileName(fileName), line(line) {}
+              frameBase(frameBase) {}
     };
 
-    std::vector<ExceptionFrame> exceptionFrames;  ///< Stack of exception frames (LIFO - last in, first handled)
+    static constexpr int MAX_EXCEPTION_FRAMES = 64;
+    ExceptionFrame exceptionFrameStack[MAX_EXCEPTION_FRAMES];
+    int exceptionFrameDepth = 0;
     bool hasException;  ///< Flag indicating an exception is currently being handled
     Value pendingException;  ///< The exception to be re-thrown after finally block executes
 

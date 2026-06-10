@@ -97,9 +97,6 @@ uint64_t aot_invoke(void* vm_ctx, uint64_t receiver, const char* methodName,
 // aot_forInInit: takes iterable, returns NaN-boxed keys array
 uint64_t aot_forInInit(void* vm_ctx, uint64_t iterableVal);
 
-// Exception handling (AOT stub: stores frame info for eventual use)
-void aot_tryPush(void* vm_ctx, uint16_t tryEnd, uint16_t catchStart, uint16_t finallyStart);
-void aot_tryPop(void* vm_ctx);
 // Reports a runtime error from a NaN-boxed exception value (for OP_THROW)
 void aot_throwError(void* vm_ctx, uint64_t exceptionVal);
 // Reports a runtime error from a C string message

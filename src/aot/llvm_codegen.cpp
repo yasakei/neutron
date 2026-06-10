@@ -109,8 +109,6 @@ struct LlvmCodegenImpl {
     llvm::Function* aotAddFunc = nullptr;
     llvm::Function* aotThrowErrorFunc = nullptr;
     llvm::Function* aotRuntimeErrorFunc = nullptr;
-    llvm::Function* aotTryPushFunc = nullptr;
-    llvm::Function* aotTryPopFunc = nullptr;
     llvm::Function* aotValidateSafeFuncFunc = nullptr;
     llvm::Function* aotValidateSafeFileFuncFunc = nullptr;
     llvm::Function* aotReportTypeErrorFunc = nullptr;
@@ -425,17 +423,6 @@ struct LlvmCodegenImpl {
         auto* runtimeErrTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i8PtrTy}, false);
         aotRuntimeErrorFunc = llvm::Function::Create(runtimeErrTy, llvm::Function::ExternalLinkage,
                                                       "aot_runtimeError", module.get());
-
-        // void @aot_tryPush(i8* vm_ctx, i16 tryEnd, i16 catchStart, i16 finallyStart)
-        auto* tryPushTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context),
-            {i8PtrTy, i16Ty, i16Ty, i16Ty}, false);
-        aotTryPushFunc = llvm::Function::Create(tryPushTy, llvm::Function::ExternalLinkage,
-                                                  "aot_tryPush", module.get());
-
-        // void @aot_tryPop(i8* vm_ctx)
-        auto* tryPopTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy}, false);
-        aotTryPopFunc = llvm::Function::Create(tryPopTy, llvm::Function::ExternalLinkage,
-                                                 "aot_tryPop", module.get());
 
         // i64 @aot_forInInit(i8* vm_ctx, i64 iterable)
         auto* forInInitTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i64Ty}, false);
@@ -2464,7 +2451,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             }
 
             case OpCode::OP_END_TRY: {
-                impl->builder->CreateCall(impl->aotTryPopFunc, {impl->vmCtx});
+                // No-op: AOT's OP_THROW calls aot_throwError (exit), so pushed frames are never read
                 break;
             }
 
@@ -2494,11 +2481,8 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 uint16_t tryEnd = impl->readShort();
                 uint16_t catchStart = impl->readShort();
                 uint16_t finallyStart = impl->readShort();
-                impl->builder->CreateCall(impl->aotTryPushFunc,
-                    {impl->vmCtx,
-                     llvm::ConstantInt::get(impl->i16Ty, tryEnd),
-                     llvm::ConstantInt::get(impl->i16Ty, catchStart),
-                     llvm::ConstantInt::get(impl->i16Ty, finallyStart)});
+                (void)tryEnd; (void)catchStart; (void)finallyStart;
+                // No-op: AOT's OP_THROW exits unconditionally, so frames are never read
                 break;
             }
 
