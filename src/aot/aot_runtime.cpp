@@ -1,6 +1,7 @@
 #include "aot/aot_runtime.h"
 #include "core/vm.h"
 #include "compiler/compiler.h"
+#include "token.h"
 #include "types/json_object.h"
 #include "types/array.h"
 #include "types/instance.h"
