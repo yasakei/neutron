@@ -298,9 +298,10 @@ void VM::relock(int count) {
     lock_count = count;
 }
 
-Function::Function(const FunctionStmt* declaration, std::shared_ptr<Environment> closure) 
+Function::Function(const FunctionStmt* declaration, std::shared_ptr<Environment> closure, int aotIdx) 
     : name(), arity_val(0), chunk(new Chunk()), declaration(declaration), closure(closure) {
     obj_type = ObjType::OBJ_FUNCTION;
+    aotFuncIndex = aotIdx;
     
     // Extract parameter types from declaration
     if (declaration) {

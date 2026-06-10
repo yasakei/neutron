@@ -38,12 +38,13 @@ class Function : public Callable {
     friend class VM;
     friend class CheckpointManager;
 public:
-    Function(const FunctionStmt* declaration, std::shared_ptr<Environment> closure);
+    Function(const FunctionStmt* declaration, std::shared_ptr<Environment> closure, int aotIdx = -1);
     
     // Constructor for deserialization
     Function(std::string name, int arity) : name(name), arity_val(arity), declaration(nullptr), closure(nullptr) {
         chunk = new Chunk();
         obj_type = ObjType::OBJ_FUNCTION;
+        aotFuncIndex = -1;
     }
 
     ~Function();
@@ -57,6 +58,7 @@ public:
     const FunctionStmt* declaration;  // Made public for error reporting
     std::vector<std::optional<TokenType>> paramTypes;  // Parameter type annotations
     std::optional<TokenType> returnType;  // Return type annotation
+    int aotFuncIndex = -1;               // Index in AOT function table (-1 = not compiled)
     
 private:
     std::shared_ptr<Environment> closure;

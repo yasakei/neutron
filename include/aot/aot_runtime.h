@@ -148,11 +148,14 @@ void     aot_arraySetCached(void* arr, uint64_t idxVal, uint64_t val);
 // String char at: returns char as NaN-boxed string value, or nil if OOB.
 uint64_t aot_stringCharAt(void* vm_ctx, uint64_t strVal, uint64_t idxVal);
 
-// Print a string ObjString* (chars + newline to stdout).
-void     aot_printStringObj(void* str);
+// ---- Phase 6: Direct native function call support ----
 
-// Print a raw double (extracted from NaN-boxed value, avoids nanToValue).
-void     aot_printDoubleNumber(uint64_t rawBits);
+// Register a compiled LLVM function pointer for a given function index.
+void     aot_registerLlvmFunc(int idx, void* funcPtr);
+
+// Try to call a pre-compiled LLVM function directly.
+// Returns the NaN-boxed result, or AOT_SENTINEL if not possible (fall back to aot_call).
+uint64_t aot_tryDirectCall(void* vm_ctx, uint64_t callee, const uint64_t* args, uint8_t argCount);
 
 #ifdef __cplusplus
 } // extern "C"

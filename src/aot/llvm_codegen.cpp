@@ -88,6 +88,7 @@ struct LlvmCodegenImpl {
     llvm::GlobalVariable* funcTableGlobal = nullptr;
 
     // External function declarations
+    llvm::Function* printfFunc = nullptr;
     llvm::Function* putsFunc = nullptr;
     llvm::Function* aotGetPropFunc = nullptr;
     llvm::Function* aotSetPropFunc = nullptr;
@@ -123,8 +124,13 @@ struct LlvmCodegenImpl {
     llvm::Function* aotArrayGetCachedFunc = nullptr;
     llvm::Function* aotArraySetCachedFunc = nullptr;
     llvm::Function* aotStringCharAtFunc = nullptr;
-    llvm::Function* aotPrintStringObjFunc = nullptr;
-    llvm::Function* aotPrintDoubleNumberFunc = nullptr;
+
+    // Phase 6: Direct native call support
+    llvm::Function* aotTryDirectCallFunc = nullptr;
+    llvm::Function* aotRegisterLlvmFuncFunc = nullptr;
+
+    // Whether we're compiling the main entry function (affects OP_RETURN behavior)
+    bool isMainFunc = true;
 
     const Chunk* chunk = nullptr;
 
@@ -348,6 +354,10 @@ struct LlvmCodegenImpl {
 
     // Declare external functions
     void declareExternals() {
+        // i32 @printf(i8*, ...) — inlined for all OP_SAY value printing
+        auto* printfTy = llvm::FunctionType::get(i32Ty, {i8PtrTy}, true);
+        printfFunc = llvm::Function::Create(printfTy, llvm::Function::ExternalLinkage, "printf", module.get());
+
         auto* putsTy = llvm::FunctionType::get(i32Ty, {i8PtrTy}, false);
         putsFunc = llvm::Function::Create(putsTy, llvm::Function::ExternalLinkage, "puts", module.get());
 
@@ -510,24 +520,26 @@ struct LlvmCodegenImpl {
         auto* stringCharAtTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i64Ty, i64Ty}, false);
         aotStringCharAtFunc = llvm::Function::Create(stringCharAtTy, llvm::Function::ExternalLinkage,
                                                        "aot_stringCharAt", module.get());
-        // void @aot_printStringObj(i8* str)
-        auto* printStrObjTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy}, false);
-        aotPrintStringObjFunc = llvm::Function::Create(printStrObjTy, llvm::Function::ExternalLinkage,
-                                                         "aot_printStringObj", module.get());
-        // void @aot_printDoubleNumber(i64 rawBits)
-        auto* printDoubleTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i64Ty}, false);
-        aotPrintDoubleNumberFunc = llvm::Function::Create(printDoubleTy, llvm::Function::ExternalLinkage,
-                                                           "aot_printDoubleNumber", module.get());
+        // Phase 6: Direct native call support
+        // i64 @aot_tryDirectCall(i8* vm_ctx, i64 callee, i8* args, i8 argCount)
+        auto* tryDirectTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i64Ty, i8PtrTy, i8Ty}, false);
+        aotTryDirectCallFunc = llvm::Function::Create(tryDirectTy, llvm::Function::ExternalLinkage,
+                                                        "aot_tryDirectCall", module.get());
+
+        // void @aot_registerLlvmFunc(i32 idx, i8* funcPtr)
+        auto* regFuncTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i32Ty, i8PtrTy}, false);
+        aotRegisterLlvmFuncFunc = llvm::Function::Create(regFuncTy, llvm::Function::ExternalLinkage,
+                                                          "aot_registerLlvmFunc", module.get());
     }
 
-    // Create the constants global array from chunk (as NaN-boxed i64 values)
-    void createConstants() {
-        size_t n = chunk->constants.size();
+    // Create the constants global array from a chunk (as NaN-boxed i64 values)
+    llvm::GlobalVariable* createConstantsForChunk(const Chunk* c, const std::string& name) {
+        size_t n = c->constants.size();
         auto* arrTy = llvm::ArrayType::get(i64Ty, n);
 
         std::vector<llvm::Constant*> elems;
         for (size_t i = 0; i < n; i++) {
-            const Value& v = chunk->constants[i];
+            const Value& v = c->constants[i];
             switch (v.type) {
                 case ValueType::NIL:
                     elems.push_back(constValue(TAG_NIL, 0.0));
@@ -545,8 +557,12 @@ struct LlvmCodegenImpl {
         }
 
         auto* init = llvm::ConstantArray::get(arrTy, elems);
-        constantsGlobal = new llvm::GlobalVariable(*module, arrTy, true,
-                                                     llvm::GlobalValue::InternalLinkage, init, "constants");
+        return new llvm::GlobalVariable(*module, arrTy, true,
+                                         llvm::GlobalValue::InternalLinkage, init, name);
+    }
+
+    void createConstants() {
+        constantsGlobal = createConstantsForChunk(chunk, "constants");
     }
 
     // --- Stack access helpers ---
@@ -564,6 +580,12 @@ struct LlvmCodegenImpl {
     llvm::Value* constantsGEP(llvm::Value* idx) {
         auto* arrTy = llvm::ArrayType::get(i64Ty, chunk->constants.size());
         return builder->CreateGEP(arrTy, constantsGlobal,
+                                   {llvm::ConstantInt::get(i32Ty, 0), idx});
+    }
+
+    llvm::Value* constantsGEPForChunk(llvm::Value* idx, const Chunk* c, llvm::GlobalVariable* cg) {
+        auto* arrTy = llvm::ArrayType::get(i64Ty, c->constants.size());
+        return builder->CreateGEP(arrTy, cg,
                                    {llvm::ConstantInt::get(i32Ty, 0), idx});
     }
 
@@ -831,7 +853,6 @@ struct LlvmCodegenImpl {
         return (static_cast<uint16_t>(b1) << 8) | b2;
     }
 };
-
 LlvmCodegen::LlvmCodegen(const Chunk* c)
     : chunk(c), generateDebugSymbols(false),
       targetPlatform(TargetPlatform::NATIVE),
@@ -877,27 +898,30 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
     impl->builder->SetInsertPoint(entry);
     impl->setupStackLocals(func, vmCtxArg);
 
-    // Find all jump targets and branch from entry to first bytecode block
-    impl->findJumpTargets();
-    // Find all global variables
-    impl->collectGlobals();
-    auto* startBB = impl->getOrCreateBB(0, func);
-    impl->builder->CreateBr(startBB);
-    impl->builder->SetInsertPoint(startBB);
+    // Lambda for compiling current function
+    auto emitCurrentFunc = [&]() -> bool {
+        impl->bbMap.clear();
+        impl->findJumpTargets();
+        if (impl->isMainFunc) impl->collectGlobals();
+        auto* startBB = impl->getOrCreateBB(0, impl->func);
+        impl->builder->CreateBr(startBB);
+        impl->builder->SetInsertPoint(startBB);
 
-    // Walk bytecode and emit LLVM IR for each instruction
-    impl->ip = 0;
-    while (impl->ip < chunk->code.size()) {
-        // Ensure we're in the right basic block for this IP
-        impl->ensureBlock(impl->ip);
+        impl->ip = 0;
+        while (impl->ip < impl->chunk->code.size()) {
+            impl->ensureBlock(impl->ip);
 
-        uint8_t instr = impl->readByte();
-        OpCode op = static_cast<OpCode>(instr);
+            uint8_t instr = impl->readByte();
+            OpCode op = static_cast<OpCode>(instr);
 
-        switch (op) {
-            case OpCode::OP_RETURN: {
-                impl->popValue();
-                impl->builder->CreateRet(llvm::ConstantInt::get(impl->i32Ty, 0));
+            switch (op) {
+                case OpCode::OP_RETURN: {
+                auto* retVal = impl->popValue();
+                if (impl->isMainFunc) {
+                    impl->builder->CreateRet(llvm::ConstantInt::get(impl->i32Ty, 0));
+                } else {
+                    impl->builder->CreateRet(retVal);
+                }
                 break;
             }
 
@@ -1012,9 +1036,9 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* bIsNum = impl->builder->CreateICmpNE(bMasked, nanBase, "add_b_is_num");
                 auto* bothNum = impl->builder->CreateAnd(aIsNum, bIsNum, "both_num");
 
-                auto* addNumBB = llvm::BasicBlock::Create(ctx, "add_num", func);
-                auto* addHelperBB = llvm::BasicBlock::Create(ctx, "add_helper", func);
-                auto* addMergeBB = llvm::BasicBlock::Create(ctx, "add_merge", func);
+                auto* addNumBB = llvm::BasicBlock::Create(ctx, "add_num", impl->func);
+                auto* addHelperBB = llvm::BasicBlock::Create(ctx, "add_helper", impl->func);
+                auto* addMergeBB = llvm::BasicBlock::Create(ctx, "add_merge", impl->func);
                 impl->builder->CreateCondBr(bothNum, addNumBB, addHelperBB);
 
                 // Number path: fadd
@@ -1344,7 +1368,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             case OpCode::OP_JUMP: {
                 uint16_t offset = impl->readShort();
                 size_t target = impl->ip + offset;
-                auto* targetBB = impl->getOrCreateBB(target, func);
+                auto* targetBB = impl->getOrCreateBB(target, impl->func);
                 impl->builder->CreateBr(targetBB);
                 break;
             }
@@ -1356,8 +1380,8 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* val = impl->popValue();
                 auto* truthy = impl->computeTruthy(val);
 
-                auto* targetBB = impl->getOrCreateBB(target, func);
-                auto* contBB = llvm::BasicBlock::Create(ctx, "cont_jf", func);
+                auto* targetBB = impl->getOrCreateBB(target, impl->func);
+                auto* contBB = llvm::BasicBlock::Create(ctx, "cont_jf", impl->func);
                 impl->builder->CreateCondBr(truthy, contBB, targetBB);
                 impl->builder->SetInsertPoint(contBB);
                 break;
@@ -1366,7 +1390,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             case OpCode::OP_LOOP: {
                 uint16_t offset = impl->readShort();
                 size_t target = (impl->ip > offset) ? (impl->ip - offset) : 0;
-                auto* targetBB = impl->getOrCreateBB(target, func);
+                auto* targetBB = impl->getOrCreateBB(target, impl->func);
                 impl->builder->CreateBr(targetBB);
                 break;
             }
@@ -1389,8 +1413,8 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 else pred = llvm::CmpInst::FCMP_OEQ;
                 auto* cmp = impl->builder->CreateFCmp(pred, aData, bData, "fused_cmp");
 
-                auto* targetBB = impl->getOrCreateBB(target, func);
-                auto* contBB = llvm::BasicBlock::Create(ctx, "cont_fj", func);
+                auto* targetBB = impl->getOrCreateBB(target, impl->func);
+                auto* contBB = llvm::BasicBlock::Create(ctx, "cont_fj", impl->func);
                 impl->builder->CreateCondBr(cmp, contBB, targetBB);
                 impl->builder->SetInsertPoint(contBB);
                 break;
@@ -1408,8 +1432,8 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* constInt = impl->builder->CreateFPToSI(impl->loadData(constPtr), impl->i64Ty, "const_int");
                 auto* cond = impl->builder->CreateICmpSLT(localInt, constInt, "loop_cond");
 
-                auto* exitBB = impl->getOrCreateBB(exitTarget, func);
-                auto* contBB = llvm::BasicBlock::Create(ctx, "cont_less", func);
+                auto* exitBB = impl->getOrCreateBB(exitTarget, impl->func);
+                auto* contBB = llvm::BasicBlock::Create(ctx, "cont_less", impl->func);
                 impl->builder->CreateCondBr(cond, contBB, exitBB);
                 impl->builder->SetInsertPoint(contBB);
                 break;
@@ -1493,6 +1517,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             case OpCode::OP_CALL:
             case OpCode::OP_CALL_FAST: {
                 uint8_t argCount = impl->readByte();
+                llvm::Value* argsPtr = llvm::ConstantPointerNull::get(impl->i8PtrTy);
                 if (argCount > 0) {
                     auto* argsTy = llvm::ArrayType::get(impl->i64Ty, argCount);
                     auto* argsAlloca = impl->builder->CreateAlloca(argsTy, nullptr, "call_args");
@@ -1504,24 +1529,32 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                              llvm::ConstantInt::get(impl->i32Ty, i)});
                         impl->builder->CreateStore(arg, gep);
                     }
-                    auto* calleePtr = impl->popValue();
-                    auto* callee = impl->builder->CreateLoad(impl->i64Ty, calleePtr, "callee");
-                    auto* argsPtr = impl->builder->CreatePointerCast(argsAlloca, impl->i8PtrTy);
-                    auto* result = impl->builder->CreateCall(impl->aotCallFunc,
-                        {impl->vmCtx, callee, argsPtr,
-                         llvm::ConstantInt::get(impl->i8Ty, argCount)}, "call_result");
-                    auto* dest = impl->pushValue();
-                    impl->builder->CreateStore(result, dest);
-                } else {
-                    auto* calleePtr = impl->popValue();
-                    auto* callee = impl->builder->CreateLoad(impl->i64Ty, calleePtr, "callee");
-                    auto* result = impl->builder->CreateCall(impl->aotCallFunc,
-                        {impl->vmCtx, callee,
-                         llvm::ConstantPointerNull::get(impl->i8PtrTy),
-                         llvm::ConstantInt::get(impl->i8Ty, 0)}, "call_result");
-                    auto* dest = impl->pushValue();
-                    impl->builder->CreateStore(result, dest);
+                    argsPtr = impl->builder->CreatePointerCast(argsAlloca, impl->i8PtrTy);
                 }
+                auto* calleePtr = impl->popValue();
+                auto* callee = impl->builder->CreateLoad(impl->i64Ty, calleePtr, "callee");
+                auto* sentinel = llvm::ConstantInt::get(impl->i64Ty, AOT_SENTINEL);
+                auto* directResult = impl->builder->CreateCall(impl->aotTryDirectCallFunc,
+                    {impl->vmCtx, callee, argsPtr,
+                     llvm::ConstantInt::get(impl->i8Ty, argCount)}, "direct_call");
+                auto* isMiss = impl->builder->CreateICmpEQ(directResult, sentinel, "is_miss");
+                auto* tryDirectBB = impl->builder->GetInsertBlock();
+                auto* callFallbackBB = llvm::BasicBlock::Create(ctx, "call_fb", impl->func);
+                auto* callMergeBB = llvm::BasicBlock::Create(ctx, "call_mg", impl->func);
+                impl->builder->CreateCondBr(isMiss, callFallbackBB, callMergeBB);
+
+                impl->builder->SetInsertPoint(callFallbackBB);
+                auto* fallbackResult = impl->builder->CreateCall(impl->aotCallFunc,
+                    {impl->vmCtx, callee, argsPtr,
+                     llvm::ConstantInt::get(impl->i8Ty, argCount)}, "call_fb_r");
+                impl->builder->CreateBr(callMergeBB);
+
+                impl->builder->SetInsertPoint(callMergeBB);
+                auto* phi = impl->builder->CreatePHI(impl->i64Ty, 2, "call_r");
+                phi->addIncoming(directResult, tryDirectBB);
+                phi->addIncoming(fallbackResult, callFallbackBB);
+                auto* dest = impl->pushValue();
+                impl->builder->CreateStore(phi, dest);
                 break;
             }
 
@@ -1648,9 +1681,9 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* isArr = impl->builder->CreateAnd(isTagged,
                     impl->builder->CreateICmpEQ(tagBits, llvm::ConstantInt::get(impl->i64Ty, 3)),
                     "idx_is_arr");
-                auto* idxArrBB = llvm::BasicBlock::Create(ctx, "idx_arr", func);
-                auto* idxFbBB = llvm::BasicBlock::Create(ctx, "idx_fb", func);
-                auto* idxMgBB = llvm::BasicBlock::Create(ctx, "idx_mg", func);
+                auto* idxArrBB = llvm::BasicBlock::Create(ctx, "idx_arr", impl->func);
+                auto* idxFbBB = llvm::BasicBlock::Create(ctx, "idx_fb", impl->func);
+                auto* idxMgBB = llvm::BasicBlock::Create(ctx, "idx_mg", impl->func);
                 impl->builder->CreateCondBr(isArr, idxArrBB, idxFbBB);
                 // Array fast path
                 impl->builder->SetInsertPoint(idxArrBB);
@@ -1694,9 +1727,9 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* isArr = impl->builder->CreateAnd(isTagged,
                     impl->builder->CreateICmpEQ(tagBits, llvm::ConstantInt::get(impl->i64Ty, 3)),
                     "set_is_arr");
-                auto* setArrBB = llvm::BasicBlock::Create(ctx, "set_arr", func);
-                auto* setFbBB = llvm::BasicBlock::Create(ctx, "set_fb", func);
-                auto* setMgBB = llvm::BasicBlock::Create(ctx, "set_mg", func);
+                auto* setArrBB = llvm::BasicBlock::Create(ctx, "set_arr", impl->func);
+                auto* setFbBB = llvm::BasicBlock::Create(ctx, "set_fb", impl->func);
+                auto* setMgBB = llvm::BasicBlock::Create(ctx, "set_mg", impl->func);
                 impl->builder->CreateCondBr(isArr, setArrBB, setFbBB);
                 // Array fast path
                 impl->builder->SetInsertPoint(setArrBB);
@@ -1740,9 +1773,9 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* isInst = impl->builder->CreateAnd(isTagged,
                     impl->builder->CreateICmpEQ(tagBits, llvm::ConstantInt::get(impl->i64Ty, 4)),
                     "gp_is_inst");
-                auto* gpTryBB = llvm::BasicBlock::Create(ctx, "gp_try", func);
-                auto* gpFbBB = llvm::BasicBlock::Create(ctx, "gp_fb", func);
-                auto* gpMgBB = llvm::BasicBlock::Create(ctx, "gp_mg", func);
+                auto* gpTryBB = llvm::BasicBlock::Create(ctx, "gp_try", impl->func);
+                auto* gpFbBB = llvm::BasicBlock::Create(ctx, "gp_fb", impl->func);
+                auto* gpMgBB = llvm::BasicBlock::Create(ctx, "gp_mg", impl->func);
                 impl->builder->CreateCondBr(isInst, gpTryBB, gpFbBB);
                 // Try cache fast path
                 impl->builder->SetInsertPoint(gpTryBB);
@@ -1793,9 +1826,9 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* isInst = impl->builder->CreateAnd(isTagged,
                     impl->builder->CreateICmpEQ(tagBits, llvm::ConstantInt::get(impl->i64Ty, 4)),
                     "sp_is_inst");
-                auto* spTryBB = llvm::BasicBlock::Create(ctx, "sp_try", func);
-                auto* spFbBB = llvm::BasicBlock::Create(ctx, "sp_fb", func);
-                auto* spMgBB = llvm::BasicBlock::Create(ctx, "sp_mg", func);
+                auto* spTryBB = llvm::BasicBlock::Create(ctx, "sp_try", impl->func);
+                auto* spFbBB = llvm::BasicBlock::Create(ctx, "sp_fb", impl->func);
+                auto* spMgBB = llvm::BasicBlock::Create(ctx, "sp_mg", impl->func);
                 impl->builder->CreateCondBr(isInst, spTryBB, spFbBB);
                 // Try cache fast path
                 impl->builder->SetInsertPoint(spTryBB);
@@ -1907,8 +1940,8 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                     impl->builder->CreateICmpEQ(tagBits,
                         llvm::ConstantInt::get(impl->i64Ty, TAG_NIL)), "is_nil");
                 size_t exitTarget = impl->ip + offset;
-                auto* loopBodyBB = llvm::BasicBlock::Create(ctx, "for_body", func);
-                auto* exitBB = impl->getOrCreateBB(exitTarget, func);
+                auto* loopBodyBB = llvm::BasicBlock::Create(ctx, "for_body", impl->func);
+                auto* exitBB = impl->getOrCreateBB(exitTarget, impl->func);
                 impl->builder->CreateCondBr(isNil, exitBB, loopBodyBB);
                 // Loop body: assign key to varSlot, increment index
                 impl->builder->SetInsertPoint(loopBodyBB);
@@ -1943,9 +1976,9 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                     impl->builder->CreateICmpEQ(tagBits,
                         llvm::ConstantInt::get(impl->i64Ty, TAG_NIL)), "is_nil");
 
-                auto* getPropBB = llvm::BasicBlock::Create(ctx, "opt_getprop", func);
-                auto* nilBB = llvm::BasicBlock::Create(ctx, "opt_nil", func);
-                auto* mergeBB = llvm::BasicBlock::Create(ctx, "opt_merge", func);
+                auto* getPropBB = llvm::BasicBlock::Create(ctx, "opt_getprop", impl->func);
+                auto* nilBB = llvm::BasicBlock::Create(ctx, "opt_nil", impl->func);
+                auto* mergeBB = llvm::BasicBlock::Create(ctx, "opt_merge", impl->func);
                 impl->builder->CreateCondBr(isNil, nilBB, getPropBB);
 
                 // Get property path
@@ -1982,9 +2015,9 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* count = impl->builder->CreateCall(impl->aotSpreadFunc,
                     {impl->vmCtx, val, bufPtr, llvm::ConstantInt::get(impl->i8Ty, 256)}, "spread_cnt");
                 // Push each element from buffer onto stack
-                auto* spreadDoneBB = llvm::BasicBlock::Create(ctx, "spread_done", func);
-                auto* spreadCheckBB = llvm::BasicBlock::Create(ctx, "spread_check", func);
-                auto* spreadBodyBB = llvm::BasicBlock::Create(ctx, "spread_body", func);
+                auto* spreadDoneBB = llvm::BasicBlock::Create(ctx, "spread_done", impl->func);
+                auto* spreadCheckBB = llvm::BasicBlock::Create(ctx, "spread_check", impl->func);
+                auto* spreadBodyBB = llvm::BasicBlock::Create(ctx, "spread_body", impl->func);
                 auto* spreadIdx = impl->builder->CreateAlloca(impl->i8Ty, nullptr, "spread_i");
                 impl->builder->CreateStore(llvm::ConstantInt::get(impl->i8Ty, 0), spreadIdx);
                 impl->builder->CreateBr(spreadCheckBB);
@@ -2008,6 +2041,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             // === Extended opcodes (fallback handlers) ===
             case OpCode::OP_TAIL_CALL: {
                 uint8_t argCount = impl->readByte();
+                llvm::Value* argsPtr = llvm::ConstantPointerNull::get(impl->i8PtrTy);
                 if (argCount > 0) {
                     auto* argsTy = llvm::ArrayType::get(impl->i64Ty, argCount);
                     auto* argsAlloca = impl->builder->CreateAlloca(argsTy, nullptr, "tcall_args");
@@ -2019,24 +2053,32 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                              llvm::ConstantInt::get(impl->i32Ty, i)});
                         impl->builder->CreateStore(arg, gep);
                     }
-                    auto* calleePtr = impl->popValue();
-                    auto* callee = impl->builder->CreateLoad(impl->i64Ty, calleePtr, "tcallee");
-                    auto* argsPtr = impl->builder->CreatePointerCast(argsAlloca, impl->i8PtrTy);
-                    auto* result = impl->builder->CreateCall(impl->aotCallFunc,
-                        {impl->vmCtx, callee, argsPtr,
-                         llvm::ConstantInt::get(impl->i8Ty, argCount)}, "tcall_result");
-                    auto* dest = impl->pushValue();
-                    impl->builder->CreateStore(result, dest);
-                } else {
-                    auto* calleePtr = impl->popValue();
-                    auto* callee = impl->builder->CreateLoad(impl->i64Ty, calleePtr, "tcallee");
-                    auto* result = impl->builder->CreateCall(impl->aotCallFunc,
-                        {impl->vmCtx, callee,
-                         llvm::ConstantPointerNull::get(impl->i8PtrTy),
-                         llvm::ConstantInt::get(impl->i8Ty, 0)}, "tcall_result");
-                    auto* dest = impl->pushValue();
-                    impl->builder->CreateStore(result, dest);
+                    argsPtr = impl->builder->CreatePointerCast(argsAlloca, impl->i8PtrTy);
                 }
+                auto* calleePtr = impl->popValue();
+                auto* callee = impl->builder->CreateLoad(impl->i64Ty, calleePtr, "tcallee");
+                auto* sentinel = llvm::ConstantInt::get(impl->i64Ty, AOT_SENTINEL);
+                auto* directResult = impl->builder->CreateCall(impl->aotTryDirectCallFunc,
+                    {impl->vmCtx, callee, argsPtr,
+                     llvm::ConstantInt::get(impl->i8Ty, argCount)}, "tdirect_call");
+                auto* isMiss = impl->builder->CreateICmpEQ(directResult, sentinel, "tis_miss");
+                auto* tryDirectBB = impl->builder->GetInsertBlock();
+                auto* callFallbackBB = llvm::BasicBlock::Create(ctx, "tcall_fb", impl->func);
+                auto* callMergeBB = llvm::BasicBlock::Create(ctx, "tcall_mg", impl->func);
+                impl->builder->CreateCondBr(isMiss, callFallbackBB, callMergeBB);
+
+                impl->builder->SetInsertPoint(callFallbackBB);
+                auto* fallbackResult = impl->builder->CreateCall(impl->aotCallFunc,
+                    {impl->vmCtx, callee, argsPtr,
+                     llvm::ConstantInt::get(impl->i8Ty, argCount)}, "tcall_fb_r");
+                impl->builder->CreateBr(callMergeBB);
+
+                impl->builder->SetInsertPoint(callMergeBB);
+                auto* phi = impl->builder->CreatePHI(impl->i64Ty, 2, "tcall_r");
+                phi->addIncoming(directResult, tryDirectBB);
+                phi->addIncoming(fallbackResult, callFallbackBB);
+                auto* dest = impl->pushValue();
+                impl->builder->CreateStore(phi, dest);
                 break;
             }
 
@@ -2045,7 +2087,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* excVal = impl->builder->CreateLoad(impl->i64Ty, excPtr, "exception");
                 impl->builder->CreateCall(impl->aotThrowErrorFunc, {impl->vmCtx, excVal});
                 // aot_throwError never returns (calls exit())
-                auto* unreachable = llvm::BasicBlock::Create(ctx, "throw_unreachable", func);
+                auto* unreachable = llvm::BasicBlock::Create(ctx, "throw_unreachable", impl->func);
                 impl->builder->CreateUnreachable();
                 impl->builder->SetInsertPoint(unreachable);
                 auto* d = impl->pushValue();
@@ -2059,7 +2101,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 // so these should never appear in bytecode. Handle as jump for safety.
                 uint16_t offset = impl->readShort();
                 size_t target = impl->ip + offset;
-                impl->builder->CreateBr(impl->getOrCreateBB(target, func));
+                impl->builder->CreateBr(impl->getOrCreateBB(target, impl->func));
                 break;
             }
 
@@ -2152,22 +2194,35 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* sPay = impl->builder->CreateAnd(val,
                     llvm::ConstantInt::get(impl->i64Ty, PAYLOAD_MASK), "say_pay");
                 // Build blocks
-                auto* sNumBB = llvm::BasicBlock::Create(ctx, "say_num", func);
-                auto* sTagBB = llvm::BasicBlock::Create(ctx, "say_tag", func);
-                auto* sNilBB = llvm::BasicBlock::Create(ctx, "say_nil", func);
-                auto* sNotNilBB = llvm::BasicBlock::Create(ctx, "say_nnil", func);
-                auto* sBoolBB = llvm::BasicBlock::Create(ctx, "say_bool", func);
-                auto* sNotBoolBB = llvm::BasicBlock::Create(ctx, "say_nbool", func);
-                auto* sTrueBB = llvm::BasicBlock::Create(ctx, "say_true", func);
-                auto* sFalseBB = llvm::BasicBlock::Create(ctx, "say_false", func);
-                auto* sStrBB = llvm::BasicBlock::Create(ctx, "say_str", func);
-                auto* sFbBB = llvm::BasicBlock::Create(ctx, "say_fb", func);
-                auto* sMgBB = llvm::BasicBlock::Create(ctx, "say_mg", func);
+                auto* sNumBB = llvm::BasicBlock::Create(ctx, "say_num", impl->func);
+                auto* sTagBB = llvm::BasicBlock::Create(ctx, "say_tag", impl->func);
+                auto* sNilBB = llvm::BasicBlock::Create(ctx, "say_nil", impl->func);
+                auto* sNotNilBB = llvm::BasicBlock::Create(ctx, "say_nnil", impl->func);
+                auto* sBoolBB = llvm::BasicBlock::Create(ctx, "say_bool", impl->func);
+                auto* sNotBoolBB = llvm::BasicBlock::Create(ctx, "say_nbool", impl->func);
+                auto* sTrueBB = llvm::BasicBlock::Create(ctx, "say_true", impl->func);
+                auto* sFalseBB = llvm::BasicBlock::Create(ctx, "say_false", impl->func);
+                auto* sStrBB = llvm::BasicBlock::Create(ctx, "say_str", impl->func);
+                auto* sFbBB = llvm::BasicBlock::Create(ctx, "say_fb", impl->func);
+                auto* sMgBB = llvm::BasicBlock::Create(ctx, "say_mg", impl->func);
                 // notTagged → numBB else → tagBB
                 impl->builder->CreateCondBr(sNotTgd, sNumBB, sTagBB);
-                // Number path
+                // Number path — inline printf("%lld" / "%g") with integer check
                 impl->builder->SetInsertPoint(sNumBB);
-                impl->builder->CreateCall(impl->aotPrintDoubleNumberFunc, {val});
+                auto* sNumDbl = impl->builder->CreateBitCast(val, impl->doubleTy, "s_nd");
+                auto* sTrunc = impl->builder->CreateFPToSI(sNumDbl, impl->i64Ty, "s_trunc");
+                auto* sTruncDbl = impl->builder->CreateSIToFP(sTrunc, impl->doubleTy, "s_td");
+                auto* sIsInt = impl->builder->CreateFCmpOEQ(sNumDbl, sTruncDbl, "s_is_int");
+                auto* sIntBB = llvm::BasicBlock::Create(ctx, "say_int", impl->func);
+                auto* sFltBB = llvm::BasicBlock::Create(ctx, "say_flt", impl->func);
+                impl->builder->CreateCondBr(sIsInt, sIntBB, sFltBB);
+                impl->builder->SetInsertPoint(sIntBB);
+                auto* sFmtInt = impl->builder->CreateGlobalStringPtr("%lld\n", "s_fmt_i");
+                impl->builder->CreateCall(impl->printfFunc, {sFmtInt, sTrunc});
+                impl->builder->CreateBr(sMgBB);
+                impl->builder->SetInsertPoint(sFltBB);
+                auto* sFmtFlt = impl->builder->CreateGlobalStringPtr("%g\n", "s_fmt_f");
+                impl->builder->CreateCall(impl->printfFunc, {sFmtFlt, sNumDbl});
                 impl->builder->CreateBr(sMgBB);
                 // Tag dispatch: isNil → nilBB else → notNilBB
                 impl->builder->SetInsertPoint(sTagBB);
@@ -2206,10 +2261,18 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* sIsStr = impl->builder->CreateICmpEQ(sTag,
                     llvm::ConstantInt::get(impl->i64Ty, 2), "say_str_chk");
                 impl->builder->CreateCondBr(sIsStr, sStrBB, sFbBB);
-                // String path: extract ObjString*, call aot_printStringObj
+                // String path: GEP into ObjString at known offsets (vtable=0, obj_type=8, is_marked=9, pad=10..15, chars._M_p=16, chars._M_len=24)
                 impl->builder->SetInsertPoint(sStrBB);
                 auto* sStrPtr = impl->builder->CreateIntToPtr(sPay, impl->i8PtrTy, "say_strp");
-                impl->builder->CreateCall(impl->aotPrintStringObjFunc, {sStrPtr});
+                auto* sSDataPtr = impl->builder->CreateGEP(impl->i8Ty, sStrPtr,
+                    llvm::ConstantInt::get(impl->i32Ty, 16), "str_dp");
+                auto* sSData = impl->builder->CreateLoad(impl->i8PtrTy, sSDataPtr, "str_d");
+                auto* sSLenPtr = impl->builder->CreateGEP(impl->i8Ty, sStrPtr,
+                    llvm::ConstantInt::get(impl->i32Ty, 24), "str_lp");
+                auto* sSLen = impl->builder->CreateLoad(impl->i64Ty, sSLenPtr, "str_l");
+                auto* sFmtStr = impl->builder->CreateGlobalStringPtr("%.*s\n", "s_fmt_s");
+                auto* sSLen32 = impl->builder->CreateTrunc(sSLen, impl->i32Ty, "str_l32");
+                impl->builder->CreateCall(impl->printfFunc, {sFmtStr, sSLen32, sSData});
                 impl->builder->CreateBr(sMgBB);
                 // Fallback: call aot_printValue
                 impl->builder->SetInsertPoint(sFbBB);
@@ -2259,11 +2322,78 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
         }
     }
 
-    // Verify
-    if (llvm::verifyFunction(*func, &llvm::outs())) {
-        std::cerr << "LLVM function verification failed" << std::endl;
+        if (llvm::verifyFunction(*impl->func, &llvm::outs())) {
+            std::cerr << "LLVM function verification failed" << std::endl;
+            return false;
+        }
+        return true;
+    };
+
+    // Compile sub-functions (scan constants for Function objects with chunks)
+    {
+        auto* mainEntryBB = entry;
+        (void)mainEntryBB;
+        int nextFuncIdx = 0;
+        for (size_t i = 0; i < chunk->constants.size(); i++) {
+            const Value& v = chunk->constants[i];
+            if (v.type == ValueType::CALLABLE && v.as.callable->obj_type == ObjType::OBJ_FUNCTION) {
+                auto* fn = static_cast<Function*>(v.as.callable);
+                if (fn->chunk) {
+                    int funcIdx = nextFuncIdx++;
+                    fn->aotFuncIndex = funcIdx;
+
+                    auto* savedFunc = impl->func;
+                    auto* savedChunk = impl->chunk;
+                    auto* savedConstants = impl->constantsGlobal;
+                    bool savedIsMain = impl->isMainFunc;
+
+                    auto* subFnTy = llvm::FunctionType::get(impl->i64Ty, {
+                        llvm::PointerType::get(impl->i8Ty, 0),
+                        llvm::PointerType::get(impl->i8Ty, 0),
+                        impl->i64Ty
+                    }, false);
+                    std::string subFnName = "neutron_func_" + std::to_string(funcIdx);
+                    auto* subLLVMFn = llvm::Function::Create(subFnTy,
+                        llvm::Function::InternalLinkage, subFnName, impl->module.get());
+                    subLLVMFn->getArg(0)->setName("vm_ctx");
+                    subLLVMFn->getArg(1)->setName("args");
+                    subLLVMFn->getArg(2)->setName("arg_count");
+
+                    impl->func = subLLVMFn;
+                    impl->chunk = fn->chunk;
+                    impl->constantsGlobal = impl->createConstantsForChunk(fn->chunk,
+                        "constants_" + std::to_string(funcIdx));
+                    impl->isMainFunc = false;
+
+                    auto* subEntry = llvm::BasicBlock::Create(ctx, "entry", subLLVMFn);
+                    impl->builder->SetInsertPoint(subEntry);
+                    impl->setupStackLocals(subLLVMFn, subLLVMFn->getArg(0));
+
+                    if (!emitCurrentFunc()) {
+                        return false;
+                    }
+
+                    impl->builder->SetInsertPoint(entry);
+                    auto* fnPtrCast = impl->builder->CreatePointerCast(subLLVMFn, impl->i8PtrTy);
+                    impl->builder->CreateCall(impl->aotRegisterLlvmFuncFunc,
+                        {llvm::ConstantInt::get(impl->i32Ty, funcIdx), fnPtrCast});
+
+                    impl->func = savedFunc;
+                    impl->chunk = savedChunk;
+                    impl->constantsGlobal = savedConstants;
+                    impl->isMainFunc = savedIsMain;
+                }
+            }
+        }
+    }
+
+    impl->builder->SetInsertPoint(entry);
+
+    // Compile main function
+    if (!emitCurrentFunc()) {
         return false;
     }
+
     impl->module->print(llvm::errs(), nullptr);
 
     // Select target

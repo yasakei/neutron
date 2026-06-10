@@ -824,6 +824,32 @@ void aot_arraySetCached(void* arr, uint64_t idxVal, uint64_t val) {
     }
 }
 
+// ---- Phase 6: Direct native function call support ----
+
+static void* s_llvmFuncTable[256] = {nullptr};
+
+void aot_registerLlvmFunc(int idx, void* funcPtr) {
+    if (idx >= 0 && idx < 256) {
+        s_llvmFuncTable[idx] = funcPtr;
+    }
+}
+
+uint64_t aot_tryDirectCall(void* vm_ctx, uint64_t callee, const uint64_t* args, uint8_t argCount) {
+    if (!aot_isTagged(callee)) return AOT_SENTINEL;
+    if (aot_getTag(callee) != AOT_NAN_CALLABLE) return AOT_SENTINEL;
+
+    void* ptr = reinterpret_cast<void*>(callee & AOT_NAN_PAYLOAD_MASK);
+    Object* obj = static_cast<Object*>(ptr);
+    if (obj->obj_type != ObjType::OBJ_FUNCTION) return AOT_SENTINEL;
+
+    auto* fn = static_cast<Function*>(obj);
+    int idx = fn->aotFuncIndex;
+    if (idx < 0 || idx >= 256 || !s_llvmFuncTable[idx]) return AOT_SENTINEL;
+
+    auto compiledFn = reinterpret_cast<uint64_t(*)(void*, const uint64_t*, uint8_t)>(s_llvmFuncTable[idx]);
+    return compiledFn(vm_ctx, args, argCount);
+}
+
 uint64_t aot_stringCharAt(void* vm_ctx, uint64_t strVal, uint64_t idxVal) {
     ObjString* s = reinterpret_cast<ObjString*>(static_cast<uintptr_t>(strVal & AOT_NAN_PAYLOAD_MASK));
     Value idx = nanToValue(idxVal);
@@ -836,23 +862,6 @@ uint64_t aot_stringCharAt(void* vm_ctx, uint64_t strVal, uint64_t idxVal) {
         }
     }
     return AOT_NAN_BASE | (AOT_NAN_NIL << 47);
-}
-
-void aot_printStringObj(void* str) {
-    ObjString* s = static_cast<ObjString*>(str);
-    fwrite(s->chars.data(), 1, s->chars.size(), stdout);
-    fputc('\n', stdout);
-}
-
-void aot_printDoubleNumber(uint64_t rawBits) {
-    double d;
-    memcpy(&d, &rawBits, sizeof(d));
-    int64_t truncated = static_cast<int64_t>(d);
-    if (static_cast<double>(truncated) == d) {
-        std::fprintf(stdout, "%lld\n", static_cast<long long>(truncated));
-    } else {
-        std::fprintf(stdout, "%g\n", d);
-    }
 }
 
 } // extern "C"
