@@ -8,6 +8,7 @@
 #include "compiler/parser.h"
 #include "compiler/compiler.h"
 #include "aot/llvm_codegen.h"
+#include "aot/target_platform.h"
 #include "core/vm.h"
 #include "types/value.h"
 #include <iostream>
@@ -357,6 +358,36 @@ bool ProjectBuilder::buildProjectExecutable(
                 llvmObjectPath = finalOutputPath + "_neutron" + objExt;
                 {
                     neutron::aot::LlvmCodegen llvmGen(mainFunc->chunk);
+
+                    // Set target platform for cross-compilation
+                    if (crossCompile) {
+                        neutron::aot::TargetPlatform xp = neutron::aot::TargetPlatform::LINUX_X64;
+                        bool isArm = targetArch.find("aarch64") != std::string::npos ||
+                                     targetArch.find("arm64")  != std::string::npos ||
+                                     targetArch.find("armv8")  != std::string::npos;
+                        bool isMac  = targetArch.find("apple")  != std::string::npos ||
+                                      targetArch.find("darwin") != std::string::npos;
+                        bool isWin  = targetArch.find("mingw")  != std::string::npos ||
+                                      targetArch.find("windows") != std::string::npos;
+                        bool isX86  = targetArch.find("i386")   != std::string::npos ||
+                                      targetArch.find("i686")   != std::string::npos;
+
+                        if (isArm) {
+                            xp = isMac  ? neutron::aot::TargetPlatform::MACOS_ARM64
+                               : isWin  ? neutron::aot::TargetPlatform::WINDOWS_X64  // no WINDOWS_ARM64 yet
+                               :          neutron::aot::TargetPlatform::LINUX_ARM64;
+                        } else if (isX86) {
+                            xp = isWin  ? neutron::aot::TargetPlatform::WINDOWS_X86
+                               :          neutron::aot::TargetPlatform::LINUX_X64;   // fallback
+                        } else {
+                            // X64 default
+                            xp = isMac  ? neutron::aot::TargetPlatform::MACOS_X64
+                               : isWin  ? neutron::aot::TargetPlatform::WINDOWS_X64
+                               :          neutron::aot::TargetPlatform::LINUX_X64;
+                        }
+                        llvmGen.setTargetPlatform(xp);
+                    }
+
                     if (!llvmGen.generateModule("neutron_main", llvmObjectPath)) {
                         std::cerr << "      LLVM codegen failed, falling back to interpreter" << std::endl;
                     } else {

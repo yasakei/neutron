@@ -139,7 +139,7 @@ if(LLVM_FOUND)
     set(LLVM_LIBS LLVM)
   else()
     llvm_map_components_to_libnames(LLVM_LIBS
-      core native support target mc object bitwriter passes
+      core native AArch64 X86 support target mc object bitwriter passes
     )
   endif()
   message(STATUS "LLVM version: ${LLVM_PACKAGE_VERSION}")

@@ -694,8 +694,10 @@ LlvmCodegen::LlvmCodegen(const Chunk* c)
 {
     static bool targetsInitialized = false;
     if (!targetsInitialized) {
-        llvm::InitializeNativeTarget();
-        llvm::InitializeNativeTargetAsmPrinter();
+        llvm::InitializeAllTargetInfos();
+        llvm::InitializeAllTargets();
+        llvm::InitializeAllTargetMCs();
+        llvm::InitializeAllAsmPrinters();
         targetsInitialized = true;
     }
 }

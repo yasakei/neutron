@@ -5,7 +5,7 @@ Replace C++ string codegen (`src/aot/aot_compiler.cpp`) with direct LLVM IR emis
 
 ---
 
-> **Status**: Phases 0–3 complete ✅. Phase 4.1–4.5 complete ✅. Remaining: Phase 5 (cross-compilation).
+> **Status**: Phases 0–3 complete ✅. Phase 4.1–4.5 complete ✅. Phase 5 complete ✅. Remaining: Phase 6 (future optimizations).
 
 ---
 
@@ -154,16 +154,18 @@ Replace C++ string codegen (`src/aot/aot_compiler.cpp`) with direct LLVM IR emis
 
 ---
 
-## Phase 5: Cross-compilation via LLVM [⬜ TODO]
+## Phase 5: Cross-compilation via LLVM [✅ DONE]
 
-### 5.1 — Replace ad-hoc cross-compile flags
-- Current `--target` flag: use LLVM `Triple` instead of `TargetPlatform` enum
-- Map `TargetPlatform::LINUX_ARM64` → `Triple("aarch64-linux-gnu")`
-- Map `TargetPlatform::WINDOWS_X64` → `Triple("x86_64-pc-windows-msvc")`
+### 5.1 — Initialize all LLVM backends
+- Replaced `InitializeNativeTarget()` + `InitializeNativeTargetAsmPrinter()` with `InitializeAllTargetInfos()`, `InitializeAllTargets()`, `InitializeAllTargetMCs()`, `InitializeAllAsmPrinters()` for cross-target codegen
+- Added `AArch64` and `X86` to `llvm_map_components_to_libnames()` in CMakeLists.txt for static lib builds
+- All 20 LLVM backends available for cross-compilation
 
-### 5.2 — LLVM backend auto-detection
-- Use `TargetRegistry::lookupTarget()` to find the right backend
-- Error if backend not compiled in (e.g., AArch64 on x86-only LLVM build)
+### 5.2 — Wire `--target` flag to LLVM codegen
+- Added `arch→TargetPlatform` mapping in `project_builder.cpp`: parses ARM64 vs X64 vs X86, detects Linux/macOS/Windows from target triple string
+- Calls `setTargetPlatform()` on `LlvmCodegen` before `generateModule()` for cross-compilation
+- Existing triple mapping (`llvm_codegen.cpp:1686-1693`) already handles all 6 non-native platforms
+- TargetRegistry::lookupTarget() already in use for backend auto-detection
 
 ---
 
