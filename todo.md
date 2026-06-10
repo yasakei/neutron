@@ -5,7 +5,7 @@ Replace C++ string codegen (`src/aot/aot_compiler.cpp`) with direct LLVM IR emis
 
 ---
 
-> **Status**: Phases 0–3 complete ✅. Phase 4.1 complete ✅. Remaining: Phase 4.2–4.5 (optimization), Phase 5 (cross-compilation).
+> **Status**: Phases 0–3 complete ✅. Phase 4.1–4.2 complete ✅. Remaining: Phase 4.3–4.5 (optimization), Phase 5 (cross-compilation).
 
 ---
 
@@ -125,10 +125,13 @@ Replace C++ string codegen (`src/aot/aot_compiler.cpp`) with direct LLVM IR emis
 - ✅ TargetMachine opt level set
 - ✅ LLVM `verifyModule()` after codegen
 
-### 4.2 — Type specialization (unboxed values) [⬜ TODO]
-- Use LLVM `load <ty>` / `add <ty>` directly when type is known (e.g., integer loop counter)
-- NaN-boxing: store doubles in `i64` directly, use pointer tagging for objects
-- Skip runtime type checks when `OP_ADD_INT` etc. are used
+### 4.2 — Type specialization (unboxed values) [✅ DONE]
+- Int-specialized ALU ops: `fptosi` → `i64` op → `sitofp` round-trip for integer semantics
+- Int comparisons: `icmp eq/slt/sgt` instead of `fcmp oeq/olt/ogt`
+- Int inc/dec: `i64` add/sub with constant 1, leaving float paths for generic variants
+- `OP_LOOP_IF_LESS_LOCAL`: `icmp slt` instead of `fcmp olt`
+- NaN-boxing: doubles stored in `i64` directly, pointer tagging for objects
+- No runtime type checks needed — int-specialized opcodes guarantee integer operands
 
 ### 4.3 — Inline caching [⬜ TODO]
 - Cache property lookup results for `OP_GET_PROPERTY` / `OP_SET_PROPERTY`
