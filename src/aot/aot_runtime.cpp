@@ -6,6 +6,7 @@
 #include "types/obj_string.h"
 #include "types/value.h"
 
+#include <cstddef>
 #include <cstring>
 #include <string>
 
@@ -156,6 +157,131 @@ void aot_setProperty(void* vm_ctx, uint64_t objVal, const char* propName, uint64
 
     if (obj.type == ValueType::INSTANCE) {
         obj.as.instance->setField(propStr, propVal);
+    } else if (obj.type == ValueType::OBJECT) {
+        if (obj.as.object->obj_type == ObjType::OBJ_JSON_OBJECT) {
+            JsonObject* jsonObj = static_cast<JsonObject*>(obj.as.object);
+            jsonObj->properties[propStr] = propVal;
+        }
+    }
+}
+
+// --- Cached property access (AOT inline cache) ---
+
+uint64_t aot_getPropertyCached(void* vm_ctx, uint64_t objVal, const char* propName, void* cachePtr) {
+    VM* vm = static_cast<VM*>(vm_ctx);
+    AotPropCache* cache = static_cast<AotPropCache*>(cachePtr);
+    Value obj = nanToValue(objVal);
+
+    if (obj.type == ValueType::INSTANCE && cache->klass != nullptr) {
+        Instance* inst = obj.as.instance;
+        if (inst->klass == cache->klass) {
+            // Cache hit — direct inline field access, no string lookup
+            return valueToNan(inst->inlineFields[cache->inlineIndex].value);
+        }
+    }
+
+    // Cache miss: do full lookup
+    ObjString* propStr = vm->internString(propName);
+
+    if (obj.type == ValueType::INSTANCE) {
+        Instance* inst = obj.as.instance;
+        Value* field = inst->getField(propStr);
+        if (field) {
+            // Check if the field is in inline storage and update cache
+            uint8_t* fieldBase = reinterpret_cast<uint8_t*>(inst->inlineFields);
+            uint8_t* fieldPtr = reinterpret_cast<uint8_t*>(field);
+            ptrdiff_t byteOff = fieldPtr - fieldBase;
+            if (byteOff >= 0 && byteOff < static_cast<ptrdiff_t>(INLINE_FIELD_COUNT * sizeof(InlineField)) &&
+                (byteOff % sizeof(InlineField)) == offsetof(InlineField, value)) {
+                cache->klass = inst->klass;
+                cache->inlineIndex = static_cast<uint8_t>(byteOff / sizeof(InlineField));
+            }
+            return valueToNan(*field);
+        }
+        auto methIt = inst->klass->methods.find(propStr);
+        if (methIt != inst->klass->methods.end()) {
+            Value methodValue = methIt->second;
+            if (methodValue.type == ValueType::CALLABLE) {
+                Callable* c = methodValue.as.callable;
+                if (c->obj_type == ObjType::OBJ_FUNCTION) {
+                    return valueToNan(Value(vm->allocate<BoundMethod>(obj, static_cast<Function*>(c))));
+                }
+            }
+            return valueToNan(methodValue);
+        }
+        return valueToNan(Value());
+    }
+
+    if (obj.type == ValueType::OBJECT) {
+        if (obj.as.object->obj_type == ObjType::OBJ_JSON_OBJECT) {
+            JsonObject* jsonObj = static_cast<JsonObject*>(obj.as.object);
+            auto it = jsonObj->properties.find(propStr);
+            if (it != jsonObj->properties.end()) {
+                return valueToNan(it->second);
+            }
+        }
+        return valueToNan(Value());
+    }
+
+    if (obj.type == ValueType::ARRAY) {
+        Array* arr = obj.as.array;
+        std::string propStrName(propName);
+        if (propStrName == "length") {
+            return valueToNan(Value(static_cast<double>(arr->size())));
+        }
+        return valueToNan(Value());
+    }
+
+    if (obj.type == ValueType::OBJ_STRING) {
+        std::string propStrName(propName);
+        ObjString* strObj = obj.as.obj_string;
+        if (propStrName == "length") {
+            return valueToNan(Value(static_cast<double>(strObj->chars.length())));
+        }
+        return valueToNan(Value());
+    }
+
+    if (obj.type == ValueType::MODULE) {
+        Module* mod = obj.as.module;
+        try {
+            Value prop = mod->get(propName);
+            return valueToNan(prop);
+        } catch (...) {
+            return valueToNan(Value());
+        }
+    }
+
+    return valueToNan(Value());
+}
+
+void aot_setPropertyCached(void* vm_ctx, uint64_t objVal, const char* propName, uint64_t val, void* cachePtr) {
+    VM* vm = static_cast<VM*>(vm_ctx);
+    AotPropCache* cache = static_cast<AotPropCache*>(cachePtr);
+    Value obj = nanToValue(objVal);
+    Value propVal = nanToValue(val);
+    ObjString* propStr = vm->internString(propName);
+
+    if (obj.type == ValueType::INSTANCE) {
+        Instance* inst = obj.as.instance;
+        // Check cache first for fast set
+        if (cache->klass == inst->klass) {
+            inst->inlineFields[cache->inlineIndex].value = propVal;
+            return;
+        }
+        // Cache miss: do full setField and try to update cache
+        inst->setField(propStr, propVal);
+        // Find the field and cache it if inline
+        Value* field = inst->getField(propStr);
+        if (field) {
+            uint8_t* fieldBase = reinterpret_cast<uint8_t*>(inst->inlineFields);
+            uint8_t* fieldPtr = reinterpret_cast<uint8_t*>(field);
+            ptrdiff_t byteOff = fieldPtr - fieldBase;
+            if (byteOff >= 0 && byteOff < static_cast<ptrdiff_t>(INLINE_FIELD_COUNT * sizeof(InlineField)) &&
+                (byteOff % sizeof(InlineField)) == offsetof(InlineField, value)) {
+                cache->klass = inst->klass;
+                cache->inlineIndex = static_cast<uint8_t>(byteOff / sizeof(InlineField));
+            }
+        }
     } else if (obj.type == ValueType::OBJECT) {
         if (obj.as.object->obj_type == ObjType::OBJ_JSON_OBJECT) {
             JsonObject* jsonObj = static_cast<JsonObject*>(obj.as.object);

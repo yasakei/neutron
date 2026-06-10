@@ -5,7 +5,7 @@ Replace C++ string codegen (`src/aot/aot_compiler.cpp`) with direct LLVM IR emis
 
 ---
 
-> **Status**: Phases 0–3 complete ✅. Phase 4.1–4.2 complete ✅. Remaining: Phase 4.3–4.5 (optimization), Phase 5 (cross-compilation).
+> **Status**: Phases 0–3 complete ✅. Phase 4.1–4.3 complete ✅. Remaining: Phase 4.4–4.5 (optimization), Phase 5 (cross-compilation).
 
 ---
 
@@ -133,9 +133,11 @@ Replace C++ string codegen (`src/aot/aot_compiler.cpp`) with direct LLVM IR emis
 - NaN-boxing: doubles stored in `i64` directly, pointer tagging for objects
 - No runtime type checks needed — int-specialized opcodes guarantee integer operands
 
-### 4.3 — Inline caching [⬜ TODO]
-- Cache property lookup results for `OP_GET_PROPERTY` / `OP_SET_PROPERTY`
-- Emit guarded fast paths: check shape → direct load if hit, else call runtime
+### 4.3 — Inline caching [✅ DONE]
+- Per-callsite `AotPropCache` struct `{klass*, inlineIndex}` stored as LLVM module-level global
+- `aot_getPropertyCached` / `aot_setPropertyCached` runtime helpers check klass match → direct inline field access on hit, full lookup + cache update on miss
+- Applied to `OP_GET_PROPERTY`, `OP_SET_PROPERTY`, `OP_OPTIONAL_CHAIN`
+- Avoids string hash table lookup on repeated property access to same class
 
 ### 4.4 — LTO and codegen tuning [⬜ TODO]
 - Emit LLVM bitcode (`.bc`) instead of `.o`, then use `lld --plugin` for LTO

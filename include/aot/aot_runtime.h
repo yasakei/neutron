@@ -5,7 +5,25 @@
 #include <cstring>
 
 #ifdef __cplusplus
+#include <cstddef>
 extern "C" {
+#endif
+
+// Per-callsite property cache for inline caching in AOT
+// Stores the klass+inlineIndex so the fast path can skip string hash lookup
+#ifdef __cplusplus
+namespace neutron { struct AotPropCache {
+    void* klass;         // cached Class* (null = empty)
+    uint8_t inlineIndex; // cached inline field index (0-3)
+    uint8_t _pad[7];     // padding to 16 bytes
+}; }
+using AotPropCache = neutron::AotPropCache;
+#else
+typedef struct {
+    void* klass;
+    uint8_t inlineIndex;
+    uint8_t _pad[7];
+} AotPropCache;
 #endif
 
 // NaN-boxing constants (mirrors llvm_codegen.cpp)
@@ -44,6 +62,12 @@ static inline uint64_t aot_getTag(uint64_t val) {
 // Property access
 uint64_t aot_getProperty(void* vm_ctx, uint64_t objVal, const char* propName);
 void    aot_setProperty(void* vm_ctx, uint64_t objVal, const char* propName, uint64_t val);
+
+// Cached property access (AOT inline cache)
+// cachePtr points to a per-callsite AotPropCache struct
+// On hit: fast inline field access. On miss: full lookup + cache update.
+uint64_t aot_getPropertyCached(void* vm_ctx, uint64_t objVal, const char* propName, void* cachePtr);
+void    aot_setPropertyCached(void* vm_ctx, uint64_t objVal, const char* propName, uint64_t val, void* cachePtr);
 
 // Index access
 uint64_t aot_indexGet(void* vm_ctx, uint64_t objVal, uint64_t indexVal);

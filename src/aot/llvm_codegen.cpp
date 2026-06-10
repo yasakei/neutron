@@ -82,6 +82,8 @@ struct LlvmCodegenImpl {
     llvm::Function* putsFunc = nullptr;
     llvm::Function* aotGetPropFunc = nullptr;
     llvm::Function* aotSetPropFunc = nullptr;
+    llvm::Function* aotGetPropCachedFunc = nullptr;
+    llvm::Function* aotSetPropCachedFunc = nullptr;
     llvm::Function* aotIndexGetFunc = nullptr;
     llvm::Function* aotIndexSetFunc = nullptr;
     llvm::Function* aotCreateArrayFunc = nullptr;
@@ -91,6 +93,20 @@ struct LlvmCodegenImpl {
     llvm::Function* aotInternFunc = nullptr;
 
     const Chunk* chunk = nullptr;
+
+    // Per-callsite property cache counter (for unique global names)
+    uint32_t propCacheId = 0;
+
+    // Create a per-callsite property cache global variable
+    // The cache is a 16-byte struct: {void* klass, uint8_t inlineIndex, uint8_t pad[7]}
+    llvm::GlobalVariable* createPropCache() {
+        auto* cacheTy = llvm::ArrayType::get(i64Ty, 2); // 16 bytes = two i64s
+        std::string name = "prop_cache_" + std::to_string(propCacheId++);
+        auto* gv = new llvm::GlobalVariable(*module, cacheTy, false,
+                                              llvm::GlobalValue::InternalLinkage,
+                                              llvm::Constant::getNullValue(cacheTy), name);
+        return gv;
+    }
 
     // Control flow state
     std::vector<bool> isJumpTarget;
@@ -312,6 +328,16 @@ struct LlvmCodegenImpl {
         auto* setPropTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i64Ty, i8PtrTy, i64Ty}, false);
         aotSetPropFunc = llvm::Function::Create(setPropTy, llvm::Function::ExternalLinkage,
                                                   "aot_setProperty", module.get());
+
+        // i64 @aot_getPropertyCached(i8* vm_ctx, i64 obj_val, i8* prop_name, i8* cache_ptr)
+        auto* getPropCachedTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i64Ty, i8PtrTy, i8PtrTy}, false);
+        aotGetPropCachedFunc = llvm::Function::Create(getPropCachedTy, llvm::Function::ExternalLinkage,
+                                                        "aot_getPropertyCached", module.get());
+
+        // void @aot_setPropertyCached(i8* vm_ctx, i64 obj_val, i8* prop_name, i64 val, i8* cache_ptr)
+        auto* setPropCachedTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i64Ty, i8PtrTy, i64Ty, i8PtrTy}, false);
+        aotSetPropCachedFunc = llvm::Function::Create(setPropCachedTy, llvm::Function::ExternalLinkage,
+                                                        "aot_setPropertyCached", module.get());
 
         // i64 @aot_indexGet(i8* vm_ctx, i64 obj_val, i64 index_val)
         auto* indexGetTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i64Ty, i64Ty}, false);
@@ -1400,8 +1426,10 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* propNameStr = impl->builder->CreateGlobalStringPtr(propName, "prop_name");
                 auto* objPtr = impl->popValue();
                 auto* objVal = impl->builder->CreateLoad(impl->i64Ty, objPtr, "obj");
-                auto* result = impl->builder->CreateCall(impl->aotGetPropFunc,
-                    {impl->vmCtx, objVal, propNameStr}, "prop_result");
+                auto* cacheGv = impl->createPropCache();
+                auto* cachePtr = impl->builder->CreateBitCast(cacheGv, impl->i8PtrTy, "cache_ptr");
+                auto* result = impl->builder->CreateCall(impl->aotGetPropCachedFunc,
+                    {impl->vmCtx, objVal, propNameStr, cachePtr}, "prop_result");
                 auto* dest = impl->pushValue();
                 impl->builder->CreateStore(result, dest);
                 break;
@@ -1417,8 +1445,10 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* objPtr = impl->popValue();
                 auto* objVal = impl->builder->CreateLoad(impl->i64Ty, objPtr, "obj");
                 auto* val = impl->builder->CreateLoad(impl->i64Ty, valPtr, "val");
-                impl->builder->CreateCall(impl->aotSetPropFunc,
-                    {impl->vmCtx, objVal, propNameStr, val});
+                auto* cacheGv = impl->createPropCache();
+                auto* cachePtr = impl->builder->CreateBitCast(cacheGv, impl->i8PtrTy, "cache_ptr");
+                impl->builder->CreateCall(impl->aotSetPropCachedFunc,
+                    {impl->vmCtx, objVal, propNameStr, val, cachePtr});
                 // OP_SET_PROPERTY pushes the value back
                 auto* dest = impl->pushValue();
                 impl->builder->CreateStore(val, dest);
@@ -1520,8 +1550,10 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 std::string propName = nameVal.type == ValueType::OBJ_STRING
                     ? nameVal.as.obj_string->chars : "?";
                 auto* propNameStr = impl->builder->CreateGlobalStringPtr(propName, "prop_name");
-                auto* propResult = impl->builder->CreateCall(impl->aotGetPropFunc,
-                    {impl->vmCtx, recvVal, propNameStr}, "prop_result");
+                auto* cacheGv = impl->createPropCache();
+                auto* cachePtr = impl->builder->CreateBitCast(cacheGv, impl->i8PtrTy, "cache_ptr");
+                auto* propResult = impl->builder->CreateCall(impl->aotGetPropCachedFunc,
+                    {impl->vmCtx, recvVal, propNameStr, cachePtr}, "prop_result");
                 auto* propSlot = impl->pushValue();
                 impl->builder->CreateStore(propResult, propSlot);
                 impl->builder->CreateBr(mergeBB);
