@@ -108,7 +108,8 @@ void BytecodeOptimizer::optimize(Chunk& chunk) {
     optimizeIntegerArithmetic(chunk);
     
     // Pass 3: Fused compare-and-jump (erases 1 byte per fusion)
-    optimizeFusedCompareJump(chunk);
+    // DISABLED: AOT codegen's OP_LESS_JUMP handling breaks loop back-edges
+    // optimizeFusedCompareJump(chunk);
     
     // Pass 4: Increment/decrement detection (erases multiple bytes)
     optimizeIncrementDecrement(chunk);

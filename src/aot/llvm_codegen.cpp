@@ -72,8 +72,7 @@ struct LlvmCodegenImpl {
     // Active function state
     llvm::Function* func = nullptr;
     llvm::Value* vmCtx = nullptr;
-    llvm::Value* stackAlloca = nullptr;
-    llvm::Value* localsAlloca = nullptr;
+    llvm::Value* slotsAlloca = nullptr;
     llvm::Value* spAlloca = nullptr;
 
     // Global constants array reference
@@ -137,16 +136,20 @@ struct LlvmCodegenImpl {
                     handled = true;
                     break;
 
-                case OpCode::OP_LOOP_IF_LESS_LOCAL:
+                case OpCode::OP_LOOP_IF_LESS_LOCAL: {
+                    size_t instrStart = scanIp;
                     if (scanIp + 3 < chunk->code.size()) {
                         scanIp += 3; // slot + const index
                         uint16_t offset = (chunk->code[scanIp] << 8) | chunk->code[scanIp + 1];
                         scanIp += 2;
-                        size_t target = scanIp + offset;
-                        if (target < chunk->code.size()) isJumpTarget[target] = true;
+                        size_t exitTarget = scanIp + offset;
+                        if (exitTarget < chunk->code.size()) isJumpTarget[exitTarget] = true;
+                        size_t loopTarget = scanIp - 5;
+                        if (loopTarget < chunk->code.size()) isJumpTarget[loopTarget] = true;
                     }
                     handled = true;
                     break;
+                }
 
                 default: break;
             }
@@ -264,7 +267,7 @@ struct LlvmCodegenImpl {
         return llvm::ConstantInt::get(i64Ty, bits);
     }
 
-    // Allocate and initialize stack + locals
+    // Allocate and initialize combined locals+stack buffer
     void setupStackLocals(llvm::Function* f, llvm::Value* ctx) {
         func = f;
         vmCtx = ctx;
@@ -274,20 +277,20 @@ struct LlvmCodegenImpl {
         // Insert allocas at the beginning of the entry block
         llvm::IRBuilder<> allocBuilder(entry, entry->begin());
 
-        auto* stackTy = llvm::ArrayType::get(i64Ty, 256);
-        auto* localsTy = llvm::ArrayType::get(i64Ty, 256);
+        // Single shared array for both locals and stack (matching interpreter behavior)
+        auto* slotsTy = llvm::ArrayType::get(i64Ty, 512);
+        slotsAlloca = allocBuilder.CreateAlloca(slotsTy, nullptr, "slots");
 
-        stackAlloca = allocBuilder.CreateAlloca(stackTy, nullptr, "stack");
-        localsAlloca = allocBuilder.CreateAlloca(localsTy, nullptr, "locals");
-
-        // Initialize all locals to nil
+        // Initialize all local slots to nil
         for (int i = 0; i < 256; i++) {
-            auto* gep = allocBuilder.CreateGEP(localsTy, localsAlloca,
+            auto* gep = allocBuilder.CreateGEP(slotsTy, slotsAlloca,
                                                 {llvm::ConstantInt::get(i32Ty, 0),
                                                  llvm::ConstantInt::get(i32Ty, i)});
             allocBuilder.CreateStore(constValue(TAG_NIL, 0.0), gep);
         }
 
+        // sp starts at 0. Local slots (0..) and stack temps share the same array,
+        // matching the interpreter where slot_offset aligns with the first push.
         spAlloca = allocBuilder.CreateAlloca(i32Ty, nullptr, "sp");
         allocBuilder.CreateStore(llvm::ConstantInt::get(i32Ty, 0), spAlloca);
 
@@ -378,12 +381,12 @@ struct LlvmCodegenImpl {
     // --- Stack access helpers ---
 
     llvm::Value* stackGEP(llvm::Value* idx) {
-        return builder->CreateGEP(llvm::ArrayType::get(i64Ty, 256), stackAlloca,
+        return builder->CreateGEP(llvm::ArrayType::get(i64Ty, 512), slotsAlloca,
                                    {llvm::ConstantInt::get(i32Ty, 0), idx});
     }
 
     llvm::Value* localsGEP(llvm::Value* idx) {
-        return builder->CreateGEP(llvm::ArrayType::get(i64Ty, 256), localsAlloca,
+        return builder->CreateGEP(llvm::ArrayType::get(i64Ty, 512), slotsAlloca,
                                    {llvm::ConstantInt::get(i32Ty, 0), idx});
     }
 
@@ -1145,11 +1148,10 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* constData = impl->loadData(constPtr);
                 auto* cond = impl->builder->CreateFCmpOLT(localData, constData, "loop_cond");
 
-                // Loop back to start of this instruction (before operands were read)
-                size_t loopTarget = impl->ip - 5; // 1(op) + 1(slot) + 1(const) + 2(offset)
-                auto* loopBB = impl->getOrCreateBB(loopTarget, func);
                 auto* exitBB = impl->getOrCreateBB(exitTarget, func);
-                impl->builder->CreateCondBr(cond, loopBB, exitBB);
+                auto* contBB = llvm::BasicBlock::Create(ctx, "cont_less", func);
+                impl->builder->CreateCondBr(cond, contBB, exitBB);
+                impl->builder->SetInsertPoint(contBB);
                 break;
             }
 
@@ -1611,6 +1613,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
         std::cerr << "LLVM function verification failed" << std::endl;
         return false;
     }
+    impl->module->print(llvm::errs(), nullptr);
 
     // Select target
     std::string targetTriple;
@@ -1637,6 +1640,8 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
 
     // Run LLVM optimization pipeline (O2)
     {
+        llvm::errs() << "=== BEFORE OPT ===\n";
+        impl->module->print(llvm::errs(), nullptr);
         llvm::LoopAnalysisManager LAM;
         llvm::FunctionAnalysisManager FAM;
         llvm::CGSCCAnalysisManager CGAM;
@@ -1652,6 +1657,9 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
         llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
         MPM.run(*impl->module, MAM);
     }
+
+    llvm::errs() << "=== AFTER OPT ===\n";
+    impl->module->print(llvm::errs(), nullptr);
 
     // Emit object file
     std::error_code ec;

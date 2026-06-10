@@ -982,7 +982,7 @@ bool ProjectBuilder::buildProjectExecutable(
                 std::string libDir = std::filesystem::path(runtimeLibPath).parent_path().string();
                 std::string libName = std::filesystem::path(runtimeLibPath).stem().string();
                 if (libName.find("lib") == 0) libName = libName.substr(3);
-                compileCommand += "-L\"" + libDir + "\" -l" + libName + " ";
+                compileCommand += "-L\"" + libDir + "\" -l" + libName + " -Wl,-rpath,\"" + libDir + "\" ";
             } else {
                 compileCommand += "\"" + runtimeLibPath + "\" ";
             }
