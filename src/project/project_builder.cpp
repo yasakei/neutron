@@ -879,10 +879,15 @@ bool ProjectBuilder::buildProjectExecutable(
     bool useStaticLib = true;
 
     // Try to find shared library first (faster linking)
+    // Shared library carries its own dependencies (jsoncpp, curl, LLVM)
+    // via cmake-set rpath, so the AOT binary doesn't need to resolve them separately.
     std::vector<std::string> sharedLibCandidates = {
         executableDir + "/libneutron_shared.so",
+        executableDir + "/libneutron_shared.dylib",
         neutronSrcDir + "/build/libneutron_shared.so",
-        neutronSrcDir + "/libneutron_shared.so"
+        neutronSrcDir + "/build/libneutron_shared.dylib",
+        neutronSrcDir + "/libneutron_shared.so",
+        neutronSrcDir + "/libneutron_shared.dylib"
     };
     
     std::string sharedLibPath;
