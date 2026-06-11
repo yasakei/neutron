@@ -402,6 +402,7 @@ bool ProjectBuilder::buildProjectExecutable(
                     } else {
                         std::cout << "      LLVM object file: " << llvmObjectPath << std::endl;
                         std::cout << "      C++ wrapper: " << tempSourcePath << std::endl;
+                        srcFile << "#include <cstdio>\n";
                         srcFile << "#include \"aot/aot_runtime.h\"\n";
                         srcFile << "#include \"core/vm.h\"\n";
                         srcFile << "#include \"compiler/scanner.h\"\n";
@@ -412,15 +413,21 @@ bool ProjectBuilder::buildProjectExecutable(
                         srcFile << "const char* embedded_source = R\"neutron_source(\n";
                         srcFile << sourceCode;
                         srcFile << "\n)neutron_source\";\n\n";
+                        srcFile << "struct DebugInit { DebugInit() { fprintf(stderr, \"DEBUG: global ctor\\n\"); } };";
+                        srcFile << "DebugInit s_debugInit;\n";
                         srcFile << "int main() {\n";
+                        srcFile << "    fprintf(stderr, \"DEBUG: main() started\\n\");\n";
                         srcFile << "    neutron::VM vm;\n";
                         srcFile << "    // Compile source to register function constants\n";
+                        srcFile << "    fprintf(stderr, \"DEBUG: scanning/parsing...\\n\");\n";
                         srcFile << "    neutron::Scanner scanner(embedded_source);\n";
                         srcFile << "    auto tokens = scanner.scanTokens();\n";
                         srcFile << "    neutron::Parser parser(tokens);\n";
                         srcFile << "    auto stmts = parser.parse();\n";
+                        srcFile << "    fprintf(stderr, \"DEBUG: compiling...\\n\");\n";
                         srcFile << "    neutron::Compiler compiler(vm);\n";
                         srcFile << "    neutron::Function* fn = compiler.compile(stmts);\n";
+                        srcFile << "    fprintf(stderr, \"DEBUG: compilation done\\n\");\n";
                         srcFile << "    // Populate func table from chunk's function-typed constants\n";
                         srcFile << "    // and class method Function objects\n";
                         srcFile << "    if (fn && fn->chunk) {\n";
@@ -471,10 +478,12 @@ bool ProjectBuilder::buildProjectExecutable(
                         srcFile << "            }\n";
                         srcFile << "        }\n";
                         srcFile << "    }\n";
+                        srcFile << "    fprintf(stderr, \"DEBUG: func table setup done\\n\");\n";
                         srcFile << "    if (neutron::ErrorHandler::hadError()) {\n";
                         srcFile << "        neutron::ErrorHandler::printSummary();\n";
                         srcFile << "        return 1;\n";
                         srcFile << "    }\n";
+                        srcFile << "    fprintf(stderr, \"DEBUG: calling neutron_main\\n\");\n";
                         srcFile << "    return neutron_main(&vm);\n";
                         srcFile << "}\n";
                         srcFile.close();
