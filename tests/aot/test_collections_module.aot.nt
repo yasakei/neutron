@@ -3,45 +3,45 @@ use collections;
 var ok = true;
 
 // ── Set ──
-var s = collections.set_new()
-if (collections.set_size(s) == 0) { say("set_new OK") } else { say("FAIL set_new"); ok = false }
+var s = collections.set_new();
+if (collections.set_size(s) == 0) { say("set_new OK"); } else { say("FAIL set_new"); ok = false; }
 
-collections.set_add(s, "a")
-collections.set_add(s, "b")
-collections.set_add(s, "a")
-if (collections.set_size(s) == 2) { say("set_add/size OK") } else { say("FAIL set_add"); ok = false }
+collections.set_add(s, "a");
+collections.set_add(s, "b");
+collections.set_add(s, "a");
+if (collections.set_size(s) == 2) { say("set_add/size OK"); } else { say("FAIL set_add"); ok = false; }
 
-if (collections.set_has(s, "a") && !collections.set_has(s, "z")) { say("set_has OK") } else { say("FAIL set_has"); ok = false }
+if (collections.set_has(s, "a") && !collections.set_has(s, "z")) { say("set_has OK"); } else { say("FAIL set_has"); ok = false; }
 
 if (collections.set_remove(s, "a") && !collections.set_has(s, "a") && collections.set_size(s) == 1) {
-    say("set_remove OK")
-} else { say("FAIL set_remove"); ok = false }
+    say("set_remove OK");
+} else { say("FAIL set_remove"); ok = false; }
 
-var arr = collections.set_to_array(s)
-if (arr.length == 1 && arr[0] == "b") { say("set_to_array OK") } else { say("FAIL set_to_array"); ok = false }
+var arr = collections.set_to_array(s);
+if (arr.length == 1 && arr[0] == "b") { say("set_to_array OK"); } else { say("FAIL set_to_array"); ok = false; }
 
 // ── Stack ──
-var st = collections.stack_new()
-if (collections.stack_is_empty(st)) { say("stack_is_empty OK") } else { say("FAIL stack_is_empty"); ok = false }
+var st = collections.stack_new();
+if (collections.stack_is_empty(st)) { say("stack_is_empty OK"); } else { say("FAIL stack_is_empty"); ok = false; }
 
-collections.stack_push(st, 10)
-collections.stack_push(st, 20)
-if (collections.stack_size(st) == 2) { say("stack_push/size OK") } else { say("FAIL stack_push"); ok = false }
-if (collections.stack_peek(st) == 20) { say("stack_peek OK") } else { say("FAIL stack_peek"); ok = false }
+collections.stack_push(st, 10);
+collections.stack_push(st, 20);
+if (collections.stack_size(st) == 2) { say("stack_push/size OK"); } else { say("FAIL stack_push"); ok = false; }
+if (collections.stack_peek(st) == 20) { say("stack_peek OK"); } else { say("FAIL stack_peek"); ok = false; }
 
-var sp = collections.stack_pop(st)
+var sp = collections.stack_pop(st);
 if (sp == 20 && collections.stack_size(st) == 1 && collections.stack_peek(st) == 10) {
-    say("stack_pop OK")
-} else { say("FAIL stack_pop"); ok = false }
+    say("stack_pop OK");
+} else { say("FAIL stack_pop"); ok = false; }
 
 // ── Queue ──
-var q = collections.queue_new()
-collections.queue_enqueue(q, 1)
-collections.queue_enqueue(q, 2)
-if (collections.queue_size(q) == 2) { say("queue_enqueue/size OK") } else { say("FAIL queue_enqueue"); ok = false }
-if (collections.queue_peek(q) == 1) { say("queue_peek OK") } else { say("FAIL queue_peek"); ok = false }
+var q = collections.queue_new();
+collections.queue_enqueue(q, 1);
+collections.queue_enqueue(q, 2);
+if (collections.queue_size(q) == 2) { say("queue_enqueue/size OK"); } else { say("FAIL queue_enqueue"); ok = false; }
+if (collections.queue_peek(q) == 1) { say("queue_peek OK"); } else { say("FAIL queue_peek"); ok = false; }
 
-var dq = collections.queue_dequeue(q)
-if (dq == 1 && collections.queue_size(q) == 1) { say("queue_dequeue OK") } else { say("FAIL queue_dequeue"); ok = false }
+var dq = collections.queue_dequeue(q);
+if (dq == 1 && collections.queue_size(q) == 1) { say("queue_dequeue OK"); } else { say("FAIL queue_dequeue"); ok = false; }
 
-if (ok) { say("AOT collections module test PASSED") }
+if (ok) { say("AOT collections module test PASSED"); }

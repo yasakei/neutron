@@ -33,4 +33,4 @@ if (regex.isValid("[a-z]+") && !regex.isValid("[")) { say("isValid OK"); } else 
 var esc = regex.escape("a.b*c");
 if (esc != "a.b*c") { say("escape OK"); } else { say("FAIL escape"); ok = false; }
 
-if (ok) { say("AOT regex module test PASSED") }
+if (ok) { say("AOT regex module test PASSED"); }

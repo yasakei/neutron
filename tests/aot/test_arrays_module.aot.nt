@@ -50,4 +50,4 @@ if (j == "a,b") { say("join OK"); } else { say("FAIL join"); ok = false; }
 arrays.clear(d);
 if (arrays.length(d) == 0) { say("clear OK"); } else { say("FAIL clear"); ok = false; }
 
-if (ok) { say("AOT arrays module test PASSED") }
+if (ok) { say("AOT arrays module test PASSED"); }

@@ -1,60 +1,60 @@
-import math
+use math;
 
 // sqrt
-var r = math.sqrt(9)
+var r = math.sqrt(9);
 if (r == 3) {
-    say("sqrt OK")
+    say("sqrt OK");
 } else {
-    say("FAIL sqrt: expected 3, got " + r)
+    say("FAIL sqrt: expected 3, got " + r);
 }
 
 // pow
-r = math.pow(2, 10)
+r = math.pow(2, 10);
 if (r == 1024) {
-    say("pow OK")
+    say("pow OK");
 } else {
-    say("FAIL pow: expected 1024, got " + r)
+    say("FAIL pow: expected 1024, got " + r);
 }
 
 // abs
-r = math.abs(-5)
+r = math.abs(-5);
 if (r == 5) {
-    say("abs OK")
+    say("abs OK");
 } else {
-    say("FAIL abs: expected 5, got " + r)
+    say("FAIL abs: expected 5, got " + r);
 }
 
 // ceil, floor, round
-r = math.ceil(3.2)
-if (r == 4) { say("ceil OK") } else { say("FAIL ceil: " + r) }
+r = math.ceil(3.2);
+if (r == 4) { say("ceil OK"); } else { say("FAIL ceil: " + r); }
 
-r = math.floor(3.9)
-if (r == 3) { say("floor OK") } else { say("FAIL floor: " + r) }
+r = math.floor(3.9);
+if (r == 3) { say("floor OK"); } else { say("FAIL floor: " + r); }
 
-r = math.round(3.5)
-if (r == 4) { say("round OK") } else { say("FAIL round: " + r) }
+r = math.round(3.5);
+if (r == 4) { say("round OK"); } else { say("FAIL round: " + r); }
 
 // sin, cos, tan (at 0)
-r = math.sin(0)
-if (r == 0) { say("sin OK") } else { say("FAIL sin: " + r) }
+r = math.sin(0);
+if (r == 0) { say("sin OK"); } else { say("FAIL sin: " + r); }
 
-r = math.cos(0)
-if (r == 1) { say("cos OK") } else { say("FAIL cos: " + r) }
+r = math.cos(0);
+if (r == 1) { say("cos OK"); } else { say("FAIL cos: " + r); }
 
-r = math.tan(0)
-if (r == 0) { say("tan OK") } else { say("FAIL tan: " + r) }
+r = math.tan(0);
+if (r == 0) { say("tan OK"); } else { say("FAIL tan: " + r); }
 
 // add, subtract, multiply, divide
-r = math.add(10, 20)
-if (r == 30) { say("add OK") } else { say("FAIL add: " + r) }
+r = math.add(10, 20);
+if (r == 30) { say("add OK"); } else { say("FAIL add: " + r); }
 
-r = math.subtract(100, 30)
-if (r == 70) { say("subtract OK") } else { say("FAIL subtract: " + r) }
+r = math.subtract(100, 30);
+if (r == 70) { say("subtract OK"); } else { say("FAIL subtract: " + r); }
 
-r = math.multiply(6, 7)
-if (r == 42) { say("multiply OK") } else { say("FAIL multiply: " + r) }
+r = math.multiply(6, 7);
+if (r == 42) { say("multiply OK"); } else { say("FAIL multiply: " + r); }
 
-r = math.divide(100, 4)
-if (r == 25) { say("divide OK") } else { say("FAIL divide: " + r) }
+r = math.divide(100, 4);
+if (r == 25) { say("divide OK"); } else { say("FAIL divide: " + r); }
 
-say("AOT math module test done")
+say("AOT math module test done");

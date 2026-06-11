@@ -20,4 +20,4 @@ time.sleep(10);
 var after = time.now();
 if (after >= before) { say("sleep OK"); } else { say("FAIL sleep"); ok = false; }
 
-if (ok) { say("AOT time module test PASSED") }
+if (ok) { say("AOT time module test PASSED"); }

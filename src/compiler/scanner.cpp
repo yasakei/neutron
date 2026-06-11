@@ -163,13 +163,13 @@ void Scanner::scanToken() {
             break;
         case '#':
             if (match('{')) {
-                // Block comment: #{ ... #}  (supports nesting)
+                // Block comment: #{ ... }#  (supports nesting)
                 int depth = 1;
                 while (!isAtEnd() && depth > 0) {
                     if (peek() == '#' && peekNext() == '{') {
                         advance(); advance();
                         depth++;
-                    } else if (peek() == '#' && peekNext() == '}') {
+                    } else if (peek() == '}' && peekNext() == '#') {
                         advance(); advance();
                         depth--;
                     } else {

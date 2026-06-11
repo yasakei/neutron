@@ -18,4 +18,4 @@ if (args.length >= 0) { say("args OK"); } else { say("FAIL args"); ok = false; }
 var tmp = sys.tmpfile();
 if (tmp != "") { say("tmpfile OK"); } else { say("FAIL tmpfile"); ok = false; }
 
-if (ok) { say("AOT sys module test PASSED") }
+if (ok) { say("AOT sys module test PASSED"); }

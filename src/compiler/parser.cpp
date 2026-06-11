@@ -213,7 +213,7 @@ std::unique_ptr<Stmt> Parser::varDeclaration(bool isStatic) {
         advance(); // consume '['
         std::vector<Token> names;
         while (!check(TokenType::RIGHT_BRACKET) && !isAtEnd()) {
-            names.push_back(consume(TokenType::IDENTIFIER, "Expect variable name in array destructure."));
+            names.push_back(consumeIdentifier("Expect variable name in array destructure."));
             if (!check(TokenType::RIGHT_BRACKET)) consume(TokenType::COMMA, "Expect ',' between names.");
         }
         consume(TokenType::RIGHT_BRACKET, "Expect ']' after array destructure.");
@@ -228,11 +228,11 @@ std::unique_ptr<Stmt> Parser::varDeclaration(bool isStatic) {
         std::vector<Token> names;
         std::vector<std::string> keys;
         while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
-            Token key = consume(TokenType::IDENTIFIER, "Expect key name in object destructure.");
+            Token key = consumeIdentifier("Expect key name in object destructure.");
             keys.push_back(key.lexeme);
             // Support renaming: { key: varName }
             if (match({TokenType::COLON})) {
-                Token varName = consume(TokenType::IDENTIFIER, "Expect variable name after ':'.");
+                Token varName = consumeIdentifier("Expect variable name after ':'.");
                 names.push_back(varName);
             } else {
                 names.push_back(key);
@@ -257,7 +257,7 @@ std::unique_ptr<Stmt> Parser::varDeclaration(bool isStatic) {
     std::vector<std::unique_ptr<Stmt>> statements;
     
     do {
-        Token name = consume(TokenType::IDENTIFIER, "Expect variable name.");
+        Token name = consumeIdentifier("Expect variable name.");
         
         std::unique_ptr<Expr> initializer = nullptr;
         if (match({TokenType::EQUAL})) {
@@ -758,11 +758,11 @@ std::unique_ptr<Expr> Parser::call() {
             Token paren = consume(TokenType::RIGHT_PAREN, "Expect ')' after arguments.");
             expr = std::make_unique<CallExpr>(std::move(expr), paren, std::move(arguments));
         } else if (match({TokenType::DOT})) {
-            Token name = consume(TokenType::IDENTIFIER, "Expect property name after '.'.");
+            Token name = consumeIdentifier("Expect property name after '.'.");
             expr = std::make_unique<MemberExpr>(std::move(expr), name);
         } else if (match({TokenType::QUESTION_DOT})) {
             // Optional chaining: obj?.prop
-            Token name = consume(TokenType::IDENTIFIER, "Expect property name after '?.'.");
+            Token name = consumeIdentifier("Expect property name after '?.'.");
             expr = std::make_unique<OptionalChainExpr>(std::move(expr), name);
         } else if (match({TokenType::LEFT_BRACKET})) {
             std::unique_ptr<Expr> index = expression();
@@ -845,7 +845,7 @@ std::unique_ptr<Expr> Parser::primary() {
         return std::make_unique<ThisExpr>(previous());
     }
     
-    if (match({TokenType::IDENTIFIER})) {
+    if (match({TokenType::IDENTIFIER, TokenType::SAFE})) {
         return std::make_unique<VariableExpr>(previous());
     }
     
@@ -991,6 +991,19 @@ Token Parser::consume(TokenType type, const std::string& message) {
     
     error(peek(), message);
     // error() throws, this is unreachable but satisfies compiler
+#if defined(_MSC_VER)
+    __assume(false);
+#elif defined(__GNUC__) || defined(__clang__)
+    __builtin_unreachable();
+#endif
+}
+
+// Consume an identifier token, also accepting certain keywords that are valid as identifiers.
+// This allows using keywords like 'safe' as variable names where unambiguous.
+Token Parser::consumeIdentifier(const std::string& message) {
+    if (check(TokenType::IDENTIFIER)) return advance();
+    if (check(TokenType::SAFE)) return advance();
+    error(peek(), message);
 #if defined(_MSC_VER)
     __assume(false);
 #elif defined(__GNUC__) || defined(__clang__)

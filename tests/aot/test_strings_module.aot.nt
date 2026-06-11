@@ -49,4 +49,4 @@ if (strings.is_alpha("abc") && !strings.is_alpha("123")) { say("is_alpha OK"); }
 if (strings.is_digit("123") && !strings.is_digit("abc")) { say("is_digit OK"); } else { say("FAIL is_digit"); ok = false; }
 if (strings.is_alnum("a1") && !strings.is_alnum("!@")) { say("is_alnum OK"); } else { say("FAIL is_alnum"); ok = false; }
 
-if (ok) { say("AOT strings module test PASSED") }
+if (ok) { say("AOT strings module test PASSED"); }

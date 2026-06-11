@@ -30,4 +30,4 @@ if (path.isabs("/absolute") && !path.isabs("relative")) { say("isabs OK"); } els
 var n = path.normalize("/a/b/../c");
 if (n == "/a/c" || n == "\\a\\c") { say("normalize OK"); } else { say("FAIL normalize: " + n); ok = false; }
 
-if (ok) { say("AOT path module test PASSED") }
+if (ok) { say("AOT path module test PASSED"); }

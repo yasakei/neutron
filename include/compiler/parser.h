@@ -104,6 +104,7 @@ private:
     Token peek();               ///< Look at current token
     Token previous();           ///< Look at previous token
     Token consume(TokenType type, const std::string& message);  ///< Expect and consume
+    Token consumeIdentifier(const std::string& message);  ///< Expect identifier or keyword-as-identifier
 
     // Error handling
     void error(Token token, const std::string& message);  ///< Report syntax error
