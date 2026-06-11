@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, release, develop ]
+    branches: [main, release, develop]
   pull_request:
-    branches: [ main, release, develop ]
+    branches: [main, release, develop]
   workflow_dispatch:
 
 jobs:
@@ -12,630 +12,634 @@ jobs:
     name: Build on Arch Linux
     runs-on: ubuntu-latest
     container: archlinux:latest
-    
+
     steps:
-    - name: Install Git (required for checkout with submodules)
-      run: |
-        pacman -Sy --noconfirm git
-    
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-      
-    - name: Install dependencies
-      run: |
-        # Update package database and install dependencies
-        pacman -Syu --noconfirm
-        pacman -S --noconfirm \
-          base-devel \
-          cmake \
-          gcc \
-          llvm \
-          pkgconf \
-          curl \
-          jsoncpp \
-          python
-        
-        # Verify GCC version (should be 15.x)
-        echo "Using GCC version:"
-        gcc --version
-        
-        # Verify LLVM
-        echo "Using LLVM: $(llvm-config --version 2>/dev/null || echo 'detected')"
-        
-        # Check jsoncpp version
-        echo "Installed jsoncpp version:"
-        pkg-config --modversion jsoncpp || echo "jsoncpp version not available via pkg-config"
-        ls -la /usr/lib/libjsoncpp.so* || echo "jsoncpp library files not found"
-          
-    - name: Build Neutron Runtime
-      run: |
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-        cmake --build build --parallel
-      
-    - name: Build Box Package Manager
-      run: |
-        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
-        cmake --build nt-box/build --parallel
-        cp nt-box/build/box .
-      
-    - name: Package
-      run: python package.py --output neutron-linux-x64 --skip-build
-      
-    - name: Remove VS Code extension from package
-      run: rm -f neutron-linux-x64/*.vsix
-      
-    - name: Verify binaries
-      run: |
-        ls -lh build/neutron
-        ls -lh box
-        ./build/neutron --version
-        ./box --version
-        
-    - name: Run tests
-      run: python3 tests/run_tests.py
+      - name: Install Git (required for checkout with submodules)
+        run: |
+          pacman -Sy --noconfirm git
 
-    - name: Run AOT compilation tests
-      run: python3 tests/run_tests.py --aot
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-    - name: Install Neutron globally
-      run: |
-        # Dependencies are already installed from the build step
-        # Install neutron and box to system PATH
-        sudo cp build/neutron /usr/local/bin/
-        sudo cp box /usr/local/bin/
-        sudo chmod +x /usr/local/bin/neutron
-        sudo chmod +x /usr/local/bin/box
-        
-        # Install include files needed for neutron build
-        sudo cp -r include /usr/local/
-        
-        # Install source files needed for runtime compilation  
-        sudo cp -r src /usr/local/
-        sudo cp -r libs /usr/local/
-        sudo mkdir -p /usr/local/nt-box
-        sudo cp -r nt-box/src /usr/local/nt-box/src/
-        sudo cp -r nt-box/include /usr/local/nt-box/include/
-        
-        # Create lib directory if it doesn't exist
-        sudo mkdir -p /usr/local/lib
-        
-        # Install runtime libraries (essential for linking)
-        if [ -f "build/libneutron_runtime.a" ]; then
-          sudo cp build/libneutron_runtime.a /usr/local/lib/
-        fi
-        if [ -f "build/libneutron_shared.so" ]; then
-          sudo cp build/libneutron_shared.so /usr/local/lib/
-        fi
-        if [ -f "build/libneutron_shared.dylib" ]; then
-          sudo cp build/libneutron_shared.dylib /usr/local/lib/
-        fi
-        
-        # Update library cache on Linux
-        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-          sudo ldconfig
-        fi
-        
-        # Verify global installation
-        which neutron
-        which box
-        neutron --version
-        box --version
-        
-    - name: Test Neutron Integration
-      run: |
-        # Create a temporary test directory
-        mkdir -p /tmp/neutron-integration-test/test-project
-        cd /tmp/neutron-integration-test/test-project
-        
-        echo "Testing neutron init..."
-        neutron init test
-        
-        echo "Testing box install base64..."
-        box install base64
-        
-        echo "Testing neutron build..."
-        neutron build
-        
-        echo "Integration tests completed successfully!"
-      
-    - name: Run Performance Benchmarks
-      run: |
-        echo "==========================================================="
-        echo "  LINUX (Ubuntu) PERFORMANCE BENCHMARKS"
-        echo "==========================================================="
-        python3 benchmarks/run_benchmark.py | tee benchmark-linux.txt
-        echo ""
-        echo "==========================================================="
-      
-    - name: Upload Benchmark Results
-      uses: actions/upload-artifact@v4
-      with:
-        name: benchmark-linux
-        path: benchmark-linux.txt
-        retention-days: 30
-      
-    - name: Create Archive
-      run: tar -czf neutron-linux-x64.tar.gz neutron-linux-x64
-      
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: neutron-linux-x64
-        path: neutron-linux-x64.tar.gz
-        retention-days: 7
+      - name: Install dependencies
+        run: |
+          # Update package database and install dependencies
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm \
+            base-devel \
+            cmake \
+            gcc \
+            llvm \
+            pkgconf \
+            curl \
+            jsoncpp \
+            python
+
+          # Verify GCC version (should be 15.x)
+          echo "Using GCC version:"
+          gcc --version
+
+          # Verify LLVM
+          echo "Using LLVM: $(llvm-config --version 2>/dev/null || echo 'detected')"
+
+          # Check jsoncpp version
+          echo "Installed jsoncpp version:"
+          pkg-config --modversion jsoncpp || echo "jsoncpp version not available via pkg-config"
+          ls -la /usr/lib/libjsoncpp.so* || echo "jsoncpp library files not found"
+
+      - name: Build Neutron Runtime
+        run: |
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
+
+      - name: Build Box Package Manager
+        run: |
+          cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
+          cmake --build nt-box/build --parallel
+          cp nt-box/build/box .
+
+      - name: Package
+        run: python package.py --output neutron-linux-x64 --skip-build
+
+      - name: Remove VS Code extension from package
+        run: rm -f neutron-linux-x64/*.vsix
+
+      - name: Verify binaries
+        run: |
+          ls -lh build/neutron
+          ls -lh box
+          ./build/neutron --version
+          ./box --version
+
+      - name: Run tests
+        run: python3 tests/run_tests.py
+
+      - name: Run AOT compilation tests
+        run: python3 tests/run_tests.py --aot
+
+      - name: Install Neutron globally
+        run: |
+          # Dependencies are already installed from the build step
+          # Install neutron and box to system PATH
+          sudo cp build/neutron /usr/local/bin/
+          sudo cp box /usr/local/bin/
+          sudo chmod +x /usr/local/bin/neutron
+          sudo chmod +x /usr/local/bin/box
+
+          # Install include files needed for neutron build
+          sudo cp -r include /usr/local/
+
+          # Install source files needed for runtime compilation
+          sudo cp -r src /usr/local/
+          sudo cp -r libs /usr/local/
+          sudo mkdir -p /usr/local/nt-box
+          sudo cp -r nt-box/src /usr/local/nt-box/src/
+          sudo cp -r nt-box/include /usr/local/nt-box/include/
+
+          # Create lib directory if it doesn't exist
+          sudo mkdir -p /usr/local/lib
+
+          # Install runtime libraries (essential for linking)
+          if [ -f "build/libneutron_runtime.a" ]; then
+            sudo cp build/libneutron_runtime.a /usr/local/lib/
+          fi
+          if [ -f "build/libneutron_shared.so" ]; then
+            sudo cp build/libneutron_shared.so /usr/local/lib/
+          fi
+          if [ -f "build/libneutron_shared.dylib" ]; then
+            sudo cp build/libneutron_shared.dylib /usr/local/lib/
+          fi
+
+          # Update library cache on Linux
+          if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            sudo ldconfig
+          fi
+
+          # Verify global installation
+          which neutron
+          which box
+          neutron --version
+          box --version
+
+      - name: Test Neutron Integration
+        run: |
+          # Create a temporary test directory
+          mkdir -p /tmp/neutron-integration-test/test-project
+          cd /tmp/neutron-integration-test/test-project
+
+          echo "Testing neutron init..."
+          neutron init test
+
+          echo "Testing box install base64..."
+          box install base64
+
+          echo "Testing neutron build..."
+          neutron build
+
+          echo "Integration tests completed successfully!"
+
+      - name: Run Performance Benchmarks
+        run: |
+          echo "==========================================================="
+          echo "  LINUX (Ubuntu) PERFORMANCE BENCHMARKS"
+          echo "==========================================================="
+          python3 benchmarks/run_benchmark.py --aot | tee benchmark-linux.txt
+          echo ""
+          echo "==========================================================="
+
+      - name: Upload Benchmark Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-linux
+          path: benchmark-linux.txt
+          retention-days: 30
+
+      - name: Create Archive
+        run: tar -czf neutron-linux-x64.tar.gz neutron-linux-x64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: neutron-linux-x64
+          path: neutron-linux-x64.tar.gz
+          retention-days: 7
 
   build-macos-arm64:
     name: Build on macOS (Apple Silicon)
     runs-on: macos-14
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-      
-    - name: Install dependencies
-      run: |
-        brew install cmake jsoncpp llvm
-        
-        # macOS comes with clang by default (Xcode Command Line Tools)
-        # Verify compiler availability
-        echo "Checking for C++ compiler..."
-        clang --version || echo "clang not available"
-        
-        # LLVM is keg-only on macOS — set CMAKE_PREFIX_PATH for find_package
-        echo "CMAKE_PREFIX_PATH=/opt/homebrew/opt/llvm" >> $GITHUB_ENV
-        
-        # LLVM is keg-only on macOS — verify via file check
-        echo "LLVM installed at: $(ls /opt/homebrew/opt/llvm/bin/llvm-config 2>/dev/null || echo 'checking CMAKE_PREFIX_PATH')"
-        
-    - name: Build Neutron Runtime
-      run: |
-        cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-        cmake --build build --parallel
-      
-    - name: Build Box Package Manager
-      run: |
-        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
-        cmake --build nt-box/build --parallel
-        cp nt-box/build/box .
-      
-    - name: Package
-      run: python package.py --output neutron-macos-arm64 --skip-build
-      
-    - name: Remove VS Code extension from package
-      run: rm -f neutron-macos-arm64/*.vsix
-      
-    - name: Verify binaries
-      run: |
-        ls -lh build/neutron
-        ls -lh box
-        file build/neutron
-        file box
-        ./build/neutron --version
-        ./box --version
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-    - name: Run tests
-      run: python3 tests/run_tests.py
+      - name: Install dependencies
+        run: |
+          brew install cmake jsoncpp llvm
 
-    - name: Run AOT compilation tests (macOS)
-      run: |
-        # AOT uses clang on macOS (included with Xcode Command Line Tools)
-        echo "Checking for C++ compiler..."
-        which clang && clang --version || echo "clang not available"
-        python3 tests/run_tests.py --aot
+          # macOS comes with clang by default (Xcode Command Line Tools)
+          # Verify compiler availability
+          echo "Checking for C++ compiler..."
+          clang --version || echo "clang not available"
 
-    - name: Install Neutron globally
-      run: |
-        # Dependencies are already installed from the build step
-        # Install neutron and box to system PATH
-        sudo cp build/neutron /usr/local/bin/
-        sudo cp box /usr/local/bin/
-        sudo chmod +x /usr/local/bin/neutron
-        sudo chmod +x /usr/local/bin/box
+          # LLVM is keg-only on macOS — set CMAKE_PREFIX_PATH for find_package
+          echo "CMAKE_PREFIX_PATH=/opt/homebrew/opt/llvm" >> $GITHUB_ENV
 
-        # Install include files needed for neutron build
-        sudo cp -r include /usr/local/
+          # LLVM is keg-only on macOS — verify via file check
+          echo "LLVM installed at: $(ls /opt/homebrew/opt/llvm/bin/llvm-config 2>/dev/null || echo 'checking CMAKE_PREFIX_PATH')"
 
-        # Install source files needed for runtime compilation
-        sudo cp -r src /usr/local/
-        sudo cp -r libs /usr/local/
+      - name: Build Neutron Runtime
+        run: |
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
 
-        # Install nt-box source files needed for native module compilation
-        sudo mkdir -p /usr/local/nt-box
-        sudo cp -r nt-box/src /usr/local/nt-box/src/
-        sudo cp -r nt-box/include /usr/local/nt-box/include/
+      - name: Build Box Package Manager
+        run: |
+          cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release
+          cmake --build nt-box/build --parallel
+          cp nt-box/build/box .
 
-        # Create lib directory if it doesn't exist
-        sudo mkdir -p /usr/local/lib
+      - name: Package
+        run: python package.py --output neutron-macos-arm64 --skip-build
 
-        # Install runtime libraries (essential for linking)
-        if [ -f "build/libneutron_runtime.a" ]; then
-          sudo cp build/libneutron_runtime.a /usr/local/lib/
-        fi
-        if [ -f "build/libneutron_shared.so" ]; then
-          sudo cp build/libneutron_shared.so /usr/local/lib/
-        fi
-        if [ -f "build/libneutron_shared.dylib" ]; then
-          sudo cp build/libneutron_shared.dylib /usr/local/lib/
-        fi
+      - name: Remove VS Code extension from package
+        run: rm -f neutron-macos-arm64/*.vsix
 
-        # On macOS, create symlinks to Homebrew libraries so neutron build can find them
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-          # Find Homebrew prefix (Apple Silicon vs Intel)
-          if [ -d "/opt/homebrew" ]; then
-            BREW_PREFIX="/opt/homebrew"
-          else
-            BREW_PREFIX="/usr/local"
+      - name: Verify binaries
+        run: |
+          ls -lh build/neutron
+          ls -lh box
+          file build/neutron
+          file box
+          ./build/neutron --version
+          ./box --version
+
+      - name: Run tests
+        run: python3 tests/run_tests.py
+
+      - name: Run AOT compilation tests (macOS)
+        run: |
+          # AOT uses clang on macOS (included with Xcode Command Line Tools)
+          echo "Checking for C++ compiler..."
+          which clang && clang --version || echo "clang not available"
+          python3 tests/run_tests.py --aot
+
+      - name: Install Neutron globally
+        run: |
+          # Dependencies are already installed from the build step
+          # Install neutron and box to system PATH
+          sudo cp build/neutron /usr/local/bin/
+          sudo cp box /usr/local/bin/
+          sudo chmod +x /usr/local/bin/neutron
+          sudo chmod +x /usr/local/bin/box
+
+          # Install include files needed for neutron build
+          sudo cp -r include /usr/local/
+
+          # Install source files needed for runtime compilation
+          sudo cp -r src /usr/local/
+          sudo cp -r libs /usr/local/
+
+          # Install nt-box source files needed for native module compilation
+          sudo mkdir -p /usr/local/nt-box
+          sudo cp -r nt-box/src /usr/local/nt-box/src/
+          sudo cp -r nt-box/include /usr/local/nt-box/include/
+
+          # Create lib directory if it doesn't exist
+          sudo mkdir -p /usr/local/lib
+
+          # Install runtime libraries (essential for linking)
+          if [ -f "build/libneutron_runtime.a" ]; then
+            sudo cp build/libneutron_runtime.a /usr/local/lib/
+          fi
+          if [ -f "build/libneutron_shared.so" ]; then
+            sudo cp build/libneutron_shared.so /usr/local/lib/
+          fi
+          if [ -f "build/libneutron_shared.dylib" ]; then
+            sudo cp build/libneutron_shared.dylib /usr/local/lib/
           fi
 
-          # Create symlinks for jsoncpp and curl libraries
-          if [ -f "$BREW_PREFIX/lib/libjsoncpp.dylib" ]; then
-            sudo ln -sf "$BREW_PREFIX/lib/libjsoncpp.dylib" /usr/local/lib/libjsoncpp.dylib
+          # On macOS, create symlinks to Homebrew libraries so neutron build can find them
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            # Find Homebrew prefix (Apple Silicon vs Intel)
+            if [ -d "/opt/homebrew" ]; then
+              BREW_PREFIX="/opt/homebrew"
+            else
+              BREW_PREFIX="/usr/local"
+            fi
+
+            # Create symlinks for jsoncpp and curl libraries
+            if [ -f "$BREW_PREFIX/lib/libjsoncpp.dylib" ]; then
+              sudo ln -sf "$BREW_PREFIX/lib/libjsoncpp.dylib" /usr/local/lib/libjsoncpp.dylib
+            fi
+            if [ -f "$BREW_PREFIX/lib/libcurl.dylib" ]; then
+              sudo ln -sf "$BREW_PREFIX/lib/libcurl.dylib" /usr/local/lib/libcurl.dylib
+            fi
+
+            echo "Created symlinks for Homebrew libraries"
           fi
-          if [ -f "$BREW_PREFIX/lib/libcurl.dylib" ]; then
-            sudo ln -sf "$BREW_PREFIX/lib/libcurl.dylib" /usr/local/lib/libcurl.dylib
+
+          # Update library cache on Linux
+          if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            sudo ldconfig
           fi
 
-          echo "Created symlinks for Homebrew libraries"
-        fi
+          # Verify global installation
+          which neutron
+          which box
+          neutron --version
+          box --version
 
-        # Update library cache on Linux
-        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-          sudo ldconfig
-        fi
+      - name: Test Neutron Integration
+        run: |
+          # Create a temporary test directory
+          mkdir -p /tmp/neutron-integration-test/test-project
+          cd /tmp/neutron-integration-test/test-project
 
-        # Verify global installation
-        which neutron
-        which box
-        neutron --version
-        box --version
+          echo "Testing neutron init..."
+          neutron init test
 
-    - name: Test Neutron Integration
-      run: |
-        # Create a temporary test directory
-        mkdir -p /tmp/neutron-integration-test/test-project
-        cd /tmp/neutron-integration-test/test-project
+          echo "Testing box install base64..."
+          box install base64
 
-        echo "Testing neutron init..."
-        neutron init test
+          echo "Testing neutron build..."
+          neutron build
 
-        echo "Testing box install base64..."
-        box install base64
+          echo "Integration tests completed successfully!"
 
-        echo "Testing neutron build..."
-        neutron build
+      - name: Run Performance Benchmarks
+        run: |
+          echo "==========================================================="
+          echo "  macOS (Apple Silicon) PERFORMANCE BENCHMARKS"
+          echo "==========================================================="
+          python3 benchmarks/run_benchmark.py --aot | tee benchmark-macos-arm64.txt
+          echo ""
+          echo "==========================================================="
 
-        echo "Integration tests completed successfully!"
+      - name: Upload Benchmark Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-macos-arm64
+          path: benchmark-macos-arm64.txt
+          retention-days: 30
 
-    - name: Run Performance Benchmarks
-      run: |
-        echo "==========================================================="
-        echo "  macOS (Apple Silicon) PERFORMANCE BENCHMARKS"
-        echo "==========================================================="
-        python3 benchmarks/run_benchmark.py | tee benchmark-macos-arm64.txt
-        echo ""
-        echo "==========================================================="
+      - name: Create Archive
+        run: tar -czf neutron-macos-arm64.tar.gz neutron-macos-arm64
 
-    - name: Upload Benchmark Results
-      uses: actions/upload-artifact@v4
-      with:
-        name: benchmark-macos-arm64
-        path: benchmark-macos-arm64.txt
-        retention-days: 30
-
-    - name: Create Archive
-      run: tar -czf neutron-macos-arm64.tar.gz neutron-macos-arm64
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: neutron-macos-arm64
-        path: neutron-macos-arm64.tar.gz
-        retention-days: 7
-
-
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: neutron-macos-arm64
+          path: neutron-macos-arm64.tar.gz
+          retention-days: 7
 
   build-windows-msvc:
     name: Build on Windows (MSVC)
     runs-on: windows-latest
-    
+
     steps:
-    - name: Checkout code (skip vcpkg submodule — use system C:\vcpkg)
-      uses: actions/checkout@v4
-      with:
-        submodules: false
-        fetch-depth: 1
+      - name: Checkout code (skip vcpkg submodule — use system C:\vcpkg)
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
 
-    - name: Init needed submodules (nt-box)
-      run: git submodule update --init --depth 1 nt-box
-        
-    - name: Setup MSVC
-      uses: ilammy/msvc-dev-cmd@v1
+      - name: Init needed submodules (nt-box)
+        run: git submodule update --init --depth 1 nt-box
 
-    - name: Use system vcpkg on runner
-      shell: pwsh
-      run: |
-        echo "VCPKG_ROOT=C:\vcpkg" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
-        & "C:\vcpkg\vcpkg" --version
-        if (Test-Path "C:\vcpkg\scripts\buildsystems\vcpkg.cmake") {
-          echo "System vcpkg toolchain found"
-        }
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Cache vcpkg packages
-      uses: actions/cache@v4
-      id: vcpkg-cache
-      with:
-        path: C:\vcpkg\packages
-        key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}
-        restore-keys: |
-          ${{ runner.os }}-vcpkg-
+      - name: Use system vcpkg on runner
+        shell: pwsh
+        run: |
+          echo "VCPKG_ROOT=C:\vcpkg" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
+          & "C:\vcpkg\vcpkg" --version
+          if (Test-Path "C:\vcpkg\scripts\buildsystems\vcpkg.cmake") {
+            echo "System vcpkg toolchain found"
+          }
 
-    - name: Install dependencies (vcpkg)
-      run: |
-        vcpkg install --no-print-usage
-      
-    - name: Build Neutron Runtime
-      run: |
-        cmake -B build -S . `
-          -DCMAKE_BUILD_TYPE=Release `
-          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
-          -G Ninja
-        cmake --build build --parallel 2>&1 | Where-Object { $_ -match ': error C|: fatal error|FAILED|Build FAILED' } | Select-Object -Unique
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      
-    - name: Build Box Package Manager
-      run: |
-        cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release -G Ninja
-        cmake --build nt-box/build --parallel 2>&1 | Where-Object { $_ -match ': error C|: fatal error|FAILED|Build FAILED' } | Select-Object -Unique
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        copy nt-box\build\box.exe .
-      
-    - name: Package
-      run: python package.py --output neutron-windows-x64 --skip-build
-      
-    - name: Remove VS Code extension from package
-      run: Remove-Item -Path "neutron-windows-x64\*.vsix" -Force -ErrorAction SilentlyContinue
-      
-    - name: Verify binaries
-      run: |
-        dir build\neutron.exe
-        dir box.exe
-        .\build\neutron.exe --version
-        .\box.exe --version
-        
-    - name: Run tests
-      run: python tests/run_tests.py
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        id: vcpkg-cache
+        with:
+          path: C:\vcpkg\packages
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
 
-    - name: Run AOT compilation tests
-      run: |
-        Write-Host "Checking for C++ compiler..."
-        cl.exe || echo "MSVC compiler not found"
-        python tests/run_tests.py --aot
+      - name: Install dependencies (vcpkg)
+        run: |
+          vcpkg install --no-print-usage
 
-    - name: Install Neutron globally (Windows)
-      run: |
-        $neutronRoot = "C:\neutron"
-        $neutronBin = "$neutronRoot\bin"
-        New-Item -ItemType Directory -Force -Path $neutronBin
-        Copy-Item "build\neutron.exe" "$neutronBin\neutron.exe"
-        Copy-Item "box.exe" "$neutronBin\box.exe"
-        if (Test-Path "build\neutron-lsp.exe") {
-            Copy-Item "build\neutron-lsp.exe" "$neutronBin\neutron-lsp.exe"
-        }
-        if (Test-Path "build\neutron_shared.dll") {
-            Copy-Item "build\neutron_shared.dll" "$neutronBin\neutron_shared.dll"
-        }
-        Copy-Item -Recurse "include" "$neutronRoot\include"
-        Copy-Item -Recurse "src" "$neutronRoot\src"
-        Copy-Item -Recurse "libs" "$neutronRoot\libs"
-        if (Test-Path "build\neutron_runtime.lib") {
-            Copy-Item "build\neutron_runtime.lib" "$neutronBin\neutron_runtime.lib"
-        }
-        if (Test-Path "build\neutron_shared.lib") {
-            Copy-Item "build\neutron_shared.lib" "$neutronBin\neutron_shared.lib"
-        }
-        $vcpkgBin = "build\vcpkg_installed\x64-windows\bin"
-        if (Test-Path $vcpkgBin) {
-            Get-ChildItem "$vcpkgBin\*.dll" | ForEach-Object { Copy-Item $_.FullName "$neutronBin\" }
-        }
-        $vcpkgLib = "build\vcpkg_installed\x64-windows\lib"
-        if (Test-Path $vcpkgLib) {
-            Get-ChildItem "$vcpkgLib\*.lib" | ForEach-Object { Copy-Item $_.FullName "$neutronBin\" }
-        }
-        $env:PATH = "$neutronBin;$env:PATH"
-        neutron.exe --version
-        box.exe --version
-        
-    - name: Test Neutron Integration (Windows)
-      run: |
-        $neutronBin = "C:\neutron\bin"
-        $env:PATH = "$neutronBin;$env:PATH"
-        $testDir = "C:\temp\neutron-integration-test\test-project"
-        New-Item -ItemType Directory -Force -Path $testDir
-        Set-Location $testDir
-        neutron.exe --version
-        neutron.exe init test
-        box.exe install base64
-        neutron.exe build
-        Write-Host "Integration tests completed successfully!"
+      - name: Build Neutron Runtime
+        run: |
+          cmake -B build -S . `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
+            -G Ninja
+          cmake --build build --parallel 2>&1 | Where-Object { $_ -match ': error C|: fatal error|FAILED|Build FAILED' } | Select-Object -Unique
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    - name: Create Windows Installer
-      if: github.event_name != 'pull_request'
-      run: |
-        Write-Host "Creating Windows installer..."
-        if (-not (Test-Path "neutron.exe")) { Copy-Item "build\neutron.exe" "." }
-        if (-not (Test-Path "box.exe")) { Copy-Item "box.exe" "." }
-        if ((Test-Path "build\neutron-lsp.exe") -and (-not (Test-Path "neutron-lsp.exe"))) {
-            Copy-Item "build\neutron-lsp.exe" "."
-        }
-        if ((Test-Path "build\neutron_runtime.lib") -and (-not (Test-Path "neutron_runtime.lib"))) {
-            Copy-Item "build\neutron_runtime.lib" "."
-        }
-        if ((Test-Path "build\neutron_shared.lib") -and (-not (Test-Path "neutron_shared.lib"))) {
-            Copy-Item "build\neutron_shared.lib" "."
-        }
-        if ((Test-Path "build\neutron_shared.dll") -and (-not (Test-Path "neutron_shared.dll"))) {
-            Copy-Item "build\neutron_shared.dll" "."
-        }
-        choco install nsis -y
-        & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
-        Write-Host "Windows installer created successfully!"
-        Get-ChildItem "*.exe" | Where-Object { $_.Name -like "*installer*" -or $_.Name -like "*setup*" -or $_.Name -like "Neutron*" }
+      - name: Build Box Package Manager
+        run: |
+          cmake -B nt-box/build -S nt-box -DCMAKE_BUILD_TYPE=Release -G Ninja
+          cmake --build nt-box/build --parallel 2>&1 | Where-Object { $_ -match ': error C|: fatal error|FAILED|Build FAILED' } | Select-Object -Unique
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          copy nt-box\build\box.exe .
 
-    - name: Upload Windows Installer
-      if: github.event_name != 'pull_request'
-      uses: actions/upload-artifact@v4
-      with:
-        name: neutron-windows-installer
-        path: "*.exe"
-        retention-days: 7
+      - name: Package
+        run: python package.py --output neutron-windows-x64 --skip-build
 
-    - name: Run Performance Benchmarks
-      if: github.event_name != 'pull_request'
-      run: |
-        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-        $env:PYTHONIOENCODING = "utf-8"
-        Write-Host "==========================================================="
-        Write-Host "  WINDOWS (x64) PERFORMANCE BENCHMARKS"
-        Write-Host "==========================================================="
-        python benchmarks/run_benchmark.py | Tee-Object -FilePath benchmark-windows.txt
-        Write-Host ""
-        Write-Host "==========================================================="
-      
-    - name: Upload Benchmark Results
-      if: github.event_name != 'pull_request'
-      uses: actions/upload-artifact@v4
-      with:
-        name: benchmark-windows
-        path: benchmark-windows.txt
-        retention-days: 30
-        
-    - name: Create Archive
-      run: |
-        Compress-Archive -Path neutron-windows-x64 -DestinationPath neutron-windows-x64.zip
-        
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: neutron-windows-x64
-        path: neutron-windows-x64.zip
-        retention-days: 7
+      - name: Remove VS Code extension from package
+        run: Remove-Item -Path "neutron-windows-x64\*.vsix" -Force -ErrorAction SilentlyContinue
+
+      - name: Verify binaries
+        run: |
+          dir build\neutron.exe
+          dir box.exe
+          .\build\neutron.exe --version
+          .\box.exe --version
+
+      - name: Run tests
+        run: python tests/run_tests.py
+
+      - name: Run AOT compilation tests
+        run: |
+          Write-Host "Checking for C++ compiler..."
+          cl.exe || echo "MSVC compiler not found"
+          python tests/run_tests.py --aot
+
+      - name: Install Neutron globally (Windows)
+        run: |
+          $neutronRoot = "C:\neutron"
+          $neutronBin = "$neutronRoot\bin"
+          New-Item -ItemType Directory -Force -Path $neutronBin
+          Copy-Item "build\neutron.exe" "$neutronBin\neutron.exe"
+          Copy-Item "box.exe" "$neutronBin\box.exe"
+          if (Test-Path "build\neutron-lsp.exe") {
+              Copy-Item "build\neutron-lsp.exe" "$neutronBin\neutron-lsp.exe"
+          }
+          if (Test-Path "build\neutron_shared.dll") {
+              Copy-Item "build\neutron_shared.dll" "$neutronBin\neutron_shared.dll"
+          }
+          Copy-Item -Recurse "include" "$neutronRoot\include"
+          Copy-Item -Recurse "src" "$neutronRoot\src"
+          Copy-Item -Recurse "libs" "$neutronRoot\libs"
+          if (Test-Path "build\neutron_runtime.lib") {
+              Copy-Item "build\neutron_runtime.lib" "$neutronBin\neutron_runtime.lib"
+          }
+          if (Test-Path "build\neutron_shared.lib") {
+              Copy-Item "build\neutron_shared.lib" "$neutronBin\neutron_shared.lib"
+          }
+          $vcpkgBin = "build\vcpkg_installed\x64-windows\bin"
+          if (Test-Path $vcpkgBin) {
+              Get-ChildItem "$vcpkgBin\*.dll" | ForEach-Object { Copy-Item $_.FullName "$neutronBin\" }
+          }
+          $vcpkgLib = "build\vcpkg_installed\x64-windows\lib"
+          if (Test-Path $vcpkgLib) {
+              Get-ChildItem "$vcpkgLib\*.lib" | ForEach-Object { Copy-Item $_.FullName "$neutronBin\" }
+          }
+          $env:PATH = "$neutronBin;$env:PATH"
+          neutron.exe --version
+          box.exe --version
+
+      - name: Test Neutron Integration (Windows)
+        run: |
+          $neutronBin = "C:\neutron\bin"
+          $env:PATH = "$neutronBin;$env:PATH"
+          $testDir = "C:\temp\neutron-integration-test\test-project"
+          New-Item -ItemType Directory -Force -Path $testDir
+          Set-Location $testDir
+          neutron.exe --version
+          neutron.exe init test
+          box.exe install base64
+          neutron.exe build
+          Write-Host "Integration tests completed successfully!"
+
+      - name: Create Windows Installer
+        if: github.event_name != 'pull_request'
+        run: |
+          Write-Host "Creating Windows installer..."
+          if (-not (Test-Path "neutron.exe")) { Copy-Item "build\neutron.exe" "." }
+          if (-not (Test-Path "box.exe")) { Copy-Item "box.exe" "." }
+          if ((Test-Path "build\neutron-lsp.exe") -and (-not (Test-Path "neutron-lsp.exe"))) {
+              Copy-Item "build\neutron-lsp.exe" "."
+          }
+          if ((Test-Path "build\neutron_runtime.lib") -and (-not (Test-Path "neutron_runtime.lib"))) {
+              Copy-Item "build\neutron_runtime.lib" "."
+          }
+          if ((Test-Path "build\neutron_shared.lib") -and (-not (Test-Path "neutron_shared.lib"))) {
+              Copy-Item "build\neutron_shared.lib" "."
+          }
+          if ((Test-Path "build\neutron_shared.dll") -and (-not (Test-Path "neutron_shared.dll"))) {
+              Copy-Item "build\neutron_shared.dll" "."
+          }
+          choco install nsis -y
+          & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
+          Write-Host "Windows installer created successfully!"
+          Get-ChildItem "*.exe" | Where-Object { $_.Name -like "*installer*" -or $_.Name -like "*setup*" -or $_.Name -like "Neutron*" }
+
+      - name: Upload Windows Installer
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: neutron-windows-installer
+          path: "*.exe"
+          retention-days: 7
+
+      - name: Run Performance Benchmarks
+        if: github.event_name != 'pull_request'
+        run: |
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+          $env:PYTHONIOENCODING = "utf-8"
+          Write-Host "==========================================================="
+          Write-Host "  WINDOWS (x64) PERFORMANCE BENCHMARKS"
+          Write-Host "==========================================================="
+          python benchmarks/run_benchmark.py --aot | Tee-Object -FilePath benchmark-windows.txt
+          Write-Host ""
+          Write-Host "==========================================================="
+
+      - name: Upload Benchmark Results
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-windows
+          path: benchmark-windows.txt
+          retention-days: 30
+
+      - name: Create Archive
+        run: |
+          Compress-Archive -Path neutron-windows-x64 -DestinationPath neutron-windows-x64.zip
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: neutron-windows-x64
+          path: neutron-windows-x64.zip
+          retention-days: 7
 
   build-vscode-extension:
     name: Build VS Code Extension
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        
-    - name: Install dependencies
-      working-directory: vscode-extension
-      run: npm ci
-      
-    - name: Compile TypeScript
-      working-directory: vscode-extension
-      run: npm run compile
-      
-    - name: Package Extension
-      working-directory: vscode-extension
-      run: |
-        npm install -g @vscode/vsce
-        vsce package --no-dependencies
-        
-    - name: Verify VSIX created
-      working-directory: vscode-extension
-      run: |
-        ls -lh *.vsix
-        echo "VS Code extension packaged successfully"
-        
-    - name: Upload Extension Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: vscode-extension
-        path: vscode-extension/*.vsix
-        retention-days: 7
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: vscode-extension
+        run: npm ci
+
+      - name: Compile TypeScript
+        working-directory: vscode-extension
+        run: npm run compile
+
+      - name: Package Extension
+        working-directory: vscode-extension
+        run: |
+          npm install -g @vscode/vsce
+          vsce package --no-dependencies
+
+      - name: Verify VSIX created
+        working-directory: vscode-extension
+        run: |
+          ls -lh *.vsix
+          echo "VS Code extension packaged successfully"
+
+      - name: Upload Extension Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-extension
+          path: vscode-extension/*.vsix
+          retention-days: 7
 
   benchmark-summary:
     name: Performance Summary
     runs-on: ubuntu-latest
     needs: [build-linux, build-macos-arm64, build-windows-msvc]
     if: github.event_name != 'pull_request'
-    
+
     steps:
-    - name: Download all benchmark results
-      uses: actions/download-artifact@v4
-      with:
-        pattern: benchmark-*
-        merge-multiple: true
-      continue-on-error: true
-        
-    - name: Generate Performance Summary
-      run: |
-        echo ""
-        echo "+====================================================================+"
-        echo "|           NEUTRON PERFORMANCE SUMMARY (ALL PLATFORMS)              |"
-        echo "+====================================================================+"
-        echo ""
-        
-        echo "+--------------------------------------------------------------------+"
-        echo "| LINUX RESULTS                                                      |"
-        echo "+--------------------------------------------------------------------+"
-        if [ -f benchmark-linux.txt ]; then
-          cat benchmark-linux.txt | grep -E "(Win Rate|Neutron Faster|Python Faster|SUMMARY)" || cat benchmark-linux.txt | tail -20
-        else
-          echo "  Linux benchmark results not available"
-        fi
-        echo ""
-        
-        echo "+--------------------------------------------------------------------+"
-        echo "| macOS (Apple Silicon) RESULTS                                      |"
-        echo "+--------------------------------------------------------------------+"
-        if [ -f benchmark-macos-arm64.txt ]; then
-          cat benchmark-macos-arm64.txt | grep -E "(Win Rate|Neutron Faster|Python Faster|SUMMARY)" || cat benchmark-macos-arm64.txt | tail -20
-        else
-          echo "  macOS (ARM64) benchmark results not available"
-        fi
-        echo ""
-        
-        echo "+--------------------------------------------------------------------+"
-        echo "| WINDOWS RESULTS                                                    |"
-        echo "+--------------------------------------------------------------------+"
-        if [ -f benchmark-windows.txt ]; then
-          cat benchmark-windows.txt | grep -E "(Win Rate|Neutron Faster|Python Faster|SUMMARY)" || cat benchmark-windows.txt | tail -20
-        else
-          echo "  Windows benchmark results not available"
-        fi
-        echo ""
-        echo "====================================================================="
+      - name: Download all benchmark results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: benchmark-*
+          merge-multiple: true
+        continue-on-error: true
+
+      - name: Generate Performance Summary
+        run: |
+          echo ""
+          echo "+====================================================================+"
+          echo "|           NEUTRON PERFORMANCE SUMMARY (ALL PLATFORMS)              |"
+          echo "+====================================================================+"
+          echo ""
+
+          echo "+--------------------------------------------------------------------+"
+          echo "| LINUX RESULTS                                                      |"
+          echo "+--------------------------------------------------------------------+"
+          if [ -f benchmark-linux.txt ]; then
+            cat benchmark-linux.txt | grep -E "(Win Rate|Neutron Faster|Python Faster|SUMMARY)" || cat benchmark-linux.txt | tail -20
+          else
+            echo "  Linux benchmark results not available"
+          fi
+          echo ""
+
+          echo "+--------------------------------------------------------------------+"
+          echo "| macOS (Apple Silicon) RESULTS                                      |"
+          echo "+--------------------------------------------------------------------+"
+          if [ -f benchmark-macos-arm64.txt ]; then
+            cat benchmark-macos-arm64.txt | grep -E "(Win Rate|Neutron Faster|Python Faster|SUMMARY)" || cat benchmark-macos-arm64.txt | tail -20
+          else
+            echo "  macOS (ARM64) benchmark results not available"
+          fi
+          echo ""
+
+          echo "+--------------------------------------------------------------------+"
+          echo "| WINDOWS RESULTS                                                    |"
+          echo "+--------------------------------------------------------------------+"
+          if [ -f benchmark-windows.txt ]; then
+            cat benchmark-windows.txt | grep -E "(Win Rate|Neutron Faster|Python Faster|SUMMARY)" || cat benchmark-windows.txt | tail -20
+          else
+            echo "  Windows benchmark results not available"
+          fi
+          echo ""
+          echo "====================================================================="
 
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [build-linux, build-macos-arm64, build-windows-msvc, build-vscode-extension]
+    needs:
+      [
+        build-linux,
+        build-macos-arm64,
+        build-windows-msvc,
+        build-vscode-extension,
+      ]
     if: always()
-    
+
     steps:
-    - name: Check build status
-      run: |
-        echo "Build Summary:"
-        echo "Linux: ${{ needs.build-linux.result }}"
-        echo "macOS ARM64: ${{ needs.build-macos-arm64.result }}"
-        echo "Windows: ${{ needs.build-windows-msvc.result }}"
-        echo "VS Code Extension: ${{ needs.build-vscode-extension.result }}"
-        
-    - name: Fail if any build failed
-      if: |
-        needs.build-linux.result != 'success' || 
-        needs.build-macos-arm64.result != 'success' || 
-        needs.build-windows-msvc.result != 'success' ||
-        needs.build-vscode-extension.result != 'success'
-      run: exit 1
+      - name: Check build status
+        run: |
+          echo "Build Summary:"
+          echo "Linux: ${{ needs.build-linux.result }}"
+          echo "macOS ARM64: ${{ needs.build-macos-arm64.result }}"
+          echo "Windows: ${{ needs.build-windows-msvc.result }}"
+          echo "VS Code Extension: ${{ needs.build-vscode-extension.result }}"
+
+      - name: Fail if any build failed
+        if: |
+          needs.build-linux.result != 'success' ||
+          needs.build-macos-arm64.result != 'success' ||
+          needs.build-windows-msvc.result != 'success' ||
+          needs.build-vscode-extension.result != 'success'
+        run: exit 1
