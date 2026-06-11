@@ -411,18 +411,39 @@ def run_aot_tests(neutron_bin, root_dir):
                 if os.path.exists(output_path):
                     try:
                         # Run the compiled executable
-                        # On macOS, enable dyld debug output to diagnose missing library crashes
                         aot_env = os.environ.copy()
                         if platform.system() == "Darwin":
+                            # Enable dyld debug to diagnose missing library crashes
                             aot_env["DYLD_PRINT_LIBRARIES"] = "1"
-                        run_result = subprocess.run(
-                            [output_path],
-                            env=aot_env,
-                            capture_output=True,
-                            text=True,
-                            encoding="utf-8",
-                            timeout=30,
-                        )
+                            # Use lldb in batch mode to capture crash backtrace
+                            run_result = subprocess.run(
+                                [
+                                    "lldb",
+                                    "--batch",
+                                    "-o",
+                                    "run",
+                                    "-o",
+                                    "bt",
+                                    "-o",
+                                    "quit",
+                                    "--",
+                                    output_path,
+                                ],
+                                env=aot_env,
+                                capture_output=True,
+                                text=True,
+                                encoding="utf-8",
+                                timeout=60,
+                            )
+                        else:
+                            run_result = subprocess.run(
+                                [output_path],
+                                env=aot_env,
+                                capture_output=True,
+                                text=True,
+                                encoding="utf-8",
+                                timeout=30,
+                            )
 
                         if run_result.returncode == 0:
                             Colors.print(f"  [PASS]", Colors.GREEN, end="")
@@ -433,7 +454,19 @@ def run_aot_tests(neutron_bin, root_dir):
                             print(f" {test_name}")
                             print(f"    Return code: {run_result.returncode}")
                             if run_result.stderr.strip():
-                                print(f"    STDERR: {run_result.stderr.strip()}")
+                                # On macOS with lldb, limit to 60 lines to avoid noise
+                                stderr_lines = run_result.stderr.strip().split("\n")
+                                if (
+                                    platform.system() == "Darwin"
+                                    and len(stderr_lines) > 60
+                                ):
+                                    print(f"    STDERR (first 60 lines):")
+                                    for line in stderr_lines[:60]:
+                                        print(f"      {line}")
+                                else:
+                                    print(
+                                        f"    STDERR: {run_result.stderr.strip()[:3000]}"
+                                    )
                             if run_result.stdout.strip():
                                 print(f"    STDOUT: {run_result.stdout.strip()[:500]}")
                             failed += 1

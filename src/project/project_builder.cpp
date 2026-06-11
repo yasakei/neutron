@@ -484,7 +484,9 @@ bool ProjectBuilder::buildProjectExecutable(
                         srcFile << "        return 1;\n";
                         srcFile << "    }\n";
                         srcFile << "    fprintf(stderr, \"DEBUG: calling neutron_main\\n\");\n";
-                        srcFile << "    return neutron_main(&vm);\n";
+                        srcFile << "    int result = neutron_main(&vm);\n";
+                        srcFile << "    fprintf(stderr, \"DEBUG: neutron_main returned %d\\n\", result);\n";
+                        srcFile << "    return result;\n";
                         srcFile << "}\n";
                         srcFile.close();
                         aotSuccess = true;

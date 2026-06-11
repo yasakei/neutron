@@ -203,6 +203,7 @@ void aot_setProperty(void* vm_ctx, uint64_t objVal, const char* propName, uint64
 // --- Cached property access (AOT inline cache) ---
 
 uint64_t aot_getPropertyCached(void* vm_ctx, uint64_t objVal, const char* propName, void* cachePtr) {
+    fprintf(stderr, "AOT: aot_getPropertyCached(%s)\n", propName ? propName : "?");
     VM* vm = static_cast<VM*>(vm_ctx);
     AotPropCache* cache = static_cast<AotPropCache*>(cachePtr);
     Value obj = nanToValue(objVal);
@@ -515,6 +516,7 @@ uint64_t aot_invoke(void* vm_ctx, uint64_t receiver, const char* methodName,
 }
 
 uint64_t aot_getGlobal(void* vm_ctx, const char* name) {
+    fprintf(stderr, "AOT: aot_getGlobal(%s)\n", name);
     VM* vm = static_cast<VM*>(vm_ctx);
     auto it = vm->globals.find(name);
     if (it != vm->globals.end()) {
