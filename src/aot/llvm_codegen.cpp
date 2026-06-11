@@ -24,6 +24,7 @@
 
 #include <iostream>
 #include <string>
+#include <unordered_set>
 #include <cstdlib>
 #include <cmath>
 #include <cstring>
@@ -134,6 +135,12 @@ struct LlvmCodegenImpl {
     bool isMainFunc = true;
 
     const Chunk* chunk = nullptr;
+
+    // Tracks which global names are module imports (loaded via OP_LOAD_MODULE).
+    // Module globals skip the LLVM GlobalVariable store on ARM64 macOS,
+    // where the optimized GlobalVariable access after a function call return
+    // can produce crashing machine code. Instead they use runtime calls.
+    std::unordered_set<std::string> moduleGlobals;
 
     // Per-callsite property cache counter (for unique global names)
     uint32_t propCacheId = 0;
@@ -1765,14 +1772,26 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
             case OpCode::OP_GET_GLOBAL:
             case OpCode::OP_GET_GLOBAL_FAST: {
                 uint8_t constIdx = impl->readByte();
-                auto* gv = impl->getOrCreateGlobal(constIdx);
-                if (gv) {
+                const Value& nameV = impl->chunk->constants[constIdx];
+                std::string gName = nameV.type == ValueType::OBJ_STRING ? nameV.as.obj_string->chars : "?";
+                bool isModule = impl->moduleGlobals.count(gName) > 0;
+                if (isModule) {
+                    // Module globals: read from vm->globals via runtime call
+                    auto* nameStr = impl->builder->CreateGlobalStringPtr(gName, "g_get");
+                    auto* val = impl->builder->CreateCall(impl->aotGetGlobalFunc,
+                        {impl->vmCtx, nameStr}, "mod_get");
                     auto* dest = impl->pushValue();
-                    auto* val = impl->builder->CreateLoad(impl->i64Ty, gv, "global");
                     impl->builder->CreateStore(val, dest);
                 } else {
-                    impl->pushValue();
-                    impl->emitConstStore(impl->peekValue(), TAG_NIL, 0.0);
+                    auto* gv = impl->getOrCreateGlobal(constIdx);
+                    if (gv) {
+                        auto* dest = impl->pushValue();
+                        auto* val = impl->builder->CreateLoad(impl->i64Ty, gv, "global");
+                        impl->builder->CreateStore(val, dest);
+                    } else {
+                        impl->pushValue();
+                        impl->emitConstStore(impl->peekValue(), TAG_NIL, 0.0);
+                    }
                 }
                 break;
             }
@@ -1788,9 +1807,12 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* val = impl->builder->CreateLoad(impl->i64Ty, src);
                 impl->builder->CreateCall(impl->aotSetGlobalTypedFunc,
                     {impl->vmCtx, gNameStr, val});
-                auto* gv = impl->getOrCreateGlobal(constIdx);
-                if (gv) {
-                    impl->builder->CreateStore(val, gv);
+                bool isModule = impl->moduleGlobals.count(gName) > 0;
+                if (!isModule) {
+                    auto* gv = impl->getOrCreateGlobal(constIdx);
+                    if (gv) {
+                        impl->builder->CreateStore(val, gv);
+                    }
                 }
                 break;
             }
@@ -1802,6 +1824,16 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 auto* nameStr = impl->builder->CreateGlobalStringPtr(modName, "g_name");
                 auto* modVal = impl->builder->CreateCall(impl->aotGetGlobalFunc,
                     {impl->vmCtx, nameStr}, "mod_val");
+                // Track as module global — avoids the LLVM GlobalVariable store path
+                // which can crash on ARM64 macOS (optimized loads after a function return
+                // produce incorrect machine code in some LLVM backend configurations).
+                // Runtime calls (aot_getGlobal / aot_setGlobalTyped) are used instead.
+                impl->moduleGlobals.insert(modName);
+                // Store in vm->globals immediately so the module is accessible even if
+                // the subsequent code path has issues.
+                auto* syncStr = impl->builder->CreateGlobalStringPtr(modName, "g_mod");
+                impl->builder->CreateCall(impl->aotSetGlobalTypedFunc,
+                    {impl->vmCtx, syncStr, modVal});
                 auto* dest = impl->pushValue();
                 impl->builder->CreateStore(modVal, dest);
                 break;
@@ -1812,17 +1844,20 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                 const Value& nameV = impl->chunk->constants[constIdx];
                 std::string gName = nameV.type == ValueType::OBJ_STRING ? nameV.as.obj_string->chars : "?";
                 auto* gNameStr = impl->builder->CreateGlobalStringPtr(gName, "g_name");
-                auto* gv = impl->getOrCreateGlobal(constIdx);
-                if (gv) {
-                    auto* src = impl->popValue();
-                    auto* val = impl->builder->CreateLoad(impl->i64Ty, src);
-                    impl->builder->CreateStore(val, gv);
-                    // Also store in vm->globals so interpreter fallback can access it
-                    impl->builder->CreateCall(impl->aotSetGlobalTypedFunc,
-                        {impl->vmCtx, gNameStr, val});
-                } else {
-                    impl->popValue();
+                auto* src = impl->popValue();
+                auto* val = impl->builder->CreateLoad(impl->i64Ty, src);
+                bool isModule = impl->moduleGlobals.count(gName) > 0;
+                if (!isModule) {
+                    // Non-module globals use LLVM GlobalVariable for fast AOT-to-AOT access
+                    auto* gv = impl->getOrCreateGlobal(constIdx);
+                    if (gv) {
+                        impl->builder->CreateStore(val, gv);
+                    }
                 }
+                // Always store in vm->globals so interpreter fallback can access it.
+                // For module globals, this is the canonical store.
+                impl->builder->CreateCall(impl->aotSetGlobalTypedFunc,
+                    {impl->vmCtx, gNameStr, val});
                 break;
             }
 

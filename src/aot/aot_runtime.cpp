@@ -517,30 +517,21 @@ uint64_t aot_invoke(void* vm_ctx, uint64_t receiver, const char* methodName,
 }
 
 uint64_t aot_getGlobal(void* vm_ctx, const char* name) {
-    fprintf(stderr, "AOT: getGlobal(%s) enter vm=%p\n", name ? name : "(null)", vm_ctx);
-    if (!vm_ctx) { fprintf(stderr, "AOT: getGlobal NULL vm_ctx!\n"); return valueToNan(Value()); }
-    if (!name) { fprintf(stderr, "AOT: getGlobal NULL name!\n"); return valueToNan(Value()); }
+    if (!vm_ctx || !name) return valueToNan(Value());
     VM* vm = static_cast<VM*>(vm_ctx);
-    fprintf(stderr, "AOT: getGlobal(%s) vm=%p globals.size=%zu\n", name, (void*)vm, vm->globals.size());
     try {
         auto it = vm->globals.find(name);
         if (it != vm->globals.end()) {
-            fprintf(stderr, "AOT: getGlobal(%s) FOUND type=%d\n", name, (int)it->second.type);
             return valueToNan(it->second);
         }
-        fprintf(stderr, "AOT: getGlobal(%s) NOT FOUND\n", name);
-        return valueToNan(Value());
-    } catch (const std::exception& e) {
-        fprintf(stderr, "AOT: getGlobal(%s) exception: %s\n", name, e.what());
         return valueToNan(Value());
     } catch (...) {
-        fprintf(stderr, "AOT: getGlobal(%s) unknown exception\n", name);
         return valueToNan(Value());
     }
 }
 
 void aot_setGlobal(void* vm_ctx, const char* name, uint64_t val) {
-    fprintf(stderr, "AOT: aot_setGlobal(%s) val=0x%016lx\n", name, val);
+    if (!vm_ctx || !name) return;
     VM* vm = static_cast<VM*>(vm_ctx);
     vm->globals[name] = nanToValue(val);
 }
@@ -757,7 +748,7 @@ void aot_reportTypeError(void* vm_ctx, uint8_t expectedType, uint64_t val) {
 }
 
 void aot_setGlobalTyped(void* vm_ctx, const char* name, uint64_t val) {
-    fprintf(stderr, "AOT: aot_setGlobalTyped(%s) val=0x%016lx\n", name, val);
+    if (!vm_ctx || !name) return;
     VM* vm = static_cast<VM*>(vm_ctx);
     std::string varName(name);
     auto typeIt = vm->globalTypes.find(varName);

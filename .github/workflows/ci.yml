@@ -77,7 +77,19 @@ jobs:
         run: python3 tests/run_tests.py
 
       - name: Run AOT compilation tests
-        run: python3 tests/run_tests.py --aot
+        run: python3 tests/run_tests.py --aot 2>&1 | tee .github/logs/linux-aot.log
+
+      - name: Commit AOT test logs
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p .github/logs
+          grep -v "^\s*$" .github/logs/linux-aot.log > .github/logs/linux-aot.log.tmp && mv .github/logs/linux-aot.log.tmp .github/logs/linux-aot.log
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          git add .github/logs/linux-aot.log
+          git diff --cached --quiet || git commit -m "update linux aot test logs [skip ci]"
+          git push origin HEAD:${{ github.ref }}
 
       - name: Install Neutron globally
         run: |
@@ -237,7 +249,19 @@ jobs:
           # AOT uses clang on macOS (included with Xcode Command Line Tools)
           echo "Checking for C++ compiler..."
           which clang && clang --version || echo "clang not available"
-          python3 tests/run_tests.py --aot
+          python3 tests/run_tests.py --aot 2>&1 | tee .github/logs/macos-aot.log
+
+      - name: Commit AOT test logs
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p .github/logs
+          grep -v "^\s*$" .github/logs/macos-aot.log > .github/logs/macos-aot.log.tmp && mv .github/logs/macos-aot.log.tmp .github/logs/macos-aot.log
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          git add .github/logs/macos-aot.log
+          git diff --cached --quiet || git commit -m "update macos aot test logs [skip ci]"
+          git push origin HEAD:${{ github.ref }}
 
       - name: Install Neutron globally
         run: |
@@ -423,7 +447,22 @@ jobs:
         run: |
           Write-Host "Checking for C++ compiler..."
           cl.exe || echo "MSVC compiler not found"
-          python tests/run_tests.py --aot
+          python tests/run_tests.py --aot 2>&1 | ForEach-Object { Add-Content -Path .github/logs/windows-aot.log -Value $_; Write-Output $_ }
+
+      - name: Commit AOT test logs
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          mkdir -Force .github/logs
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:$($env:GITHUB_TOKEN)@github.com/$($env:GITHUB_REPOSITORY)
+          git add .github/logs/windows-aot.log
+          $diff = git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m "update windows aot test logs [skip ci]"
+            git push origin HEAD:$env:GITHUB_REF
+          }
 
       - name: Install Neutron globally (Windows)
         run: |
