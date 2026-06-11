@@ -92,6 +92,9 @@ uint64_t aot_call(void* vm_ctx, uint64_t callee, const uint64_t* args, uint8_t a
 // Method invocation (receiver.method(args))
 uint64_t aot_invoke(void* vm_ctx, uint64_t receiver, const char* methodName,
                     const uint64_t* args, uint8_t argCount);
+// Fast path: try AOT-compiled method directly (avoids vm->call overhead)
+uint64_t aot_tryDirectInvoke(void* vm_ctx, uint64_t receiver, const char* methodName,
+                              const uint64_t* args, uint8_t argCount);
 
 // For-in loop helper
 // aot_forInInit: takes iterable, returns NaN-boxed keys array

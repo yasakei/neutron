@@ -103,6 +103,7 @@ struct LlvmCodegenImpl {
     llvm::Function* aotCreateObjectFunc = nullptr;
     llvm::Function* aotCallFunc = nullptr;
     llvm::Function* aotInvokeFunc = nullptr;
+    llvm::Function* aotTryDirectInvokeFunc = nullptr;
     llvm::Function* aotPrintFunc = nullptr;
     llvm::Function* aotInternFunc = nullptr;
     llvm::Function* aotForInInitFunc = nullptr;
@@ -403,6 +404,9 @@ struct LlvmCodegenImpl {
         auto* invokeTy = llvm::FunctionType::get(i64Ty, {i8PtrTy, i64Ty, i8PtrTy, i8PtrTy, i8Ty}, false);
         aotInvokeFunc = llvm::Function::Create(invokeTy, llvm::Function::ExternalLinkage,
                                                   "aot_invoke", module.get());
+        // i64 @aot_tryDirectInvoke(i8* vm_ctx, i64 receiver, i8* method_name, i8* args, i8 arg_count)
+        aotTryDirectInvokeFunc = llvm::Function::Create(invokeTy, llvm::Function::ExternalLinkage,
+                                                          "aot_tryDirectInvoke", module.get());
 
         // void @aot_printValue(i8* vm_ctx, i64 val)
         auto* printTy = llvm::FunctionType::get(llvm::Type::getVoidTy(context), {i8PtrTy, i64Ty}, false);
@@ -2105,7 +2109,7 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                     ? nameVal.as.obj_string->chars : "?";
                 auto* methodNameStr = impl->builder->CreateGlobalStringPtr(methodName, "method_name");
 
-                // Pop args and receiver from stack (args are pushed first, then receiver)
+                llvm::Value* argsPtr = llvm::ConstantPointerNull::get(impl->i8PtrTy);
                 if (argCount > 0) {
                     auto* argsTy = llvm::ArrayType::get(impl->i64Ty, argCount);
                     auto* argsAlloca = impl->builder->CreateAlloca(argsTy, nullptr, "invoke_args");
@@ -2117,24 +2121,33 @@ bool LlvmCodegen::generateModule(const std::string& functionName, const std::str
                              llvm::ConstantInt::get(impl->i32Ty, i)});
                         impl->builder->CreateStore(arg, gep);
                     }
-                    auto* receiverPtr = impl->popValue();
-                    auto* receiver = impl->builder->CreateLoad(impl->i64Ty, receiverPtr, "receiver");
-                    auto* argsPtr = impl->builder->CreatePointerCast(argsAlloca, impl->i8PtrTy);
-                    auto* result = impl->builder->CreateCall(impl->aotInvokeFunc,
-                        {impl->vmCtx, receiver, methodNameStr, argsPtr,
-                         llvm::ConstantInt::get(impl->i8Ty, argCount)}, "invoke_result");
-                    auto* dest = impl->pushValue();
-                    impl->builder->CreateStore(result, dest);
-                } else {
-                    auto* receiverPtr = impl->popValue();
-                    auto* receiver = impl->builder->CreateLoad(impl->i64Ty, receiverPtr, "receiver");
-                    auto* result = impl->builder->CreateCall(impl->aotInvokeFunc,
-                        {impl->vmCtx, receiver, methodNameStr,
-                         llvm::ConstantPointerNull::get(impl->i8PtrTy),
-                         llvm::ConstantInt::get(impl->i8Ty, 0)}, "invoke_result");
-                    auto* dest = impl->pushValue();
-                    impl->builder->CreateStore(result, dest);
+                    argsPtr = impl->builder->CreatePointerCast(argsAlloca, impl->i8PtrTy);
                 }
+                auto* receiverPtr = impl->popValue();
+                auto* receiver = impl->builder->CreateLoad(impl->i64Ty, receiverPtr, "receiver");
+
+                auto* sentinel = llvm::ConstantInt::get(impl->i64Ty, AOT_SENTINEL);
+                auto* directResult = impl->builder->CreateCall(impl->aotTryDirectInvokeFunc,
+                    {impl->vmCtx, receiver, methodNameStr, argsPtr,
+                     llvm::ConstantInt::get(impl->i8Ty, argCount)}, "direct_invoke");
+                auto* isMiss = impl->builder->CreateICmpEQ(directResult, sentinel, "is_miss");
+                auto* tryDirectBB = impl->builder->GetInsertBlock();
+                auto* invokeFallbackBB = llvm::BasicBlock::Create(ctx, "invoke_fb", impl->func);
+                auto* invokeMergeBB = llvm::BasicBlock::Create(ctx, "invoke_mg", impl->func);
+                impl->builder->CreateCondBr(isMiss, invokeFallbackBB, invokeMergeBB);
+
+                impl->builder->SetInsertPoint(invokeFallbackBB);
+                auto* fallbackResult = impl->builder->CreateCall(impl->aotInvokeFunc,
+                    {impl->vmCtx, receiver, methodNameStr, argsPtr,
+                     llvm::ConstantInt::get(impl->i8Ty, argCount)}, "invoke_fb_r");
+                impl->builder->CreateBr(invokeMergeBB);
+
+                impl->builder->SetInsertPoint(invokeMergeBB);
+                auto* phi = impl->builder->CreatePHI(impl->i64Ty, 2, "invoke_r");
+                phi->addIncoming(directResult, tryDirectBB);
+                phi->addIncoming(fallbackResult, invokeFallbackBB);
+                auto* dest = impl->pushValue();
+                impl->builder->CreateStore(phi, dest);
                 break;
             }
 

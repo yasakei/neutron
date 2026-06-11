@@ -3,11 +3,11 @@
 ## Status
 ✅ **Phases 0–16 complete** — All bytecode opcodes emit LLVM IR; user-defined functions compile to native IR and dispatch directly. 128/128 interpreter + 10/10 AOT tests pass.
 
-❌ **Phases 16–17** — Remaining helpers (method invocation, module linking). See below.
+❌ **Phase 17** — Module linking. See below.
 
 ---
 
-## ✅ Completed — Phases 0–6
+## ✅ Completed — Phases 0–16
 
 | Phase | What |
 |-------|------|
@@ -119,13 +119,14 @@ Every helper below is a C++ function called from LLVM IR. The goal is to inline 
 
 ---
 
-### Phase 16: Method Invocation (`OP_INVOKE`) — HARD
+### ✅ Phase 16: Method Invocation (`OP_INVOKE`) — HARD ✅
 
-| Helper | Lines | What it does | Inline approach |
-|--------|-------|-------------|-----------------|
-| `aot_invoke` | 1892, 1900 | Look up method on Instance klass, or handle built-in Array methods | Inline method table lookup (hash on ObjString key), bind receiver, call the method |
+| Helper | What we did |
+|--------|-------------|
+| `aot_invoke` | Kept as fallback — covers non-Instance receivers, Array push/pop, non-AOT methods, edge cases |
+| `aot_tryDirectInvoke` | **Added** — fast path: does full method lookup then calls AOT-compiled function directly via `s_llvmFuncTable` (avoids `vm->call` overhead) |
 
-Very similar to property get + call. Could be refactored as: inline the method table probe, then emit a direct call to the resolved function pointer.
+**Done**: Added `aot_tryDirectInvoke` runtime helper that performs method lookup and calls the resolved AOT-compiled function directly (bypassing `vm->call`). Updated OP_INVOKE codegen to use try-direct + fallback pattern with phi merge (mirrors OP_CALL's architecture). Falls back to `aot_invoke` for non-AOT methods, Array push/pop, and edge cases.
 
 ---
 
@@ -158,7 +159,7 @@ Compile each C++ module to LLVM bitcode (`-flto -emit-llvm -c`), emit direct `ex
 | 13 (EH) ✅ | `aotTryPushFunc`, `aotTryPopFunc` (removed, dead code) | `aotThrowErrorFunc` (cold path) |
 | 14 (Typed) ✅ | `aotSetLocalTypedFunc` (+ added `aotReportTypeErrorFunc`) | `aotSetGlobalTypedFunc`, `aotDefineTypedGlobalFunc` |
 | 15 (Safe) ✅ | `aotValidateSafeVarFunc`, `aotValidateSafeFileVarFunc` | `aotValidateSafeFuncFunc`, `aotValidateSafeFileFuncFunc` |
-| 16 (Invoke) | `aotInvokeFunc` | — |
+| 16 (Invoke) ✅ | `aotInvokeFunc` (now fallback-only) | `aotTryDirectInvokeFunc` (added), `aotInvokeFunc` (kept) |
 | 17 (Module) | — | — (new code) |
 
 **Total removals**: ~27 function declarations + `Function::Create` calls

@@ -774,6 +774,37 @@ uint64_t aot_tryDirectCall(void* vm_ctx, uint64_t callee, const uint64_t* args, 
     return compiledFn(vm_ctx, args, argCount);
 }
 
+// Fast path: try to call an AOT-compiled method directly (avoids vm->call overhead)
+uint64_t aot_tryDirectInvoke(void* vm_ctx, uint64_t receiver, const char* methodName,
+                              const uint64_t* args, uint8_t argCount) {
+    VM* vm = static_cast<VM*>(vm_ctx);
+    Value recv = nanToValue(receiver);
+
+    if (recv.type != ValueType::INSTANCE) return AOT_SENTINEL;
+
+    Instance* inst = recv.as.instance;
+    ObjString* methodStr = vm->internString(methodName);
+    auto methIt = inst->klass->methods.find(methodStr);
+    if (methIt == inst->klass->methods.end()) return AOT_SENTINEL;
+
+    Value callee = methIt->second;
+    if (callee.type != ValueType::CALLABLE) return AOT_SENTINEL;
+    if (callee.as.callable->obj_type != ObjType::OBJ_FUNCTION) return AOT_SENTINEL;
+
+    auto* fn = static_cast<Function*>(callee.as.callable);
+    int idx = fn->aotFuncIndex;
+    if (idx < 0 || idx >= 256 || !s_llvmFuncTable[idx]) return AOT_SENTINEL;
+
+    uint64_t combined[1 + 255];
+    combined[0] = receiver;
+    for (uint8_t i = 0; i < argCount; i++) {
+        combined[i + 1] = args[i];
+    }
+
+    auto compiledFn = reinterpret_cast<uint64_t(*)(void*, const uint64_t*, uint8_t)>(s_llvmFuncTable[idx]);
+    return compiledFn(vm_ctx, combined, argCount + 1);
+}
+
 uint64_t aot_stringCharAt(void* vm_ctx, uint64_t strVal, uint64_t idxVal) {
     ObjString* s = reinterpret_cast<ObjString*>(static_cast<uintptr_t>(strVal & AOT_NAN_PAYLOAD_MASK));
     Value idx = nanToValue(idxVal);
