@@ -411,8 +411,13 @@ def run_aot_tests(neutron_bin, root_dir):
                 if os.path.exists(output_path):
                     try:
                         # Run the compiled executable
+                        # On macOS, enable dyld debug output to diagnose missing library crashes
+                        aot_env = os.environ.copy()
+                        if platform.system() == "Darwin":
+                            aot_env["DYLD_PRINT_LIBRARIES"] = "1"
                         run_result = subprocess.run(
                             [output_path],
+                            env=aot_env,
                             capture_output=True,
                             text=True,
                             encoding="utf-8",
