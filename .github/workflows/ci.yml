@@ -191,6 +191,18 @@ jobs:
           # LLVM is keg-only on macOS — verify via file check
           echo "LLVM installed at: $(ls /opt/homebrew/opt/llvm/bin/llvm-config 2>/dev/null || echo 'checking CMAKE_PREFIX_PATH')"
 
+          # Create symlinks for Homebrew libraries so the AOT linker can find them
+          if [ -d "/opt/homebrew" ]; then
+            BREW_PREFIX="/opt/homebrew"
+          else
+            BREW_PREFIX="/usr/local"
+          fi
+          if [ -f "$BREW_PREFIX/lib/libjsoncpp.dylib" ]; then
+            sudo mkdir -p /usr/local/lib
+            sudo ln -sf "$BREW_PREFIX/lib/libjsoncpp.dylib" /usr/local/lib/libjsoncpp.dylib
+            echo "Created symlink for jsoncpp"
+          fi
+
       - name: Build Neutron Runtime
         run: |
           cmake -B build -S . -DCMAKE_BUILD_TYPE=Release

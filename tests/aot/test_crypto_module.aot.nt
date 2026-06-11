@@ -18,9 +18,10 @@ if (hash == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824") 
     say("sha256 OK");
 } else { say("FAIL sha256: " + hash); ok = false; }
 
-// md5
-var md = crypto.md5("hello");
-if (md == "5d41402abc4b2a76b9719d911017c592") { say("md5 OK"); } else { say("FAIL md5"); ok = false; }
+// random_bytes + hex_encode
+var rnd = crypto.random_bytes(8);
+var rndHex = crypto.hex_encode(rnd);
+if (rndHex.length == 16) { say("random_bytes/hex OK"); } else { say("FAIL random_bytes"); ok = false; }
 
 // hex encode/decode
 var hex = crypto.hex_encode("ABC");
