@@ -431,6 +431,7 @@ uint64_t aot_call(void* vm_ctx, uint64_t callee, const uint64_t* args, uint8_t a
 
 uint64_t aot_invoke(void* vm_ctx, uint64_t receiver, const char* methodName,
                     const uint64_t* args, uint8_t argCount) {
+    fprintf(stderr, "DEBUG aot_invoke: method=%s argCount=%u\n", methodName ? methodName : "(null)", argCount);
     VM* vm = static_cast<VM*>(vm_ctx);
     Value recv = nanToValue(receiver);
     ObjString* methodStr = vm->internString(methodName);
@@ -516,16 +517,21 @@ uint64_t aot_invoke(void* vm_ctx, uint64_t receiver, const char* methodName,
 }
 
 uint64_t aot_getGlobal(void* vm_ctx, const char* name) {
-    fprintf(stderr, "AOT: aot_getGlobal(%s)\n", name);
+    fprintf(stderr, "AOT: aot_getGlobal(%s) enter\n", name);
     VM* vm = static_cast<VM*>(vm_ctx);
     auto it = vm->globals.find(name);
     if (it != vm->globals.end()) {
-        return valueToNan(it->second);
+        fprintf(stderr, "AOT: aot_getGlobal(%s) FOUND type=%d\n", name, (int)it->second.type);
+        uint64_t result = valueToNan(it->second);
+        fprintf(stderr, "AOT: aot_getGlobal(%s) result=0x%016lx\n", name, result);
+        return result;
     }
+    fprintf(stderr, "AOT: aot_getGlobal(%s) NOT FOUND\n", name);
     return valueToNan(Value());
 }
 
 void aot_setGlobal(void* vm_ctx, const char* name, uint64_t val) {
+    fprintf(stderr, "AOT: aot_setGlobal(%s) val=0x%016lx\n", name, val);
     VM* vm = static_cast<VM*>(vm_ctx);
     vm->globals[name] = nanToValue(val);
 }
