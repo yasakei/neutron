@@ -1142,7 +1142,7 @@ bool ProjectBuilder::buildProjectExecutable(
     }
 
     std::cout << "[3/4] Compiling and linking..." << std::endl;
-    // std::cout << "Command: " << compileCommand << std::endl;  // DEBUG: Commented out for clean output
+    std::cout << "Command: " << compileCommand << std::endl;
     
     int result;
     
