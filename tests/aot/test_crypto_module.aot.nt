@@ -1,0 +1,32 @@
+use crypto;
+
+var ok = true;
+
+// base64 encode/decode
+var orig = "Hello, World!"
+var enc = crypto.base64_encode(orig)
+var dec = crypto.base64_decode(enc)
+if (orig == dec && enc == "SGVsbG8sIFdvcmxkIQ==") { say("base64 OK") } else { say("FAIL base64"); ok = false }
+
+// base64 empty
+if (crypto.base64_decode(crypto.base64_encode("")) == "") { say("base64 empty OK") } else { say("FAIL base64 empty"); ok = false }
+
+// sha256
+var hash = crypto.sha256("hello")
+// sha256("hello") = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+if (hash == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824") {
+    say("sha256 OK")
+} else { say("FAIL sha256: " + hash); ok = false }
+
+// md5
+var md = crypto.md5("hello")
+if (md == "5d41402abc4b2a76b9719d911017c592") { say("md5 OK") } else { say("FAIL md5"); ok = false }
+
+// hex encode/decode
+var hex = crypto.hex_encode("ABC")
+if (hex == "414243") { say("hex_encode OK") } else { say("FAIL hex_encode"); ok = false }
+
+var raw = crypto.hex_decode("414243")
+if (raw == "ABC") { say("hex_decode OK") } else { say("FAIL hex_decode"); ok = false }
+
+if (ok) { say("AOT crypto module test PASSED") }

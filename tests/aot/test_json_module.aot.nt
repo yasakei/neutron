@@ -1,0 +1,31 @@
+use json;
+
+var ok = true;
+
+// stringify basic
+if (json.stringify(nil) == "null") { say("stringify nil OK") } else { say("FAIL stringify nil"); ok = false }
+if (json.stringify(true) == "true") { say("stringify bool OK") } else { say("FAIL stringify bool"); ok = false }
+if (json.stringify(42) == "42") { say("stringify num OK") } else { say("FAIL stringify num"); ok = false }
+if (json.stringify("hi") == "\"hi\"") { say("stringify str OK") } else { say("FAIL stringify str"); ok = false }
+
+// parse basic
+if (json.parse("null") == nil) { say("parse null OK") } else { say("FAIL parse null"); ok = false }
+if (json.parse("true") == true) { say("parse bool OK") } else { say("FAIL parse bool"); ok = false }
+if (json.parse("42") == 42) { say("parse num OK") } else { say("FAIL parse num"); ok = false }
+if (json.parse("\"hi\"") == "hi") { say("parse str OK") } else { say("FAIL parse str"); ok = false }
+
+// parse object + get
+var obj = json.parse("{\"name\": \"Alice\", \"age\": 30}")
+if (json.get(obj, "name") == "Alice") { say("get OK") } else { say("FAIL get"); ok = false }
+if (json.has(obj, "name") && !json.has(obj, "nope")) { say("has OK") } else { say("FAIL has"); ok = false }
+
+// set + stringify roundtrip
+json.set(obj, "age", 31)
+var str = json.stringify(obj)
+if (json.get(obj, "age") == 31) { say("set OK") } else { say("FAIL set"); ok = false }
+
+// keys
+var keys = json.keys(obj)
+if (keys.length >= 2) { say("keys OK") } else { say("FAIL keys"); ok = false }
+
+if (ok) { say("AOT json module test PASSED") }

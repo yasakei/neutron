@@ -13,6 +13,9 @@
 #include <cstdlib>
 #include <string>
 #include <setjmp.h>
+#include <cmath>
+#include <unordered_map>
+#include <vector>
 
 namespace neutron {
 namespace aot {
@@ -44,6 +47,12 @@ static inline uint64_t valueToNan(const Value& val) {
         case ValueType::OBJECT:
             return AOT_NAN_BASE | (AOT_NAN_OBJECT << 47) |
                    (reinterpret_cast<uint64_t>(val.as.object) & AOT_NAN_PAYLOAD_MASK);
+        case ValueType::MODULE:
+            return AOT_NAN_BASE | (AOT_NAN_MODULE << 47) |
+                   (reinterpret_cast<uint64_t>(val.as.module) & AOT_NAN_PAYLOAD_MASK);
+        case ValueType::CLASS:
+            return AOT_NAN_BASE | (AOT_NAN_CLASS << 47) |
+                   (reinterpret_cast<uint64_t>(val.as.klass) & AOT_NAN_PAYLOAD_MASK);
         default:
             return AOT_NAN_BASE | (AOT_NAN_NIL << 47);
     }
@@ -75,6 +84,10 @@ static inline Value nanToValue(uint64_t nanVal) {
             return Value(reinterpret_cast<Callable*>(payload));
         case AOT_NAN_OBJECT:
             return Value(reinterpret_cast<Object*>(payload));
+        case AOT_NAN_MODULE:
+            return Value(reinterpret_cast<Module*>(payload));
+        case AOT_NAN_CLASS:
+            return Value(reinterpret_cast<Class*>(payload));
         default:
             return Value();
     }
@@ -86,7 +99,25 @@ static inline Value nanToValue(uint64_t nanVal) {
 using namespace neutron;
 using namespace neutron::aot;
 
+// ---- Phase 17: Forward declarations of module functions ----
+extern Value add(VM& vm, std::vector<Value> args);
+extern Value subtract(VM& vm, std::vector<Value> args);
+extern Value multiply(VM& vm, std::vector<Value> args);
+extern Value divide(VM& vm, std::vector<Value> args);
+extern Value sqrt_fn(VM& vm, std::vector<Value> args);
+extern Value pow_fn(VM& vm, std::vector<Value> args);
+extern Value abs_fn(VM& vm, std::vector<Value> args);
+extern Value ceil_fn(VM& vm, std::vector<Value> args);
+extern Value floor_fn(VM& vm, std::vector<Value> args);
+extern Value round_fn(VM& vm, std::vector<Value> args);
+extern Value sin_fn(VM& vm, std::vector<Value> args);
+extern Value cos_fn(VM& vm, std::vector<Value> args);
+extern Value tan_fn(VM& vm, std::vector<Value> args);
+extern Value random_fn(VM& vm, std::vector<Value> args);
+
 extern "C" {
+
+static std::unordered_map<void*, void*> s_moduleWrappers;
 
 uint64_t aot_getProperty(void* vm_ctx, uint64_t objVal, const char* propName) {
     VM* vm = static_cast<VM*>(vm_ctx);
@@ -390,6 +421,8 @@ uint64_t aot_call(void* vm_ctx, uint64_t callee, const uint64_t* args, uint8_t a
         return valueToNan(result);
     } catch (const Return& ret) {
         return valueToNan(ret.value);
+    } catch (const std::exception& e) {
+        return valueToNan(Value());
     } catch (...) {
         return valueToNan(Value());
     }
@@ -439,6 +472,42 @@ uint64_t aot_invoke(void* vm_ctx, uint64_t receiver, const char* methodName,
                 return valueToNan(v);
             }
             return valueToNan(Value());
+        }
+    }
+
+    if (recv.type == ValueType::MODULE) {
+        Module* mod = recv.as.module;
+        Value callee = mod->get(methodName);
+        if (callee.type != ValueType::NIL) {
+            // Check if it's a native function and call directly (avoid vm->call overhead)
+            if (callee.type == ValueType::CALLABLE && callee.as.callable->obj_type == ObjType::OBJ_NATIVE_FN) {
+                auto* nativeFn = static_cast<NativeFn*>(callee.as.callable);
+                
+                // Check for registered AOT wrapper first
+                auto it = s_moduleWrappers.find(nativeFn);
+                if (it != s_moduleWrappers.end()) {
+                    auto wrapperFn = reinterpret_cast<uint64_t(*)(void*, const uint64_t*, uint8_t)>(it->second);
+                    return wrapperFn(vm_ctx, args, argCount);
+                }
+                
+                // Generic fallback: call NativeFn directly
+                try {
+                    Value result = nativeFn->call(*vm, argVec);
+                    return valueToNan(result);
+                } catch (const std::exception&) {
+                    return valueToNan(Value());
+                }
+            }
+            
+            // Regular function - use vm->call
+            try {
+                Value result = vm->call(callee, argVec);
+                return valueToNan(result);
+            } catch (const Return& ret) {
+                return valueToNan(ret.value);
+            } catch (...) {
+                return valueToNan(Value());
+            }
         }
     }
 
@@ -674,8 +743,8 @@ void aot_setGlobalTyped(void* vm_ctx, const char* name, uint64_t val) {
     VM* vm = static_cast<VM*>(vm_ctx);
     std::string varName(name);
     auto typeIt = vm->globalTypes.find(varName);
+    Value value = nanToValue(val);
     if (typeIt != vm->globalTypes.end()) {
-        Value value = nanToValue(val);
         if (!aot_validateType(static_cast<uint8_t>(typeIt->second), value)) {
             std::string actualName = value.type == ValueType::NIL ? "nil" :
                                       value.type == ValueType::BOOLEAN ? "boolean" :
@@ -687,8 +756,11 @@ void aot_setGlobalTyped(void* vm_ctx, const char* name, uint64_t val) {
             aot_runtimeError(vm_ctx, msg.c_str());
         }
     }
-    // Note: actual global value is stored by AOT codegen in LLVM global;
-    // this helper only does type validation.
+    // FIX: Also store in vm->globals so interpreter fallback can access global variables.
+    // AOT codegen stores the value in LLVM globals for AOT-to-AOT access, but when
+    // functions fall back to interpreter (due to aotFuncIndex=-1 from wrapper recompile),
+    // the interpreted code needs vm->globals to find variables.
+    vm->globals[varName] = value;
 }
 
 void aot_defineTypedGlobal(void* vm_ctx, const char* name, uint64_t val, uint8_t typeByte) {
@@ -758,20 +830,161 @@ void aot_registerLlvmFunc(int idx, void* funcPtr) {
     }
 }
 
+// Optimized string concatenation for AOT: works directly on NaN-boxed values
+// Skips Value struct creation for the common string+string case
+uint64_t aot_concatStrings(void* vm_ctx, uint64_t a, uint64_t b) {
+    VM* vm = static_cast<VM*>(vm_ctx);
+
+    bool aIsStr = aot_isTagged(a) && aot_getTag(a) == AOT_NAN_STRING;
+    bool bIsStr = aot_isTagged(b) && aot_getTag(b) == AOT_NAN_STRING;
+
+    // Fast path: both strings - extract ObjString* directly from NaN payload
+    if (aIsStr && bIsStr) {
+        ObjString* sa = reinterpret_cast<ObjString*>(static_cast<uintptr_t>(a & AOT_NAN_PAYLOAD_MASK));
+        ObjString* sb = reinterpret_cast<ObjString*>(static_cast<uintptr_t>(b & AOT_NAN_PAYLOAD_MASK));
+        std::string result = sa->chars + sb->chars;
+        return valueToNan(Value(vm->internString(result)));
+    }
+
+    // Mixed path: one string, one non-string
+    Value va = nanToValue(a);
+    Value vb = nanToValue(b);
+    std::string result = va.toString() + vb.toString();
+    return valueToNan(Value(vm->internString(result)));
+}
+
+// ---- Phase 17: Module wrapper dispatch table ----
+
+void aot_registerModuleNativeFn(void* nativeFn, void* wrapperFn) {
+    s_moduleWrappers[nativeFn] = wrapperFn;
+}
+
 uint64_t aot_tryDirectCall(void* vm_ctx, uint64_t callee, const uint64_t* args, uint8_t argCount) {
-    if (!aot_isTagged(callee)) return AOT_SENTINEL;
-    if (aot_getTag(callee) != AOT_NAN_CALLABLE) return AOT_SENTINEL;
+    if (!aot_isTagged(callee)) {
+        return AOT_SENTINEL;
+    }
+    if (aot_getTag(callee) != AOT_NAN_CALLABLE) {
+        return AOT_SENTINEL;
+    }
 
     void* ptr = reinterpret_cast<void*>(callee & AOT_NAN_PAYLOAD_MASK);
     Object* obj = static_cast<Object*>(ptr);
-    if (obj->obj_type != ObjType::OBJ_FUNCTION) return AOT_SENTINEL;
 
-    auto* fn = static_cast<Function*>(obj);
-    int idx = fn->aotFuncIndex;
-    if (idx < 0 || idx >= 256 || !s_llvmFuncTable[idx]) return AOT_SENTINEL;
+    // Fast path: AOT-compiled Neutron function
+    if (obj->obj_type == ObjType::OBJ_FUNCTION) {
+        auto* fn = static_cast<Function*>(obj);
+        int idx = fn->aotFuncIndex;
+        if (idx >= 0 && idx < 256 && s_llvmFuncTable[idx]) {
+            auto compiledFn = reinterpret_cast<uint64_t(*)(void*, const uint64_t*, uint8_t)>(s_llvmFuncTable[idx]);
+            auto result = compiledFn(vm_ctx, args, argCount);
+            return result;
+        }
+        return AOT_SENTINEL;
+    }
 
-    auto compiledFn = reinterpret_cast<uint64_t(*)(void*, const uint64_t*, uint8_t)>(s_llvmFuncTable[idx]);
-    return compiledFn(vm_ctx, args, argCount);
+    // Phase 17: Native function call support
+    if (obj->obj_type == ObjType::OBJ_NATIVE_FN) {
+        auto* nativeFn = static_cast<NativeFn*>(obj);
+
+        // Prefer registered wrapper (direct function pointer, skips std::function)
+        auto it = s_moduleWrappers.find(obj);
+        if (it != s_moduleWrappers.end()) {
+            auto wrapperFn = reinterpret_cast<uint64_t(*)(void*, const uint64_t*, uint8_t)>(it->second);
+            return wrapperFn(vm_ctx, args, argCount);
+        }
+
+        // Generic fallback for ALL unregistered NativeFn objects
+        // Converts NaN args to Value, calls NativeFn::call directly (skips vm->call dispatch)
+        VM* vm = static_cast<VM*>(vm_ctx);
+        std::vector<Value> argVec;
+        argVec.reserve(argCount);
+        for (uint8_t i = 0; i < argCount; i++) {
+            argVec.push_back(nanToValue(args[i]));
+        }
+        try {
+            Value result = nativeFn->call(*vm, argVec);
+            return valueToNan(result);
+        } catch (const std::exception&) {
+            return AOT_NAN_BASE | (AOT_NAN_NIL << 47);
+        }
+    }
+
+    return AOT_SENTINEL;
+}
+
+// ---- Phase 17: Math module NaN-boxed wrappers ----
+
+static uint64_t mathWrap1(void* vm_ctx, const uint64_t* args, uint8_t argCount,
+                          Value (*nativeFn)(VM&, std::vector<Value>)) {
+    if (argCount != 1) return AOT_NAN_BASE | (AOT_NAN_NIL << 47);
+    VM* vm = static_cast<VM*>(vm_ctx);
+    Value a0 = nanToValue(args[0]);
+    if (a0.type != ValueType::NUMBER) return AOT_NAN_BASE | (AOT_NAN_NIL << 47);
+    try {
+        Value result = nativeFn(*vm, {a0});
+        return valueToNan(result);
+    } catch (const std::exception&) {
+        return AOT_NAN_BASE | (AOT_NAN_NIL << 47);
+    }
+}
+
+static uint64_t mathWrap2(void* vm_ctx, const uint64_t* args, uint8_t argCount,
+                          Value (*nativeFn)(VM&, std::vector<Value>)) {
+    if (argCount != 2) return AOT_NAN_BASE | (AOT_NAN_NIL << 47);
+    VM* vm = static_cast<VM*>(vm_ctx);
+    Value a0 = nanToValue(args[0]);
+    Value a1 = nanToValue(args[1]);
+    if (a0.type != ValueType::NUMBER || a1.type != ValueType::NUMBER)
+        return AOT_NAN_BASE | (AOT_NAN_NIL << 47);
+    try {
+        Value result = nativeFn(*vm, {a0, a1});
+        return valueToNan(result);
+    } catch (const std::exception&) {
+        return AOT_NAN_BASE | (AOT_NAN_NIL << 47);
+    }
+}
+
+uint64_t aot_wrap_math_add(void* vm_ctx, const uint64_t* args, uint8_t argCount) {
+    return mathWrap2(vm_ctx, args, argCount, &add);
+}
+uint64_t aot_wrap_math_subtract(void* vm_ctx, const uint64_t* args, uint8_t argCount) {
+    return mathWrap2(vm_ctx, args, argCount, &subtract);
+}
+uint64_t aot_wrap_math_multiply(void* vm_ctx, const uint64_t* args, uint8_t argCount) {
+    return mathWrap2(vm_ctx, args, argCount, &multiply);
+}
+uint64_t aot_wrap_math_divide(void* vm_ctx, const uint64_t* args, uint8_t argCount) {
+    return mathWrap2(vm_ctx, args, argCount, &divide);
+}
+uint64_t aot_wrap_math_sqrt(void* vm_ctx, const uint64_t* args, uint8_t argCount) {
+    return mathWrap1(vm_ctx, args, argCount, &sqrt_fn);
+}
+uint64_t aot_wrap_math_pow(void* vm_ctx, const uint64_t* args, uint8_t argCount) {
+    return mathWrap2(vm_ctx, args, argCount, &pow_fn);
+}
+uint64_t aot_wrap_math_abs(void* vm_ctx, const uint64_t* args, uint8_t argCount) {
+    return mathWrap1(vm_ctx, args, argCount, &abs_fn);
+}
+uint64_t aot_wrap_math_ceil(void* vm_ctx, const uint64_t* args, uint8_t argCount) {
+    return mathWrap1(vm_ctx, args, argCount, &ceil_fn);
+}
+uint64_t aot_wrap_math_floor(void* vm_ctx, const uint64_t* args, uint8_t argCount) {
+    return mathWrap1(vm_ctx, args, argCount, &floor_fn);
+}
+uint64_t aot_wrap_math_round(void* vm_ctx, const uint64_t* args, uint8_t argCount) {
+    return mathWrap1(vm_ctx, args, argCount, &round_fn);
+}
+uint64_t aot_wrap_math_sin(void* vm_ctx, const uint64_t* args, uint8_t argCount) {
+    return mathWrap1(vm_ctx, args, argCount, &sin_fn);
+}
+uint64_t aot_wrap_math_cos(void* vm_ctx, const uint64_t* args, uint8_t argCount) {
+    return mathWrap1(vm_ctx, args, argCount, &cos_fn);
+}
+uint64_t aot_wrap_math_tan(void* vm_ctx, const uint64_t* args, uint8_t argCount) {
+    return mathWrap1(vm_ctx, args, argCount, &tan_fn);
+}
+uint64_t aot_wrap_math_random(void* vm_ctx, const uint64_t* args, uint8_t argCount) {
+    return mathWrap1(vm_ctx, args, argCount, &random_fn);
 }
 
 // Fast path: try to call an AOT-compiled method directly (avoids vm->call overhead)
@@ -780,29 +993,74 @@ uint64_t aot_tryDirectInvoke(void* vm_ctx, uint64_t receiver, const char* method
     VM* vm = static_cast<VM*>(vm_ctx);
     Value recv = nanToValue(receiver);
 
-    if (recv.type != ValueType::INSTANCE) return AOT_SENTINEL;
+    // Handle INSTANCE method calls
+    if (recv.type == ValueType::INSTANCE) {
+        Instance* inst = recv.as.instance;
+        ObjString* methodStr = vm->internString(methodName);
+        auto methIt = inst->klass->methods.find(methodStr);
+        if (methIt == inst->klass->methods.end()) return AOT_SENTINEL;
 
-    Instance* inst = recv.as.instance;
-    ObjString* methodStr = vm->internString(methodName);
-    auto methIt = inst->klass->methods.find(methodStr);
-    if (methIt == inst->klass->methods.end()) return AOT_SENTINEL;
+        Value callee = methIt->second;
+        if (callee.type != ValueType::CALLABLE) return AOT_SENTINEL;
+        if (callee.as.callable->obj_type != ObjType::OBJ_FUNCTION) return AOT_SENTINEL;
 
-    Value callee = methIt->second;
-    if (callee.type != ValueType::CALLABLE) return AOT_SENTINEL;
-    if (callee.as.callable->obj_type != ObjType::OBJ_FUNCTION) return AOT_SENTINEL;
+        auto* fn = static_cast<Function*>(callee.as.callable);
+        int idx = fn->aotFuncIndex;
+        if (idx < 0 || idx >= 256 || !s_llvmFuncTable[idx]) return AOT_SENTINEL;
 
-    auto* fn = static_cast<Function*>(callee.as.callable);
-    int idx = fn->aotFuncIndex;
-    if (idx < 0 || idx >= 256 || !s_llvmFuncTable[idx]) return AOT_SENTINEL;
+        uint64_t combined[1 + 255];
+        combined[0] = receiver;
+        for (uint8_t i = 0; i < argCount; i++) {
+            combined[i + 1] = args[i];
+        }
 
-    uint64_t combined[1 + 255];
-    combined[0] = receiver;
-    for (uint8_t i = 0; i < argCount; i++) {
-        combined[i + 1] = args[i];
+        auto compiledFn = reinterpret_cast<uint64_t(*)(void*, const uint64_t*, uint8_t)>(s_llvmFuncTable[idx]);
+        return compiledFn(vm_ctx, combined, argCount + 1);
     }
 
-    auto compiledFn = reinterpret_cast<uint64_t(*)(void*, const uint64_t*, uint8_t)>(s_llvmFuncTable[idx]);
-    return compiledFn(vm_ctx, combined, argCount + 1);
+    // Handle MODULE method calls (native functions)
+    if (recv.type == ValueType::MODULE) {
+        Module* mod = recv.as.module;
+        Value callee = mod->get(methodName);
+        if (callee.type != ValueType::CALLABLE) return AOT_SENTINEL;
+        
+        // Handle native functions
+        if (callee.as.callable->obj_type == ObjType::OBJ_NATIVE_FN) {
+            auto* nativeFn = static_cast<NativeFn*>(callee.as.callable);
+            
+            // Check for registered AOT wrapper
+            auto it = s_moduleWrappers.find(nativeFn);
+            if (it != s_moduleWrappers.end()) {
+                auto wrapperFn = reinterpret_cast<uint64_t(*)(void*, const uint64_t*, uint8_t)>(it->second);
+                return wrapperFn(vm_ctx, args, argCount);
+            }
+            
+            // Generic fallback: convert args and call directly
+            std::vector<Value> argVec;
+            argVec.reserve(argCount);
+            for (uint8_t i = 0; i < argCount; i++) {
+                argVec.push_back(nanToValue(args[i]));
+            }
+            try {
+                Value result = nativeFn->call(*vm, argVec);
+                return valueToNan(result);
+            } catch (const std::exception&) {
+                return AOT_NAN_BASE | (AOT_NAN_NIL << 47);
+            }
+        }
+        
+        // Handle regular compiled functions from modules
+        if (callee.as.callable->obj_type == ObjType::OBJ_FUNCTION) {
+            auto* fn = static_cast<Function*>(callee.as.callable);
+            int idx = fn->aotFuncIndex;
+            if (idx >= 0 && idx < 256 && s_llvmFuncTable[idx]) {
+                auto compiledFn = reinterpret_cast<uint64_t(*)(void*, const uint64_t*, uint8_t)>(s_llvmFuncTable[idx]);
+                return compiledFn(vm_ctx, args, argCount);
+            }
+        }
+    }
+
+    return AOT_SENTINEL;
 }
 
 uint64_t aot_stringCharAt(void* vm_ctx, uint64_t strVal, uint64_t idxVal) {
@@ -820,3 +1078,4 @@ uint64_t aot_stringCharAt(void* vm_ctx, uint64_t strVal, uint64_t idxVal) {
 }
 
 } // extern "C"
+// force rebuild

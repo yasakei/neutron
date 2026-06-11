@@ -786,6 +786,10 @@ void Compiler::visitUseStmt(const UseStmt* stmt) {
                     vm.globals.erase(stmt->library.lexeme);
                 }
             }
+            // Emit bytecode to load module from VM globals at runtime
+            // (needed for AOT codegen which uses LLVM globals, not vm.globals)
+            emitBytes((uint8_t)OpCode::OP_LOAD_MODULE, makeConstant(Value(vm.internString(moduleName))));
+            emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(vm.internString(moduleName))));
         }
     } else {
         // Selective import

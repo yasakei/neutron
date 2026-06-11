@@ -1,0 +1,33 @@
+use path;
+
+var ok = true;
+
+// join
+var j = path.join("home", "user", "docs")
+// Result can be unix or windows style
+if (j == "home/user/docs" || j == "home\\user\\docs") { say("join OK") } else { say("FAIL join: " + j); ok = false }
+
+// split
+var sp = path.split("/home/user/file.txt")
+if (sp.length == 2 && sp[1] == "file.txt") { say("split OK") } else { say("FAIL split"); ok = false }
+
+// dirname
+var d = path.dirname("/a/b/c.txt")
+if (d == "/a/b" || d == "\\a\\b") { say("dirname OK") } else { say("FAIL dirname: " + d); ok = false }
+
+// basename
+var b = path.basename("/a/b/c.txt")
+if (b == "c.txt") { say("basename OK") } else { say("FAIL basename: " + b); ok = false }
+
+// extname
+var e = path.extname("file.txt")
+if (e == ".txt") { say("extname OK") } else { say("FAIL extname: " + e); ok = false }
+
+// isabs
+if (path.isabs("/absolute") && !path.isabs("relative")) { say("isabs OK") } else { say("FAIL isabs"); ok = false }
+
+// normalize
+var n = path.normalize("/a/b/../c")
+if (n == "/a/c" || n == "\\a\\c") { say("normalize OK") } else { say("FAIL normalize: " + n); ok = false }
+
+if (ok) { say("AOT path module test PASSED") }

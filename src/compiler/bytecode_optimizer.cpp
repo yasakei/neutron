@@ -66,6 +66,7 @@ int BytecodeOptimizer::getInstructionSize(const Chunk& chunk, size_t offset) {
         case OpCode::OP_DEC_LOCAL_INT:
         case OpCode::OP_CONST_INT8:
         case OpCode::OP_TYPE_GUARD:
+        case OpCode::OP_LOAD_MODULE:
             return 2;
         default:
             return 1;

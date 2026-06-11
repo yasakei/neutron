@@ -306,12 +306,9 @@ bool ProjectBuilder::buildProjectExecutable(
         std::vector<std::string> aotUsedModules = getUsedModules(sourceCode);
         auto boxModules = findBoxModules(projectRoot);
 
-        // Modules that require interpreter (native code or external dependencies)
-        // Note: math, random, fmt, path have AOT-compatible implementations in aot_module.h
-        std::set<std::string> nonAotModules = {
-            "http", "json", "sys", "time", "crypto", "process",
-            "arrays", "async", "regex"
-        };
+        // Phase 17: aot_tryDirectCall handles ALL NativeFn objects via generic dispatch
+        // (converts NaN args → NativeFn::call() → converts result). No modules blocked.
+        std::set<std::string> nonAotModules;
         
         bool canAot = true;
         bool hasStaticLibs = true;
@@ -392,6 +389,7 @@ bool ProjectBuilder::buildProjectExecutable(
                         std::cerr << "      LLVM codegen failed, falling back to interpreter" << std::endl;
                     } else {
                         std::cout << "      LLVM object file: " << llvmObjectPath << std::endl;
+                        std::cout << "      C++ wrapper: " << tempSourcePath << std::endl;
                         srcFile << "#include \"aot/aot_runtime.h\"\n";
                         srcFile << "#include \"core/vm.h\"\n";
                         srcFile << "#include \"compiler/scanner.h\"\n";
@@ -412,13 +410,52 @@ bool ProjectBuilder::buildProjectExecutable(
                         srcFile << "    neutron::Compiler compiler(vm);\n";
                         srcFile << "    neutron::Function* fn = compiler.compile(stmts);\n";
                         srcFile << "    // Populate func table from chunk's function-typed constants\n";
+                        srcFile << "    // and class method Function objects\n";
                         srcFile << "    if (fn && fn->chunk) {\n";
                         srcFile << "        size_t n = fn->chunk->constants.size();\n";
+                        srcFile << "        int aotFuncIdx = 0;\n";
+                        srcFile << "        // First pass: top-level functions (CALLABLE constants)\n";
                         srcFile << "        for (size_t i = 0; i < n && i < 256; i++) {\n";
                         srcFile << "            const auto& v = fn->chunk->constants[i];\n";
                         srcFile << "            if (v.type == neutron::ValueType::CALLABLE) {\n";
                         srcFile << "                uint64_t ptr = reinterpret_cast<uint64_t>(v.as.callable);\n";
                         srcFile << "                neutron_func_table[i] = AOT_NAN_BASE | (AOT_NAN_CALLABLE << 47) | (ptr & AOT_NAN_PAYLOAD_MASK);\n";
+                        srcFile << "                // Set aotFuncIndex to match the AOT codegen's ordering\n";
+                        srcFile << "                auto* callable = v.as.callable;\n";
+                        srcFile << "                if (callable && callable->obj_type == neutron::ObjType::OBJ_FUNCTION) {\n";
+                        srcFile << "                    auto* funcObj = static_cast<neutron::Function*>(callable);\n";
+                        srcFile << "                    if (funcObj->chunk) {\n";
+                        srcFile << "                        funcObj->aotFuncIndex = aotFuncIdx;\n";
+                        srcFile << "                    }\n";
+                        srcFile << "                }\n";
+                        srcFile << "                aotFuncIdx++;\n";
+                        srcFile << "            }\n";
+                        srcFile << "        }\n";
+                        srcFile << "        // Second pass: store CLASS constants in vm->globals so AOT code can find them\n";
+                        srcFile << "        for (size_t i = 0; i < n && i < 256; i++) {\n";
+                        srcFile << "            const auto& v = fn->chunk->constants[i];\n";
+                        srcFile << "            if (v.type == neutron::ValueType::CLASS) {\n";
+                        srcFile << "                vm.globals[v.as.klass->name] = v;\n";
+                        srcFile << "            }\n";
+                        srcFile << "        }\n";
+                        srcFile << "        // Third pass: iterate CLASS constants and set aotFuncIndex on their methods\n";
+                        srcFile << "        // (Only aotFuncIndex is needed; s_llvmFuncTable is populated by the AOT codegen via aot_registerLlvmFunc)\n";
+                        srcFile << "        for (size_t i = 0; i < n && i < 256; i++) {\n";
+                        srcFile << "            const auto& v = fn->chunk->constants[i];\n";
+                        srcFile << "            if (v.type == neutron::ValueType::CLASS && v.as.klass) {\n";
+                        srcFile << "                auto* klass = v.as.klass;\n";
+                        srcFile << "                for (auto& methodEntry : klass->methods) {\n";
+                        srcFile << "                    auto& methodVal = methodEntry.second;\n";
+                        srcFile << "                    if (methodVal.type == neutron::ValueType::CALLABLE &&\n";
+                        srcFile << "                        methodVal.as.callable &&\n";
+                        srcFile << "                        methodVal.as.callable->obj_type == neutron::ObjType::OBJ_FUNCTION) {\n";
+                        srcFile << "                        auto* funcObj = static_cast<neutron::Function*>(methodVal.as.callable);\n";
+                        srcFile << "                        if (funcObj->chunk && aotFuncIdx < 256) {\n";
+                        srcFile << "                            funcObj->aotFuncIndex = aotFuncIdx;\n";
+                        srcFile << "                            aotFuncIdx++;\n";
+                        srcFile << "                        }\n";
+                        srcFile << "                    }\n";
+                        srcFile << "                }\n";
                         srcFile << "            }\n";
                         srcFile << "        }\n";
                         srcFile << "    }\n";

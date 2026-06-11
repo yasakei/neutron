@@ -6,6 +6,7 @@ import subprocess
 import time
 import io
 import shutil
+import tempfile
 
 # Force UTF-8 output on Windows
 if sys.platform == 'win32':
@@ -36,8 +37,33 @@ class Colors:
             ascii_text = text.encode('ascii', 'replace').decode('ascii')
             print(ascii_text, end=end)
 
-def run_benchmark(name, neutron_bin, neutron_file, python_file, js_file=None, neutron_extra_args=None):
+def build_aot(neutron_bin, source_path, tmpdir):
+    """Build a Neutron source with --aot and return path to the compiled binary."""
+    main_nt = os.path.join(tmpdir, "main.nt")
+    shutil.copy2(source_path, main_nt)
+    with open(os.path.join(tmpdir, ".quark"), "w") as f:
+        f.write("[project]\nname = \"bench_aot\"\nversion = \"1.0.0\"\nentry = \"main.nt\"\n")
+    result = subprocess.run(
+        [neutron_bin, "build", "--aot"],
+        cwd=tmpdir, capture_output=True, text=True, timeout=120
+    )
+    if result.returncode != 0:
+        return None, result.stderr.strip()[:500]
+
+    exe_name = "bench_aot"
+    if platform.system() == "Windows":
+        exe_name += ".exe"
+    exe_path = os.path.join(tmpdir, "build", exe_name)
+    if not os.path.exists(exe_path):
+        exe_path = os.path.join(tmpdir, exe_name)
+    if os.path.exists(exe_path):
+        return exe_path, None
+    return None, "binary not found after build"
+
+
+def run_benchmark(name, neutron_bin, neutron_file, python_file, js_file=None, neutron_extra_args=None, aot_mode=False):
     results = {}
+    aot_tmpdir = None
     
     # Run Python version
     python_start = time.time()
@@ -112,6 +138,32 @@ def run_benchmark(name, neutron_bin, neutron_file, python_file, js_file=None, ne
             'display': "FAILED"
         }
 
+    # Run AOT-compiled version (if --aot flag is set)
+    if aot_mode:
+        aot_tmpdir = tempfile.mkdtemp(prefix="neutron_aot_bench_")
+        aot_exe, aot_err = build_aot(neutron_bin, neutron_file, aot_tmpdir)
+        if aot_exe:
+            aot_start = time.time()
+            try:
+                aot_result = subprocess.run(
+                    [aot_exe],
+                    capture_output=True, text=True, encoding='utf-8', errors='replace'
+                )
+                aot_end = time.time()
+                if aot_result.returncode == 0:
+                    aot_time = aot_end - aot_start
+                    results['aot'] = {
+                        'time': aot_time, 'success': True,
+                        'output': aot_result.stdout.strip(),
+                        'display': f"{aot_time:.3f}s"
+                    }
+                else:
+                    results['aot'] = {'time': 0, 'success': False, 'output': "", 'display': "FAILED"}
+            except Exception as e:
+                results['aot'] = {'time': 0, 'success': False, 'output': "", 'display': "FAILED"}
+        else:
+            results['aot'] = {'time': 0, 'success': False, 'output': "", 'display': "AOT FAIL"}
+
     # Run JS version with Bun (if available and file exists)
     if js_file and os.path.exists(js_file) and shutil.which('bun'):
         js_start = time.time()
@@ -163,7 +215,7 @@ def run_benchmark(name, neutron_bin, neutron_file, python_file, js_file=None, ne
         }
 
     # Compare outputs and calculate performance
-    global neutron_faster, python_faster, js_faster, failed_benchmarks
+    global neutron_faster, aot_faster, python_faster, js_faster, failed_benchmarks
     
     # Check if outputs match (only for successful runs)
     successful_runs = [k for k, v in results.items() if v['success']]
@@ -186,11 +238,13 @@ def run_benchmark(name, neutron_bin, neutron_file, python_file, js_file=None, ne
         result_str = "ALL FAILED"
         color = Colors.RED
     elif len(successful_runs) == 1:
-        # Only one language succeeded
         fastest_lang = successful_runs[0]
         if fastest_lang == 'neutron':
             neutron_faster += 1
             color = Colors.GREEN
+        elif fastest_lang == 'aot':
+            aot_faster += 1
+            color = Colors.MAGENTA
         elif fastest_lang == 'python':
             python_faster += 1
             color = Colors.YELLOW
@@ -199,7 +253,6 @@ def run_benchmark(name, neutron_bin, neutron_file, python_file, js_file=None, ne
             color = Colors.CYAN
         result_str = f"{fastest_lang[:3].upper()} only"
     else:
-        # Find the fastest successful run
         fastest_lang = None
         fastest_time = float('inf')
         
@@ -211,6 +264,9 @@ def run_benchmark(name, neutron_bin, neutron_file, python_file, js_file=None, ne
         if fastest_lang == 'neutron':
             neutron_faster += 1
             color = Colors.GREEN
+        elif fastest_lang == 'aot':
+            aot_faster += 1
+            color = Colors.MAGENTA
         elif fastest_lang == 'python':
             python_faster += 1
             color = Colors.YELLOW
@@ -218,17 +274,16 @@ def run_benchmark(name, neutron_bin, neutron_file, python_file, js_file=None, ne
             js_faster += 1
             color = Colors.CYAN
         
-        # Calculate ratios
         ratios = []
         for lang in successful_runs:
             if lang != fastest_lang and results[lang]['time'] > 0:
                 ratio = results[lang]['time'] / fastest_time
                 ratios.append(f"{ratio:.1f}x")
         
-        # Create readable language names
         lang_names = {
             'neutron': 'Neutron',
-            'python': 'Python', 
+            'aot': 'AOT',
+            'python': 'Python',
             'javascript': 'Bun/JS'
         }
         
@@ -241,6 +296,8 @@ def run_benchmark(name, neutron_bin, neutron_file, python_file, js_file=None, ne
     print(f"│ {name:<20} │", end="")
     print(f" {results['python']['display']:<8} │", end="")
     print(f" {results['neutron']['display']:<8} │", end="")
+    if aot_mode:
+        print(f" {results['aot']['display']:<8} │", end="")
     print(f" {results['javascript']['display']:<8} │", end="")
     Colors.print(f" {result_str:<25} │", color)
     
@@ -251,7 +308,12 @@ def run_benchmark(name, neutron_bin, neutron_file, python_file, js_file=None, ne
             for line in results[lang]['output'].splitlines():
                 print(f"      {line}")
 
+    # Cleanup AOT temp directory
+    if aot_tmpdir:
+        shutil.rmtree(aot_tmpdir, ignore_errors=True)
+
 neutron_faster = 0
+aot_faster = 0
 python_faster = 0
 js_faster = 0
 failed_benchmarks = 0
@@ -260,6 +322,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="Neutron Benchmark Suite")
     parser.add_argument('--no-jit', action='store_true', help='Disable JIT compilation for Neutron benchmarks')
+    parser.add_argument('--aot', action='store_true', help='Also compile and benchmark AOT-compiled binaries')
     args = parser.parse_args()
 
     # Script lives in benchmarks/, root is one level up
@@ -315,9 +378,11 @@ def main():
     print()
 
     # Table header
-    Colors.print("┌──────────────────────┬──────────┬──────────┬──────────┬───────────────────────────┐", Colors.CYAN)
-    Colors.print("│ Benchmark            │ Python   │ Neutron  │ Bun/JS   │ Result                    │", Colors.CYAN)
-    Colors.print("├──────────────────────┼──────────┼──────────┼──────────┼───────────────────────────┤", Colors.CYAN)
+    aot_col = "┬──────────" if args.aot else ""
+    aot_head = "│ AOT      " if args.aot else ""
+    Colors.print(f"┌──────────────────────┬──────────┬──────────{aot_col}┬──────────┬───────────────────────────┐", Colors.CYAN)
+    Colors.print(f"│ Benchmark            │ Python   │ Neutron  {aot_head}│ Bun/JS   │ Result                    │", Colors.CYAN)
+    Colors.print(f"├──────────────────────┼──────────┼──────────{aot_col}┼──────────┼───────────────────────────┤", Colors.CYAN)
 
     # Define benchmarks with JS files
     categories = [
@@ -365,12 +430,14 @@ def main():
     ]
 
     total_benchmarks = 0
+    sep_col = "┼──────────" if args.aot else ""
+    cat_col = "│          " if args.aot else ""
     
     for category, benches in categories:
         # Category separator
-        Colors.print("├──────────────────────┼──────────┼──────────┼──────────┼───────────────────────────┤", Colors.CYAN)
-        Colors.print(f"│ {category:<20} │          │          │          │                           │", Colors.BOLD)
-        Colors.print("├──────────────────────┼──────────┼──────────┼──────────┼───────────────────────────┤", Colors.CYAN)
+        Colors.print(f"├──────────────────────┼──────────┼──────────{sep_col}┼──────────┼───────────────────────────┤", Colors.CYAN)
+        Colors.print(f"│ {category:<20} │          │          {cat_col}│          │                           │", Colors.BOLD)
+        Colors.print(f"├──────────────────────┼──────────┼──────────{sep_col}┼──────────┼───────────────────────────┤", Colors.CYAN)
         
         for name, n_file, p_file, js_file in benches:
              js_path = os.path.join(bench_dir, js_file) if js_file else None
@@ -381,12 +448,14 @@ def main():
                  os.path.join(bench_dir, n_file), 
                  os.path.join(bench_dir, p_file),
                  js_path,
-                 neutron_extra_args=extra_args
+                 neutron_extra_args=extra_args,
+                 aot_mode=args.aot
              )
              total_benchmarks += 1
 
     # Table footer
-    Colors.print("└──────────────────────┴──────────┴──────────┴──────────┴───────────────────────────┘", Colors.CYAN)
+    aot_col = "┴──────────" if args.aot else ""
+    Colors.print(f"└──────────────────────┴──────────┴──────────{aot_col}┴──────────┴───────────────────────────┘", Colors.CYAN)
     print()
 
     # Summary
@@ -394,10 +463,14 @@ def main():
     Colors.print("🎯 BENCHMARK SUMMARY", Colors.CYAN)
     print(f"Total Benchmarks: {total_benchmarks}")
     print()
+    denom = total_benchmarks - failed_benchmarks
     print("Winners:")
-    Colors.print(f"  🚀 Neutron:  {neutron_faster} ({(neutron_faster * 100 / (total_benchmarks - failed_benchmarks)):.1f}%)" if total_benchmarks > failed_benchmarks else f"  🚀 Neutron:  {neutron_faster}", Colors.GREEN)
-    Colors.print(f"  🐍 Python:   {python_faster} ({(python_faster * 100 / (total_benchmarks - failed_benchmarks)):.1f}%)" if total_benchmarks > failed_benchmarks else f"  🐍 Python:   {python_faster}", Colors.YELLOW)
-    Colors.print(f"  ⚡ Bun/JS:   {js_faster} ({(js_faster * 100 / (total_benchmarks - failed_benchmarks)):.1f}%)" if total_benchmarks > failed_benchmarks else f"  ⚡ Bun/JS:   {js_faster}", Colors.CYAN)
+    if neutron_faster:
+        Colors.print(f"  🚀 Neutron (interp): {neutron_faster} ({neutron_faster * 100 / denom:.1f}%)" if denom > 0 else f"  🚀 Neutron (interp): {neutron_faster}", Colors.GREEN)
+    if aot_faster:
+        Colors.print(f"  ⚡ AOT:             {aot_faster} ({aot_faster * 100 / denom:.1f}%)" if denom > 0 else f"  ⚡ AOT:             {aot_faster}", Colors.MAGENTA)
+    Colors.print(f"  🐍 Python:   {python_faster} ({python_faster * 100 / denom:.1f}%)" if denom > 0 else f"  🐍 Python:   {python_faster}", Colors.YELLOW)
+    Colors.print(f"  ⚡ Bun/JS:   {js_faster} ({js_faster * 100 / denom:.1f}%)" if denom > 0 else f"  ⚡ Bun/JS:   {js_faster}", Colors.CYAN)
     
     if failed_benchmarks > 0:
         Colors.print(f"  ❌ Failed:   {failed_benchmarks}", Colors.RED)

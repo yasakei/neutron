@@ -236,6 +236,9 @@ enum class OpCode : uint8_t {
     // === Spread/rest ===
     OP_SPREAD,           ///< Spread array onto stack as individual values
 
+    // === Module support ===
+    OP_LOAD_MODULE,      ///< Load a module from VM globals by name and push it
+
     OP_COUNT             ///< Sentinel: total number of opcodes (not a real opcode)
 };
 

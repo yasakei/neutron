@@ -27,12 +27,12 @@ typedef struct {
 #endif
 
 // NaN-boxing constants (mirrors llvm_codegen.cpp)
-// Tagged NaN base: 0x7FFC000000000000 (quiet NaN with bit 50 set)
-// Tag in bits 49:47 (3 bits, 8 tag values)
+// Tagged NaN base: 0x7FF8000000000000 (quiet NaN with bit 50 clear, bit 51 set)
+// Tag in bits 50:47 (4 bits, 16 tag values)
 // Payload in bits 46:0 (47 bits)
 // Numbers are raw double bits (not NaN-boxed)
-static const uint64_t AOT_NAN_BASE = 0x7FFC000000000000ULL;
-static const uint64_t AOT_NAN_MASK = 0x7FFC000000000000ULL;
+static const uint64_t AOT_NAN_BASE = 0x7FF8000000000000ULL;
+static const uint64_t AOT_NAN_MASK = 0x7FF8000000000000ULL;
 static const uint64_t AOT_NAN_PAYLOAD_MASK = 0x7FFFFFFFFFFFULL;
 
 enum AotNanTag : uint64_t {
@@ -42,7 +42,9 @@ enum AotNanTag : uint64_t {
     AOT_NAN_ARRAY = 3,
     AOT_NAN_INSTANCE = 4,
     AOT_NAN_CALLABLE = 5,
-    AOT_NAN_OBJECT = 6
+    AOT_NAN_OBJECT = 6,
+    AOT_NAN_MODULE = 7,
+    AOT_NAN_CLASS = 8
 };
 
 static inline bool aot_isTagged(uint64_t val) {
@@ -50,7 +52,7 @@ static inline bool aot_isTagged(uint64_t val) {
 }
 
 static inline uint64_t aot_getTag(uint64_t val) {
-    return (val >> 47) & 0x7;
+    return (val >> 47) & 0xF;
 }
 
 // Sentinel for "cache miss" — tagged value with tag=7 (unused) and payload=0
@@ -75,6 +77,9 @@ void    aot_setPropertyCached(void* vm_ctx, uint64_t objVal, const char* propNam
 
 // Addition (handles both numeric and string concatenation)
 uint64_t aot_add(void* vm_ctx, uint64_t a, uint64_t b);
+
+// Optimized string concatenation (avoids Value struct conversion for string+string)
+uint64_t aot_concatStrings(void* vm_ctx, uint64_t a, uint64_t b);
 
 // Index access
 uint64_t aot_indexGet(void* vm_ctx, uint64_t objVal, uint64_t indexVal);
@@ -149,6 +154,26 @@ void     aot_registerLlvmFunc(int idx, void* funcPtr);
 // Try to call a pre-compiled LLVM function directly.
 // Returns the NaN-boxed result, or AOT_SENTINEL if not possible (fall back to aot_call).
 uint64_t aot_tryDirectCall(void* vm_ctx, uint64_t callee, const uint64_t* args, uint8_t argCount);
+
+// ---- Phase 17: Module function wrapper registration ----
+// Register a wrapper function for a NativeFn so aot_tryDirectCall can dispatch to it.
+void     aot_registerModuleNativeFn(void* nativeFn, void* wrapperFn);
+
+// Module wrapper functions (extern "C", NaN-boxed args/return)
+uint64_t aot_wrap_math_add(void* vm_ctx, const uint64_t* args, uint8_t argCount);
+uint64_t aot_wrap_math_subtract(void* vm_ctx, const uint64_t* args, uint8_t argCount);
+uint64_t aot_wrap_math_multiply(void* vm_ctx, const uint64_t* args, uint8_t argCount);
+uint64_t aot_wrap_math_divide(void* vm_ctx, const uint64_t* args, uint8_t argCount);
+uint64_t aot_wrap_math_sqrt(void* vm_ctx, const uint64_t* args, uint8_t argCount);
+uint64_t aot_wrap_math_pow(void* vm_ctx, const uint64_t* args, uint8_t argCount);
+uint64_t aot_wrap_math_abs(void* vm_ctx, const uint64_t* args, uint8_t argCount);
+uint64_t aot_wrap_math_ceil(void* vm_ctx, const uint64_t* args, uint8_t argCount);
+uint64_t aot_wrap_math_floor(void* vm_ctx, const uint64_t* args, uint8_t argCount);
+uint64_t aot_wrap_math_round(void* vm_ctx, const uint64_t* args, uint8_t argCount);
+uint64_t aot_wrap_math_sin(void* vm_ctx, const uint64_t* args, uint8_t argCount);
+uint64_t aot_wrap_math_cos(void* vm_ctx, const uint64_t* args, uint8_t argCount);
+uint64_t aot_wrap_math_tan(void* vm_ctx, const uint64_t* args, uint8_t argCount);
+uint64_t aot_wrap_math_random(void* vm_ctx, const uint64_t* args, uint8_t argCount);
 
 #ifdef __cplusplus
 } // extern "C"

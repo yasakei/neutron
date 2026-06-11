@@ -1,0 +1,23 @@
+use time;
+
+var ok = true;
+
+// now returns positive timestamp
+var ts = time.now()
+if (ts > 0) { say("now OK") } else { say("FAIL now"); ok = false }
+
+// progression
+var ts2 = time.now()
+if (ts2 >= ts) { say("progression OK") } else { say("FAIL progression"); ok = false }
+
+// format returns non-empty string
+var f = time.format(ts)
+if (f != "") { say("format OK") } else { say("FAIL format"); ok = false }
+
+// sleep 10ms
+var before = time.now()
+time.sleep(10)
+var after = time.now()
+if (after >= before) { say("sleep OK") } else { say("FAIL sleep"); ok = false }
+
+if (ok) { say("AOT time module test PASSED") }

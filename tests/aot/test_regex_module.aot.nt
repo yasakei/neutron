@@ -1,0 +1,36 @@
+use regex;
+
+var ok = true;
+
+// test - exact match
+if (regex.test("hello", "hello")) { say("test match OK") } else { say("FAIL test match"); ok = false }
+if (!regex.test("hello", "world")) { say("test no-match OK") } else { say("FAIL test no-match"); ok = false }
+
+// search - pattern search
+if (regex.search("The quick brown fox", "quick")) { say("search OK") } else { say("FAIL search"); ok = false }
+if (regex.search("abc123", "\\d+")) { say("search pattern OK") } else { say("FAIL search pattern"); ok = false }
+
+// find - first match with details
+var found = regex.find("abc123def", "\\d+")
+if (found != nil && found.matched == "123") { say("find OK") } else { say("FAIL find"); ok = false }
+
+// find all
+var all = regex.findAll("a1b2c3", "\\d")
+if (all.length == 3 && all[0] == "1" && all[2] == "3") { say("findAll OK") } else { say("FAIL findAll"); ok = false }
+
+// replace
+var rep = regex.replace("hello 123 world", "\\d+", "NUM")
+if (rep == "hello NUM world") { say("replace OK") } else { say("FAIL replace: " + rep); ok = false }
+
+// split
+var parts = regex.split("a,b,c", ",")
+if (parts.length == 3 && parts[0] == "a" && parts[2] == "c") { say("split OK") } else { say("FAIL split"); ok = false }
+
+// isValid
+if (regex.isValid("[a-z]+") && !regex.isValid("[")) { say("isValid OK") } else { say("FAIL isValid"); ok = false }
+
+// escape output should be different from input
+var esc = regex.escape("a.b*c")
+if (esc != "a.b*c") { say("escape OK") } else { say("FAIL escape"); ok = false }
+
+if (ok) { say("AOT regex module test PASSED") }

@@ -15,6 +15,7 @@
  */
 #include "native.h"
 #include "vm.h"
+#include "aot/aot_runtime.h"
 #include <cmath>
 
 using namespace neutron;
@@ -221,20 +222,63 @@ Value random_fn(VM& vm, std::vector<Value> args) {
 
 namespace neutron {
     void register_math_functions(VM& vm, std::shared_ptr<Environment> env) {
-        env->define("add", Value(vm.allocate<NativeFn>(add, 2, true)));
-        env->define("subtract", Value(vm.allocate<NativeFn>(subtract, 2, true)));
-        env->define("multiply", Value(vm.allocate<NativeFn>(multiply, 2, true)));
-        env->define("divide", Value(vm.allocate<NativeFn>(divide, 2, true)));
-        env->define("sqrt", Value(vm.allocate<NativeFn>(sqrt_fn, 1, true)));
-        env->define("pow", Value(vm.allocate<NativeFn>(pow_fn, 2, true)));
-        env->define("abs", Value(vm.allocate<NativeFn>(abs_fn, 1, true)));
-        env->define("ceil", Value(vm.allocate<NativeFn>(ceil_fn, 1, true)));
-        env->define("floor", Value(vm.allocate<NativeFn>(floor_fn, 1, true)));
-        env->define("round", Value(vm.allocate<NativeFn>(round_fn, 1, true)));
-        env->define("sin", Value(vm.allocate<NativeFn>(sin_fn, 1, true)));
-        env->define("cos", Value(vm.allocate<NativeFn>(cos_fn, 1, true)));
-        env->define("tan", Value(vm.allocate<NativeFn>(tan_fn, 1, true)));
-        env->define("random", Value(vm.allocate<NativeFn>(random_fn, 0, true)));
+        NativeFn* fn;
+
+        fn = vm.allocate<NativeFn>(add, 2, true);
+        aot_registerModuleNativeFn(fn, (void*)&aot_wrap_math_add);
+        env->define("add", Value(fn));
+
+        fn = vm.allocate<NativeFn>(subtract, 2, true);
+        aot_registerModuleNativeFn(fn, (void*)&aot_wrap_math_subtract);
+        env->define("subtract", Value(fn));
+
+        fn = vm.allocate<NativeFn>(multiply, 2, true);
+        aot_registerModuleNativeFn(fn, (void*)&aot_wrap_math_multiply);
+        env->define("multiply", Value(fn));
+
+        fn = vm.allocate<NativeFn>(divide, 2, true);
+        aot_registerModuleNativeFn(fn, (void*)&aot_wrap_math_divide);
+        env->define("divide", Value(fn));
+
+        fn = vm.allocate<NativeFn>(sqrt_fn, 1, true);
+        aot_registerModuleNativeFn(fn, (void*)&aot_wrap_math_sqrt);
+        env->define("sqrt", Value(fn));
+
+        fn = vm.allocate<NativeFn>(pow_fn, 2, true);
+        aot_registerModuleNativeFn(fn, (void*)&aot_wrap_math_pow);
+        env->define("pow", Value(fn));
+
+        fn = vm.allocate<NativeFn>(abs_fn, 1, true);
+        aot_registerModuleNativeFn(fn, (void*)&aot_wrap_math_abs);
+        env->define("abs", Value(fn));
+
+        fn = vm.allocate<NativeFn>(ceil_fn, 1, true);
+        aot_registerModuleNativeFn(fn, (void*)&aot_wrap_math_ceil);
+        env->define("ceil", Value(fn));
+
+        fn = vm.allocate<NativeFn>(floor_fn, 1, true);
+        aot_registerModuleNativeFn(fn, (void*)&aot_wrap_math_floor);
+        env->define("floor", Value(fn));
+
+        fn = vm.allocate<NativeFn>(round_fn, 1, true);
+        aot_registerModuleNativeFn(fn, (void*)&aot_wrap_math_round);
+        env->define("round", Value(fn));
+
+        fn = vm.allocate<NativeFn>(sin_fn, 1, true);
+        aot_registerModuleNativeFn(fn, (void*)&aot_wrap_math_sin);
+        env->define("sin", Value(fn));
+
+        fn = vm.allocate<NativeFn>(cos_fn, 1, true);
+        aot_registerModuleNativeFn(fn, (void*)&aot_wrap_math_cos);
+        env->define("cos", Value(fn));
+
+        fn = vm.allocate<NativeFn>(tan_fn, 1, true);
+        aot_registerModuleNativeFn(fn, (void*)&aot_wrap_math_tan);
+        env->define("tan", Value(fn));
+
+        fn = vm.allocate<NativeFn>(random_fn, 0, true);
+        aot_registerModuleNativeFn(fn, (void*)&aot_wrap_math_random);
+        env->define("random", Value(fn));
     }
 }
 

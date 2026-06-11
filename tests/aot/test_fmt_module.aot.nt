@@ -1,0 +1,37 @@
+use fmt;
+
+var ok = true;
+
+// to_int
+if (fmt.to_int(42.9) == 42) { say("to_int float OK") } else { say("FAIL to_int float"); ok = false }
+if (fmt.to_int("123") == 123) { say("to_int str OK") } else { say("FAIL to_int str"); ok = false }
+if (fmt.to_int(true) == 1) { say("to_int true OK") } else { say("FAIL to_int true"); ok = false }
+if (fmt.to_int(false) == 0) { say("to_int false OK") } else { say("FAIL to_int false"); ok = false }
+
+// to_float
+if (fmt.to_float(42) == 42) { say("to_float OK") } else { say("FAIL to_float"); ok = false }
+if (fmt.to_float("3.14") == 3.14) { say("to_float str OK") } else { say("FAIL to_float str"); ok = false }
+
+// to_str
+if (fmt.to_str(42) == "42") { say("to_str num OK") } else { say("FAIL to_str num"); ok = false }
+if (fmt.to_str("hi") == "hi") { say("to_str str OK") } else { say("FAIL to_str str"); ok = false }
+if (fmt.to_str(true) == "true") { say("to_str bool OK") } else { say("FAIL to_str bool"); ok = false }
+
+// to_bin
+if (fmt.to_bin(10) == "1010") { say("to_bin OK") } else { say("FAIL to_bin"); ok = false }
+if (fmt.to_bin(0) == "0") { say("to_bin zero OK") } else { say("FAIL to_bin zero"); ok = false }
+
+// type
+if (fmt.type(nil) == "nil") { say("type nil OK") } else { say("FAIL type nil"); ok = false }
+if (fmt.type(true) == "bool") { say("type bool OK") } else { say("FAIL type bool"); ok = false }
+if (fmt.type(42) == "number") { say("type number OK") } else { say("FAIL type number"); ok = false }
+if (fmt.type("hi") == "string") { say("type string OK") } else { say("FAIL type string"); ok = false }
+
+// is_* helpers
+if (fmt.is_int(5) && !fmt.is_float(5)) { say("is_int OK") } else { say("FAIL is_int"); ok = false }
+if (fmt.is_float(3.14) && !fmt.is_int(3.14)) { say("is_float OK") } else { say("FAIL is_float"); ok = false }
+if (fmt.is_string("hi") && !fmt.is_string(5)) { say("is_string OK") } else { say("FAIL is_string"); ok = false }
+if (fmt.is_bool(true) && !fmt.is_bool(1)) { say("is_bool OK") } else { say("FAIL is_bool"); ok = false }
+if (fmt.is_nil(nil) && !fmt.is_nil(0)) { say("is_nil OK") } else { say("FAIL is_nil"); ok = false }
+
+if (ok) { say("AOT fmt module test PASSED") }

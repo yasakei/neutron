@@ -1114,6 +1114,7 @@ void VM::run(size_t minFrameDepth) {
         &&CASE_OP_FOR_IN_NEXT,
         &&CASE_OP_OPTIONAL_CHAIN,
         &&CASE_OP_SPREAD,
+        &&CASE_OP_LOAD_MODULE,
     };
     #define DISPATCH() goto *dispatch_table[READ_BYTE()]
     #define CASE(op) CASE_##op:
@@ -1268,6 +1269,16 @@ void VM::run(size_t minFrameDepth) {
                 pop();
                 // Invalidate global cache — map may have rehashed
                 std::memset(global_cache, 0, sizeof(global_cache));
+                DISPATCH();
+            }
+            CASE(OP_LOAD_MODULE) {
+                const std::string& name = READ_STRING();
+                auto it = globals.find(name);
+                if (it == globals.end()) {
+                    runtimeError(this, "Module '" + name + "' is not loaded.");
+                } else {
+                    FAST_PUSH(it->second);
+                }
                 DISPATCH();
             }
             CASE(OP_DEFINE_TYPED_GLOBAL) {
@@ -3154,6 +3165,39 @@ Value VM::call(const Value& callee, const std::vector<Value>& arguments) {
     size_t initial_frames_size = frames.size();
     size_t initial_stack_size = stack.size();
     try {
+        // Handle CLASS type (constructor call): create instance, call initializer
+        if (callee.type == ValueType::CLASS) {
+            // Push callee and arguments for callValue
+            push(callee);
+            for (const auto& arg : arguments) {
+                push(arg);
+            }
+            
+            if (!callValue(callee, static_cast<int>(arguments.size()))) {
+                throw std::runtime_error("Failed to create instance.");
+            }
+            
+            Value result;
+            // If initializer exists, a new call frame was set up — run it
+            if (frames.size() > initial_frames_size) {
+                run(frames.size() - 1);
+            }
+            
+            if (stack.size() > initial_stack_size) {
+                result = stack.back();
+            } else {
+                result = Value();
+            }
+            
+            // Clean up any remaining stack items
+            while (stack.size() > initial_stack_size) {
+                pop();
+            }
+            
+            unlock();
+            return result;
+        }
+        
         if (callee.type != ValueType::CALLABLE) {
             throw std::runtime_error("Can only call functions.");
         }

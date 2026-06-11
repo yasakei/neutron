@@ -1,0 +1,21 @@
+use sys;
+
+var ok = true;
+
+// cwd returns non-empty string
+var cwd = sys.cwd()
+if (cwd != "") { say("cwd OK") } else { say("FAIL cwd"); ok = false }
+
+// info returns object with platform
+var info = sys.info()
+if (info.platform != "") { say("info OK") } else { say("FAIL info"); ok = false }
+
+// args returns array
+var args = sys.args()
+if (args.length >= 0) { say("args OK") } else { say("FAIL args"); ok = false }
+
+// tmpfile returns non-empty string
+var tmp = sys.tmpfile()
+if (tmp != "") { say("tmpfile OK") } else { say("FAIL tmpfile"); ok = false }
+
+if (ok) { say("AOT sys module test PASSED") }

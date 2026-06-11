@@ -80,6 +80,7 @@ static int getInstructionSize(uint8_t opcode) {
         case OpCode::OP_DEC_LOCAL_INT:
         case OpCode::OP_CONST_INT8:
         case OpCode::OP_TYPE_GUARD:
+        case OpCode::OP_LOAD_MODULE:
         case OpCode::OP_INCREMENT_LOCAL:
         case OpCode::OP_DECREMENT_LOCAL:
         case OpCode::OP_INCREMENT_GLOBAL:

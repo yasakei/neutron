@@ -1,0 +1,53 @@
+use arrays;
+
+var ok = true;
+
+// new + push + length
+var a = arrays.new()
+arrays.push(a, 10)
+arrays.push(a, 20)
+arrays.push(a, 30)
+if (arrays.length(a) == 3) { say("new/push/length OK") } else { say("FAIL length"); ok = false }
+
+// at
+if (arrays.at(a, 0) == 10 && arrays.at(a, 2) == 30) { say("at OK") } else { say("FAIL at"); ok = false }
+
+// set
+arrays.set(a, 1, 99)
+if (arrays.at(a, 1) == 99) { say("set OK") } else { say("FAIL set"); ok = false }
+
+// pop
+var p = arrays.pop(a)
+if (p == 30 && arrays.length(a) == 2) { say("pop OK") } else { say("FAIL pop"); ok = false }
+
+// contains
+if (arrays.contains(a, 10) && !arrays.contains(a, 999)) { say("contains OK") } else { say("FAIL contains"); ok = false }
+
+// index_of
+if (arrays.index_of(a, 99) == 1 && arrays.index_of(a, 999) == -1) { say("index_of OK") } else { say("FAIL index_of"); ok = false }
+
+// clone
+var b = arrays.clone(a)
+if (arrays.length(b) == 2 && arrays.at(b, 0) == 10) { say("clone OK") } else { say("FAIL clone"); ok = false }
+
+// sort
+var c = arrays.new()
+arrays.push(c, 3); arrays.push(c, 1); arrays.push(c, 2)
+arrays.sort(c)
+if (arrays.at(c, 0) == 1 && arrays.at(c, 2) == 3) { say("sort OK") } else { say("FAIL sort"); ok = false }
+
+// reverse
+arrays.reverse(c)
+if (arrays.at(c, 0) == 3 && arrays.at(c, 2) == 1) { say("reverse OK") } else { say("FAIL reverse"); ok = false }
+
+// join
+var d = arrays.new()
+arrays.push(d, "a"); arrays.push(d, "b")
+var j = arrays.join(d, ",")
+if (j == "a,b") { say("join OK") } else { say("FAIL join"); ok = false }
+
+// clear
+arrays.clear(d)
+if (arrays.length(d) == 0) { say("clear OK") } else { say("FAIL clear"); ok = false }
+
+if (ok) { say("AOT arrays module test PASSED") }
