@@ -649,6 +649,11 @@ int main(int argc, char* argv[]) {
         }
         
         runFile(filePath, vm);
+        
+        // Exit with error code if there were syntax errors
+        if (neutron::ErrorHandler::hadError()) {
+            return 1;
+        }
     } else {
         runPrompt(vm);
     }

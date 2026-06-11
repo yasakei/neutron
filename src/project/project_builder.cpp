@@ -10,6 +10,7 @@
 #include "aot/llvm_codegen.h"
 #include "aot/target_platform.h"
 #include "core/vm.h"
+#include "runtime/error_handler.h"
 #include "types/value.h"
 #include <iostream>
 #include <fstream>
@@ -291,7 +292,8 @@ bool ProjectBuilder::buildProjectExecutable(
     srcFile << "#include \"compiler/parser.h\"\n";
     srcFile << "#include \"compiler/compiler.h\"\n";
     srcFile << "#include \"compiler/bytecode.h\"\n";
-    srcFile << "#include \"token.h\"\n\n";
+    srcFile << "#include \"token.h\"\n";
+    srcFile << "#include \"runtime/error_handler.h\"\n";
 
     // Find box modules
     auto boxModules = findBoxModules(projectRoot);
@@ -344,6 +346,16 @@ bool ProjectBuilder::buildProjectExecutable(
             auto aotTokens = aotScanner.scanTokens();
             neutron::Parser aotParser(aotTokens);
             auto aotStatements = aotParser.parse();
+
+            // Check for syntax errors before proceeding with AOT compilation
+            if (neutron::ErrorHandler::hadError()) {
+                std::cerr << "      AOT compilation failed due to syntax errors." << std::endl;
+                srcFile.close();
+                std::filesystem::remove(tempSourcePath);
+                return false;
+            }
+
+            {
             neutron::Compiler aotCompiler(aotVm);
             neutron::Function* mainFunc = aotCompiler.compile(aotStatements);
             
@@ -459,6 +471,10 @@ bool ProjectBuilder::buildProjectExecutable(
                         srcFile << "            }\n";
                         srcFile << "        }\n";
                         srcFile << "    }\n";
+                        srcFile << "    if (neutron::ErrorHandler::hadError()) {\n";
+                        srcFile << "        neutron::ErrorHandler::printSummary();\n";
+                        srcFile << "        return 1;\n";
+                        srcFile << "    }\n";
                         srcFile << "    return neutron_main(&vm);\n";
                         srcFile << "}\n";
                         srcFile.close();
@@ -468,6 +484,7 @@ bool ProjectBuilder::buildProjectExecutable(
 #else
                 std::cout << "      LLVM codegen not available (recompile with LLVM)" << std::endl;
 #endif
+            }
             }
         }
     }
@@ -698,6 +715,10 @@ bool ProjectBuilder::buildProjectExecutable(
     srcFile << "    std::vector<neutron::Token> tokens = scanner.scanTokens();\n";
     srcFile << "    neutron::Parser parser(tokens);\n";
     srcFile << "    std::vector<std::unique_ptr<neutron::Stmt>> statements = parser.parse();\n";
+    srcFile << "    if (neutron::ErrorHandler::hadError()) {\n";
+    srcFile << "        neutron::ErrorHandler::printSummary();\n";
+    srcFile << "        return 1;\n";
+    srcFile << "    }\n";
     srcFile << "    neutron::Compiler compiler(vm);\n";
     srcFile << "    neutron::Function* function = compiler.compile(statements);\n";
     srcFile << "    vm.interpret(function);\n";

@@ -35,11 +35,18 @@ option(NEUTRON_UNSAFE_OPTIMIZATIONS "Enable unsafe performance optimizations (di
 #   4. cmake -B build-release -DNEUTRON_PGO=USE=pgo.profdata && cmake --build build-release
 set(NEUTRON_PGO "OFF" CACHE STRING "Profile-Guided Optimization: OFF, GENERATE, or USE=<path>")
 
+# NEUTRON_USE_CCACHE: Enable ccache for faster incremental rebuilds.
+# When ON (default), CMake will automatically find ccache and use it as a
+# compiler launcher. Set to OFF to disable, or set the standard
+# CMAKE_C_COMPILER_LAUNCHER/CMAKE_CXX_COMPILER_LAUNCHER variables directly
+# to override with a different caching tool (e.g. sccache).
+option(NEUTRON_USE_CCACHE "Enable ccache for faster incremental rebuilds" ON)
+
 # Compiler options
 if(MSVC)
     # Set multithreaded runtime library (required for _beginthreadex and std::thread)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-    
+
     # Optimization flags (avoid /O2 and /Ox to prevent /Ob2 vs /Ob3 conflict)
     # Use individual optimization flags instead of /O2 or /Ox
     # /Oi: Enable intrinsic functions
@@ -51,10 +58,10 @@ if(MSVC)
     # Note: /Og is deprecated in newer MSVC versions, removed
     # Suppress common warnings: C4267 (size_t conversion), C4244 (type conversion), C4100 (unreferenced parameter), C4458 (declaration hides member), C4273 (inconsistent dll linkage), C4101 (unreferenced local variable)6)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" && cd C:\Users\yasakei\.temp\test && neutron build
     add_compile_options(/W4 /utf-8 /EHsc /Oi /Ot /fp:fast /GL /Gy /permissive- /wd4267 /wd4244 /wd4100 /wd4458 /wd4273 /wd4101)
-    
+
     # Ensure threading support is enabled
     add_compile_definitions(_WIN32_WINNT=0x0601)  # Windows 7 or later for threading
-    
+
     # /GS-: Disable stack buffer security checks (small speedup, security trade-off)
     # Only enabled when NEUTRON_UNSAFE_OPTIMIZATIONS is ON
     if(NEUTRON_UNSAFE_OPTIMIZATIONS)
@@ -83,7 +90,39 @@ else()
     endif()
 endif()
 
+# =============================================================================
+# ccache — compiler cache for faster rebuilds
+# =============================================================================
+# NEUTRON_USE_CCACHE must be ON, ccache must be found, and we must not already
+# have a compiler launcher set (e.g. from a toolchain file or CMake preset).
+if(NEUTRON_USE_CCACHE)
+    if(NOT CMAKE_C_COMPILER_LAUNCHER AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+        find_program(CCACHE_PROGRAM ccache)
+        if(CCACHE_PROGRAM)
+            set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+            set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+            message(STATUS "ccache found: ${CCACHE_PROGRAM} — compiler caching enabled")
+        else()
+            message(STATUS "ccache not found — compiler caching disabled (install ccache for faster rebuilds)")
+        endif()
+    else()
+        message(STATUS "ccache: compiler launcher already set (CMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}, CMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}) — respecting existing configuration")
+    endif()
+else()
+    message(STATUS "ccache disabled by NEUTRON_USE_CCACHE=OFF")
+endif()
+
+# =============================================================================
 # PGO: profile-generate or profile-use for GCC/Clang
+# =============================================================================
+# NEUTRON_PGO: Profile-Guided Optimization.
+# Set to "GENERATE" to build an instrumented binary, or "USE=<path>" to consume
+# a profile data file. Requires Clang or GCC on Linux/macOS.
+# Workflow:
+#   1. cmake -B build-pgo -DNEUTRON_PGO=GENERATE && cmake --build build-pgo
+#   2. LLVM_PROFILE_FILE="default_%p.profraw" ./build-pgo/neutron <benchmark>
+#   3. llvm-profdata merge -output=pgo.profdata default_*.profraw
+#   4. cmake -B build-release -DNEUTRON_PGO=USE=pgo.profdata && cmake --build build-release
 if(NEUTRON_PGO MATCHES "^USE=(.+)$")
     set(NEUTRON_PGO_FILE "${CMAKE_MATCH_1}")
     if(NOT EXISTS "${NEUTRON_PGO_FILE}")
@@ -398,7 +437,7 @@ function(add_neutron_utility UTILITY_NAME UTILITY_PATH)
 endfunction()
 
 # Add component interface sources to utilities
-list(APPEND NEUTRON_UTILS_SOURCES 
+list(APPEND NEUTRON_UTILS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/utils/component_interface.cpp
 )
 
@@ -681,13 +720,13 @@ add_test(NAME functions_test COMMAND neutron ${CMAKE_SOURCE_DIR}/dev_tests/test_
 # --------------------------------------------------------
 # LSP Server
 # --------------------------------------------------------
-add_executable(neutron-lsp 
-    lsp/main.cpp 
-    lsp/server.cpp 
+add_executable(neutron-lsp
+    lsp/main.cpp
+    lsp/server.cpp
     lsp/protocol.cpp
 )
 
-target_link_libraries(neutron-lsp 
+target_link_libraries(neutron-lsp
     neutron_runtime
     ${JSONCPP_LIBRARIES}
 )

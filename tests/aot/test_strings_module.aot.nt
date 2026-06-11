@@ -3,50 +3,50 @@ use strings;
 var ok = true;
 
 // split
-var parts = strings.split("a,b,c", ",")
+var parts = strings.split("a,b,c", ",");
 if (parts.length == 3 && parts[0] == "a" && parts[1] == "b" && parts[2] == "c") {
-    say("split OK")
-} else { say("FAIL split"); ok = false }
+    say("split OK");
+} else { say("FAIL split"); ok = false; }
 
 // join
-var j = strings.join(["x", "y"], "-")
-if (j == "x-y") { say("join OK") } else { say("FAIL join: " + j); ok = false }
+var j = strings.join(["x", "y"], "-");
+if (j == "x-y") { say("join OK"); } else { say("FAIL join: " + j); ok = false; }
 
 // trim
-var t = strings.trim("  hi  ")
-if (t == "hi") { say("trim OK") } else { say("FAIL trim"); ok = false }
+var t = strings.trim("  hi  ");
+if (t == "hi") { say("trim OK"); } else { say("FAIL trim"); ok = false; }
 
 // upper/lower
-if (strings.upper("hello") == "HELLO") { say("upper OK") } else { say("FAIL upper"); ok = false }
-if (strings.lower("WORLD") == "world") { say("lower OK") } else { say("FAIL lower"); ok = false }
+if (strings.upper("hello") == "HELLO") { say("upper OK"); } else { say("FAIL upper"); ok = false; }
+if (strings.lower("WORLD") == "world") { say("lower OK"); } else { say("FAIL lower"); ok = false; }
 
 // replace
-var r = strings.replace("aabbaa", "a", "x")
-if (r == "xxbbxx") { say("replace OK") } else { say("FAIL replace"); ok = false }
+var r = strings.replace("aabbaa", "a", "x");
+if (r == "xxbbxx") { say("replace OK"); } else { say("FAIL replace"); ok = false; }
 
 // contains
-if (strings.contains("hello world", "world")) { say("contains OK") } else { say("FAIL contains"); ok = false }
+if (strings.contains("hello world", "world")) { say("contains OK"); } else { say("FAIL contains"); ok = false; }
 
 // starts_with / ends_with
-if (strings.starts_with("hello", "hel")) { say("starts_with OK") } else { say("FAIL starts_with"); ok = false }
-if (strings.ends_with("hello", "llo")) { say("ends_with OK") } else { say("FAIL ends_with"); ok = false }
+if (strings.starts_with("hello", "hel")) { say("starts_with OK"); } else { say("FAIL starts_with"); ok = false; }
+if (strings.ends_with("hello", "llo")) { say("ends_with OK"); } else { say("FAIL ends_with"); ok = false; }
 
 // length
-if (strings.length("abc") == 3) { say("length OK") } else { say("FAIL length"); ok = false }
+if (strings.length("abc") == 3) { say("length OK"); } else { say("FAIL length"); ok = false; }
 
 // repeat
-var rep = strings.repeat("ab", 3)
-if (rep == "ababab") { say("repeat OK") } else { say("FAIL repeat"); ok = false }
+var rep = strings.repeat("ab", 3);
+if (rep == "ababab") { say("repeat OK"); } else { say("FAIL repeat"); ok = false; }
 
 // reverse
-if (strings.reverse("abc") == "cba") { say("reverse OK") } else { say("FAIL reverse"); ok = false }
+if (strings.reverse("abc") == "cba") { say("reverse OK"); } else { say("FAIL reverse"); ok = false; }
 
 // is_empty
-if (strings.is_empty("") && !strings.is_empty("x")) { say("is_empty OK") } else { say("FAIL is_empty"); ok = false }
+if (strings.is_empty("") && !strings.is_empty("x")) { say("is_empty OK"); } else { say("FAIL is_empty"); ok = false; }
 
 // is_alpha / is_digit / is_alnum
-if (strings.is_alpha("abc") && !strings.is_alpha("123")) { say("is_alpha OK") } else { say("FAIL is_alpha"); ok = false }
-if (strings.is_digit("123") && !strings.is_digit("abc")) { say("is_digit OK") } else { say("FAIL is_digit"); ok = false }
-if (strings.is_alnum("a1") && !strings.is_alnum("!@")) { say("is_alnum OK") } else { say("FAIL is_alnum"); ok = false }
+if (strings.is_alpha("abc") && !strings.is_alpha("123")) { say("is_alpha OK"); } else { say("FAIL is_alpha"); ok = false; }
+if (strings.is_digit("123") && !strings.is_digit("abc")) { say("is_digit OK"); } else { say("FAIL is_digit"); ok = false; }
+if (strings.is_alnum("a1") && !strings.is_alnum("!@")) { say("is_alnum OK"); } else { say("FAIL is_alnum"); ok = false; }
 
 if (ok) { say("AOT strings module test PASSED") }
