@@ -1,0 +1,42 @@
+// Coroutine example: cooperative multitasking with coro
+// Run: ./build/neutron examples/coro_basics.nt
+use coro;
+
+fun downloader(int id) -> int {
+    say("downloader " + id + ": start");
+    coro.yield(id * 10);
+    say("downloader " + id + ": fetching");
+    coro.yield(id * 20);
+    say("downloader " + id + ": done");
+    return id * 100;
+}
+
+var fiber d1 = coro.create(downloader, 1);
+var fiber d2 = coro.create(downloader, 2);
+
+say("--- round 1 ---");
+say("d1 yielded " + coro.resume(d1));
+say("d2 yielded " + coro.resume(d2));
+
+say("--- round 2 ---");
+say("d1 yielded " + coro.resume(d1));
+say("d2 yielded " + coro.resume(d2));
+
+say("--- join ---");
+say("d1 result " + coro.join(d1));
+say("d2 result " + coro.join(d2));
+
+// Producer/consumer via spawn + schedule
+fun producer(int n) -> int {
+    var int i = 0;
+    while (i < n) {
+        say("produce " + i);
+        coro.yield(i);
+        i = i + 1;
+    }
+    return n;
+}
+
+var fiber p = coro.spawn(producer, 3);
+coro.schedule();
+say("producer finished: " + coro.status(p));

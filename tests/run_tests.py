@@ -114,56 +114,12 @@ def build_neutron(root_dir):
         return None
 
 def run_quark_test(neutron_bin, root_dir):
-    """Run quark project test"""
+    """Run quark project test - SKIPPED (project system removed)"""
     Colors.print("Testing: quark project", Colors.BLUE)
-    
-    quark_dir = os.path.join(root_dir, "tests", "quark")
-    if not os.path.exists(quark_dir):
-        print(f"  ", end="")
-        Colors.print("[SKIP]", Colors.YELLOW, end="")
-        print(f" quark directory not found")
-        return 0, 0
-    
-    # Check if .quark file exists
-    quark_file = os.path.join(quark_dir, ".quark")
-    if not os.path.exists(quark_file):
-        print(f"  ", end="")
-        Colors.print("[SKIP]", Colors.YELLOW, end="")
-        print(f" .quark file not found")
-        return 0, 0
-    
-    # Check if main.nt exists
-    main_file = os.path.join(quark_dir, "main.nt")
-    if not os.path.exists(main_file):
-        print(f"  ", end="")
-        Colors.print("[SKIP]", Colors.YELLOW, end="")
-        print(f" main.nt file not found")
-        return 0, 0
-    
-    try:
-        # Run neutron with main.nt in the quark project directory
-        result = subprocess.run([neutron_bin, "main.nt"], cwd=quark_dir, capture_output=True, text=True)
-        
-        if result.returncode == 0:
-            print(f"  ", end="")
-            Colors.print("[PASS]", Colors.GREEN, end="")
-            print(f" quark project")
-            return 1, 0
-        else:
-            print(f"  ", end="")
-            Colors.print("[FAIL]", Colors.RED, end="")
-            print(f" quark project")
-            output = result.stdout + result.stderr
-            for line in output.splitlines():
-                print(f"    {line}")
-            return 0, 1
-            
-    except Exception as e:
-        print(f"  ", end="")
-        Colors.print("[FAIL]", Colors.RED, end="")
-        print(f" quark project (Exception)")
-        print(f"    {str(e)}")
-        return 0, 1
+    print(f"  ", end="")
+    Colors.print("[SKIP]", Colors.YELLOW, end="")
+    print(f" project system removed")
+    return 0, 0
 
 def compare_outputs(expected, actual, test_name):
     """Compare expected and actual outputs, handling common variations"""
@@ -294,196 +250,17 @@ def run_box_test(neutron_bin, root_dir):
         return 0, 1
 
 def run_aot_tests(neutron_bin, root_dir):
-    """Run AOT compilation tests"""
-    aot_test_dir = os.path.join(root_dir, "tests", "aot")
-    
-    if not os.path.isdir(aot_test_dir):
-        Colors.print("AOT test directory not found", Colors.YELLOW)
-        return 0, 0, []
-    
+    """Run AOT compilation tests - SKIPPED (AOT removed)"""
     Colors.print("\n=== AOT Compilation Tests ===", Colors.CYAN)
-    
-    test_files = glob.glob(os.path.join(aot_test_dir, "*.aot.nt"))
-    if not test_files:
-        Colors.print("No AOT test files found", Colors.YELLOW)
-        return 0, 0, []
-    
-    passed = 0
-    failed = 0
-    failed_tests = []
-    
-    # Create temporary build directory
-    temp_build_dir = tempfile.mkdtemp(prefix="neutron_aot_test_")
-    
-    try:
-        for test_file in test_files:
-            test_name = os.path.splitext(os.path.basename(test_file))[0]
-            
-            # Create a temporary project for each test
-            test_project_dir = os.path.join(temp_build_dir, test_name)
-            os.makedirs(test_project_dir, exist_ok=True)
-            
-            # Copy test file as main.nt
-            main_nt = os.path.join(test_project_dir, "main.nt")
-            shutil.copy2(test_file, main_nt)
-            
-            # Create .quark project file
-            quark_file = os.path.join(test_project_dir, ".quark")
-            with open(quark_file, 'w') as f:
-                f.write(f"[project]\n")
-                f.write(f"name = \"{test_name}\"\n")
-                f.write(f"version = \"1.0.0\"\n")
-                f.write(f"entry = \"main.nt\"\n")
-            
-            try:
-                # Build with AOT
-                build_result = subprocess.run(
-                    [neutron_bin, "build", "--aot"],
-                    cwd=test_project_dir,
-                    capture_output=True,
-                    text=True,
-                    encoding='utf-8',
-                    timeout=120
-                )
-
-                # Check if build succeeded
-                if build_result.returncode != 0:
-                    # AOT compilation failed, fall back to interpreter
-                    # This is expected on platforms without C++ compiler or for complex code
-                    # Print build error for debugging
-                    print(f"\n  [BUILD ERROR] AOT compilation failed:")
-                    print(f"    stdout: {build_result.stdout.strip()[:3000]}")
-                    print(f"    stderr: {build_result.stderr.strip()[:3000]}")
-                    
-                    Colors.print(f"  [INFO]", Colors.YELLOW, end="")
-                    print(f" {test_name} (AOT -> interpreter)")
-
-                    run_result = subprocess.run(
-                        [neutron_bin, main_nt],
-                        capture_output=True,
-                        text=True,
-                        encoding='utf-8',
-                        timeout=30
-                    )
-                    
-                    if run_result.returncode == 0:
-                        Colors.print(f"  [PASS]", Colors.GREEN, end="")
-                        print(f" {test_name} (interpreter)")
-                        passed += 1
-                    else:
-                        Colors.print(f"  [FAIL]", Colors.RED, end="")
-                        print(f" {test_name}")
-                        print(f"    {run_result.stderr.strip()}")
-                        failed += 1
-                        failed_tests.append(test_name)
-                    continue
-
-                # Look for built executable
-                output_name = test_name
-                if platform.system() == "Windows":
-                    output_name += ".exe"
-                output_path = os.path.join(test_project_dir, "build", output_name)
-
-                if not os.path.exists(output_path):
-                    # Try alternative location
-                    output_path = os.path.join(test_project_dir, output_name)
-                
-                if os.path.exists(output_path):
-                    try:
-                        # Run the compiled executable
-                        run_result = subprocess.run(
-                            [output_path],
-                            capture_output=True,
-                            text=True,
-                            encoding='utf-8',
-                            timeout=30
-                        )
-
-                        if run_result.returncode == 0:
-                            Colors.print(f"  [PASS]", Colors.GREEN, end="")
-                            print(f" {test_name} (AOT)")
-                            passed += 1
-                        else:
-                            Colors.print(f"  [FAIL]", Colors.RED, end="")
-                            print(f" {test_name}")
-                            if run_result.stderr.strip():
-                                print(f"    {run_result.stderr.strip()}")
-                            failed += 1
-                            failed_tests.append(test_name)
-                    except UnicodeDecodeError:
-                        # AOT binary has encoding issues, fall back to interpreter
-                        Colors.print(f"  [INFO]", Colors.YELLOW, end="")
-                        print(f" {test_name} (AOT binary encoding issue, using interpreter)")
-
-                        run_result = subprocess.run(
-                            [neutron_bin, main_nt],
-                            capture_output=True,
-                            text=True,
-                            encoding='utf-8',
-                            timeout=30
-                        )
-
-                        if run_result.returncode == 0:
-                            Colors.print(f"  [PASS]", Colors.GREEN, end="")
-                            print(f" {test_name} (interpreter)")
-                            passed += 1
-                        else:
-                            Colors.print(f"  [FAIL]", Colors.RED, end="")
-                            print(f" {test_name}")
-                            print(f"    {run_result.stderr.strip()}")
-                            failed += 1
-                            failed_tests.append(test_name)
-                else:
-                    # AOT compilation failed, try interpreter fallback
-                    Colors.print(f"  [INFO]", Colors.YELLOW, end="")
-                    print(f" {test_name} (AOT not available, using interpreter)")
-
-                    run_result = subprocess.run(
-                        [neutron_bin, main_nt],
-                        capture_output=True,
-                        text=True,
-                        encoding='utf-8',
-                        timeout=30
-                    )
-                    
-                    if run_result.returncode == 0:
-                        Colors.print(f"  [PASS]", Colors.GREEN, end="")
-                        print(f" {test_name} (interpreter)")
-                        passed += 1
-                    else:
-                        Colors.print(f"  [FAIL]", Colors.RED, end="")
-                        print(f" {test_name}")
-                        print(f"    {run_result.stderr.strip()}")
-                        failed += 1
-                        failed_tests.append(test_name)
-                    
-            except subprocess.TimeoutExpired:
-                Colors.print(f"  [FAIL]", Colors.RED, end="")
-                print(f" {test_name} (timeout)")
-                failed += 1
-                failed_tests.append(test_name)
-            except Exception as e:
-                Colors.print(f"  [FAIL]", Colors.RED, end="")
-                print(f" {test_name} (exception: {str(e)})")
-                failed += 1
-                failed_tests.append(test_name)
-    
-    finally:
-        # Clean up temporary build directory
-        try:
-            shutil.rmtree(temp_build_dir)
-        except:
-            pass
-    
+    print(f"  ", end="")
+    Colors.print("[SKIP]", Colors.YELLOW, end="")
+    print(f" AOT compilation removed")
     print()
     Colors.print("AOT Test Summary:", Colors.CYAN)
-    print("  Passed: ", end="")
-    Colors.print(f"{passed}", Colors.GREEN)
-    print("  Failed: ", end="")
-    Colors.print(f"{failed}", Colors.RED)
+    print("  Passed: 0")
+    print("  Failed: 0")
     print()
-    
-    return passed, failed, failed_tests
+    return 0, 0, []
 
 def main():
     # Parse command line arguments
@@ -502,20 +279,13 @@ def main():
 
     Colors.print(f"Using binary: {neutron_bin}", Colors.CYAN)
     
-    # If --aot flag is passed, only run AOT tests
+    # If --aot flag is passed, run AOT tests (now skipped)
     if run_aot:
-        Colors.print("\n=== Running AOT Tests Only ===", Colors.CYAN)
+        Colors.print("\n=== Running AOT Tests ===", Colors.CYAN)
         aot_passed, aot_failed, aot_failed_tests = run_aot_tests(neutron_bin, root_dir)
-        
-        if aot_failed > 0:
-            Colors.print("==== AOT TESTS FAILED ====", Colors.RED)
-            print(f"Failed: {aot_failed}")
-            for t in aot_failed_tests:
-                Colors.print(f"  - {t}", Colors.RED)
-            sys.exit(1)
-        else:
-            Colors.print("==== ALL AOT TESTS PASSED ====", Colors.GREEN)
-            sys.exit(0)
+        Colors.print("==== AOT TESTS SKIPPED ====", Colors.YELLOW)
+        print("AOT compilation has been removed from the language.")
+        sys.exit(0)
         return
 
     test_dirs = [

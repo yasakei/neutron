@@ -1,0 +1,45 @@
+// Test coro module API surface (use coro;)
+use coro;
+
+say("=== coro module API ===");
+
+fun idfun(int x) -> int {
+    return x;
+}
+
+// create returns fiber, status is string
+var fiber f = coro.create(idfun, 1);
+var string s0 = coro.status(f);
+say("create/status: " + s0);
+
+// resume passes args on first run and returns result
+var fiber g = coro.create(idfun, 2);
+var int v = coro.resume(g);
+say("resume: " + v);
+
+// yield from main is no-op passthrough
+var int y = coro.yield(99);
+say("yield passthrough: " + y);
+
+// join runs to completion
+var fiber h = coro.create(idfun, 3);
+var int j = coro.join(h);
+say("join: " + j);
+
+// spawn creates and starts
+var fiber sp = coro.spawn(idfun, 4);
+say("spawn/status: " + coro.status(sp));
+say("spawn/join: " + coro.join(sp));
+
+// schedule + count + sleep + all
+coro.schedule();
+var int n = coro.count();
+say("count: " + n);
+coro.sleep(1);
+var fiber a1 = coro.create(idfun, 5);
+var fiber a2 = coro.create(idfun, 6);
+var array fa = [a1, a2];
+var array ra = coro.all(fa);
+say("all: " + ra);
+
+say("=== coro module OK ===");

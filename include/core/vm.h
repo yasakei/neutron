@@ -114,6 +114,8 @@
 namespace neutron {
     class Stmt;
     class FunctionStmt;
+    class VM;
+    class Fiber;
     
     // Forward declarations for module registration functions
     void register_sys_functions(VM& vm, std::shared_ptr<Environment> env);
@@ -125,6 +127,26 @@ namespace neutron {
 }
 
 namespace neutron {
+
+/**
+ * @brief VMExceptionFrame - Tracks try-catch-finally blocks during execution.
+ * Defined at namespace scope so both Fiber and VM can use it.
+ */
+struct VMExceptionFrame {
+    int tryStart;
+    int tryEnd;
+    int catchStart;
+    int finallyStart;
+    size_t frameBase;
+    std::string fileName;
+    int line;
+
+    VMExceptionFrame() : tryStart(0), tryEnd(0), catchStart(-1), finallyStart(-1), frameBase(0), fileName(""), line(-1) {}
+
+    VMExceptionFrame(int tryStart, int tryEnd, int catchStart, int finallyStart, size_t frameBase, const std::string& fileName, int line)
+        : tryStart(tryStart), tryEnd(tryEnd), catchStart(catchStart), finallyStart(finallyStart),
+          frameBase(frameBase), fileName(fileName), line(line) {}
+};
 
 /**
  * @brief CallFrame - The VM's way of remembering where it was before that function call interrupted things.
@@ -153,6 +175,68 @@ struct CallFrame {
         static const std::string empty;
         return fileName ? *fileName : empty;
     }
+};
+
+/**
+ * @brief Fiber - A lightweight concurrency primitive for cooperative multitasking.
+ * 
+ * Fibers are similar to goroutines in Go - lightweight, user-space threads that
+ * are scheduled cooperatively by the VM. Each fiber has its own call stack and
+ * execution context, and can yield control to other fibers.
+ * 
+ * Fiber states:
+ * - CREATED: Fiber created but not started
+ * - RUNNING: Fiber is currently executing
+ * - SUSPENDED: Fiber yielded and is waiting to be resumed
+ * - FINISHED: Fiber completed execution
+ * 
+ * Usage:
+ * - spawn func() to create and start a fiber
+ * - Fiber.yield() to yield execution
+ * - fiber.join() to wait for completion
+ */
+class Fiber : public Object {
+public:
+    enum class State {
+        CREATED,
+        RUNNING,
+        SUSPENDED,
+        FINISHED
+    };
+
+    Fiber(Function* func, std::vector<Value> args);
+
+    State state;                    ///< Current fiber state
+    Function* function;             ///< Function to execute
+    std::vector<Value> args;        ///< Arguments to pass to function
+    std::vector<Value> stack;       ///< Fiber's own stack (saved on yield)
+    std::vector<CallFrame> frames;  ///< Fiber's call frames
+    std::vector<VMExceptionFrame> exceptionFrames; ///< Saved exception frames
+    size_t stackSlotOffset;         ///< Stack slot where fiber's locals start
+    Value returnValue;              ///< Value returned by the fiber
+    Value yieldValue;               ///< Last yielded value
+    std::string name;               ///< Fiber name (for debugging)
+
+    // Resume the fiber - returns true if fiber is still alive
+    bool resume(VM& vm);
+
+    // Yield execution back to the scheduler
+    void yield(VM& vm, Value value);
+
+    // Get current state as string
+    std::string getStateString() const;
+
+    // Object interface
+    std::string toString() const override {
+        return "<fiber: " + getStateString() + ">";
+    }
+};
+
+// Exception used to unwind the VM stack on fiber yield.
+// Thrown by coro.yield, caught by VM::resumeFiber.
+struct FiberYield {
+    Value value;
+    explicit FiberYield(Value v) : value(v) {}
 };
 
 /**
@@ -420,6 +504,7 @@ public:
     // Public data members (for access from other components)
     // Yes, these are public. Encapsulation is important, but so is performance.
     std::vector<CallFrame> frames;           ///< Call stack - tracks active function calls
+    
     Chunk* chunk;                             ///< Current bytecode chunk being executed
     uint8_t* ip;                              ///< Current instruction pointer
     std::vector<Value> stack;                 ///< Operand stack - where values live during execution
@@ -495,26 +580,10 @@ public:
     
     /**
      * @brief Exception handling support - because errors happen (especially in production).
-     * 
-     * ExceptionFrame tracks try-catch-finally blocks during execution.
-     * When an exception occurs, frames are searched to find handlers.
-     * The stack is unwound to the handler's frame, and execution resumes.
+     * ExceptionFrame is an alias for VMExceptionFrame (defined at namespace scope
+     * so Fiber can also store exception state).
      */
-    struct ExceptionFrame {
-        int tryStart;         ///< Start offset of try block in bytecode
-        int tryEnd;           ///< End offset of try block in bytecode
-        int catchStart;       ///< Start offset of catch block (-1 if no catch)
-        int finallyStart;     ///< Start offset of finally block (-1 if no finally)
-        size_t frameBase;     ///< Stack frame base when exception frame was created
-        std::string fileName; ///< Source file name for debugging
-        int line;             ///< Source line number for debugging
-
-        ExceptionFrame() : tryStart(0), tryEnd(0), catchStart(-1), finallyStart(-1), frameBase(0), fileName(""), line(-1) {}
-
-        ExceptionFrame(int tryStart, int tryEnd, int catchStart, int finallyStart, size_t frameBase, const std::string& fileName, int line)
-            : tryStart(tryStart), tryEnd(tryEnd), catchStart(catchStart), finallyStart(finallyStart),
-              frameBase(frameBase), fileName(fileName), line(line) {}
-    };
+    using ExceptionFrame = VMExceptionFrame;
 
     std::vector<ExceptionFrame> exceptionFrames;  ///< Stack of exception frames (LIFO - last in, first handled)
     bool hasException;  ///< Flag indicating an exception is currently being handled
@@ -528,9 +597,10 @@ public:
     // Because accidentally redefining 'pi = 3.14' in the REPL would be embarrassing
     std::set<std::string> declaredGlobals;
 
-    // Flag to track if we're running a .ntsc (safe) file
-    // Safe files have restricted permissions (no file I/O, no system calls, etc.)
-    bool isSafeFile;
+    // Fiber support
+    std::vector<Fiber*> fibers;              ///< All fibers created in this VM
+    Fiber* currentFiber;                    ///< Currently executing fiber (nullptr for main)
+    std::vector<Fiber*> readyQueue;         ///< Fibers ready to run
 
 private:
     // Internal call methods - not for public consumption (like the kitchen in a restaurant)
@@ -565,6 +635,12 @@ public:
     int unlock_fully();
     void relock(int count);
 
+    // Fiber management methods
+    Fiber* createFiber(Function* func, std::vector<Value> args, const std::string& name = "");
+    Value resumeFiber(Fiber* fiber, std::vector<Value> args = {});
+    void yieldFiber(Value value = Value());
+    void runFiberScheduler();
+
 private:
     // Module interpretation - internal use only
     void interpret_module(const std::vector<std::unique_ptr<Stmt>>& statements, std::shared_ptr<Environment> module_env);
@@ -598,6 +674,11 @@ inline bool isTruthy(const Value& value) {
             return value.as.array->size() > 0;
         case ValueType::OBJECT:
         case ValueType::CALLABLE:
+        case ValueType::FIBER:
+        case ValueType::CLASS:
+        case ValueType::INSTANCE:
+        case ValueType::MODULE:
+        case ValueType::BUFFER:
             return true;
         default:
             return false;

@@ -1,4 +1,4 @@
-/*
+/* 
  * Neutron Programming Language
  * Copyright (c) 2026 yasakei
  *
@@ -19,51 +19,45 @@
  * ===============================================
  * 
  * This file is the entry point for the Neutron interpreter and CLI tool.
- * It handles command-line parsing, file execution, REPL mode, and project
- * management commands.
+ * It handles command-line parsing, file execution, and REPL mode.
  * 
  * What This File Includes:
- * ------------------------
+ * ------------------------ 
  * - run(): Compile and execute Neutron source code
  * - runFile(): Load and execute a Neutron source file
  * - runPrompt(): Interactive REPL for experimentation
  * - main(): Command-line interface and dispatch
  * 
  * How It Works:
- * -------------
+ * ------------- 
  * The main function parses command-line arguments and dispatches to
  * appropriate handlers:
- * - File execution: Load .nt/.ntsc files and run through the compiler/VM
+ * - File execution: Load .nt files and run through the compiler/VM
  * - REPL: Interactive read-eval-print loop for experimentation
- * - Project commands: init, run, build (via ProjectManager)
- * - Utilities: fmt (code formatter), install (package manager)
+ * - Utilities: fmt (code formatter)
  * - Checkpoint resume: --resume for durable execution
  * 
  * Adding Features:
- * ----------------
+ * ---------------- 
  * - New CLI commands: Add else-if branch in main() with your command logic
  * - New execution modes: Extend run() with additional flags/parameters
  * - Integration hooks: Use VM::registerComponent() for plugins
  * 
  * What You Should NOT Do:
- * -----------------------
+ * ----------------------- 
  * - Do NOT modify the VM directly from multiple threads
  * - Do NOT bypass the error handler for error reporting
  * - Do NOT remove safety checks for .ntsc (safe) files
  * - Do NOT change command-line argument parsing without updating help text
  * 
  * Command-Line Interface:
- * -----------------------
+ * ----------------------- 
  * neutron [options] [script.nt] [args...]
  * 
  * Options:
  *   --version, -v     Show version information
  *   --resume <file>   Resume from checkpoint
  *   --no-jit          Disable JIT compilation
- *   init <name>       Initialize new project
- *   run               Run project entry point
- *   build [opts]      Build project executable
- *   install [pkg]     Install packages
  *   fmt <file>        Format Neutron source
  */
 
@@ -85,9 +79,6 @@
 #include "modules/module_loader.h"
 #include "types/version.h"
 #include "runtime/error_handler.h"
-#include "project/project_manager.h"
-#include "project/project_config.h"
-#include "project/project_builder.h"
 #include "platform/platform.h"
 #include "formatter.h"
 
@@ -111,16 +102,9 @@ void runPrompt(neutron::VM& vm);
  * @param vm The virtual machine instance used for compilation and execution.
  *           The VM's current file/name and module search paths may be used
  *           for diagnostics and module resolution.
- * @param isSafeFile When true, compile the source with safety restrictions
- *                   appropriate for "safe" files (e.g., sandboxing or reduced
- *                   permissions). Default is false.
- * 
- * Safety Notes:
- * - Safe files (.ntsc) have restricted I/O and system access
- * - Errors during compilation stop execution before VM interpretation
- * - Runtime errors trigger stack trace output and process exit
+ * @param isSafeFile This parameter is deprecated and ignored. All files are now compiled without safety restrictions.
  */
-void run(const std::string& source, neutron::VM& vm, bool isSafeFile = false) {
+void run(const std::string& source, neutron::VM& vm) {
     // Split source into lines for error reporting
     // The ErrorHandler uses these for producing helpful diagnostics
     std::vector<std::string> lines;
@@ -156,7 +140,7 @@ void run(const std::string& source, neutron::VM& vm, bool isSafeFile = false) {
 
         // Phase 3: Compilation - AST to bytecode
         // The compiler doesn't judge your coding style (the formatter does that)
-        neutron::Compiler compiler(vm, isSafeFile);
+        neutron::Compiler compiler(vm);
         neutron::Function* function = compiler.compile(statements);
 
         // Phase 4: Interpretation - execute the bytecode
@@ -177,12 +161,7 @@ void run(const std::string& source, neutron::VM& vm, bool isSafeFile = false) {
  * This function handles file I/O, sets up error reporting context,
  * and configures the module search path to include the file's directory.
  * 
- * Special handling for .ntsc (Neutron Safe Code) files:
- * - These files are compiled with restricted permissions
- * - No file I/O, no system calls, no network access
- * - Suitable for untrusted code execution
- * 
- * @param path Path to the Neutron source file (.nt or .ntsc).
+ * @param path Path to the Neutron source file (.nt).
  * @param vm The VM instance for execution.
  */
 void runFile(const std::string& path, neutron::VM& vm) {
@@ -191,20 +170,12 @@ void runFile(const std::string& path, neutron::VM& vm) {
     neutron::ErrorHandler::setCurrentFile(path);
     vm.currentFileName = path;
 
-    // Check if this is a .ntsc file (Neutron Safe Code)
-    // Safe files are sandboxed - they can't touch the filesystem or run system commands
-    bool isSafeFile = false;
-    if (path.length() >= 5 && path.substr(path.length() - 5) == ".ntsc") {
-        isSafeFile = true;
-        vm.isSafeFile = true;
-    }
-
     // Add the script's directory to the module search path
     // This allows modules in the same directory to be imported relatively
     std::string directory;
-    // Find last path separator — handle both Unix '/' and Windows '\'
+    // Find last path separator — handle both Unix '/' and Windows '\\'
     const size_t last_slash = path.rfind('/');
-    const size_t last_backslash = path.rfind('\\');
+    const size_t last_backslash = path.rfind('\\\\');
     size_t last_sep = std::string::npos;
     if (last_slash != std::string::npos && last_backslash != std::string::npos)
         last_sep = std::max(last_slash, last_backslash);
@@ -235,7 +206,7 @@ void runFile(const std::string& path, neutron::VM& vm) {
     file.close();
 
     // Execute the source
-    run(source, vm, isSafeFile);
+    run(source, vm);
 }
 
 /**
@@ -302,226 +273,6 @@ int main(int argc, char* argv[]) {
             return 0;
         }
         
-        // Project commands
-        else if (arg == "init") {
-            std::string projectName = argc > 2 ? argv[2] : "";
-            return neutron::ProjectManager::initProject(projectName) ? 0 : 1;
-        }
-        
-        else if (arg == "run") {
-            // Check if we're in a Neutron project
-            std::string projectRoot = neutron::ProjectManager::findProjectRoot(".");
-            if (projectRoot.empty()) {
-                std::cerr << "Error: Not in a Neutron project. Run './neutron init' to create one." << std::endl;
-                return 1;
-            }
-            
-            // Load config and run the entry file
-            auto config = neutron::ProjectManager::loadConfig(projectRoot);
-            if (!config) {
-                std::cerr << "Error: Failed to load project configuration" << std::endl;
-                return 1;
-            }
-
-            std::string entryFile = projectRoot + "/" + config->entry;
-
-            neutron::VM vm;
-            vm.commandLineArgs.push_back(entryFile);
-            runFile(entryFile, vm);
-            return 0;
-        }
-        
-        else if (arg == "build") {
-            bool bundleLibs = true;
-            bool aotCompile = true;  // AOT is now the default
-            std::string targetArch = "";  // Cross-compilation target
-
-            for (int i = 2; i < argc; i++) {
-                std::string flag = argv[i];
-                if (flag == "--no-bundle") {
-                    bundleLibs = false;
-                } else if (flag == "--aot" || flag == "-c") {
-                    aotCompile = true;
-                } else if (flag == "--no-aot" || flag == "--interpret") {
-                    aotCompile = false;  // Allow fallback to interpreter mode
-                } else if (flag == "--target" && i + 1 < argc) {
-                    targetArch = argv[++i];  // Cross-compilation target
-                } else if (flag.find("--target=") == 0) {
-                    targetArch = flag.substr(9);  // --target=xxx format
-                }
-            }
-
-            // Check if we're in a Neutron project
-            std::string projectRoot = neutron::ProjectManager::findProjectRoot(".");
-            if (projectRoot.empty()) {
-                std::cerr << "Error: Not in a Neutron project. Run './neutron init' to create one." << std::endl;
-                return 1;
-            }
-
-            // Load config
-            auto config = neutron::ProjectManager::loadConfig(projectRoot);
-            if (!config) {
-                std::cerr << "Error: Failed to load project configuration" << std::endl;
-                return 1;
-            }
-
-            std::string entryFile = projectRoot + "/" + config->entry;
-
-            std::cout << "Building: " << config->name << std::endl;
-            std::cout << "  Mode: " << (aotCompile ? "AOT (native)" : "Interpreter") << std::endl;
-            if (!targetArch.empty()) {
-                std::cout << "  Target: " << targetArch << " (cross-compilation)" << std::endl;
-            }
-
-            // Create build directory
-            std::string buildDir = projectRoot + "/build";
-            std::filesystem::create_directories(buildDir);
-
-            // Output executable name
-            std::string outputName = config->name;
-#ifdef _WIN32
-            outputName += ".exe";
-#endif
-            std::string outputPath = buildDir + "/" + outputName;
-
-            std::cout << "  Output: " << outputPath << std::endl;
-            std::cout << std::endl;
-            
-            // Read the entry file
-            std::ifstream file(entryFile);
-            if (!file.is_open()) {
-                std::cerr << "Error: Could not open entry file: " << entryFile << std::endl;
-                return 1;
-            }
-            
-            std::string line;
-            std::string source;
-            while (std::getline(file, line)) {
-                source += line + "\n";
-            }
-            file.close();
-            
-            // Build using project-aware builder
-            bool success = neutron::ProjectBuilder::buildProjectExecutable(
-                projectRoot,
-                source,
-                entryFile,
-                outputPath,
-                neutron::platform::getExecutablePath(),
-                bundleLibs,
-                aotCompile,
-                targetArch
-            );
-            
-            return success ? 0 : 1;
-        }
-        
-        else if (arg == "install") {
-            // If no arguments, install all dependencies from .quark
-            if (argc < 3) {
-                std::string projectRoot = neutron::ProjectManager::findProjectRoot(".");
-                if (projectRoot.empty()) {
-                    std::cerr << "Error: Not in a Neutron project" << std::endl;
-                    return 1;
-                }
-
-                std::string quarkPath = projectRoot + "/.quark";
-                std::ifstream quarkFile(quarkPath);
-                if (!quarkFile.is_open()) {
-                    std::cerr << "Error: No .quark file found" << std::endl;
-                    return 1;
-                }
-
-                std::cout << "Reading dependencies from .quark..." << std::endl;
-                std::cout << std::endl;
-
-                std::string line;
-                bool inDeps = false;
-                std::vector<std::string> deps;
-
-                while (std::getline(quarkFile, line)) {
-                    if (line == "[dependencies]") {
-                        inDeps = true;
-                        continue;
-                    }
-                    if (inDeps && line[0] != '[' && !line.empty() && line[0] != '#') {
-                        size_t eq = line.find('=');
-                        if (eq != std::string::npos) {
-                            std::string name = line.substr(0, eq);
-                            std::string version = line.substr(eq + 1);
-                            // Trim whitespace
-                            name.erase(0, name.find_first_not_of(" \t\r\n"));
-                            name.erase(name.find_last_not_of(" \t\r\n") + 1);
-                            version.erase(0, version.find_first_not_of(" \t\r\n"));
-                            version.erase(version.find_last_not_of(" \t\r\n") + 1);
-                            // Remove quotes if present
-                            if (version.size() >= 2) {
-                                if ((version.front() == '"' && version.back() == '"') ||
-                                    (version.front() == '\'' && version.back() == '\'')) {
-                                    version = version.substr(1, version.size() - 2);
-                                }
-                            }
-                            if (!name.empty() && !version.empty()) {
-                                deps.push_back(name + "@" + version);
-                            }
-                        }
-                    }
-                }
-                quarkFile.close();
-
-                if (deps.empty()) {
-                    std::cout << "No dependencies found in .quark" << std::endl;
-                    return 0;
-                }
-
-                std::cout << "Found " << deps.size() << " dependenc" << (deps.size() == 1 ? "y" : "ies") << ":" << std::endl;
-                for (const auto& dep : deps) {
-                    std::cout << "  - " << dep << std::endl;
-                }
-                std::cout << std::endl;
-
-                // Find box executable
-                std::string boxExe = neutron::platform::getExecutablePath();
-                size_t lastSlash = boxExe.find_last_of("/\\");
-                if (lastSlash != std::string::npos) {
-                    boxExe = boxExe.substr(0, lastSlash) + "/box";
-                } else {
-                    boxExe = "./box";
-                }
-
-                // Install each dependency
-                int installed = 0;
-                for (const auto& dep : deps) {
-                    std::string cmd = boxExe + " install \"" + dep + "\"";
-                    int result = system(cmd.c_str());
-                    if (result == 0) {
-                        installed++;
-                    }
-                }
-
-                std::cout << std::endl;
-                std::cout << "Installed " << installed << "/" << deps.size() << " packages" << std::endl;
-                return (installed == deps.size()) ? 0 : 1;
-            }
-
-            // Install specific package
-            std::string package = argv[2];
-            std::string boxPath = neutron::platform::getExecutablePath();
-            size_t lastSlash = boxPath.find_last_of("/\\");
-            if (lastSlash != std::string::npos) {
-                boxPath = boxPath.substr(0, lastSlash) + "/box";
-            } else {
-                boxPath = "./box";
-            }
-
-            std::string cmd = "\"" + boxPath + "\" install " + package;
-            for (int i = 3; i < argc; i++) {
-                cmd += " " + std::string(argv[i]);
-            }
-
-            return system(cmd.c_str());
-        }
-        
         // Format command
         else if (arg == "fmt") {
             if (argc < 3) {
@@ -567,7 +318,7 @@ int main(int argc, char* argv[]) {
                     for (const auto& entry : std::filesystem::recursive_directory_iterator(target)) {
                         if (entry.is_regular_file()) {
                             std::string ext = entry.path().extension().string();
-                            if (ext == ".nt" || ext == ".ntsc") {
+                            if (ext == ".nt") {
                                 std::string filePath = entry.path().string();
                                 fileCount++;
                                 

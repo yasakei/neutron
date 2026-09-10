@@ -43,6 +43,7 @@ enum class TokenType {
     // Type annotations (optional type safety)
     TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_BOOL, 
     TYPE_ARRAY, TYPE_OBJECT, TYPE_ANY,
+    TYPE_FIBER,
     
     END_OF_FILE
 };

@@ -1177,20 +1177,19 @@ void AotCompiler::generateBytecodeBody() {
                 break;
             }
 
-            case OpCode::OP_VALIDATE_SAFE_FUNCTION:
-            case OpCode::OP_VALIDATE_SAFE_VARIABLE:
-            case OpCode::OP_VALIDATE_SAFE_FILE_FUNCTION:
-            case OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE:
-                // =================================================================
-                // Safe Mode Validation - No-op in AOT
-                // These opcodes are for runtime safe mode validation.
-                // AOT-compiled code is already validated at compile time,
-                // so these can be safely skipped.
-                // =================================================================
-                code << "    // " << static_cast<int>(op) << " (safe mode - no-op in AOT)\n\n";
-                // Skip operands
+            case OpCode::OP_FIBER_CREATE:
+            case OpCode::OP_FIBER_YIELD:
+            case OpCode::OP_FIBER_RESUME:
+            case OpCode::OP_FIBER_JOIN:
+            case OpCode::OP_FIBER_STATUS:
+            case OpCode::OP_FIBER_SLEEP:
+                // Fiber opcodes require VM runtime (cooperative scheduler).
+                // In AOT mode, emit a runtime error stub.
+                code << "    // fiber opcode - requires interpreter runtime\n";
+                code << "    std::cerr << \"RUNTIME ERROR: fiber/coro is not supported in AOT mode, use interpreter\" << std::endl;\n";
+                code << "    return Value();\n";
                 break;
-                
+
             case OpCode::OP_COUNT:
                 break;
         }

@@ -59,6 +59,7 @@ enum class ObjType : uint8_t {
     OBJ_BOUND_METHOD,     ///< Bound method (method + receiver)
     OBJ_BOUND_ARRAY_METHOD,   ///< Bound array method
     OBJ_BOUND_STRING_METHOD,  ///< Bound string method
+    OBJ_FIBER,                ///< Fiber (lightweight coroutine)
     OBJ_CLASS,            ///< Class definition
     OBJ_INSTANCE,         ///< Class instance (most common in OOP code)
     OBJ_STRING,           ///< Interned string object

@@ -38,6 +38,7 @@ ValueType tokenTypeToValueType(TokenType type) {
         case TokenType::TYPE_FLOAT: return ValueType::NUMBER;
         case TokenType::TYPE_STRING: return ValueType::OBJ_STRING;
         case TokenType::TYPE_BOOL: return ValueType::BOOLEAN;
+        case TokenType::TYPE_FIBER: return ValueType::FIBER;
         case TokenType::TYPE_ARRAY: return ValueType::ARRAY;
         case TokenType::TYPE_OBJECT: return ValueType::OBJECT;
         default: return ValueType::NIL; // Should not happen
@@ -50,9 +51,10 @@ std::string tokenTypeToString(TokenType type) {
         case TokenType::TYPE_FLOAT: return "float";
         case TokenType::TYPE_STRING: return "string";
         case TokenType::TYPE_BOOL: return "bool";
+        case TokenType::TYPE_FIBER: return "fiber";
         case TokenType::TYPE_ARRAY: return "array";
         case TokenType::TYPE_OBJECT: return "object";
-        case TokenType::TYPE_ANY: return "any";
+        case TokenType::TYPE_ANY: return "any (not allowed in strict mode)";
         default: return "unknown";
     }
 }
@@ -249,7 +251,8 @@ std::unique_ptr<Stmt> Parser::varDeclaration(bool isStatic) {
     // Check for optional type annotation
     std::optional<Token> typeAnnotation = std::nullopt;
     if (match({TokenType::TYPE_INT, TokenType::TYPE_FLOAT, TokenType::TYPE_STRING, 
-               TokenType::TYPE_BOOL, TokenType::TYPE_ARRAY, TokenType::TYPE_OBJECT, 
+               TokenType::TYPE_BOOL, TokenType::TYPE_ARRAY, TokenType::TYPE_OBJECT,
+               TokenType::TYPE_FIBER, 
                TokenType::TYPE_ANY})) {
         typeAnnotation = previous();
     }
@@ -267,9 +270,7 @@ std::unique_ptr<Stmt> Parser::varDeclaration(bool isStatic) {
         // Static variables must have an initializer
         if (isStatic && !initializer) {
             error(name, "Static variables must be initialized.");
-        }
-
-        if (typeAnnotation && initializer && typeAnnotation->type != TokenType::TYPE_ANY) {
+        }            if (typeAnnotation && initializer) { // strict mode: always check types, any is not allowed
             // Only perform compile-time type checking for literal expressions
             // Non-literal expressions will be type-checked at runtime
             if (initializer->type == ExprType::LITERAL) {

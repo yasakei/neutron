@@ -15,9 +15,11 @@
  */
 
 #include "vm.h"
+#include "compiler/compiler.h"
 #include "runtime/native_functions.h"
 #include "sys/native.h"
-#include "compiler/compiler.h"
+#include <thread>
+#include <chrono>
 #include "compiler/bytecode.h"
 #include "runtime/debug.h"
 #include "runtime/error_handler.h"
@@ -55,6 +57,7 @@
 #include "../libs/math/native.h"
 #include "../libs/http/native.h"
 #include "../libs/async/native.h"
+#include "../libs/coro/native.h"
 #include "../libs/regex/native.h"
 #include "../libs/process/native.h"
 #include "../libs/log/native.h"
@@ -77,6 +80,24 @@ struct VMException {
     VMException(Value v) : value(v) {}
 };
 
+// Fiber implementation - methods defined in vm.cpp
+Fiber::Fiber(Function* func, std::vector<Value> args)
+    : state(State::CREATED), function(func), args(std::move(args)),
+      stackSlotOffset(0), returnValue(Value()), yieldValue(Value()) {
+    obj_type = ObjType::OBJ_FIBER;
+}
+
+std::string Fiber::getStateString() const {
+    switch (state) {
+        case State::CREATED: return "created";
+        case State::RUNNING: return "running";
+        case State::SUSPENDED: return "suspended";
+        case State::FINISHED: return "finished";
+        default: return "unknown";
+    }
+}
+
+// Fiber method implementations are in vm.cpp
 // Note: isTruthy() is now defined inline in vm.h for cross-library use
 
 /**
@@ -195,7 +216,7 @@ struct VMException {
     exit(1);
 }
 
-VM::VM() : ip(nullptr), nextGC(32768), currentFileName("<stdin>"), hasException(false), pendingException(Value()), isSafeFile(false) {  // Start GC at 32768 objects
+VM::VM() : ip(nullptr), nextGC(32768), currentFileName("<stdin>"), hasException(false), pendingException(Value()), currentFiber(nullptr) {  // Start GC at 32768 objects
     // Reserve moderate stack - benchmarks rarely exceed a few hundred slots.
     // Grows automatically if needed. Big reserve (1M) wastes 16MB at startup.
     stack.reserve(8192);
@@ -210,6 +231,156 @@ VM::VM() : ip(nullptr), nextGC(32768), currentFileName("<stdin>"), hasException(
     jitManager.initialize(false);  // Monitoring disabled by default
 
     globals["say"] = Value(allocate<NativeFn>(std::function<Value(std::vector<Value>)>(native_say), 1));
+    
+    // Fiber module exposed as 'coro' to avoid keyword conflict with 'fiber' type
+    auto coroEnv = std::make_shared<Environment>();
+    globals["coro"] = Value(allocate<Module>("coro", coroEnv));
+    Module* coroMod = globals["coro"].as.module;
+
+    // coro.sleep(ms): cooperative sleep
+    coroMod->define("sleep", Value(allocate<NativeFn>(
+        NativeFn::NativeFnPtrWithVM([](VM& vm, std::vector<Value> args) -> Value {
+            (void)vm;
+            if (!args.empty() && args[0].type == ValueType::NUMBER) {
+                double ms = args[0].as.number;
+                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<uint32_t>(ms)));
+            }
+            return Value();
+        }), 1, true)));
+
+    // coro.create(func, ...args): create a fiber, returns fiber handle (CREATED)
+    coroMod->define("create", Value(allocate<NativeFn>(
+        NativeFn::NativeFnPtrWithVM([](VM& vm, std::vector<Value> args) -> Value {
+            if (args.empty()) {
+                throw std::runtime_error("coro.create() requires a function argument");
+            }
+            if (args[0].type != ValueType::CALLABLE) {
+                throw std::runtime_error("coro.create() first argument must be a function");
+            }
+            Function* func = dynamic_cast<Function*>(args[0].as.callable);
+            if (!func) {
+                throw std::runtime_error("coro.create() requires a user-defined function (not native)");
+            }
+            std::vector<Value> fargs(args.begin() + 1, args.end());
+            std::string fname = (func->name.empty() ? "<fiber>" : func->name);
+            Fiber* fiber = vm.createFiber(func, fargs, fname);
+            return Value(fiber);
+        }), -1, true)));
+
+    // coro.resume(fiber, ...args): resume fiber, returns yielded value or final result
+    coroMod->define("resume", Value(allocate<NativeFn>(
+        NativeFn::NativeFnPtrWithVM([](VM& vm, std::vector<Value> args) -> Value {
+            if (args.empty() || args[0].type != ValueType::FIBER) {
+                throw std::runtime_error("coro.resume() requires a fiber argument");
+            }
+            Fiber* fiber = args[0].as.fiber;
+            if (!fiber) throw std::runtime_error("coro.resume() got null fiber");
+            std::vector<Value> fargs(args.begin() + 1, args.end());
+            return vm.resumeFiber(fiber, fargs);
+        }), -1, true)));
+
+    // coro.yield(value): yield from current fiber
+    coroMod->define("yield", Value(allocate<NativeFn>(
+        NativeFn::NativeFnPtrWithVM([](VM& vm, std::vector<Value> args) -> Value {
+            Value v = args.empty() ? Value() : args[0];
+            if (!vm.currentFiber) {
+                return v; // no-op outside fiber
+            }
+            // Clean the yield call itself from the live stack before saving:
+            // stack is [..., callee, arg0..argN]. Remove them so saved state
+            // looks as if the native call had returned.
+            size_t toPop = args.size() + 1;
+            for (size_t i = 0; i < toPop && !vm.stack.empty(); ++i) {
+                vm.stack.pop_back();
+            }
+            vm.yieldFiber(v); // saves state + throws FiberYield
+            return v; // unreachable
+        }), -1, true)));
+
+    // coro.join(fiber): run fiber to completion, return final result
+    coroMod->define("join", Value(allocate<NativeFn>(
+        NativeFn::NativeFnPtrWithVM([](VM& vm, std::vector<Value> args) -> Value {
+            if (args.empty() || args[0].type != ValueType::FIBER) {
+                throw std::runtime_error("coro.join() requires a fiber argument");
+            }
+            Fiber* fiber = args[0].as.fiber;
+            if (!fiber) throw std::runtime_error("coro.join() got null fiber");
+            Value last;
+            int guard = 0;
+            while (fiber->state != Fiber::State::FINISHED && guard++ < 1000000) {
+                last = vm.resumeFiber(fiber);
+            }
+            if (fiber->state == Fiber::State::FINISHED) return fiber->returnValue;
+            return last;
+        }), 1, true)));
+
+    // coro.status(fiber): returns "created|running|suspended|finished"
+    coroMod->define("status", Value(allocate<NativeFn>(
+        NativeFn::NativeFnPtrWithVM([](VM& vm, std::vector<Value> args) -> Value {
+            if (args.empty() || args[0].type != ValueType::FIBER) {
+                throw std::runtime_error("coro.status() requires a fiber argument");
+            }
+            Fiber* fiber = args[0].as.fiber;
+            if (!fiber) throw std::runtime_error("coro.status() got null fiber");
+            return Value(vm.makeString(fiber->getStateString()));
+        }), 1, true)));
+
+    // coro.spawn(func, ...args): create + immediately resume (goroutine-like)
+    coroMod->define("spawn", Value(allocate<NativeFn>(
+        NativeFn::NativeFnPtrWithVM([](VM& vm, std::vector<Value> args) -> Value {
+            if (args.empty()) {
+                throw std::runtime_error("coro.spawn() requires a function argument");
+            }
+            if (args[0].type != ValueType::CALLABLE) {
+                throw std::runtime_error("coro.spawn() first argument must be a function");
+            }
+            Function* func = dynamic_cast<Function*>(args[0].as.callable);
+            if (!func) {
+                throw std::runtime_error("coro.spawn() requires a user-defined function (not native)");
+            }
+            std::vector<Value> fargs(args.begin() + 1, args.end());
+            std::string fname = (func->name.empty() ? "<fiber>" : func->name);
+            Fiber* fiber = vm.createFiber(func, fargs, fname);
+            vm.resumeFiber(fiber, fargs);
+            return Value(fiber);
+        }), -1, true)));
+
+    // coro.schedule(): run all created/suspended fibers to completion (round-robin)
+    coroMod->define("schedule", Value(allocate<NativeFn>(
+        NativeFn::NativeFnPtrWithVM([](VM& vm, std::vector<Value> args) -> Value {
+            (void)args;
+            vm.runFiberScheduler();
+            return Value();
+        }), 0, true)));
+
+    // coro.count(): number of fibers created in this VM
+    coroMod->define("count", Value(allocate<NativeFn>(
+        NativeFn::NativeFnPtrWithVM([](VM& vm, std::vector<Value> args) -> Value {
+            (void)args;
+            return Value(static_cast<double>(vm.fibers.size()));
+        }), 0, true)));
+
+    // coro.all([fibers]): join multiple fibers, return array of results
+    coroMod->define("all", Value(allocate<NativeFn>(
+        NativeFn::NativeFnPtrWithVM([](VM& vm, std::vector<Value> args) -> Value {
+            if (args.empty() || args[0].type != ValueType::ARRAY) {
+                throw std::runtime_error("coro.all([fibers]) requires an array of fibers");
+            }
+            Array* arr = args[0].as.array;
+            Array* out = vm.allocate<Array>();
+            for (const Value& v : arr->elements) {
+                if (v.type != ValueType::FIBER || !v.as.fiber) {
+                    throw std::runtime_error("coro.all() array must contain only fibers");
+                }
+                Fiber* fiber = v.as.fiber;
+                int guard = 0;
+                while (fiber->state != Fiber::State::FINISHED && guard++ < 1000000) {
+                    vm.resumeFiber(fiber);
+                }
+                out->elements.push_back(fiber->returnValue);
+            }
+            return Value(out);
+        }), 1, true)));
     
     // Register array functions
     // Built-in modules (sys, math, json, http, time, convert) are now loaded on-demand
@@ -1076,10 +1247,6 @@ void VM::run(size_t minFrameDepth) {
         &&CASE_OP_DECREMENT_LOCAL,
         &&CASE_OP_INCREMENT_GLOBAL,
         &&CASE_OP_LOOP_IF_LESS_LOCAL,
-        &&CASE_OP_VALIDATE_SAFE_FUNCTION,
-        &&CASE_OP_VALIDATE_SAFE_VARIABLE,
-        &&CASE_OP_VALIDATE_SAFE_FILE_FUNCTION,
-        &&CASE_OP_VALIDATE_SAFE_FILE_VARIABLE,
         // Extended opcodes (bytecode optimizer)
         &&CASE_OP_CALL,              // OP_CALL_FAST → same as OP_CALL
         &&CASE_OP_CALL,              // OP_TAIL_CALL → same as OP_CALL (for now)
@@ -1113,6 +1280,12 @@ void VM::run(size_t minFrameDepth) {
         &&CASE_OP_FOR_IN_NEXT,
         &&CASE_OP_OPTIONAL_CHAIN,
         &&CASE_OP_SPREAD,
+        &&CASE_OP_FIBER_CREATE,
+        &&CASE_OP_FIBER_YIELD,
+        &&CASE_OP_FIBER_RESUME,
+        &&CASE_OP_FIBER_JOIN,
+        &&CASE_OP_FIBER_STATUS,
+        &&CASE_OP_FIBER_SLEEP,
     };
     #define DISPATCH() goto *dispatch_table[READ_BYTE()]
     #define CASE(op) CASE_##op:
@@ -1280,70 +1453,7 @@ void VM::run(size_t minFrameDepth) {
                 std::memset(global_cache, 0, sizeof(global_cache));
                 DISPATCH();
             }
-            CASE(OP_VALIDATE_SAFE_FUNCTION) {
-                // Validate that the function on top of stack has proper type annotations for safe block
-                Value functionValue = peek(0);
-                if (functionValue.type == ValueType::CALLABLE) {
-                    Function* function = dynamic_cast<Function*>(functionValue.as.callable);
-                    if (function && function->declaration) {
-                        // Check that all parameters have type annotations
-                        for (const auto& param : function->declaration->params) {
-                            if (!param.typeAnnotation.has_value()) {
-                                if (this->isSafeFile) {
-                                    throw VMException(Value("Function parameter '" + param.name.lexeme + "' must have a type annotation in .ntsc files (Neutron Safe Code)."));
-                                } else {
-                                    throw VMException(Value("Function parameter '" + param.name.lexeme + "' must have a type annotation inside a safe block."));
-                                }
-                            }
-                        }
-                        
-                        // Check that function has a return type annotation
-                        if (!function->declaration->returnType.has_value()) {
-                            throw VMException(Value("Function '" + function->declaration->name.lexeme + "' must have a return type annotation inside a safe block."));
-                        }
-                    }
-                }
-                DISPATCH();
-            }
-            CASE(OP_VALIDATE_SAFE_VARIABLE) {
-                {
-                // Validate that a variable has a type annotation in safe block
-                std::string varName = READ_STRING();
-                if (this->isSafeFile) {
-                    throw VMException(Value("Variable '" + varName + "' must have a type annotation in .ntsc files (Neutron Safe Code)."));
-                } else {
-                    throw VMException(Value("Variable '" + varName + "' must have a type annotation inside a safe block."));
-                }
-                }
-                DISPATCH();
-            }
-            CASE(OP_VALIDATE_SAFE_FILE_FUNCTION) {
-                // Validate that the function on top of stack has proper type annotations for safe file
-                Value functionValue = peek(0);
-                if (functionValue.type == ValueType::CALLABLE) {
-                    Function* function = dynamic_cast<Function*>(functionValue.as.callable);
-                    if (function && function->declaration) {
-                        // Check that all parameters have type annotations
-                        for (const auto& param : function->declaration->params) {
-                            if (!param.typeAnnotation.has_value()) {
-                                throw VMException(Value("Function parameter '" + param.name.lexeme + "' must have a type annotation in safe file (.ntsc)."));
-                            }
-                        }
-                        
-                        // Check that function has a return type annotation
-                        if (!function->declaration->returnType.has_value()) {
-                            throw VMException(Value("Function '" + function->declaration->name.lexeme + "' must have a return type annotation in safe file (.ntsc)."));
-                        }
-                    }
-                }
-                DISPATCH();
-            }
-            CASE(OP_VALIDATE_SAFE_FILE_VARIABLE) {
-                // Validate that a variable has a type annotation in safe file
-                const std::string& varName = READ_STRING();
-                throw VMException(Value("Variable '" + varName + "' must have a type annotation in safe file (.ntsc)."));
-                DISPATCH();
-            }
+
             CASE(OP_SET_GLOBAL) {
                 uint8_t idx = READ_BYTE();
                 ObjString* nameStr = frame->function->chunk->constants[idx].as.obj_string;
@@ -3054,6 +3164,112 @@ void VM::run(size_t minFrameDepth) {
                 // DISPATCH();
                 continue;
             }
+            CASE(OP_FIBER_CREATE) {
+                // Stack: [func, arg1..argN], operand: argCount
+                uint8_t argCount = READ_BYTE();
+                std::vector<Value> fargs;
+                for (int i = 0; i < argCount; i++) {
+                    fargs.push_back(pop());
+                }
+                std::reverse(fargs.begin(), fargs.end());
+                Value funcVal = pop();
+                if (funcVal.type == ValueType::CALLABLE) {
+                    Function* func = dynamic_cast<Function*>(funcVal.as.callable);
+                    if (!func) {
+                        runtimeError(this, "Fiber create requires a user-defined function.", frames.empty() ? -1 : frames.back().currentLine);
+                        push(Value());
+                    } else {
+                        std::string fiberName = func->name.empty() ? "<fiber>" : func->name;
+                        Fiber* fiber = createFiber(func, fargs, fiberName);
+                        push(Value(fiber));
+                    }
+                } else {
+                    runtimeError(this, "Fiber create requires a callable on stack.", frames.empty() ? -1 : frames.back().currentLine);
+                    push(Value());
+                }
+                DISPATCH();
+            }
+            CASE(OP_FIBER_YIELD) {
+                Value yv = pop();
+                try {
+                    yieldFiber(yv);
+                } catch (const FiberYield& y) {
+                    // Yield inside run() when executed via opcode directly:
+                    // This path only happens if fiber opcodes are used without
+                    // resumeFiber wrapper. Re-throw to let resumeFiber handle it.
+                    throw;
+                }
+                // Yield from main (no-op): push value back
+                push(yv);
+                DISPATCH();
+            }
+            CASE(OP_FIBER_RESUME) {
+                uint8_t argCount = READ_BYTE();
+                std::vector<Value> rargs;
+                for (int i = 0; i < argCount; i++) {
+                    rargs.push_back(pop());
+                }
+                std::reverse(rargs.begin(), rargs.end());
+                Value fiberVal = pop();
+                if (fiberVal.type == ValueType::FIBER && fiberVal.as.fiber) {
+                    Fiber* fiber = fiberVal.as.fiber;
+                    try {
+                        Value r = resumeFiber(fiber, rargs);
+                        if (fiber->state == Fiber::State::FINISHED) {
+                            push(fiber->returnValue);
+                        } else {
+                            // Suspended: push fiber back + yielded value?
+                            // Protocol: push yielded value, keep fiber accessible via variable.
+                            // For opcode symmetry with coro.resume, push yielded value.
+                            push(r);
+                        }
+                    } catch (const std::exception& e) {
+                        runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
+                        push(Value());
+                    }
+                } else {
+                    runtimeError(this, "Fiber resume requires a fiber on stack.", frames.empty() ? -1 : frames.back().currentLine);
+                    push(Value());
+                }
+                DISPATCH();
+            }
+            CASE(OP_FIBER_JOIN) {
+                Value fiberVal = pop();
+                if (fiberVal.type == ValueType::FIBER && fiberVal.as.fiber) {
+                    Fiber* fiber = fiberVal.as.fiber;
+                    int guard = 0;
+                    while (fiber->state != Fiber::State::FINISHED && guard++ < 1000000) {
+                        try {
+                            resumeFiber(fiber);
+                        } catch (const std::exception& e) {
+                            runtimeError(this, e.what(), frames.empty() ? -1 : frames.back().currentLine);
+                            break;
+                        }
+                    }
+                    push(fiber->returnValue);
+                } else {
+                    runtimeError(this, "Fiber join requires a fiber on stack.", frames.empty() ? -1 : frames.back().currentLine);
+                    push(Value());
+                }
+                DISPATCH();
+            }
+            CASE(OP_FIBER_STATUS) {
+                Value fiberVal = pop();
+                if (fiberVal.type == ValueType::FIBER && fiberVal.as.fiber) {
+                    Fiber* fiber = fiberVal.as.fiber;
+                    ObjString* statusStr = makeString(fiber->getStateString());
+                    push(Value(statusStr));
+                } else {
+                    runtimeError(this, "Fiber status requires a fiber on stack.", frames.empty() ? -1 : frames.back().currentLine);
+                    push(Value());
+                }
+                DISPATCH();
+            }
+            CASE(OP_FIBER_SLEEP) {
+                uint16_t ms = READ_SHORT();
+                std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+                DISPATCH();
+            }
 #if !COMPUTED_GOTO
         }
 #endif
@@ -3119,6 +3335,8 @@ void VM::run(size_t minFrameDepth) {
 #undef READ_CONSTANT
 #undef READ_STRING
 }
+
+
 
 void VM::define_native(const std::string& name, Callable* function) {
     globals[name] = Value(function);
@@ -3323,6 +3541,14 @@ void VM::load_module(const std::string& name) {
     // Check if module is already loaded in the cache
     if (loadedModuleCache.find(name) != loadedModuleCache.end()) {
         return; // Module already loaded
+    }
+
+    // Built-in coro must (re)initialize even if pre-created in VM ctor,
+    // so that all functions (including all/count/schedule) are present.
+    if (name == "coro") {
+        neutron_init_coro_module(this);
+        loadedModuleCache[name] = true;
+        return;
     }
     
     // Check if module is already defined as a global
@@ -3843,6 +4069,14 @@ void VM::markRoots() {
         }
     }
 
+    // Mark fibers and their saved state (so live fibers are never collected)
+    for (Fiber* fiber : fibers) {
+        markObject(fiber);
+    }
+    if (currentFiber) {
+        markObject(currentFiber);
+    }
+
     // Mark temporary roots
     for (Object* obj : tempRoots) {
         markObject(obj);
@@ -3960,6 +4194,18 @@ void VM::blackenObject(Object* obj) {
         case ObjType::OBJ_GENERIC:
             // No references to trace
             break;
+        case ObjType::OBJ_FIBER: {
+            auto* fiber = static_cast<Fiber*>(obj);
+            if (fiber->function) markObject(fiber->function);
+            for (const auto& v : fiber->args) markValue(v);
+            for (const auto& v : fiber->stack) markValue(v);
+            for (const auto& fr : fiber->frames) {
+                if (fr.function) markObject(fr.function);
+            }
+            markValue(fiber->returnValue);
+            markValue(fiber->yieldValue);
+            break;
+        }
     }
 }
 
@@ -3973,6 +4219,8 @@ void VM::markValue(const Value& value) {
         case ValueType::MODULE: obj = value.as.module; break;
         case ValueType::CLASS: obj = value.as.klass; break;
         case ValueType::INSTANCE: obj = value.as.instance; break;
+        case ValueType::FIBER: obj = value.as.fiber; break;
+        case ValueType::BUFFER: obj = value.as.buffer; break;
         default: return;
     }
     markObject(obj);
@@ -4207,6 +4455,182 @@ void VM::printJITStatistics() const {
     std::cout << "OSR Transitions: " << osrTransitions << std::endl;
     std::cout << "Loop Counter: " << jitLoopCounter << std::endl;
     std::cout << "========================\n" << std::endl;
+}
+
+// Fiber management implementation (cooperative, exception-based yield)
+
+Fiber* VM::createFiber(Function* func, std::vector<Value> args, const std::string& name) {
+    Fiber* fiber = allocate<Fiber>(func, std::move(args));
+    fiber->name = name;
+    fiber->state = Fiber::State::CREATED;
+    fibers.push_back(fiber);
+    return fiber;
+}
+
+Value VM::resumeFiber(Fiber* fiber, std::vector<Value> args) {
+    if (!fiber || fiber->state == Fiber::State::FINISHED) {
+        return Value();
+    }
+    if (fiber->state == Fiber::State::RUNNING) {
+        throw std::runtime_error("coro.resume(): fiber is already running (recursive resume)");
+    }
+
+    // Save main VM state
+    std::vector<CallFrame> savedFrames = std::move(frames);
+    std::vector<Value> savedStack = std::move(stack);
+    std::vector<VMExceptionFrame> savedExFrames = std::move(exceptionFrames);
+    bool savedHasException = hasException;
+    Value savedPending = pendingException;
+    Fiber* savedCurrent = currentFiber;
+    frames.clear();
+    stack.clear();
+    exceptionFrames.clear();
+    hasException = false;
+
+    Value result;
+    bool yielded = false;
+    bool finished = false;
+    try {
+        currentFiber = fiber;
+        fiber->state = Fiber::State::RUNNING;
+
+        if (fiber->frames.empty() && fiber->stack.empty()) {
+            // First resume: invoke function with stored args + any extra resume args.
+            // Prefer explicit resume args if provided, else stored creation args.
+            const std::vector<Value>& callArgs = args.empty() ? fiber->args : args;
+            Value callee(fiber->function);
+            // Use VM::call which sets up frame + runs to completion.
+            // Yield inside will throw FiberYield, unwinding through call().
+            result = call(callee, callArgs);
+            fiber->returnValue = result;
+            fiber->state = Fiber::State::FINISHED;
+            finished = true;
+        } else {
+            // Resume suspended fiber: restore saved execution state.
+            frames = fiber->frames;   // copy (keep saved copy until yield overwrites)
+            stack = fiber->stack;
+            exceptionFrames = fiber->exceptionFrames;
+            hasException = false;
+            // Simulate native return for the suspended coro.yield call:
+            // saved stack is clean (yield callee+args removed), so push the
+            // resume value (or nil) as the yield expression's result.
+            if (!args.empty()) {
+                stack.push_back(args[0]);
+            } else {
+                stack.push_back(Value());
+            }
+            size_t depth = 0; // run until all fiber frames complete
+            run(depth);
+            // If run() returned normally, fiber function returned.
+            if (!stack.empty()) {
+                result = stack.back();
+            } else {
+                result = Value();
+            }
+            fiber->returnValue = result;
+            fiber->state = Fiber::State::FINISHED;
+            finished = true;
+            // Clear saved state
+            fiber->frames.clear();
+            fiber->stack.clear();
+            fiber->exceptionFrames.clear();
+        }
+    } catch (const FiberYield& y) {
+        // Cooperative yield. yieldFiber already saved live state into the fiber
+        // BEFORE unwinding. However, when the first resume goes through VM::call(),
+        // call() cleans live frames/stack to empty before rethrowing, so live
+        // `frames`/`stack` here may be empty. Only overwrite saved state if live
+        // state is non-empty (i.e. yield via run() path where no cleanup happened).
+        if (!frames.empty() || !stack.empty()) {
+            // Live state exists (run() path): refresh saved state, but keep
+            // the already-saved copy if live is just the cleaned empty state.
+            // If fiber already has saved frames and live is empty, keep saved.
+            if (!(fiber->frames.size() > 0 && frames.empty())) {
+                fiber->frames = frames;
+                fiber->stack = stack;
+                fiber->exceptionFrames = exceptionFrames;
+            }
+        }
+        fiber->yieldValue = y.value;
+        fiber->returnValue = y.value;
+        fiber->state = Fiber::State::SUSPENDED;
+        result = y.value;
+        yielded = true;
+    } catch (...) {
+        // Any other exception: mark fiber finished, restore main state, rethrow.
+        fiber->state = Fiber::State::FINISHED;
+        frames = std::move(savedFrames);
+        stack = std::move(savedStack);
+        exceptionFrames = std::move(savedExFrames);
+        hasException = savedHasException;
+        pendingException = savedPending;
+        currentFiber = savedCurrent;
+        throw;
+    }
+
+    // Restore main VM state
+    // If yielded, keep fiber's saved copies; clear live VM state back to main.
+    if (yielded) {
+        // fiber->frames/stack already saved above (copies). Clear live.
+        frames = std::move(savedFrames);
+        stack = std::move(savedStack);
+        exceptionFrames = std::move(savedExFrames);
+        hasException = savedHasException;
+        pendingException = savedPending;
+        currentFiber = savedCurrent;
+        return result;
+    }
+    // Finished: restore main state, return final value.
+    frames = std::move(savedFrames);
+    stack = std::move(savedStack);
+    exceptionFrames = std::move(savedExFrames);
+    hasException = savedHasException;
+    pendingException = savedPending;
+    currentFiber = savedCurrent;
+    if (finished) return fiber->returnValue;
+    return result;
+}
+
+void VM::yieldFiber(Value value) {
+    if (!currentFiber) {
+        // Yield outside a fiber is a no-op (returns value to caller).
+        return;
+    }
+    Fiber* f = currentFiber;
+    // Save live VM state into the fiber BEFORE unwinding.
+    f->frames = frames;
+    f->stack = stack;
+    f->exceptionFrames = exceptionFrames;
+    f->yieldValue = value;
+    f->returnValue = value;
+    f->state = Fiber::State::SUSPENDED;
+    throw FiberYield(value);
+}
+
+void VM::runFiberScheduler() {
+    if (fibers.empty()) {
+        return;
+    }
+    // Round-robin until all fibers finish. New fibers created during scheduling
+    // are picked up because we re-scan each iteration.
+    bool progress = true;
+    int guard = 0;
+    while (progress && guard++ < 1000000) {
+        progress = false;
+        for (Fiber* fiber : fibers) {
+            if (fiber->state == Fiber::State::CREATED || fiber->state == Fiber::State::SUSPENDED) {
+                progress = true;
+                try {
+                    // Resume with stored args on first run, no extra args afterwards.
+                    resumeFiber(fiber);
+                } catch (const std::exception&) {
+                    fiber->state = Fiber::State::FINISHED;
+                } catch (...) {
+                    fiber->state = Fiber::State::FINISHED;
+                }
+            }
+        }
+    }
 }
 
 } // namespace neutron
