@@ -31,7 +31,7 @@ fun countOccurrences(haystack, needle) {
 }
 
 fun simpleConcatenate(base, addition, times) {
-    var int result = base;
+    var string result = base;
     var int i = 0;
     while (i < times) {
         result = result + addition;

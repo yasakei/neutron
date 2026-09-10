@@ -14,7 +14,7 @@ fun conditionalLoop() {
     return evenSum + oddSum;
 }
 
-var string result = conditionalLoop();
+var int result = conditionalLoop();
 var int expected = 19900;  // Sum of 0 to 199
 
 if (result == expected) {

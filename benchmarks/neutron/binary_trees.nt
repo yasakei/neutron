@@ -76,7 +76,7 @@ fun buildBalanced(arr, lo, hi, root) {
 }
 
 var array sortedOrder = arrays.range(0, 1000);
-var int root;
+var object root;
 root = buildBalanced(sortedOrder, 0, 999, root);
 
 // Operations
