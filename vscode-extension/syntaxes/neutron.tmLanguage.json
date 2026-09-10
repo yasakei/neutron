@@ -87,10 +87,6 @@
 				{
 					"name": "storage.type.neutron",
 					"match": "\\b(var|fun|class|static|enum)\\b"
-				},
-				{
-					"name": "storage.modifier.neutron",
-					"match": "\\b(safe)\\b"
 				}
 			]
 		},
@@ -98,7 +94,7 @@
 			"patterns": [
 				{
 					"name": "support.type.primitive.neutron",
-					"match": "\\b(int|float|string|bool|array|object|any)\\b"
+					"match": "\\b(int|float|string|bool|array|object|fiber)\\b"
 				}
 			]
 		},
@@ -122,7 +118,7 @@
 			"patterns": [
 				{
 					"name": "support.module.neutron",
-					"match": "\\b(sys|json|math|fmt|arrays|time|http|regex|async|process)\\b"
+					"match": "\\b(sys|json|math|fmt|arrays|time|http|regex|async|coro|process|crypto|path|random|collections|log|strings)\\b"
 				}
 			]
 		},
