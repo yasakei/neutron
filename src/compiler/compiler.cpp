@@ -454,7 +454,17 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
     } else {
         emitByte((uint8_t)OpCode::OP_NIL);
     }
-    
+
+    // Strict mode: globals must have type annotations (same as locals).
+    // Without this check, .value() below throws std::bad_optional_access.
+    if (!stmt->typeAnnotation.has_value()) {
+        throw std::runtime_error("Variable '" + stmt->name.lexeme + "' must have a type annotation. " +
+                                 "Use: var <type> <name> = <value>");
+    }
+    if (stmt->typeAnnotation.value().type == TokenType::TYPE_ANY) {
+        throw std::runtime_error("Type 'any' is not allowed in strict mode. Use a specific type instead.");
+    }
+
     // All variables must have type annotations in strict mode
     // Emit the typed define instruction
     emitBytes((uint8_t)OpCode::OP_DEFINE_TYPED_GLOBAL, makeConstant(Value(vm.internString(stmt->name.lexeme))));
