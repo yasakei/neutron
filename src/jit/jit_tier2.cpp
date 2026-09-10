@@ -72,8 +72,12 @@ static int getInstructionSize(uint8_t opcode) {
         case OpCode::OP_CLOSURE:
         case OpCode::OP_ARRAY:
         case OpCode::OP_OBJECT:
-        case OpCode::OP_VALIDATE_SAFE_VARIABLE:
-        case OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE:
+        case OpCode::OP_FIBER_CREATE:
+        case OpCode::OP_FIBER_YIELD:
+        case OpCode::OP_FIBER_RESUME:
+        case OpCode::OP_FIBER_JOIN:
+        case OpCode::OP_FIBER_STATUS:
+        case OpCode::OP_FIBER_SLEEP:
         case OpCode::OP_GET_GLOBAL_FAST:
         case OpCode::OP_SET_GLOBAL_FAST:
         case OpCode::OP_INC_LOCAL_INT:
@@ -716,17 +720,44 @@ uint64_t Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
     // =====================================================================
     struct ForwardJump {
         size_t patch_offset;   // Where in code[] to patch the rel32
-        uint32_t target_ir;    // Target IR index (current + operand1 + 1)
+        uint32_t target_ir;    // Target IR index (resolved via bytecode_pc map)
     };
     std::vector<ForwardJump> forward_jumps;
     bool seen_first_jif = false; // Track whether we've seen the loop exit JIF
+
+    // Precise jump-target resolution: map source bytecode pc -> IR index.
+    // (Bytecode offsets stored in JUMP/JUMP_IF_FALSE operand1 are absolute
+    // target pcs; this map stays valid across optimizer passes, unlike the
+    // old ir_idx+bytecodes heuristic which broke with multi-IR expansions.)
+    std::unordered_map<uint32_t, uint32_t> pc_to_ir;
+    for (uint32_t idx = 0; idx < trace.ir_instructions.size(); idx++) {
+        uint32_t bpc = trace.ir_instructions[idx].bytecode_pc;
+        if (pc_to_ir.find(bpc) == pc_to_ir.end()) {
+            pc_to_ir[bpc] = idx;
+        }
+    }
+    auto resolve_target_ir = [&](const IRInstruction& jinstr) -> uint32_t {
+        if (jinstr.operand2 == 1) {
+            return jinstr.operand1; // Already a resolved IR index (unrolled)
+        }
+        auto it = pc_to_ir.find(jinstr.operand1);
+        if (it != pc_to_ir.end()) {
+            return it->second;
+        }
+        // Target outside trace (should not happen for internal jumps);
+        // fall through to the next instruction like the old clamp behavior.
+        return static_cast<uint32_t>(trace.ir_instructions.size());
+    };
+    // Code offset recorded at each IR index (for patching backward jumps).
+    std::vector<size_t> ir_code_offsets(trace.ir_instructions.size(), 0);
 
     // =====================================================================
     // BODY: Emit native code for each IR instruction
     // =====================================================================
     for (size_t ir_idx = 0; ir_idx < trace.ir_instructions.size(); ++ir_idx) {
         const auto& instr = trace.ir_instructions[ir_idx];
-        
+        ir_code_offsets[ir_idx] = code.size();
+
         // Resolve forward jumps that target this IR index
         for (auto it = forward_jumps.begin(); it != forward_jumps.end(); ) {
             if (it->target_ir == ir_idx) {
@@ -1368,41 +1399,12 @@ uint64_t Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
                     code.push_back(0); code.push_back(0);
                 } else {
                     // Internal conditional → forward jump within loop body.
-                    // operand1 is the bytecode jump offset, but we need the IR
-                    // index to jump to. We calculate the target IR index by
-                    // scanning forward for the matching POP (condition result).
-                    // The jump target in IR is approximately: skip ahead by
-                    // the number of IR instructions in the if-block body.
-                    // We use operand1 as a hint for the number of bytecodes
-                    // to skip, and count corresponding IR instructions.
-                    uint32_t bytecodes_to_skip = instr.operand1;
-                    // Rough estimate: each IR instruction ≈ 1-2 bytecodes
-                    // More precise: count IR instructions that correspond to
-                    // bytecodes_to_skip bytecodes from current position.
-                    // For safety, scan forward for JUMP instruction which
-                    // marks the end of the if-block.
-                    uint32_t target_ir = ir_idx + 1;
-                    int depth = 1;
-                    for (size_t scan = ir_idx + 1; scan < trace.ir_instructions.size(); scan++) {
-                        const auto& scan_instr = trace.ir_instructions[scan];
-                        if (scan_instr.opcode == IRInstruction::Opcode::JUMP_IF_FALSE) {
-                            depth++;
-                        } else if (scan_instr.opcode == IRInstruction::Opcode::JUMP) {
-                            depth--;
-                            if (depth == 0) {
-                                // The JUMP's target is after the else-block.
-                                // But for simple if (no else), the JIF target
-                                // is right after the if-body, which is at JUMP+1.
-                                target_ir = scan + 1;
-                                break;
-                            }
-                        }
-                    }
-                    // If no JUMP found, use bytecode offset as rough estimate
-                    if (depth != 0) {
-                        uint32_t max_target = (uint32_t)(trace.ir_instructions.size());
-                        uint32_t calc_target = (uint32_t)(ir_idx + bytecodes_to_skip);
-                        target_ir = calc_target < max_target ? calc_target : max_target;
+                    // Target was resolved to an exact IR index at convertToIR
+                    // time via each instruction's bytecode_pc (robust against
+                    // multi-IR expansions and optimizer passes).
+                    uint32_t target_ir = resolve_target_ir(instr);
+                    if (target_ir > trace.ir_instructions.size()) {
+                        target_ir = static_cast<uint32_t>(trace.ir_instructions.size());
                     }
                     forward_jumps.push_back({code.size(), target_ir});
                     code.push_back(0); code.push_back(0);
@@ -1425,21 +1427,13 @@ uint64_t Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
                 // Note: rel32 = 0 means "jump to next instruction" which creates
                 // an infinite loop if not patched - hence the exit stub below.
                 codegen.emitJmpRel32(code, 0); // placeholder - will be patched
-                
-                // Find the target IR index — the JUMP skips bytecodes_to_skip
-                // bytecodes ahead. Use operand1 as rough offset from current IR.
-                uint32_t bytecodes_to_skip = instr.operand1;
-                uint32_t target_ir = ir_idx + 1;
-                // For if-without-else: JUMP target is usually right after the else body
-                // For simple if: operand1 skips to after the if-body POP
-                // Approximate: target_ir ≈ ir_idx + operand1
-                // More precise: just use operand1 as an IR offset estimate
-                {
-                    uint32_t max_target = (uint32_t)(trace.ir_instructions.size());
-                    uint32_t calc_target = (uint32_t)(ir_idx + bytecodes_to_skip + 1);
-                    target_ir = calc_target < max_target ? calc_target : max_target;
+
+                // Exact target IR index via bytecode_pc map (see above).
+                uint32_t target_ir = resolve_target_ir(instr);
+                if (target_ir > trace.ir_instructions.size()) {
+                    target_ir = static_cast<uint32_t>(trace.ir_instructions.size());
                 }
-                
+
                 forward_jumps.push_back({code.size() - 4, target_ir});
                 break;
             }
@@ -1470,6 +1464,27 @@ uint64_t Tier2Compiler::compileTrace(const ExecutionTrace& trace) {
                 break;
         }
     }
+
+    // =====================================================================
+    // Patch any leftover forward jumps (backward targets, or targets at/past
+    // the trace end). Backward jumps resolve via recorded IR code offsets;
+    // beyond-end targets fall through to the exit stub below.
+    // =====================================================================
+    for (const auto& fj : forward_jumps) {
+        size_t dest;
+        if (fj.target_ir < ir_code_offsets.size()) {
+            dest = ir_code_offsets[fj.target_ir];
+        } else {
+            dest = code.size(); // fall through to exit stub
+        }
+        int64_t diff = (int64_t)dest - (int64_t)(fj.patch_offset + 4);
+        int32_t diff32 = (int32_t)diff;
+        code[fj.patch_offset]     = diff32 & 0xFF;
+        code[fj.patch_offset + 1] = (diff32 >> 8) & 0xFF;
+        code[fj.patch_offset + 2] = (diff32 >> 16) & 0xFF;
+        code[fj.patch_offset + 3] = (diff32 >> 24) & 0xFF;
+    }
+    forward_jumps.clear();
 
     // =====================================================================
     // EXIT STUB: Sync modified locals back to memory, then return
@@ -1638,24 +1653,40 @@ Tier2Compiler::unrollLoop(const ExecutionTrace& trace, int unroll_factor) {
         trace.ir_instructions.begin(),
         trace.ir_instructions.begin() + loop_back_idx);
 
+    // Map source bytecode pc -> pre-unroll IR index, so jump targets can be
+    // rebased to post-duplication indices (operand2=1 marks them resolved).
+    std::unordered_map<uint32_t, uint32_t> pre_pc_to_ir;
+    for (uint32_t idx = 0; idx < trace.ir_instructions.size(); idx++) {
+        uint32_t bpc = trace.ir_instructions[idx].bytecode_pc;
+        if (pre_pc_to_ir.find(bpc) == pre_pc_to_ir.end()) {
+            pre_pc_to_ir[bpc] = idx;
+        }
+    }
+
     // Replicate the loop body unroll_factor times
     unrolled->ir_instructions.clear();
-    
-    for (int i = 0; i < unroll_factor; ++i) {
-        // Copy loop body, but modify branch targets for unrolled iterations
+
+    for (int i = 0; i < unroll_factor; i++) {
+        // Copy loop body, rebasing jump targets into the duplicated layout
         for (const auto& instr : loop_body) {
             IRInstruction copy = instr;
-            
-            // Mark unrolled instructions
-            if (instr.opcode == IRInstruction::Opcode::JUMP_IF_FALSE ||
-                instr.opcode == IRInstruction::Opcode::JUMP) {
-                // In a real system, would adjust jump targets
-                // For now, keep as-is
+
+            if ((instr.opcode == IRInstruction::Opcode::JUMP_IF_FALSE ||
+                 instr.opcode == IRInstruction::Opcode::JUMP) &&
+                instr.operand2 == 0) {
+                auto it = pre_pc_to_ir.find(instr.operand1);
+                if (it != pre_pc_to_ir.end() && it->second < loop_back_idx) {
+                    copy.operand1 = static_cast<uint32_t>(
+                        i * loop_body.size() + it->second);
+                    copy.operand2 = 1; // resolved IR index, skip pc translation
+                }
+                // Else: target outside loop body (e.g. loop exit) — keep the
+                // bytecode pc; codegen handles it as before.
             }
-            
+
             unrolled->ir_instructions.push_back(copy);
         }
-        
+
         // Add unroll marker
         IRInstruction unroll_marker;
         unroll_marker.opcode = IRInstruction::Opcode::UNROLL_MARKER;
@@ -1807,6 +1838,8 @@ Tier2Compiler::convertToIR(const Chunk& bytecode, uint64_t start_pc, uint64_t en
     for (uint64_t pc = start_pc; pc < end_pc && pc < bytecode.code.size(); ) {
         uint8_t opcode = bytecode.code[pc];
         int instr_size = getInstructionSize(opcode);
+        uint64_t opcode_pc = pc; // Source offset for jump-target resolution
+        size_t ir_start_count = ir.size();
         pc++; // Consume opcode
 
         IRInstruction instr;
@@ -2200,7 +2233,13 @@ Tier2Compiler::convertToIR(const Chunk& bytecode, uint64_t start_pc, uint64_t en
             
             case OpCode::OP_JUMP_IF_FALSE:
                 instr.opcode = IRInstruction::Opcode::JUMP_IF_FALSE;
-                instr.operand1 = readU16BE(bytecode.code, pc);
+                // Store ABSOLUTE bytecode target pc (resolved to an IR index
+                // by codegen using each instruction's bytecode_pc). This stays
+                // valid across optimizer passes that add/remove IR entries.
+                instr.operand1 = static_cast<uint32_t>(
+                    opcode_pc + static_cast<uint64_t>(instr_size) +
+                    readU16BE(bytecode.code, pc));
+                instr.operand2 = 0; // 0 = needs pc->IR translation
                 pc += 2; // Skip offset
                 break;
 
@@ -2211,7 +2250,10 @@ Tier2Compiler::convertToIR(const Chunk& bytecode, uint64_t start_pc, uint64_t en
                 ir.push_back(instr);
                 IRInstruction jif;
                 jif.opcode = IRInstruction::Opcode::JUMP_IF_FALSE;
-                jif.operand1 = readU16BE(bytecode.code, pc);
+                jif.operand1 = static_cast<uint32_t>(
+                    opcode_pc + static_cast<uint64_t>(instr_size) +
+                    readU16BE(bytecode.code, pc));
+                jif.operand2 = 0;
                 pc += 2;
                 instr = jif;
                 break;
@@ -2222,7 +2264,10 @@ Tier2Compiler::convertToIR(const Chunk& bytecode, uint64_t start_pc, uint64_t en
                 ir.push_back(instr);
                 IRInstruction jif;
                 jif.opcode = IRInstruction::Opcode::JUMP_IF_FALSE;
-                jif.operand1 = readU16BE(bytecode.code, pc);
+                jif.operand1 = static_cast<uint32_t>(
+                    opcode_pc + static_cast<uint64_t>(instr_size) +
+                    readU16BE(bytecode.code, pc));
+                jif.operand2 = 0;
                 pc += 2;
                 instr = jif;
                 break;
@@ -2233,7 +2278,10 @@ Tier2Compiler::convertToIR(const Chunk& bytecode, uint64_t start_pc, uint64_t en
                 ir.push_back(instr);
                 IRInstruction jif;
                 jif.opcode = IRInstruction::Opcode::JUMP_IF_FALSE;
-                jif.operand1 = readU16BE(bytecode.code, pc);
+                jif.operand1 = static_cast<uint32_t>(
+                    opcode_pc + static_cast<uint64_t>(instr_size) +
+                    readU16BE(bytecode.code, pc));
+                jif.operand2 = 0;
                 pc += 2;
                 instr = jif;
                 break;
@@ -2241,7 +2289,10 @@ Tier2Compiler::convertToIR(const Chunk& bytecode, uint64_t start_pc, uint64_t en
             
             case OpCode::OP_JUMP:
                 instr.opcode = IRInstruction::Opcode::JUMP;
-                instr.operand1 = readU16BE(bytecode.code, pc);
+                instr.operand1 = static_cast<uint32_t>(
+                    opcode_pc + static_cast<uint64_t>(instr_size) +
+                    readU16BE(bytecode.code, pc));
+                instr.operand2 = 0; // 0 = needs pc->IR translation
                 pc += 2; // Skip offset
                 break;
             
@@ -2305,7 +2356,9 @@ Tier2Compiler::convertToIR(const Chunk& bytecode, uint64_t start_pc, uint64_t en
 
                 instr = IRInstruction();
                 instr.opcode = IRInstruction::Opcode::JUMP_IF_FALSE;
-                instr.operand1 = offset;
+                instr.operand1 = static_cast<uint32_t>(
+                    opcode_pc + static_cast<uint64_t>(instr_size) + offset);
+                instr.operand2 = 0; // 0 = needs pc->IR translation
                 break;
             }
 
@@ -2342,7 +2395,13 @@ Tier2Compiler::convertToIR(const Chunk& bytecode, uint64_t start_pc, uint64_t en
                 return {};
         }
 
+        // Tag every IR instruction emitted for this bytecode with its
+        // source pc (used for precise jump-target resolution in codegen).
+        for (size_t k = ir_start_count; k < ir.size(); k++) {
+            ir[k].bytecode_pc = static_cast<uint32_t>(opcode_pc);
+        }
         if (instr.opcode != IRInstruction::Opcode::INVALID) {
+             instr.bytecode_pc = static_cast<uint32_t>(opcode_pc);
              ir.push_back(instr);
         }
         

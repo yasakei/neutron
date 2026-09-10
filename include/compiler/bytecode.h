@@ -181,12 +181,6 @@ enum class OpCode : uint8_t {
     // === Fused loop instruction ===
     OP_LOOP_IF_LESS_LOCAL,  ///< Fused: if (local < const) loop, else jump
     
-    // === Safe block validation ===
-    OP_VALIDATE_SAFE_FUNCTION,   ///< Validate function in safe block
-    OP_VALIDATE_SAFE_VARIABLE,   ///< Validate variable in safe block
-    OP_VALIDATE_SAFE_FILE_FUNCTION,  ///< Validate function in safe file
-    OP_VALIDATE_SAFE_FILE_VARIABLE,  ///< Validate variable in safe file
-
     // === Bytecode optimizer extended opcodes ===
     // These are emitted by BytecodeOptimizer in post-compilation passes
     OP_CALL_FAST,        ///< Fast function call (no closure check overhead)
@@ -236,6 +230,14 @@ enum class OpCode : uint8_t {
     // === Spread/rest ===
     OP_SPREAD,           ///< Spread array onto stack as individual values
 
+    // === Fiber/Concurrency ===
+    OP_FIBER_CREATE,    ///< Create a new fiber from function on stack
+    OP_FIBER_YIELD,     ///< Yield execution to fiber scheduler
+    OP_FIBER_RESUME,    ///< Resume a suspended fiber
+    OP_FIBER_JOIN,      ///< Wait for fiber to complete
+    OP_FIBER_STATUS,    ///< Get fiber status (returns string)
+    OP_FIBER_SLEEP,     ///< Sleep for specified milliseconds
+    
     OP_COUNT             ///< Sentinel: total number of opcodes (not a real opcode)
 };
 

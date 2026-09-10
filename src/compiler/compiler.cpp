@@ -8,7 +8,7 @@
 
 namespace neutron {
 
-Compiler::Compiler(VM& vm, bool isSafeFile) : enclosing(nullptr), function(nullptr), vm(vm), chunk(nullptr), scopeDepth(0), currentLine(1), inSafeBlock(isSafeFile), isSafeFile(isSafeFile) {
+Compiler::Compiler(VM& vm) : enclosing(nullptr), function(nullptr), vm(vm), chunk(nullptr), scopeDepth(0), currentLine(1), inSafeBlock(false) {
     function = vm.allocate<Function>(nullptr, std::make_shared<Environment>());
     function->name = "<script>";
     // function->chunk is already allocated in constructor
@@ -18,7 +18,7 @@ Compiler::Compiler(VM& vm, bool isSafeFile) : enclosing(nullptr), function(nullp
     declaredGlobals = vm.declaredGlobals;
 }
 
-Compiler::Compiler(Compiler* enclosing) : enclosing(enclosing), function(nullptr), vm(enclosing->vm), chunk(nullptr), scopeDepth(0), currentLine(1), inSafeBlock(false), isSafeFile(enclosing->isSafeFile) {
+Compiler::Compiler(Compiler* enclosing) : enclosing(enclosing), function(nullptr), vm(enclosing->vm), chunk(nullptr), scopeDepth(0), currentLine(1), inSafeBlock(false) {
     function = vm.allocate<Function>(nullptr, std::make_shared<Environment>());
     // function->chunk is already allocated in constructor
     chunk = function->chunk;
@@ -392,27 +392,25 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
             }
         }
 
-        // Check if we're in a safe block and emit validation instruction
-        if (inSafeBlock && !stmt->typeAnnotation.has_value()) {
-            // Emit validation instruction that will be executed at runtime
-            if (isSafeFile) {
-                emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE, makeConstant(Value(vm.internString(stmt->name.lexeme))));
-            } else {
-                emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_VARIABLE, makeConstant(Value(vm.internString(stmt->name.lexeme))));
-            }
+        // Require type annotations for all variables (strict mode like TypeScript/Go)
+        if (!stmt->typeAnnotation.has_value()) {
+            throw std::runtime_error("Variable '" + stmt->name.lexeme + "' must have a type annotation. " +
+                                     "Use: var <type> <name> = <value>");
+        }
+        
+        // Check for 'any' type - not allowed in strict mode
+        if (stmt->typeAnnotation.has_value() && stmt->typeAnnotation.value().type == TokenType::TYPE_ANY) {
+            throw std::runtime_error("Type 'any' is not allowed in strict mode. Use a specific type instead.");
         }
 
-        // Perform compile-time type checking if type annotation exists
-        if (stmt->typeAnnotation.has_value() && stmt->initializer) {
+        // Perform compile-time type checking if initializer exists
+        if (stmt->initializer) {
             ValueType exprType = getExpressionType(stmt->initializer.get());
-            // Debug: Print what we're checking
             std::string expectedType = tokenTypeToString(stmt->typeAnnotation.value().type);
             std::string actualType = valueTypeToString(exprType);
-            // For debugging, check if we have a type mismatch case
             if (exprType != ValueType::NIL) {
                 bool isValid = validateType(stmt->typeAnnotation, exprType);
                 if (!isValid) {
-                    // Type mismatch - throw an error to enforce type safety
                     throw std::runtime_error("Type mismatch on line " + std::to_string(stmt->name.line) + 
                                              ": Cannot assign value of type '" + actualType + 
                                              "' to variable of type '" + expectedType + "'");
@@ -446,16 +444,6 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
     declaredGlobals.insert(stmt->name.lexeme);
     vm.declaredGlobals.insert(stmt->name.lexeme); // Update VM for REPL persistence
     
-    // Check if we're in a safe block and emit validation instruction
-    if (inSafeBlock && !stmt->typeAnnotation.has_value()) {
-        // Emit validation instruction that will be executed at runtime
-        if (isSafeFile) {
-            emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE, makeConstant(Value(vm.internString(stmt->name.lexeme))));
-        } else {
-            emitBytes((uint8_t)OpCode::OP_VALIDATE_SAFE_VARIABLE, makeConstant(Value(vm.internString(stmt->name.lexeme))));
-        }
-    }
-    
     // Track static variables in VM (persistence across REPL statements)
     if (stmt->isStatic) {
         vm.staticVariables.insert(stmt->name.lexeme);
@@ -466,15 +454,21 @@ void Compiler::visitVarStmt(const VarStmt* stmt) {
     } else {
         emitByte((uint8_t)OpCode::OP_NIL);
     }
-    
-    // If there's a type annotation, use the typed define instruction
-    if (stmt->typeAnnotation.has_value()) {
-        emitBytes((uint8_t)OpCode::OP_DEFINE_TYPED_GLOBAL, makeConstant(Value(vm.internString(stmt->name.lexeme))));
-        emitByte((uint8_t)stmt->typeAnnotation.value().type);
-    } else {
-        // Use regular define for variables without type annotations
-        emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(vm.internString(stmt->name.lexeme))));
+
+    // Strict mode: globals must have type annotations (same as locals).
+    // Without this check, .value() below throws std::bad_optional_access.
+    if (!stmt->typeAnnotation.has_value()) {
+        throw std::runtime_error("Variable '" + stmt->name.lexeme + "' must have a type annotation. " +
+                                 "Use: var <type> <name> = <value>");
     }
+    if (stmt->typeAnnotation.value().type == TokenType::TYPE_ANY) {
+        throw std::runtime_error("Type 'any' is not allowed in strict mode. Use a specific type instead.");
+    }
+
+    // All variables must have type annotations in strict mode
+    // Emit the typed define instruction
+    emitBytes((uint8_t)OpCode::OP_DEFINE_TYPED_GLOBAL, makeConstant(Value(vm.internString(stmt->name.lexeme))));
+    emitByte((uint8_t)stmt->typeAnnotation.value().type);
 }
 
 void Compiler::visitBlockStmt(const BlockStmt* stmt) {
@@ -687,35 +681,41 @@ void Compiler::visitClassStmt(const ClassStmt* stmt) {
     // Compile the methods
     for (const auto& method : stmt->body) {
         if (auto funcStmt = dynamic_cast<const FunctionStmt*>(method.get())) {
-            // In safe blocks or .ntsc files, enforce type annotations on class methods
-            if (inSafeBlock) {
-                // Check that all parameters have type annotations
-                for (const auto& param : funcStmt->params) {
-                    if (!param.typeAnnotation.has_value()) {
-                        std::string errorMsg = "Class method parameter '" + param.name.lexeme + 
-                                              "' must have a type annotation";
-                        if (vm.isSafeFile) {
-                            errorMsg += " in .ntsc files.";
-                        } else {
-                            errorMsg += " inside a safe block.";
-                        }
-                        ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, param.name.line);
-                        exit(1);
-                    }
-                }
-                
-                // Check that the method has a return type annotation
-                if (!funcStmt->returnType.has_value()) {
-                    std::string errorMsg = "Class method '" + funcStmt->name.lexeme + 
-                                          "' must have a return type annotation";
-                    if (vm.isSafeFile) {
-                        errorMsg += " in .ntsc files.";
-                    } else {
-                        errorMsg += " inside a safe block.";
-                    }
-                    ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, funcStmt->name.line);
+            // In strict mode, all methods must have type annotations
+            // Check that all parameters have type annotations
+            for (const auto& param : funcStmt->params) {
+                if (!param.typeAnnotation.has_value()) {
+                    std::string errorMsg = "Class method parameter '" + param.name.lexeme + 
+                                          "' must have a type annotation. Use: fun methodName(type paramName)";
+                    ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, param.name.line);
                     exit(1);
                 }
+            }
+            
+            // Check that the method has a return type annotation
+            if (!funcStmt->returnType.has_value()) {
+                std::string errorMsg = "Class method '" + funcStmt->name.lexeme + 
+                                      "' must have a return type annotation. Use: fun methodName() -> type";
+                ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, funcStmt->name.line);
+                exit(1);
+            }
+            
+            // Check for 'any' type in parameters
+            for (const auto& param : funcStmt->params) {
+                if (param.typeAnnotation.has_value() && param.typeAnnotation.value().type == TokenType::TYPE_ANY) {
+                    std::string errorMsg = "Type 'any' is not allowed for parameter '" + param.name.lexeme + 
+                                          "'. Use a specific type.";
+                    ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, param.name.line);
+                    exit(1);
+                }
+            }
+            
+            // Check for 'any' return type
+            if (funcStmt->returnType.has_value() && funcStmt->returnType.value().type == TokenType::TYPE_ANY) {
+                std::string errorMsg = "Return type 'any' is not allowed for method '" + funcStmt->name.lexeme + 
+                                      "'. Use a specific type.";
+                ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, funcStmt->name.line);
+                exit(1);
             }
             
             Compiler compiler(this);
@@ -744,15 +744,18 @@ void Compiler::visitClassStmt(const ClassStmt* stmt) {
                 klass->initializer = compiler.function;
             }
         } else if (auto varStmt = dynamic_cast<const VarStmt*>(method.get())) {
-            // In safe blocks or .ntsc files, enforce type annotations on class properties
-            if (inSafeBlock && !varStmt->typeAnnotation.has_value()) {
+            // In strict mode, all class properties must have type annotations
+            if (!varStmt->typeAnnotation.has_value()) {
                 std::string errorMsg = "Class property '" + varStmt->name.lexeme + 
-                                      "' must have a type annotation";
-                if (vm.isSafeFile) {
-                    errorMsg += " in .ntsc files.";
-                } else {
-                    errorMsg += " inside a safe block.";
-                }
+                                      "' must have a type annotation. Use: var type propertyName;";
+                ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, varStmt->name.line);
+                exit(1);
+            }
+            
+            // Check for 'any' type in properties
+            if (varStmt->typeAnnotation.has_value() && varStmt->typeAnnotation.value().type == TokenType::TYPE_ANY) {
+                std::string errorMsg = "Type 'any' is not allowed for property '" + varStmt->name.lexeme + 
+                                      "'. Use a specific type.";
                 ErrorHandler::reportRuntimeError(errorMsg, vm.currentFileName, varStmt->name.line);
                 exit(1);
             }
@@ -880,14 +883,8 @@ void Compiler::visitFunctionStmt(const FunctionStmt* stmt) {
     // Emit the function constant
     emitBytes((uint8_t)OpCode::OP_CONSTANT, constant);
     
-    // If we're in a safe block, emit validation instruction
-    if (inSafeBlock) {
-        if (isSafeFile) {
-            emitByte((uint8_t)OpCode::OP_VALIDATE_SAFE_FILE_FUNCTION);
-        } else {
-            emitByte((uint8_t)OpCode::OP_VALIDATE_SAFE_FUNCTION);
-        }
-    }
+    // In strict mode, we validate types at compile time (above) and runtime (via VM)
+    // No additional validation instruction needed
     
     // Define the function as a global variable in the current scope
     emitBytes((uint8_t)OpCode::OP_DEFINE_GLOBAL, makeConstant(Value(vm.internString(stmt->name.lexeme))));
@@ -1131,6 +1128,7 @@ std::string Compiler::tokenTypeToString(TokenType type) {
         case TokenType::TYPE_BOOL: return "bool";
         case TokenType::TYPE_ARRAY: return "array";
         case TokenType::TYPE_OBJECT: return "object";
+        case TokenType::TYPE_FIBER: return "fiber";
         case TokenType::TYPE_ANY: return "any";
         default: return "unknown";
     }
@@ -1155,7 +1153,9 @@ bool Compiler::validateType(const std::optional<Token>& typeAnnotation, ValueTyp
         case TokenType::TYPE_ARRAY:
             return actualType == ValueType::ARRAY;
         case TokenType::TYPE_OBJECT:
-            return actualType == ValueType::OBJECT;
+            return actualType == ValueType::OBJECT || actualType == ValueType::INSTANCE;
+        case TokenType::TYPE_FIBER:
+            return actualType == ValueType::FIBER;
         case TokenType::TYPE_ANY:
             return true; // 'any' type accepts everything
         default:
@@ -1239,6 +1239,7 @@ ValueType Compiler::getExpressionType(const Expr* expr) {
                 case TokenType::TYPE_ARRAY:
                     return ValueType::ARRAY;
                 case TokenType::TYPE_OBJECT:
+                    // Instances are objects at runtime (may hold class state)
                     return ValueType::OBJECT;
                 default:
                     break;

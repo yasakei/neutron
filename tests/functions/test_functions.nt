@@ -12,7 +12,7 @@ say("✓ Simple function works");
 fun add(a, b) {
     return a + b;
 }
-var result = add(5, 10);
+var int result = add(5, 10);
 if (result == 15) {
     say("✓ Function with return works");
 } else {
@@ -23,7 +23,7 @@ if (result == 15) {
 fun calculate(x, y, z) {
     return x + y * z;
 }
-var calc = calculate(2, 3, 4);
+var int calc = calculate(2, 3, 4);
 if (calc == 14) {
     say("✓ Function with multiple parameters works");
 } else {
@@ -37,7 +37,7 @@ fun double(n) {
 fun quadruple(n) {
     return double(double(n));
 }
-var quad = quadruple(5);
+var int quad = quadruple(5);
 if (quad == 20) {
     say("✓ Function calling function works");
 } else {
@@ -51,8 +51,8 @@ fun isPositive(n) {
     }
     return false;
 }
-var pos = isPositive(10);
-var neg = isPositive(-5);
+var int pos = isPositive(10);
+var int neg = isPositive(-5);
 if (pos == true and neg == false) {
     say("✓ Function with conditional return works");
 } else {

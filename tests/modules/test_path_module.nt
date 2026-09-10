@@ -3,14 +3,14 @@ use path;
 
 say("=== Path Module Tests ===");
 
-var test_count = 0;
-var pass_count = 0;
+var int test_count = 0;
+var int pass_count = 0;
 
 // Helper function to run tests
 fun test(description, test_func) {
     test_count = test_count + 1;
     try {
-        var result = test_func();
+        var array result = test_func();
         if (result) {
             say("✓ " + description);
             pass_count = pass_count + 1;
@@ -24,170 +24,170 @@ fun test(description, test_func) {
 
 // Test path.join
 test("Path join basic", fun() {
-    var result = path.join("home", "user", "documents");
+    var array result = path.join("home", "user", "documents");
     return result == "home/user/documents" or result == "home\\user\\documents";
 });
 
 test("Path join with absolute", fun() {
-    var result = path.join("home", "/absolute", "path");
+    var int result = path.join("home", "/absolute", "path");
     return result == "/absolute/path" or result == "\\absolute\\path";
 });
 
 test("Path join empty parts", fun() {
-    var result = path.join("home", "", "user");
+    var array result = path.join("home", "", "user");
     return result == "home/user" or result == "home\\user";
 });
 
 test("Path join single part", fun() {
-    var result = path.join("single");
+    var array result = path.join("single");
     return result == "single";
 });
 
 test("Path join no arguments", fun() {
-    var result = path.join();
+    var array result = path.join();
     return result == "";
 });
 
 // Test path.split
 test("Path split basic", fun() {
-    var result = path.split("/home/user/file.txt");
+    var int result = path.split("/home/user/file.txt");
     return result[0] == "/home/user" && result[1] == "file.txt";
 });
 
 test("Path split no directory", fun() {
-    var result = path.split("file.txt");
+    var array result = path.split("file.txt");
     return result[0] == "" && result[1] == "file.txt";
 });
 
 test("Path split root", fun() {
-    var result = path.split("/file.txt");
+    var int result = path.split("/file.txt");
     return (result[0] == "/" || result[0] == "\\") && result[1] == "file.txt";
 });
 
 // Test path.dirname
 test("Path dirname basic", fun() {
-    var result = path.dirname("/home/user/file.txt");
+    var int result = path.dirname("/home/user/file.txt");
     return result == "/home/user";
 });
 
 test("Path dirname no directory", fun() {
-    var result = path.dirname("file.txt");
+    var array result = path.dirname("file.txt");
     return result == ".";
 });
 
 test("Path dirname root", fun() {
-    var result = path.dirname("/file.txt");
+    var int result = path.dirname("/file.txt");
     return result == "/" or result == "\\";
 });
 
 // Test path.basename
 test("Path basename basic", fun() {
-    var result = path.basename("/home/user/file.txt");
+    var int result = path.basename("/home/user/file.txt");
     return result == "file.txt";
 });
 
 test("Path basename no directory", fun() {
-    var result = path.basename("file.txt");
+    var array result = path.basename("file.txt");
     return result == "file.txt";
 });
 
 test("Path basename directory only", fun() {
-    var result = path.basename("/home/user/");
+    var int result = path.basename("/home/user/");
     return result == "";
 });
 
 // Test path.extname
 test("Path extname basic", fun() {
-    var result = path.extname("file.txt");
+    var array result = path.extname("file.txt");
     return result == ".txt";
 });
 
 test("Path extname no extension", fun() {
-    var result = path.extname("file");
+    var array result = path.extname("file");
     return result == "";
 });
 
 test("Path extname multiple dots", fun() {
-    var result = path.extname("file.tar.gz");
+    var array result = path.extname("file.tar.gz");
     return result == ".gz";
 });
 
 test("Path extname hidden file", fun() {
-    var result = path.extname(".hidden");
+    var array result = path.extname(".hidden");
     return result == "";
 });
 
 test("Path extname with path", fun() {
-    var result = path.extname("/home/user/file.txt");
+    var int result = path.extname("/home/user/file.txt");
     return result == ".txt";
 });
 
 // Test path.isabs
 test("Path isabs unix absolute", fun() {
-    var result = path.isabs("/home/user");
+    var int result = path.isabs("/home/user");
     return result == true;
 });
 
 test("Path isabs relative", fun() {
-    var result = path.isabs("home/user");
+    var int result = path.isabs("home/user");
     return result == false;
 });
 
 test("Path isabs current directory", fun() {
-    var result = path.isabs("./file");
+    var int result = path.isabs("./file");
     return result == false;
 });
 
 test("Path isabs parent directory", fun() {
-    var result = path.isabs("../file");
+    var int result = path.isabs("../file");
     return result == false;
 });
 
 // Test path.normalize
 test("Path normalize basic", fun() {
-    var result = path.normalize("/home/user/../user/./file");
+    var int result = path.normalize("/home/user/../user/./file");
     return result == "/home/user/file" or result == "\\home\\user\\file";
 });
 
 test("Path normalize current directory", fun() {
-    var result = path.normalize("./file");
+    var int result = path.normalize("./file");
     return result == "file";
 });
 
 test("Path normalize parent directory", fun() {
-    var result = path.normalize("home/../file");
+    var int result = path.normalize("home/../file");
     return result == "file";
 });
 
 test("Path normalize empty", fun() {
-    var result = path.normalize("");
+    var array result = path.normalize("");
     return result == ".";
 });
 
 test("Path normalize multiple slashes", fun() {
-    var result = path.normalize("home//user///file");
+    var int result = path.normalize("home//user///file");
     return result == "home/user/file";
 });
 
 // Test path.resolve (basic test - depends on current directory)
 test("Path resolve absolute", fun() {
-    var result = path.resolve("/home/user");
+    var int result = path.resolve("/home/user");
     return result == "/home/user" or result == "\\home\\user";
 });
 
 // Test path.relative
 test("Path relative basic", fun() {
-    var result = path.relative("/home/user", "/home/user/documents");
+    var int result = path.relative("/home/user", "/home/user/documents");
     return result == "documents";
 });
 
 test("Path relative parent", fun() {
-    var result = path.relative("/home/user/documents", "/home/user");
+    var int result = path.relative("/home/user/documents", "/home/user");
     return result == "..";
 });
 
 test("Path relative same", fun() {
-    var result = path.relative("/home/user", "/home/user");
+    var int result = path.relative("/home/user", "/home/user");
     return result == ".";
 });
 
@@ -202,12 +202,12 @@ test("Path delimiter exists", fun() {
 
 // Test cross-platform utilities
 test("Path toUnix", fun() {
-    var result = path.toUnix("home\\user\\file");
+    var array result = path.toUnix("home\\user\\file");
     return result == "home/user/file";
 });
 
 test("Path toWindows", fun() {
-    var result = path.toWindows("home/user/file");
+    var int result = path.toWindows("home/user/file");
     return result == "home\\user\\file";
 });
 

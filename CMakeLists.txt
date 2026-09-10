@@ -197,6 +197,7 @@ set(NEUTRON_BUILTIN_MODULE_SOURCES
     libs/time/native.cpp
     libs/arrays/native.cpp
     libs/async/native.cpp
+    libs/coro/native.cpp
     libs/regex/native.cpp
     libs/process/native.cpp
     libs/crypto/native.cpp
@@ -263,13 +264,6 @@ set(NEUTRON_MODULE_SOURCES
     src/modules/module_utils.cpp
 )
 
-# Project system source files
-set(NEUTRON_PROJECT_SOURCES
-    src/project/project_config.cpp
-    src/project/project_manager.cpp
-    src/project/project_builder.cpp
-)
-
 # Platform abstraction source files
 set(NEUTRON_PLATFORM_SOURCES_LIST
     src/platform/platform.cpp
@@ -286,7 +280,6 @@ set(NEUTRON_CORE_SOURCES
     ${NEUTRON_TYPES_SOURCES}
     ${NEUTRON_RUNTIME_SOURCES}
     ${NEUTRON_MODULE_SOURCES}
-    ${NEUTRON_PROJECT_SOURCES}
     ${NEUTRON_PLATFORM_SOURCES_LIST}
 )
 
@@ -540,7 +533,7 @@ endif()
 if (NOT WIN32)
     add_custom_command(TARGET neutron POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:neutron> ${CMAKE_SOURCE_DIR}/$<TARGET_FILE_NAME:neutron>
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/build/libneutron_runtime.a ${CMAKE_SOURCE_DIR}/libneutron_runtime.a
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:neutron_shared> ${CMAKE_SOURCE_DIR}/$<TARGET_FILE_NAME:neutron_shared>
         COMMENT "Copying binaries to project root"
     )
 elseif(WIN32 AND MINGW)

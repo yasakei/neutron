@@ -2,7 +2,7 @@
 say("=== Testing Control Flow ===");
 
 // Test 1: Simple if statement
-var x = 10;
+var int x = 10;
 if (x == 10) {
     say("✓ Simple if statement works");
 } else {
@@ -10,7 +10,7 @@ if (x == 10) {
 }
 
 // Test 2: If-else statement
-var y = 5;
+var int y = 5;
 if (y > 10) {
     say("✗ If-else condition wrong");
 } else {
@@ -18,8 +18,8 @@ if (y > 10) {
 }
 
 // Test 3: Nested if statements
-var a = 10;
-var b = 20;
+var int a = 10;
+var int b = 20;
 if (a < b) {
     if (a == 10) {
         say("✓ Nested if statements work");
@@ -31,8 +31,8 @@ if (a < b) {
 }
 
 // Test 4: While loop
-var i = 0;
-var sum = 0;
+var int i = 0;
+var int sum = 0;
 while (i < 5) {
     sum = sum + i;
     i = i + 1;
@@ -44,7 +44,7 @@ if (sum == 10) {
 }
 
 // Test 5: While loop with condition
-var count = 0;
+var int count = 0;
 while (count < 10) {
     count = count + 1;
     if (count == 5) {
@@ -58,7 +58,7 @@ if (count == 5) {
 }
 
 // Test 6: Complex conditions
-var val = 15;
+var int val = 15;
 if (val > 10 and val < 20) {
     say("✓ Complex conditions work");
 } else {

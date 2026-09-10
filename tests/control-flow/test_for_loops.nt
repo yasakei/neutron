@@ -2,8 +2,8 @@
 say("=== Testing For Loops ===");
 
 // Test 1: Basic for loop
-var sum = 0;
-for (var i = 0; i < 5; i = i + 1) {
+var int sum = 0;
+for (var int i = 0; i < 5; i = i + 1) {
     sum = sum + i;
 }
 if (sum == 10) {
@@ -13,8 +13,8 @@ if (sum == 10) {
 }
 
 // Test 2: For loop with different increment
-var count = 0;
-for (var j = 0; j < 10; j = j + 2) {
+var int count = 0;
+for (var int j = 0; j < 10; j = j + 2) {
     count = count + 1;
 }
 if (count == 5) {
@@ -24,8 +24,8 @@ if (count == 5) {
 }
 
 // Test 3: Countdown for loop
-var countdown = 0;
-for (var k = 10; k > 0; k = k - 1) {
+var int countdown = 0;
+for (var int k = 10; k > 0; k = k - 1) {
     countdown = k;
 }
 if (countdown == 1) {
@@ -35,8 +35,8 @@ if (countdown == 1) {
 }
 
 // Test 4: For loop with break
-var breakSum = 0;
-for (var m = 0; m < 10; m = m + 1) {
+var int breakSum = 0;
+for (var int m = 0; m < 10; m = m + 1) {
     if (m == 5) {
         break;
     }
@@ -49,8 +49,8 @@ if (breakSum == 10) {
 }
 
 // Test 5: For loop with continue
-var continueSum = 0;
-for (var n = 0; n < 5; n = n + 1) {
+var int continueSum = 0;
+for (var int n = 0; n < 5; n = n + 1) {
     if (n == 2) {
         continue;
     }
@@ -63,9 +63,9 @@ if (continueSum == 8) {
 }
 
 // Test 6: Nested for loops
-var nestedSum = 0;
-for (var outer = 0; outer < 3; outer = outer + 1) {
-    for (var inner = 0; inner < 2; inner = inner + 1) {
+var int nestedSum = 0;
+for (var int outer = 0; outer < 3; outer = outer + 1) {
+    for (var int inner = 0; inner < 2; inner = inner + 1) {
         nestedSum = nestedSum + 1;
     }
 }

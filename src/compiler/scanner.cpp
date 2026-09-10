@@ -72,6 +72,7 @@ Scanner::Scanner(const std::string& source)
     keywords["float"] = TokenType::TYPE_FLOAT;
     keywords["string"] = TokenType::TYPE_STRING;
     keywords["bool"] = TokenType::TYPE_BOOL;
+    keywords["fiber"] = TokenType::TYPE_FIBER;
     keywords["array"] = TokenType::TYPE_ARRAY;
     keywords["object"] = TokenType::TYPE_OBJECT;
     keywords["any"] = TokenType::TYPE_ANY;

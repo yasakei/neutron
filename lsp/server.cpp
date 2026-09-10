@@ -338,83 +338,45 @@ void LSPServer::validateDocument(const std::string &uri,
   // Clear callback
   ErrorHandler::setErrorCallback(nullptr);
 
-  // Additional validation for .ntsc files and safe {} blocks
-  bool isNtscFile = (uri.find(".ntsc") != std::string::npos);
+  // Strict mode is the default: ALL files require type annotations.
+  // (.ntsc safe-file mode and `safe {}` blocks were removed; every .nt file
+  // is checked the same way the compiler enforces it.)
+  // Supported types: int, float, string, bool, array, object, fiber
+  // (`any` is banned and reported as its own diagnostic below.)
 
-  // Track which lines are inside safe {} blocks
-  std::vector<bool> lineInSafeBlock(lines.size(), false);
-
-  // First pass: identify which lines are inside safe {} blocks
-  if (!isNtscFile) {
-    int braceDepth = 0;
-    bool inSafe = false;
-    int safeStartBrace = 0;
-
-    for (size_t i = 0; i < lines.size(); i++) {
-      const std::string &lineText = lines[i];
-
-      // Check for "safe {" or "safe\n{"
-      if (lineText.find("safe") != std::string::npos) {
-        size_t safePos = lineText.find("safe");
-        // Check it's not part of another word
-        bool validSafe = true;
-        if (safePos > 0 &&
-            (isalnum(lineText[safePos - 1]) || lineText[safePos - 1] == '_')) {
-          validSafe = false;
-        }
-        if (safePos + 4 < lineText.length() &&
-            (isalnum(lineText[safePos + 4]) || lineText[safePos + 4] == '_')) {
-          validSafe = false;
-        }
-        if (validSafe) {
-          inSafe = true;
-          safeStartBrace = braceDepth;
-        }
-      }
-
-      // Count braces
-      bool inString = false;
-      for (size_t j = 0; j < lineText.length(); j++) {
-        char c = lineText[j];
-        if (c == '"' || c == '\'')
-          inString = !inString;
-        if (!inString) {
-          if (c == '{') {
-            braceDepth++;
-            if (inSafe && braceDepth == safeStartBrace + 1) {
-              // This is the opening brace of safe block
-            }
-          } else if (c == '}') {
-            braceDepth--;
-            if (inSafe && braceDepth == safeStartBrace) {
-              inSafe = false;
-            }
-          }
-        }
-      }
-
-      lineInSafeBlock[i] = inSafe;
-    }
-  }
-
-  // Check for missing type annotations
+  // Check for missing type annotations (always, strict default)
   std::regex varNoType(R"(^\s*var\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=)");
   std::regex varWithType(
-      R"(^\s*var\s+(int|float|string|bool|array|object|any)\s+)");
+      R"(^\s*var\s+(int|float|string|bool|array|object|fiber)\s+)");
+  std::regex varAnyType(
+      R"(^\s*var\s+any\s+)");
   std::regex funNoReturnType(
       R"(^\s*fun\s+[a-zA-Z_][a-zA-Z0-9_]*\s*\([^)]*\)\s*\{)");
   std::regex funWithReturnType(
-      R"(^\s*fun\s+[a-zA-Z_][a-zA-Z0-9_]*\s*\([^)]*\)\s*->\s*(int|float|string|bool|array|object|any)\s*\{)");
+      R"(^\s*fun\s+[a-zA-Z_][a-zA-Z0-9_]*\s*\([^)]*\)\s*->\s*(int|float|string|bool|array|object|fiber)\s*\{)");
 
   for (size_t i = 0; i < lines.size(); i++) {
     const std::string &lineText = lines[i];
-    bool requireTypes = isNtscFile || lineInSafeBlock[i];
+    bool requireTypes = true;
 
     if (!requireTypes)
       continue;
 
     std::smatch match;
-    std::string context = isNtscFile ? ".ntsc files" : "safe blocks";
+    std::string context = "strict mode (all files)";
+
+    // Flag banned `any` type explicitly
+    if (std::regex_search(lineText, varAnyType)) {
+      Diagnostic d;
+      d.message = "Type 'any' is not allowed in strict mode. Use a specific type (int, float, string, bool, array, object, fiber).";
+      d.severity = DiagnosticSeverity::Error;
+      d.range.start.line = static_cast<int>(i);
+      d.range.start.character = static_cast<int>(lineText.find("any"));
+      d.range.end.line = static_cast<int>(i);
+      d.range.end.character = static_cast<int>(lineText.find("any") + 3);
+      d.source = "neutron";
+      diagnostics.push_back(d);
+    }
 
     // Check for var without type: "var x = " but not "var int x = "
     if (std::regex_search(lineText, match, varNoType)) {
@@ -727,6 +689,17 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
         {"await", "Await async result"},
         {"sleep", "Async sleep"},
         {"timer", "Create timer"}}},
+      {"coro",
+       {{"create", "Create fiber (coro.create(func, ...args))"},
+        {"spawn", "Create + start fiber (coro.spawn(func, ...args))"},
+        {"resume", "Resume fiber (coro.resume(fiber, ...args))"},
+        {"yield", "Yield from fiber (coro.yield(value))"},
+        {"join", "Run fiber to completion (coro.join(fiber))"},
+        {"status", "Fiber status: created|running|suspended|finished"},
+        {"sleep", "Sleep ms (coro.sleep(ms))"},
+        {"schedule", "Round-robin all fibers (coro.schedule())"},
+        {"count", "Number of fibers (coro.count())"},
+        {"all", "Join multiple fibers (coro.all([f1, f2]))"}}},
       {"process",
        {{"spawn", "Spawn new process"},
         {"send", "Send message to process"},
@@ -1089,12 +1062,12 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
 
   // General completions (not after a dot)
 
-  // Keywords
+  // Keywords (strict mode default; `safe` blocks removed)
   const char *keywords[] = {"var",      "fun",     "class",  "if",      "else",
                             "elif",     "while",   "for",    "do",      "return",  "break",
                             "continue", "match",   "case",   "default", "try",
                             "catch",    "finally", "throw",  "retry",   "use",
-                            "using",    "from",    "static", "safe",    "true",
+                            "using",    "from",    "static", "true",
                             "false",    "nil",     "this",   "super",   "init",
                             "enum",     "in"};
   for (const char *kw : keywords) {
@@ -1105,9 +1078,9 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
     result.append(item);
   }
 
-  // Types
+  // Types (strict mode: `any` banned; `fiber` added for coro)
   const char *types[] = {"int",   "float",  "string", "bool",
-                         "array", "object", "any"};
+                         "array", "object", "fiber"};
   for (const char *t : types) {
     Json::Value item;
     set(item, "label") = t;
@@ -1118,7 +1091,7 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
 
   // Built-in modules (always suggest for use statements)
   const char *modules[] = {"sys",  "json", "math",  "fmt",   "arrays",
-                           "time", "http", "regex", "async", "process",
+                           "time", "http", "regex", "async", "coro", "process",
                            "crypto", "path", "random", "collections", "log", "strings"};
   for (const char *m : modules) {
     Json::Value item;
@@ -1137,28 +1110,16 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
   set(sayItem, "insertTextFormat") = 2; // Snippet
   result.append(sayItem);
 
-  // Check if we're in a safe context (inside safe{} block or .ntsc file)
-  bool inSafeContext = (uri.find(".ntsc") != std::string::npos);
-  if (!inSafeContext) {
-    // Check for safe { block
-    std::regex safeBlockRegex(R"(safe\s*\{)");
-    if (std::regex_search(documentText, safeBlockRegex)) {
-      // Simple check - if there's a safe block in the file, suggest typed
-      // completions
-      inSafeContext = true;
-    }
-  }
-
-  // Add type-safe snippets (especially useful in safe contexts)
-  if (inSafeContext) {
-    // Typed variable declarations
+  // Strict mode is default: always offer typed snippets.
+  // Typed variable declarations
+  {
     const char *typeNames[] = {"int",   "float",  "string", "bool",
-                               "array", "object", "any"};
+                               "array", "object", "fiber"};
     for (const char *t : typeNames) {
       Json::Value item;
       set(item, "label") = std::string("var ") + t;
       set(item, "kind") = 15; // Snippet
-      set(item, "detail") = "Typed variable declaration";
+      set(item, "detail") = "Typed variable declaration (required)";
       set(item, "insertText") =
           std::string("var ") + t + " ${1:name} = ${2:value};";
       set(item, "insertTextFormat") = 2; // Snippet
@@ -1169,7 +1130,7 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
     Json::Value typedFun;
     set(typedFun, "label") = "fun (typed)";
     set(typedFun, "kind") = 15; // Snippet
-    set(typedFun, "detail") = "Function with type annotations";
+    set(typedFun, "detail") = "Function with type annotations (required)";
     set(typedFun, "insertText") =
         "fun ${1:name}(${2:type} ${3:param}) -> ${4:returnType} {\n\t$0\n}";
     set(typedFun, "insertTextFormat") = 2;
@@ -1179,7 +1140,7 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
     Json::Value typedClass;
     set(typedClass, "label") = "class (typed)";
     set(typedClass, "kind") = 15; // Snippet
-    set(typedClass, "detail") = "Class with type annotations";
+    set(typedClass, "detail") = "Class with type annotations (required)";
     set(typedClass, "insertText") =
         "class ${1:Name} {\n\tvar ${2:type} ${3:field};\n\t\n\tfun "
         "init(${4:type} ${5:param}) -> int {\n\t\tthis.${3:field} = "
@@ -1188,17 +1149,37 @@ void LSPServer::onCompletion(const Json::Value &params, const Json::Value &id) {
     result.append(typedClass);
   }
 
-  // Safe block snippet
-  Json::Value safeBlock;
-  set(safeBlock, "label") = "safe";
-  set(safeBlock, "kind") = 15; // Snippet
-  set(safeBlock, "detail") = "Type-safe code block";
-  set(safeBlock, "documentation") =
-      "Enforces type annotations on all variables, functions, and classes "
-      "within the block";
-  set(safeBlock, "insertText") = "safe {\n\t$0\n}";
-  set(safeBlock, "insertTextFormat") = 2;
-  result.append(safeBlock);
+  // Coro / fiber snippets
+  {
+    Json::Value item;
+    set(item, "label") = "coro.create";
+    set(item, "kind") = 15; // Snippet
+    set(item, "detail") = "Create a fiber";
+    set(item, "documentation") = "var fiber f = coro.create(func, ...args);";
+    set(item, "insertText") = "var fiber ${1:f} = coro.create(${2:func}${3:, args});";
+    set(item, "insertTextFormat") = 2;
+    result.append(item);
+  }
+  {
+    Json::Value item;
+    set(item, "label") = "coro.spawn";
+    set(item, "kind") = 15; // Snippet
+    set(item, "detail") = "Create + start a fiber";
+    set(item, "documentation") = "var fiber f = coro.spawn(func, ...args);";
+    set(item, "insertText") = "var fiber ${1:f} = coro.spawn(${2:func}${3:, args});";
+    set(item, "insertTextFormat") = 2;
+    result.append(item);
+  }
+  {
+    Json::Value item;
+    set(item, "label") = "coro.yield";
+    set(item, "kind") = 15; // Snippet
+    set(item, "detail") = "Yield from fiber";
+    set(item, "documentation") = "coro.yield(value);";
+    set(item, "insertText") = "coro.yield(${1:value});";
+    set(item, "insertTextFormat") = 2;
+    result.append(item);
+  }
 
   // ── New feature snippets ──────────────────────────────────────────────────
 
@@ -1349,50 +1330,26 @@ void LSPServer::onHover(const Json::Value &params, const Json::Value &id) {
 
       std::string word = currentLine.substr(start, end - start);
 
-      // Check if in .ntsc file
-      bool isNtscFile = (uri.find(".ntsc") != std::string::npos);
-
-      // Hover documentation
+      // Hover documentation (strict mode default; .ntsc removed)
       std::string doc;
       if (word == "say")
         doc = "**say(value)**\n\nPrints value to console with newline.";
       else if (word == "var") {
-        if (isNtscFile) {
-          doc = "**var**\n\nDeclare a typed variable (required in .ntsc "
-                "files).\n```neutron\nvar int x = 10;\nvar string name = "
-                "\"Alice\";\n```";
-        } else {
-          doc = "**var**\n\nDeclare a variable.\n```neutron\nvar x = 10;\nvar "
-                "int y = 20;  // with type\n```";
-        }
+        doc = "**var**\n\nDeclare a typed variable (required in strict mode, the default).\n```neutron\nvar int x = 10;\nvar string name = "
+              "\"Alice\";\nvar fiber f = coro.create(task, 1);\n```";
       } else if (word == "fun") {
-        if (isNtscFile) {
-          doc = "**fun**\n\nDeclare a typed function (parameter and return "
-                "types required in .ntsc files).\n```neutron\nfun add(int a, "
-                "int b) -> int {\n    return a + b;\n}\n```";
-        } else {
-          doc = "**fun**\n\nDeclare a function.\n```neutron\nfun add(a, b) {\n "
-                "   return a + b;\n}\n```";
-        }
+        doc = "**fun**\n\nDeclare a typed function (parameter and return "
+              "types required in strict mode).\n```neutron\nfun add(int a, "
+              "int b) -> int {\n    return a + b;\n}\n```";
       } else if (word == "class") {
-        if (isNtscFile) {
-          doc = "**class**\n\nDeclare a typed class (all properties and "
-                "methods must have types in .ntsc files).\n```neutron\nclass "
-                "Person {\n    var string name;\n    fun init(string n) -> int "
-                "{\n        this.name = n;\n        return 0;\n    }\n}\n```";
-        } else {
-          doc = "**class**\n\nDeclare a class.\n```neutron\nclass Person {\n   "
-                " var name;\n    init(n) { this.name = n; }\n}\n```";
-        }
-      } else if (word == "safe")
-        doc =
-            "**safe**\n\nType-safe code block. All variables, functions, and "
-            "classes inside must have type annotations.\n```neutron\nsafe {\n  "
-            "  var int x = 10;\n    fun add(int a, int b) -> int {\n        "
-            "return a + b;\n    }\n}\n```\n\n**Requirements inside safe "
-            "block:**\n- Variables must have type: `var int x = 10;`\n- "
-            "Functions must have parameter types and return type: `fun add(int "
-            "a, int b) -> int`\n- Class properties and methods must be typed";
+        doc = "**class**\n\nDeclare a typed class (all properties and "
+              "methods must have types in strict mode).\n```neutron\nclass "
+              "Person {\n    var string name;\n    fun init(string n) -> int "
+              "{\n        this.name = n;\n        return 0;\n    }\n}\n```";
+      } else if (word == "fiber")
+        doc = "**fiber**\n\nLightweight coroutine handle (see `coro` module).\n```neutron\nuse coro;\nvar fiber f = coro.create(task, 1);\ncoro.resume(f);\n```";
+      else if (word == "coro")
+        doc = "**coro module**\n\nCooperative fibers.\n\nFunctions: `create`, `spawn`, `resume`, `yield`, `join`, `status`, `sleep`, `schedule`, `count`, `all`.\n```neutron\nuse coro;\nvar fiber f = coro.spawn(task, 1);\ncoro.schedule();\n```";
       else if (word == "use")
         doc = "**use**\n\nImport a built-in module.\n```neutron\nuse sys;\nuse "
               "json;\n```";
@@ -1455,8 +1412,11 @@ void LSPServer::onHover(const Json::Value &params, const Json::Value &id) {
         doc = "**object**\n\nObject/dictionary type.\n```neutron\nvar object "
               "data = {\"key\": \"value\"};\n```";
       else if (word == "any")
-        doc = "**any**\n\nAny type (accepts any value).\n```neutron\nvar any "
-              "value = 42;\nvalue = \"now a string\";\n```";
+        doc = "**any**\n\nBanned in strict mode (the default). Use a specific type instead (`int`, `float`, `string`, `bool`, `array`, `object`, `fiber`).";
+      else if (word == "fiber")
+        doc = "**fiber**\n\nLightweight coroutine handle (see `coro` module).\n```neutron\nuse coro;\nvar fiber f = coro.create(task, 1);\ncoro.resume(f);\n```";
+      else if (word == "coro")
+        doc = "**coro module**\n\nCooperative fibers.\n\nFunctions: `create`, `spawn`, `resume`, `yield`, `join`, `status`, `sleep`, `schedule`, `count`, `all`.\n```neutron\nuse coro;\nvar fiber f = coro.spawn(task, 1);\ncoro.schedule();\n```";
       
       // String properties and methods
       else if (word == "length")

@@ -4,7 +4,7 @@
 say("=== NEUT-005: Testing Exception Handling ===");
 
 // Test basic try-catch
-var caught = false;
+var bool caught = false;
 try {
     throw "test error";
 } catch (e) {
@@ -16,9 +16,9 @@ if (caught) {
 }
 
 // Test finally block
-var finallyCalled = false;
+var bool finallyCalled = false;
 try {
-    var x = 5;
+    var int x = 5;
 } finally {
     finallyCalled = true;
 }
@@ -28,7 +28,7 @@ if (finallyCalled) {
 }
 
 // Test catch with finally
-var bothWork = false;
+var bool bothWork = false;
 try {
     throw "error";
 } catch (e) {

@@ -167,8 +167,13 @@ public:
         } opcode;
 
         uint32_t operand1;   ///< First operand (register index, constant index, etc.)
-        uint32_t operand2;   ///< Second operand (for binary operations)
+        uint32_t operand2;   ///< Second operand (for binary operations).
+                             ///< For JUMP/JUMP_IF_FALSE: 1 = operand1 is already a
+                             ///< resolved IR index (set by unrollLoop); 0 = operand1
+                             ///< is an absolute bytecode pc needing translation.
         void* data;          ///< Additional data (constants, types, pointers)
+        uint32_t bytecode_pc = 0; ///< Source bytecode offset of this IR (for
+                             ///< precise jump-target resolution in codegen).
     };
 
     /**

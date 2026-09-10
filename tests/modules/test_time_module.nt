@@ -4,7 +4,7 @@ use time;
 say("=== Testing Time Module ===");
 
 // Test 1: Get current timestamp
-var timestamp1 = time.now();
+var int timestamp1 = time.now();
 if (timestamp1 > 0) {
     say("✓ time.now() returns timestamp");
 } else {
@@ -12,7 +12,7 @@ if (timestamp1 > 0) {
 }
 
 // Test 2: Multiple timestamps show progression
-var timestamp2 = time.now();
+var int timestamp2 = time.now();
 if (timestamp2 >= timestamp1) {
     say("✓ Timestamps progress forward");
 } else {
@@ -20,7 +20,7 @@ if (timestamp2 >= timestamp1) {
 }
 
 // Test 3: Format timestamp
-var formatted = time.format(timestamp1);
+var string formatted = time.format(timestamp1);
 if (formatted != "") {
     say("✓ time.format() works: " + formatted);
 } else {
@@ -29,10 +29,10 @@ if (formatted != "") {
 
 // Test 4: Sleep function (brief pause)
 say("Testing sleep...");
-var before = time.now();
+var int before = time.now();
 time.sleep(100);
-var after = time.now();
-var diff = after - before;
+var int after = time.now();
+var int diff = after - before;
 if (diff >= 100) {
     say("✓ time.sleep() works");
 } else {
@@ -40,7 +40,7 @@ if (diff >= 100) {
 }
 
 // Test 5: Custom format
-var customFormat = time.format(timestamp1, "%Y-%m-%d");
+var int customFormat = time.format(timestamp1, "%Y-%m-%d");
 if (customFormat != "") {
     say("✓ Custom format works: " + customFormat);
 } else {

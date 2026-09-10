@@ -1,11 +1,11 @@
 
 // Bitwise operations benchmark
 
-var a = 0;
-var b = 0;
-var c = 0;
+var int a = 0;
+var int b = 0;
+var int c = 0;
 
-for (var i = 0; i < 5000000; i = i + 1) {
+for (var int i = 0; i < 5000000; i = i + 1) {
     a = i & 65535;
     b = i | 43690;
     c = a ^ b;

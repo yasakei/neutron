@@ -4,9 +4,9 @@ use sys;
 say("=== Testing Sys Module ===");
 
 // Test 1: File write and read
-var testFile = "test_sys_temp.txt";
+var string testFile = "test_sys_temp.txt";
 sys.write(testFile, "Test content");
-var content = sys.read(testFile);
+var string content = sys.read(testFile);
 if (content == "Test content") {
     say("✓ sys.write and sys.read work");
 } else {
@@ -14,7 +14,7 @@ if (content == "Test content") {
 }
 
 // Test 2: File exists
-var exists = sys.exists(testFile);
+var bool exists = sys.exists(testFile);
 if (exists == true) {
     say("✓ sys.exists works");
 } else {
@@ -22,7 +22,7 @@ if (exists == true) {
 }
 
 // Test 3: Current working directory
-var cwd = sys.cwd();
+var string cwd = sys.cwd();
 if (cwd != "") {
     say("✓ sys.cwd works");
 } else {
@@ -30,7 +30,7 @@ if (cwd != "") {
 }
 
 // Test 4: System info
-var info = sys.info();
+var object info = sys.info();
 if (info.platform != "" and info.arch != "") {
     say("✓ sys.info works");
 } else {
@@ -38,7 +38,7 @@ if (info.platform != "" and info.arch != "") {
 }
 
 // Test 5: Command line args
-var args = sys.args();
+var array args = sys.args();
 if (args[0] != "") {
     say("✓ sys.args works");
 } else {
@@ -46,7 +46,7 @@ if (args[0] != "") {
 }
 
 // Test 6: Temporary file
-var tmp = sys.tmpfile();
+var int tmp = sys.tmpfile();
 if (tmp != "") {
     say("✓ sys.tmpfile works");
 } else {
@@ -55,7 +55,7 @@ if (tmp != "") {
 
 // Test 7: File stat
 sys.write(tmp, "Hello, World!");
-var fileInfo = sys.stat(tmp);
+var array fileInfo = sys.stat(tmp);
 if (fileInfo.size == 13 and fileInfo.is_file) {
     say("✓ sys.stat works");
 } else {
@@ -67,8 +67,8 @@ sys.chmod(tmp, 420);
 say("✓ sys.chmod works");
 
 // Test 9: Directory listing
-var files = sys.listdir(".");
-var found_files = false;
+var array files = sys.listdir(".");
+var bool found_files = false;
 if (files.length > 0) {
     found_files = true;
 }

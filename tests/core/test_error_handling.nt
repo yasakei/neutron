@@ -6,7 +6,7 @@ say("");
 
 // Test 1: Verify variables work (no ReferenceError)
 say("1. Testing variable access (should work):");
-var x = 10;
+var int x = 10;
 say("✓ Variable x = " + x);
 
 // Test 2: Verify functions work (no ArgumentError)
@@ -15,26 +15,26 @@ say("2. Testing function calls (should work):");
 fun add(a, b) {
     return a + b;
 }
-var sum = add(5, 3);
+var string sum = add(5, 3);
 say("✓ add(5, 3) = " + sum);
 
 // Test 3: Verify division works (no DivisionError)
 say("");
 say("3. Testing division (should work):");
-var result = 10 / 2;
+var int result = 10 / 2;
 say("✓ 10 / 2 = " + result);
 
 // Test 4: Verify array access (no RangeError)
 say("");
 say("4. Testing array access (should work):");
-var arr = [1, 2, 3];
+var array arr = [1, 2, 3];
 say("✓ arr[0] = " + arr[0]);
 
 // Test 5: Verify type operations (no TypeError)
 say("");
 say("5. Testing numeric operations (should work):");
-var a = 5;
-var b = 10;
+var int a = 5;
+var int b = 10;
 say("✓ " + a + " + " + b + " = " + (a + b));
 
 say("");

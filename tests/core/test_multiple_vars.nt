@@ -1,13 +1,13 @@
 say("=== Test Multiple Variable Declarations ===");
 
-var x = 10, y = 20;
+var int x = 10, y = 20;
 if (x == 10 and y == 20) {
     say("✓ Basic multiple declaration passed");
 } else {
     say("✗ Basic multiple declaration failed");
 }
 
-var a = 1, b = 2, c = 3;
+var int a = 1, b = 2, c = 3;
 if (a + b + c == 6) {
     say("✓ Three variables declaration passed");
 } else {

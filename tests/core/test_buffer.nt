@@ -4,7 +4,7 @@ say("=== Buffer Tests ===");
 
 // 1. Creation
 say("\n1. Creation:");
-var buf = sys.alloc(5);
+var string buf = sys.alloc(5);
 say("Buffer created: " + buf);
 
 // 2. Size
@@ -32,7 +32,7 @@ say("buf[2] (default) = " + buf[2]);
 say("\n4. Out of bounds access:");
 try {
     say("Attempting to access index 10...");
-    var val = buf[10];
+    var int val = buf[10];
     say("Should not reach here!");
 } catch (e) {
     say("Caught expected error: " + e);

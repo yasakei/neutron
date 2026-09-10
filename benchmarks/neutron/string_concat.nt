@@ -1,8 +1,8 @@
 
 // String concatenation benchmark
-var s = "";
+var string s = "";
 
-for (var i = 0; i < 50000; i = i + 1) {
+for (var int i = 0; i < 50000; i = i + 1) {
     s = s + "a";
 }
 

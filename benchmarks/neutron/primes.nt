@@ -10,7 +10,7 @@ fun isPrime(n) {
     if (n % 2 == 0) {
         return false;
     }
-    var i = 3;
+    var int i = 3;
     while (i * i <= n) {
         if (n % i == 0) {
             return false;
@@ -21,8 +21,8 @@ fun isPrime(n) {
 }
 
 fun generatePrimes(limit) {
-    var primes = [];
-    var num = 2;
+    var array primes = [];
+    var int num = 2;
     while (num < limit) {
         if (isPrime(num)) {
             primes.push(num);
@@ -33,5 +33,5 @@ fun generatePrimes(limit) {
 }
 
 // Generate primes up to 1000 (reduced from 5000 to avoid stack issues)
-var result = generatePrimes(1000);
+var array result = generatePrimes(1000);
 say("Found ${result.length} primes");

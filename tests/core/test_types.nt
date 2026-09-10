@@ -1,10 +1,10 @@
-// Test Type Annotations
-// This file tests the optional type annotation feature
+// Test Type Annotations (Strict Mode)
+// In strict mode, ALL variables MUST have type annotations
 
-say("=== Type Annotation Tests ===");
+say("=== Type Annotation Tests (Strict Mode) ===");
 
-// Test 1: Basic type annotations
-say("\n1. Basic type annotations:");
+// Test 1: Basic type annotations - REQUIRED in strict mode
+say("\n1. Basic type annotations (required):");
 var int x = 42;
 say("int x = 42: " + x);
 
@@ -17,53 +17,24 @@ say("float pi = 3.14159: " + pi);
 var bool isActive = true;
 say("bool isActive = true: " + isActive);
 
-// Test 2: Variables without type annotations (backward compatibility)
-say("\n2. Untyped variables (backward compatibility):");
-var y = 100;
-say("var y = 100: " + y);
-
-var message = "Hello, World!";
-say("var message = 'Hello, World!': " + message);
-
-var ratio = 2.5;
-say("var ratio = 2.5: " + ratio);
-
-// Test 3: Reassignment of typed variables
-say("\n3. Reassignment of typed variables:");
-var int counter = 0;
-say("Initial counter: " + counter);
-counter = 10;
-say("After reassignment: " + counter);
-counter = counter + 5;
-say("After increment: " + counter);
-
-// Test 4: Type annotations with arrays
-say("\n4. Type annotations with arrays:");
+// Test 2: Type annotations with arrays - REQUIRED
+say("\n2. Type annotations with arrays:");
 var array numbers = [1, 2, 3, 4, 5];
 say("array numbers: " + numbers);
 
-// Test 5: Type annotations with objects
-say("\n5. Type annotations with objects:");
+// Test 3: Type annotations with objects - REQUIRED
+say("\n3. Type annotations with objects:");
 var object person = {"name": "Bob", "age": 30};
 say("object person: " + person);
 
-// Test 6: any type (accepts anything)
-say("\n6. Any type annotation:");
-var any value = 42;
-say("any value = 42: " + value);
-value = "now a string";
-say("any value = 'now a string': " + value);
-value = true;
-say("any value = true: " + value);
-
-// Test 7: Type annotations in for loops
-say("\n7. Type annotations in loops:");
+// Test 4: Type annotations in for loops - REQUIRED
+say("\n4. Type annotations in loops:");
 for (var int i = 0; i < 5; i = i + 1) {
     say("Loop iteration " + i);
 }
 
-// Test 8: Multiple declarations
-say("\n8. Multiple typed declarations:");
+// Test 5: Multiple typed declarations
+say("\n5. Multiple typed declarations:");
 var string firstName = "John";
 var string lastName = "Doe";
 var int age = 25;
@@ -72,9 +43,33 @@ say("Name: " + firstName + " " + lastName);
 say("Age: " + age);
 say("Student: " + isStudent);
 
-// Test 9: Uninitialized typed variables
-say("\n9. Uninitialized typed variables:");
-var int uninitialized;
-say("Uninitialized int: " + uninitialized);
+// Test 6: Typed functions
+say("\n6. Typed functions:");
+fun add(int a, int b) -> int {
+    return a + b;
+}
+var int sum = add(5, 10);
+say("add(5, 10) = " + sum);
+
+// Test 7: Typed classes
+say("\n7. Typed classes:");
+class Person {
+    var string name;
+    var int age;
+    
+    fun init(string n, int a) -> int {
+        this.name = n;
+        this.age = a;
+        return a;
+    }
+    
+    fun getName() -> string {
+        return this.name;
+    }
+}
+
+var object p = Person();
+p.init("Charlie", 25);
+say("Person: " + p.getName());
 
 say("\n=== All Type Annotation Tests Complete ===");

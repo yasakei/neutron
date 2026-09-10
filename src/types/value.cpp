@@ -7,6 +7,7 @@
 #include "types/class.h"
 #include "types/instance.h"
 #include "types/buffer.h"
+#include "core/vm.h"
 #include <sstream>
 
 namespace neutron {
@@ -73,6 +74,11 @@ std::string Value::toString() const {
             return as.instance->toString();
         case ValueType::BUFFER:
             return as.buffer->toString();
+        case ValueType::FIBER:
+            if (as.fiber) {
+                return "<fiber: " + as.fiber->getStateString() + ">";
+            }
+            return "<null fiber>";
     }
     return "";
 }
@@ -108,6 +114,21 @@ Buffer* Value::asBuffer() const {
         return as.buffer;
     }
     return nullptr;
+}
+
+bool Value::isFiber() const {
+    return type == ValueType::FIBER;
+}
+
+Fiber* Value::asFiber() const {
+    if (isFiber()) {
+        return as.fiber;
+    }
+    return nullptr;
+}
+
+Value::Value(Fiber* fiber) : type(ValueType::FIBER) {
+    as.fiber = fiber;
 }
 
 }

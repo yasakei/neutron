@@ -2,12 +2,12 @@
 // Tests AOT bitwise operation support
 
 fun testBitwise() {
-    var a = 12;  // 1100 in binary
-    var b = 10;  // 1010 in binary
+    var int a = 12;  // 1100 in binary
+    var int b = 10;  // 1010 in binary
     
-    var and_result = a & b;  // 1000 = 8
-    var or_result = a | b;   // 1110 = 14
-    var xor_result = a ^ b;  // 0110 = 6
+    var int and_result = a & b;  // 1000 = 8
+    var int or_result = a | b;   // 1110 = 14
+    var int xor_result = a ^ b;  // 0110 = 6
     
     if (and_result == 8 && or_result == 14 && xor_result == 6) {
         say("AOT bitwise test PASSED");

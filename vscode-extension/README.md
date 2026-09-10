@@ -27,9 +27,9 @@
 | Feature | Description |
 |---------|-------------|
 | **High Performance** | C++ bytecode VM - significantly faster than Python for computational tasks |
-| **Project System** | Built-in project management with `.quark` configs - init, build, and run with ease |
-| **Native Executables** | Build standalone binaries with all dependencies bundled |
-| **Modern Package Manager** | Box package manager for native C++ modules with automatic platform detection |
+| **Fast Execution** | C++ bytecode VM - significantly faster than Python for computational tasks |
+| **Native Module Interface** | Direct C++ integration for performance-critical operations |
+| **Cross-Platform** | Write once, run anywhere - Linux, macOS, and Windows support |
 | **Cross-Platform** | Write once, run anywhere - Linux, macOS, and Windows support |
 | **Extensible** | Easy C++ integration for performance-critical operations |
 
@@ -276,20 +276,17 @@ See [scripts/README.md](scripts/README.md) for detailed installation instruction
 
 ## Quick Start
 
-### Project-Based Development
+### Running Neutron Code
 
 ```bash
-# Create a new project
-./neutron init my-app
+# Run a Neutron script directly
+./neutron script.nt
 
-# Run your project
-./neutron run
+# Start the interactive REPL
+./neutron
 
-# Build to standalone native executable (bundles all dependencies)
-./neutron build
-
-# Install Box package manager
-./neutron install box
+# Format Neutron source files
+./neutron fmt file.nt
 ```
 
 ### Hello World

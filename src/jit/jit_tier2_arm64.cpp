@@ -8,6 +8,7 @@
 #include "jit/jit_tier2.h"
 #include <cstring>
 #include <algorithm>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace neutron::jit {
@@ -141,12 +142,33 @@ uint64_t Tier2Compiler::compileTraceARM64(const ExecutionTrace& trace) {
     std::vector<ForwardJump> forward_jumps;
     bool seen_first_jif = false;
 
+    // Precise jump-target resolution: map source bytecode pc -> IR index.
+    std::unordered_map<uint32_t, uint32_t> pc_to_ir;
+    for (uint32_t idx = 0; idx < trace.ir_instructions.size(); idx++) {
+        uint32_t bpc = trace.ir_instructions[idx].bytecode_pc;
+        if (pc_to_ir.find(bpc) == pc_to_ir.end()) {
+            pc_to_ir[bpc] = idx;
+        }
+    }
+    auto resolve_target_ir = [&](const IRInstruction& jinstr) -> uint32_t {
+        if (jinstr.operand2 == 1) {
+            return jinstr.operand1; // Already resolved (unrolled)
+        }
+        auto it = pc_to_ir.find(jinstr.operand1);
+        if (it != pc_to_ir.end()) {
+            return it->second;
+        }
+        return static_cast<uint32_t>(trace.ir_instructions.size());
+    };
+    std::vector<size_t> ir_code_offsets(trace.ir_instructions.size(), 0);
+
     // =====================================================================
     // BODY: Emit ARM64 code for each IR instruction
     // =====================================================================
     for (size_t ir_idx = 0; ir_idx < trace.ir_instructions.size(); ++ir_idx) {
         const auto& instr = trace.ir_instructions[ir_idx];
-        
+        ir_code_offsets[ir_idx] = code.size();
+
         // Resolve forward jumps targeting this IR index
         for (auto it = forward_jumps.begin(); it != forward_jumps.end(); ) {
             if (it->target_ir == ir_idx) {
@@ -585,25 +607,11 @@ uint64_t Tier2Compiler::compileTraceARM64(const ExecutionTrace& trace) {
                     // 3. After code generation, patch all jumps to correct offsets
                     CG::emitBCond(code, cond, 0); // placeholder - will be patched
                 } else {
-                    uint32_t bytecodes_to_skip = instr.operand1;
-                    uint32_t target_ir = ir_idx + 1;
-                    int depth = 1;
-                    for (size_t scan = ir_idx + 1; scan < trace.ir_instructions.size(); scan++) {
-                        const auto& scan_instr = trace.ir_instructions[scan];
-                        if (scan_instr.opcode == IRInstruction::Opcode::JUMP_IF_FALSE) {
-                            depth++;
-                        } else if (scan_instr.opcode == IRInstruction::Opcode::JUMP) {
-                            depth--;
-                            if (depth == 0) {
-                                target_ir = scan + 1;
-                                break;
-                            }
-                        }
-                    }
-                    if (depth != 0) {
-                        uint32_t max_target = (uint32_t)(trace.ir_instructions.size());
-                        uint32_t calc_target = (uint32_t)(ir_idx + bytecodes_to_skip);
-                        target_ir = calc_target < max_target ? calc_target : max_target;
+                    // Exact target via bytecode_pc map (robust against
+                    // multi-IR expansions and optimizer passes).
+                    uint32_t target_ir = resolve_target_ir(instr);
+                    if (target_ir > trace.ir_instructions.size()) {
+                        target_ir = static_cast<uint32_t>(trace.ir_instructions.size());
                     }
                     forward_jumps.push_back({code.size(), target_ir, cond});
                     CG::emitBCond(code, cond, 0); // placeholder - will be patched
@@ -620,15 +628,13 @@ uint64_t Tier2Compiler::compileTraceARM64(const ExecutionTrace& trace) {
                 // Offset 0 = branch-to-self (infinite loop) if not patched
                 // All forward jumps MUST be patched before execution
                 CG::emitB(code, 0); // placeholder - will be patched
-                
-                uint32_t bytecodes_to_skip = instr.operand1;
-                uint32_t target_ir = ir_idx + 1;
-                {
-                    uint32_t max_target = (uint32_t)(trace.ir_instructions.size());
-                    uint32_t calc_target = (uint32_t)(ir_idx + bytecodes_to_skip + 1);
-                    target_ir = calc_target < max_target ? calc_target : max_target;
+
+                // Exact target via bytecode_pc map (see above).
+                uint32_t target_ir = resolve_target_ir(instr);
+                if (target_ir > trace.ir_instructions.size()) {
+                    target_ir = static_cast<uint32_t>(trace.ir_instructions.size());
                 }
-                
+
                 forward_jumps.push_back({jump_offset, target_ir, 0xFF}); // 0xFF = unconditional
                 break;
             }
@@ -673,15 +679,19 @@ uint64_t Tier2Compiler::compileTraceARM64(const ExecutionTrace& trace) {
         CG::patchBCond(code, offset, cond, diff);
     }
     
-    // Patch any remaining unresolved forward jumps (e.g. break → exit)
+    // Patch any remaining unresolved forward jumps: in-range (backward)
+    // targets use recorded code offsets, beyond-end targets go to epilogue.
     for (const auto& fj : forward_jumps) {
-        int32_t diff = (int32_t)(code.size() - fj.patch_offset);
+        size_t dest = (fj.target_ir < ir_code_offsets.size())
+            ? ir_code_offsets[fj.target_ir] : code.size();
+        int32_t diff = (int32_t)(dest - fj.patch_offset);
         if (fj.cond == 0xFF) {
             CG::patchB(code, fj.patch_offset, diff);
         } else {
             CG::patchBCond(code, fj.patch_offset, fj.cond, diff);
         }
     }
+    forward_jumps.clear();
 
     // =====================================================================
     // EPILOGUE: Restore callee-saved registers and return

@@ -1,8 +1,8 @@
 // Loop operations benchmark in Neutron
 
 fun sumWithForLoop(n) {
-    var total = 0;
-    var i = 0;
+    var int total = 0;
+    var int i = 0;
     while (i < n) {
         total = total + i;
         i = i + 1;
@@ -11,8 +11,8 @@ fun sumWithForLoop(n) {
 }
 
 fun sumWithWhileLoop(n) {
-    var total = 0;
-    var i = 0;
+    var int total = 0;
+    var int i = 0;
     while (i < n) {
         total = total + i;
         i = i + 1;
@@ -21,12 +21,12 @@ fun sumWithWhileLoop(n) {
 }
 
 fun nestedLoops(depth, size) {
-    var count = 0;
-    var i = 0;
+    var int count = 0;
+    var int i = 0;
     while (i < depth) {
-        var j = 0;
+        var int j = 0;
         while (j < size) {
-            var k = 0;
+            var int k = 0;
             while (k < size) {
                 count = count + 1;
                 k = k + 1;
@@ -39,8 +39,8 @@ fun nestedLoops(depth, size) {
 }
 
 // Perform loop operations
-var forResult = sumWithForLoop(100000);
-var whileResult = sumWithWhileLoop(100000);
-var nestedResult = nestedLoops(10, 50);
+var int forResult = sumWithForLoop(100000);
+var int whileResult = sumWithWhileLoop(100000);
+var int nestedResult = nestedLoops(10, 50);
 
 say("Loops: for=${forResult} while=${whileResult} nested=${nestedResult}");

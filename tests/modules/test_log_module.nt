@@ -5,13 +5,13 @@ use strings;
 
 say("=== Log Module Tests ===");
 
-var test_count = 0;
-var pass_count = 0;
+var int test_count = 0;
+var int pass_count = 0;
 
 fun test(desc, fn) {
     test_count = test_count + 1;
     try {
-        var r = fn();
+        var int r = fn();
         if (r) {
             say("✓ " + desc);
             pass_count = pass_count + 1;
@@ -36,7 +36,7 @@ test("default level is INFO (1)", fun() {
 
 test("set_level changes level", fun() {
     log.set_level(log.DEBUG);
-    var lvl = log.get_level();
+    var int lvl = log.get_level();
     log.set_level(log.INFO); // restore
     return lvl == 0;
 });
@@ -72,7 +72,7 @@ test("set_timestamp non-bool throws", fun() {
 
 // --- file output ---
 // Use OS temp directory: /tmp on Linux/macOS, C:/temp on Windows
-var tmplog = sys.exists("/tmp") ? "/tmp/test_log_output.txt" : "C:/temp/test_log_output.txt";
+var string tmplog = sys.exists("/tmp") ? "/tmp/test_log_output.txt" : "C:/temp/test_log_output.txt";
 
 test("set_file writes to file", fun() {
     log.set_color(false);
@@ -87,7 +87,7 @@ test("set_file writes to file", fun() {
     log.set_timestamp(true);
     log.set_color(true);
 
-    var content = sys.read(tmplog);
+    var string content = sys.read(tmplog);
     return strings.contains(content, "file-test-marker");
 });
 
@@ -107,7 +107,7 @@ test("log level filters messages", fun() {
     log.set_timestamp(true);
     log.set_color(true);
 
-    var content = sys.read(tmplog);
+    var string content = sys.read(tmplog);
     return strings.contains(content, "error-only-marker");
 });
 

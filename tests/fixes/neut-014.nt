@@ -45,10 +45,13 @@ if (complex == 50) {
     say("✓ Type annotation with complex expression works");
 }
 
-// Test any type
-var any flexible = 42;
-flexible = "now a string";
-flexible = true;
-say("✓ Any type annotation allows any value");
+// Test strict types: same-type reassignment is allowed
+var string flexible = "hello";
+flexible = "now another string";
+say("✓ String reassignment works");
+
+var int counter = 42;
+counter = 100;
+say("✓ Int reassignment works");
 
 say("=== NEUT-014: All tests passed ===");

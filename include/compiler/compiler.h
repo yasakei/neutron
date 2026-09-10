@@ -132,9 +132,9 @@ public:
     /**
      * @brief Construct a top-level compiler.
      * @param vm The VM instance for memory allocation.
-     * @param isSafeFile Whether this is a safe file (.ntsc).
+     * In strict mode (current), all variables and functions require type annotations.
      */
-    Compiler(VM& vm, bool isSafeFile = false);
+    Compiler(VM& vm);
     
     /**
      * @brief Construct a nested compiler (for closures).
@@ -247,8 +247,6 @@ public:
     // Track if we're currently in a safe block (enforces type annotations)
     bool inSafeBlock;
 
-    // Track if we're compiling a safe file (.ntsc)
-    bool isSafeFile;
 };
 } // namespace neutron
 

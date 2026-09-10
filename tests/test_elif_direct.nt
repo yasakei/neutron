@@ -1,4 +1,4 @@
-var x = 2;
+var int x = 2;
 if (x == 1) {
     say("one");
 } elif (x == 2) {

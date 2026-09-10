@@ -1,0 +1,72 @@
+// Test Coro (Fiber) Module - Strict Mode
+// Cooperative multitasking with create/resume/yield/join/status
+use coro;
+
+say("=== Coro Tests ===");
+
+// Test 1: create + status
+say("\n1. create + status:");
+fun worker1(int n) -> int {
+    return n * 2;
+}
+var fiber f1 = coro.create(worker1, 21);
+say("status after create: " + coro.status(f1));
+
+// Test 2: resume to completion (no yield)
+say("\n2. resume (no yield):");
+var int r1 = coro.resume(f1);
+say("resume result: " + r1);
+say("status after finish: " + coro.status(f1));
+
+// Test 3: yield + resume
+say("\n3. yield + resume:");
+fun worker2(int n) -> int {
+    say("worker2 start");
+    coro.yield(n * 10);
+    say("worker2 resumed");
+    return n * 100;
+}
+var fiber f2 = coro.create(worker2, 5);
+var int y1 = coro.resume(f2);
+say("yielded: " + y1);
+say("status suspended: " + coro.status(f2));
+var int r2 = coro.resume(f2);
+say("final: " + r2);
+say("status finished: " + coro.status(f2));
+
+// Test 4: join
+say("\n4. join:");
+fun worker3(int n) -> int {
+    coro.yield(n);
+    return n + 1;
+}
+var fiber f3 = coro.create(worker3, 41);
+var int r3 = coro.join(f3);
+say("join result: " + r3);
+
+// Test 5: spawn + schedule + count + sleep
+say("\n5. spawn/schedule/count/sleep:");
+fun task(int id) -> int {
+    say("task running");
+    return id;
+}
+var fiber s1 = coro.spawn(task, 7);
+say("spawn status: " + coro.status(s1));
+coro.schedule();
+say("after schedule: " + coro.status(s1));
+say("count: " + coro.count());
+coro.sleep(5);
+say("sleep ok");
+
+// Test 6: all (join multiple)
+say("\n6. all:");
+fun quick(int n) -> int {
+    return n * 2;
+}
+var fiber q1 = coro.create(quick, 10);
+var fiber q2 = coro.create(quick, 20);
+var array fibers = [q1, q2];
+var array results = coro.all(fibers);
+say("all results: " + results);
+
+say("\n=== All Coro Tests Complete ===");

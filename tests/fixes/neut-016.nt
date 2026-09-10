@@ -4,36 +4,36 @@
 say("=== NEUT-016: Testing Constant Pool Handling ===");
 
 // Create many string constants
-var s1 = "string1";
-var s2 = "string2";
-var s3 = "string3";
-var s4 = "string4";
-var s5 = "string5";
-var s6 = "string6";
-var s7 = "string7";
-var s8 = "string8";
-var s9 = "string9";
-var s10 = "string10";
+var string s1 = "string1";
+var string s2 = "string2";
+var string s3 = "string3";
+var string s4 = "string4";
+var string s5 = "string5";
+var string s6 = "string6";
+var string s7 = "string7";
+var string s8 = "string8";
+var string s9 = "string9";
+var string s10 = "string10";
 
 // Create many number constants
-var n1 = 1;
-var n2 = 2;
-var n3 = 3;
-var n4 = 4;
-var n5 = 5;
-var n6 = 6;
-var n7 = 7;
-var n8 = 8;
-var n9 = 9;
-var n10 = 10;
+var int n1 = 1;
+var int n2 = 2;
+var int n3 = 3;
+var int n4 = 4;
+var int n5 = 5;
+var int n6 = 6;
+var int n7 = 7;
+var int n8 = 8;
+var int n9 = 9;
+var int n10 = 10;
 
 // Create mixed type constants
-var m1 = 3.14159;
-var m2 = 2.71828;
-var m3 = 1.41421;
-var m4 = true;
-var m5 = false;
-var m6 = nil;
+var float m1 = 3.14159;
+var float m2 = 2.71828;
+var float m3 = 1.41421;
+var bool m4 = true;
+var bool m5 = false;
+var int m6;
 
 // Test that all constants are correctly stored
 if (s5 == "string5") {
@@ -53,7 +53,7 @@ if (m4 == true) {
 }
 
 // Create array with many constants
-var bigArray = [
+var array bigArray = [
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
     "a", "b", "c", "d", "e",
     true, false, nil,

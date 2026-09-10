@@ -1,15 +1,15 @@
 say("=== Test Static Variables ===");
 
 // Basic static variable
-static var PI = 3.14159;
+static var float PI = 3.14159;
 if (PI == 3.14159) {
     say("✓ Static variable declaration works");
 }
 
 // Static with different types
-static var MAX_SIZE = 100;
-static var APP_NAME = "Neutron";
-static var DEBUG = true;
+static var int MAX_SIZE = 100;
+static var string APP_NAME = "Neutron";
+static var bool DEBUG = true;
 
 if (MAX_SIZE == 100 and APP_NAME == "Neutron" and DEBUG == true) {
     say("✓ Multiple static variables work");

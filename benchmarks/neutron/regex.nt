@@ -2,7 +2,7 @@
 use strings;
 
 // Test data - repeat 100 times
-var testStrings = [
+var array testStrings = [
     "Contact us at support@example.com or sales@company.org",
     "Call 123-456-7890 or 987-654-3210",
     "Server IP: 192.168.1.1 or 10.0.0.255",
@@ -12,8 +12,8 @@ var testStrings = [
 
 // Email pattern matching (count @)
 fun matchEmail(text) {
-    var count = 0;
-    var i = 0;
+    var int count = 0;
+    var int i = 0;
     while (i < text.length) {
         if (text[i] == "@") {
             count = count + 1;
@@ -25,8 +25,8 @@ fun matchEmail(text) {
 
 // Phone pattern matching (xxx-xxx-xxxx)
 fun matchPhone(text) {
-    var count = 0;
-    var i = 0;
+    var int count = 0;
+    var int i = 0;
     while (i < text.length - 11) {
         if (text[i + 3] == "-" && text[i + 7] == "-") {
             count = count + 1;
@@ -40,7 +40,7 @@ fun matchPhone(text) {
 
 // URL pattern matching
 fun matchURL(text) {
-    var count = 0;
+    var int count = 0;
     if (strings.contains(text, "http")) {
         count = 1;
     }
@@ -49,13 +49,13 @@ fun matchURL(text) {
 
 // Capitalized word matching (check if uppercase)
 fun matchCapitalized(text) {
-    var count = 0;
-    var i = 0;
+    var int count = 0;
+    var int i = 0;
     while (i < text.length) {
-        var c = text[i];
+        var int c = text[i];
         // Check if character is uppercase by comparing
-        var upper = strings.upper(c);
-        var lower = strings.lower(c);
+        var string upper = strings.upper(c);
+        var string lower = strings.lower(c);
         if (c == upper && c != lower) {
             count = count + 1;
         }
@@ -65,12 +65,12 @@ fun matchCapitalized(text) {
 }
 
 // Run all matches
-var totalMatches = 0;
-var reps = 0;
+var int totalMatches = 0;
+var int reps = 0;
 while (reps < 100) {
-    var j = 0;
+    var int j = 0;
     while (j < testStrings.length) {
-        var text = testStrings[j];
+        var array text = testStrings[j];
         totalMatches = totalMatches + matchEmail(text);
         totalMatches = totalMatches + matchPhone(text);
         totalMatches = totalMatches + matchURL(text);

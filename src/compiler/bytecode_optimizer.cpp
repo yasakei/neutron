@@ -58,8 +58,12 @@ int BytecodeOptimizer::getInstructionSize(const Chunk& chunk, size_t offset) {
         case OpCode::OP_CLOSURE:
         case OpCode::OP_ARRAY:
         case OpCode::OP_OBJECT:
-        case OpCode::OP_VALIDATE_SAFE_VARIABLE:
-        case OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE:
+        case OpCode::OP_FIBER_CREATE:
+        case OpCode::OP_FIBER_YIELD:
+        case OpCode::OP_FIBER_RESUME:
+        case OpCode::OP_FIBER_JOIN:
+        case OpCode::OP_FIBER_STATUS:
+        case OpCode::OP_FIBER_SLEEP:
         case OpCode::OP_GET_GLOBAL_FAST:
         case OpCode::OP_SET_GLOBAL_FAST:
         case OpCode::OP_INC_LOCAL_INT:

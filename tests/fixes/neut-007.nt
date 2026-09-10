@@ -4,8 +4,8 @@
 say("=== NEUT-007: Testing Array Bounds Checking ===");
 
 // Test valid array access
-var arr = [1, 2, 3, 4, 5];
-var val = arr[2];
+var array arr = [1, 2, 3, 4, 5];
+var int val = arr[2];
 if (val == 3) {
     say("✓ Valid array access works");
 }

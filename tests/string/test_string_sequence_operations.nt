@@ -2,8 +2,8 @@ say("=== String Sequence Operations Tests ===");
 
 // Test 1: String indexing (positive and negative)
 say("Test 1: String indexing");
-var index_str = "hello";
-var indexing_tests = (
+var string index_str = "hello";
+var int indexing_tests = (
     index_str[0] == "h" &&
     index_str[1] == "e" &&
     index_str[4] == "o" &&
@@ -20,8 +20,8 @@ if (indexing_tests) {
 
 // Test 2: String slicing
 say("Test 2: String slicing");
-var slice_str = "abcdefgh";
-var slicing_tests = (
+var string slice_str = "abcdefgh";
+var int slicing_tests = (
     slice_str.slice(0, 3) == "abc" &&
     slice_str.slice(2, 5) == "cde" &&
     slice_str.slice(0, 8, 2) == "aceg" &&
@@ -38,7 +38,7 @@ if (slicing_tests) {
 
 // Test 3: String multiplication
 say("Test 3: String multiplication");
-var mult_tests = (
+var int mult_tests = (
     "test" * 3 == "testtesttest" &&
     "a" * 5 == "aaaaa" &&
     "test" * 0 == "" &&
@@ -56,8 +56,8 @@ if (mult_tests) {
 say("Test 4: Sequence properties");
 
 // Negative indexing consistency
-var neg_test_str = "abcde";
-var neg_consistency = (
+var string neg_test_str = "abcde";
+var int neg_consistency = (
     neg_test_str[0] == neg_test_str[-5] &&
     neg_test_str[1] == neg_test_str[-4] &&
     neg_test_str[2] == neg_test_str[-3] &&
@@ -66,7 +66,7 @@ var neg_consistency = (
 );
 
 // Slicing boundary behavior
-var slice_boundaries = (
+var int slice_boundaries = (
     neg_test_str.slice(0, 0) == "" &&
     neg_test_str.slice(5, 5) == "" &&
     neg_test_str.slice(0, 10) == neg_test_str &&
@@ -74,7 +74,7 @@ var slice_boundaries = (
 );
 
 // String multiplication properties
-var mult_properties = (
+var int mult_properties = (
     ("abc" * 0) == "" &&
     ("abc" * 1) == "abc" &&
     ("abc" * 2).length == 6 &&
@@ -89,8 +89,8 @@ if (neg_consistency && slice_boundaries && mult_properties) {
 
 // Test 5: Complex sequence operations
 say("Test 5: Complex sequence operations");
-var complex_str = "Hello World";
-var complex_ops_fixed = (
+var string complex_str = "Hello World";
+var int complex_ops_fixed = (
     complex_str.slice(0, 5).upper() == "HELLO" &&
     complex_str.slice(6, 11).lower() == "world" &&
     (complex_str * 2).find("World") == 6 &&

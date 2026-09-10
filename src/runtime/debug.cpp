@@ -40,6 +40,9 @@ std::ostream& operator<<(std::ostream& os, ValueType type) {
         case ValueType::BUFFER:
             os << "BUFFER";
             break;
+        case ValueType::FIBER:
+            os << "FIBER";
+            break;
     }
     return os;
 }
@@ -183,14 +186,18 @@ size_t disassembleInstruction(const Chunk* chunk, size_t offset) {
             return simpleInstruction("OP_THROW", offset);
         case OpCode::OP_LOGICAL_AND:
             return simpleInstruction("OP_LOGICAL_AND", offset);
-        case OpCode::OP_VALIDATE_SAFE_FUNCTION:
-            return simpleInstruction("OP_VALIDATE_SAFE_FUNCTION", offset);
-        case OpCode::OP_VALIDATE_SAFE_VARIABLE:
-            return constantInstruction("OP_VALIDATE_SAFE_VARIABLE", chunk, offset);
-        case OpCode::OP_VALIDATE_SAFE_FILE_FUNCTION:
-            return simpleInstruction("OP_VALIDATE_SAFE_FILE_FUNCTION", offset);
-        case OpCode::OP_VALIDATE_SAFE_FILE_VARIABLE:
-            return constantInstruction("OP_VALIDATE_SAFE_FILE_VARIABLE", chunk, offset);
+        case OpCode::OP_FIBER_CREATE:
+            return simpleInstruction("OP_FIBER_CREATE", offset);
+        case OpCode::OP_FIBER_YIELD:
+            return simpleInstruction("OP_FIBER_YIELD", offset);
+        case OpCode::OP_FIBER_RESUME:
+            return simpleInstruction("OP_FIBER_RESUME", offset);
+        case OpCode::OP_FIBER_JOIN:
+            return simpleInstruction("OP_FIBER_JOIN", offset);
+        case OpCode::OP_FIBER_STATUS:
+            return simpleInstruction("OP_FIBER_STATUS", offset);
+        case OpCode::OP_FIBER_SLEEP:
+            return simpleInstruction("OP_FIBER_SLEEP", offset);
         case OpCode::OP_LOGICAL_OR:
             return simpleInstruction("OP_LOGICAL_OR", offset);
         case OpCode::OP_CLOSURE:

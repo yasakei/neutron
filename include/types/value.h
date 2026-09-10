@@ -52,6 +52,7 @@ class Callable;
 class Module;
 class Class;
 class Instance;
+class Fiber;
 class Buffer;
 
 /**
@@ -71,7 +72,8 @@ enum class ValueType {
     MODULE,      ///< Loaded module
     CLASS,       ///< Class definition
     INSTANCE,    ///< Class instance
-    BUFFER       ///< Binary buffer for raw data
+    BUFFER,      ///< Binary buffer for raw data
+    FIBER        ///< Fiber (lightweight coroutine)
 };
 
 /**
@@ -91,7 +93,8 @@ union ValueUnion {
     Object* object;     ///< Generic object pointer
     Callable* callable; ///< Function/callable pointer
     Module* module;     ///< Module pointer
-    Class* klass;       ///< Class pointer (named 'klass' to avoid C++ keyword)
+    Fiber* fiber;      ///< Fiber pointer
+    Class* klass;      ///< Class pointer (named 'klass' to avoid C++ keyword)
     Instance* instance; ///< Class instance pointer
     Buffer* buffer;     ///< Binary buffer pointer
 };
@@ -131,6 +134,7 @@ struct Value {
     Value(Object* object);        ///< Construct from generic object
     Value(Callable* callable);    ///< Construct from callable
     Value(Module* module);        ///< Construct from module
+    Value(Fiber* fiber);         ///< Construct from fiber
     Value(Class* klass);          ///< Construct from class
     Value(Instance* instance);    ///< Construct from instance
     Value(Buffer* buffer);        ///< Construct from buffer
@@ -177,6 +181,18 @@ struct Value {
      * @return Pointer to Buffer, or nullptr if not a buffer.
      */
     Buffer* asBuffer() const;
+    
+    /**
+     * @brief Check if value is a fiber.
+     * @return true if type is FIBER.
+     */
+    bool isFiber() const;
+    
+    /**
+     * @brief Get value as fiber pointer.
+     * @return Pointer to Fiber, or nullptr if not a fiber.
+     */
+    Fiber* asFiber() const;
 };
 
 }

@@ -1,11 +1,11 @@
 // Tree Traversal benchmark in Neutron
 
 class TreeNode {
-    var val;
-    var left;
-    var right;
+    var int val;
+    var int left;
+    var int right;
     
-    fun initialize(val) {
+    fun initialize(int val) -> int {
         this.val = val;
         this.left = nil;
         this.right = nil;
@@ -17,7 +17,7 @@ fun buildTree(depth, val) {
         return nil;
     }
     
-    var node = TreeNode(val);
+    var object node = TreeNode(val);
     node.left = buildTree(depth - 1, val * 2 + 1);
     node.right = buildTree(depth - 1, val * 2 + 2);
     
@@ -28,7 +28,7 @@ fun inorderSum(node) {
     if (node == nil) {
         return 0;
     }
-    var sum = inorderSum(node.left);
+    var int sum = inorderSum(node.left);
     sum = sum + node.val;
     sum = sum + inorderSum(node.right);
     return sum;
@@ -42,10 +42,10 @@ fun countNodes(node) {
 }
 
 // Build tree of depth 15
-var root = buildTree(15, 0);
+var int root = buildTree(15, 0);
 
 // Count and sum
-var nodeCount = countNodes(root);
-var totalSum = inorderSum(root);
+var int nodeCount = countNodes(root);
+var int totalSum = inorderSum(root);
 
 say("Tree nodes: ${nodeCount}, Sum: ${totalSum}");

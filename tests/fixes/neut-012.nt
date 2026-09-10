@@ -9,7 +9,7 @@ fun getValue(x) {
     return x * 2;
 }
 
-var result = getValue(5);
+var string result = getValue(5);
 if (result == 10) {
     say("✓ Simple function call returns value");
 } else {
@@ -21,7 +21,7 @@ fun add(a, b) {
     return a + b;
 }
 
-var sum = add(3, 4);
+var int sum = add(3, 4);
 if (sum == 7) {
     say("✓ Function in expression works");
 }

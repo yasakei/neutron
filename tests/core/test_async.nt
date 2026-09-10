@@ -8,7 +8,7 @@ fun task() {
 }
 
 say("Starting async task");
-var future = async.run(task);
+var array future = async.run(task);
 say("Task started, waiting...");
-var result = async.await(future);
+var string result = async.await(future);
 say("Result: " + result);

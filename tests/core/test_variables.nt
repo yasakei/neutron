@@ -2,15 +2,15 @@
 say("=== Testing Variables and Data Types ===");
 
 // Test 1: Variable declaration
-var x;
-var y = 10;
-var z = 20;
+var int x;
+var int y = 10;
+var int z = 20;
 say("✓ Variable declaration works");
 
 // Test 2: Numbers
-var integer = 42;
-var decimal = 3.14;
-var negative = -5;
+var int integer = 42;
+var float decimal = 3.14;
+var int negative = -5;
 if (integer == 42 and decimal == 3.14 and negative == -5) {
     say("✓ Number types work");
 } else {
@@ -18,8 +18,8 @@ if (integer == 42 and decimal == 3.14 and negative == -5) {
 }
 
 // Test 3: Booleans
-var isTrue = true;
-var isFalse = false;
+var bool isTrue = true;
+var bool isFalse = false;
 if (isTrue == true and isFalse == false) {
     say("✓ Boolean types work");
 } else {
@@ -27,8 +27,8 @@ if (isTrue == true and isFalse == false) {
 }
 
 // Test 4: Strings
-var name = "Neutron";
-var message = "Hello, world!";
+var string name = "Neutron";
+var string message = "Hello, world!";
 if (name == "Neutron" and message == "Hello, world!") {
     say("✓ String types work");
 } else {
@@ -36,21 +36,21 @@ if (name == "Neutron" and message == "Hello, world!") {
 }
 
 // Test 5: Nil
-var nothing = nil;
+var int nothing;
 if (nothing == nil) {
     say("✓ Nil type works");
 } else {
     say("✗ Nil type failed");
 }
 
-// Test 6: Dynamic typing
-var value = 42;
-value = "hello";
-value = true;
-say("✓ Dynamic typing works");
+// Test 6: Strict typing (same-type reassignment)
+var int value = 42;
+value = 100;
+value = -7;
+say("✓ Strict typing works");
 
 // Test 7: Variable reassignment
-var counter = 0;
+var int counter = 0;
 counter = counter + 1;
 counter = counter + 1;
 if (counter == 2) {

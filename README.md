@@ -35,8 +35,7 @@
  #### Windows
  - Download the **Installer** (`NeutronInstaller.exe`) from Releases.
  
- ---
- 
+ --- 
  ## Overview
  
  **Neutron** is a high-performance scripting language with a C++ runtime, designed for speed and simplicity.
@@ -47,6 +46,7 @@
  - **Native:** Compiles to standalone executables
  - **Battery-Included:** Standard library with HTTP, JSON, RegEx, and more
  - **Cross-Platform:** Runs on Linux, macOS (Apple Silicon & Intel), Windows
+ - **Strict Typing:** Type annotations required for all variables and functions (TypeScript/Go style)
  
  > [!NOTE]
  > **New?** Check the **[Quick Start Guide](docs/guides/quickstart.md)** to get running in 5 minutes.
@@ -60,7 +60,6 @@
  - **Zero Dependencies:** Written in C++17 with minimal external reliance.
  - **Smart Memory:** Deterministic RC/GC memory management.
  - **JIT Compilation:** Three-tier execution (interpreter → threaded code → tracing JIT) with native codegen for **x86-64** and **ARM64**. Features OSR and deoptimization support.
- - **AOT Compilation:** Compile to standalone native executables with **[AOT Compiler](docs/implementation/aot.md)**. 100% test coverage.
  - **Native Modules:** Direct C++ integration for max performance.
 
 ## Core Features
@@ -83,8 +82,8 @@ Classes, methods, inheritance, and `this` keyword for structured programming
 **First-Class Functions**  
 Lambdas, closures, and higher-order functions for functional programming patterns
 
-**Exception Handling**  
-`try`/`catch`/`finally` blocks for robust error management
+**Strict Type System**  
+All variables and functions require type annotations. Type checking at compile-time and runtime.
 
 </td>
 <td width="50%">
@@ -125,9 +124,6 @@ Native multi-threading support with async/await syntax
 
 ### Developer Tools
 
-**Box Package Manager**  
-`box install module` - Native C++ modules with zero configuration
-
 **Comprehensive Errors**  
 Detailed stack traces with source code context and helpful suggestions
 
@@ -140,7 +136,7 @@ Detailed stack traces with source code context and helpful suggestions
 ### Modern Features
 
 **String Interpolation**  
-`"Hello, ${name}!"` - Embed expressions in strings
+`\"Hello, ${name}!\"` - Embed expressions in strings
 
 **Array Literals**  
 `[1, 2, 3]` with full indexing and manipulation
@@ -157,20 +153,17 @@ Write performance-critical code in C++ and call it from Neutron
 
 ## Quick Start
 
-### Project-Based Development
+### Running Neutron Code
 
 ```bash
-# Create a new project
-./neutron init my-app
+# Run a Neutron script directly
+./neutron script.nt
 
-# Run your project
-./neutron run
+# Start the interactive REPL
+./neutron
 
-# Build to standalone native executable (bundles all dependencies)
-./neutron build
-
-# Install Box package manager
-./neutron install box
+# Format Neutron source files
+./neutron fmt file.nt
 ```
 
 ### Hello World
@@ -184,344 +177,44 @@ say("Hello, World!");
 ./neutron hello.nt  # Run it directly
 ```
 
+### Type Annotations (Required)
+
+In strict mode, ALL variables and functions MUST have type annotations:
+
+```js
+// Variables - type required
+var int age = 25;
+var string name = "Alice";
+var float pi = 3.14159;
+var bool isActive = true;
+var array numbers = [1, 2, 3];
+var object person = {"name": "Bob", "age": 30};
+
+// Functions - parameter and return types required
+fun add(int a, int b) -> int {
+    return a + b;
+}
+
+// Classes - properties and methods require types
+class Person {
+    var string name;
+    var int age;
+    
+    fun init(string n, int a) -> int {
+        this.name = n;
+        this.age = a;
+        return a;
+    }
+    
+    fun getName() -> string {
+        return this.name;
+    }
+}
+```
+
 > [!TIP]
 > **Common Mistake**: Use `.length` (property), not `.length()` (method). See [Common Pitfalls Guide](docs/guides/common-pitfalls.md).
 
 > [!NOTE]
 > **Looking for more examples?** Check out the `examples/real_world/` directory for practical applications like a Todo CLI, HTTP Server, and Data Processing scripts.
 
-### Real-World Examples
-
-<details>
-<summary><b>HTTP & JSON - Fetch GitHub Repository Data</b></summary>
-
-```js
-// github.nt - Fetch repository information
-use http;
-use json;
-
-var response = http.get("https://api.github.com/repos/microsoft/vscode");
-var repo = json.parse(response.body);
-
-say("Repository: ${repo.name}");
-say("Stars: ${repo.stargazers_count}");
-say("Forks: ${repo.forks_count}");
-say("Language: ${repo.language}");
-```
-</details>
-
-<details>
-<summary><b>HTTP Server - Simple Web Server</b></summary>
-
-```js
-// server.nt - Simple HTTP server
-use http;
-
-fun handler(req) {
-    say("Request: " + req.method + " " + req.path);
-    
-    if (req.path == "/") {
-        return "Hello from Neutron!";
-    } else {
-        return {
-            "status": 404,
-            "body": "Not Found"
-        };
-    }
-}
-
-say("Starting server on port 8080...");
-var server = http.createServer(handler);
-http.listen(server, 8080);
-```
-</details>
-
-<details>
-<summary><b>Algorithms - Fibonacci with Performance</b></summary>
-
-```js
-// fibonacci.nt - Fast recursive fibonacci
-fun fib(n) {
-    if (n <= 1) return n;
-    return fib(n - 1) + fib(n - 2);
-}
-
-use time;
-var start = time.now();
-
-for (var i = 0; i < 30; i = i + 1) {
-    say("fib(${i}) = ${fib(i)}");
-}
-
-var elapsed = time.now() - start;
-say("Computed in ${elapsed}ms");
-```
-</details>
-
-<details>
-<summary><b>OOP - Person Class with Methods</b></summary>
-
-```js
-// person.nt - Object-oriented programming
-class Person {
-    var name;
-    var age;
-
-    fun init(name, age) {
-        this.name = name;
-        this.age = age;
-    }
-
-    fun greet() {
-        return "Hi, I'm ${this.name}, ${this.age} years old";
-    }
-
-    fun birthday() {
-        this.age = this.age + 1;
-        say("Happy birthday! Now ${this.age}!");
-    }
-}
-
-var alice = Person();
-alice.init("Alice", 25);
-say(alice.greet());
-alice.birthday();
-```
-</details>
-
-<details>
-<summary><b>File I/O - Log Analyzer</b></summary>
-
-```js
-// analyzer.nt - Analyze log files
-use sys;
-
-var content = sys.read("server.log");
-var lines = content.split("\n");
-
-var errors = 0;
-var warnings = 0;
-
-for (var i = 0; i < lines.length(); i = i + 1) {
-    var line = lines[i];
-    if (line.contains("ERROR")) {
-        errors = errors + 1;
-    }
-    if (line.contains("WARN")) {
-        warnings = warnings + 1;
-    }
-}
-
-say("Log Analysis:");
-say("  Errors: ${errors}");
-say("  Warnings: ${warnings}");
-```
-</details>
-
-> [!TIP]
-> See the [Quick Start Guide](docs/guides/quickstart.md) for more examples and the [Language Reference](docs/reference/language-reference.md) for complete syntax.
-
-## Documentation
-
-**[Complete Documentation Index](docs/README.md)**
-
-### Essential Guides
-- [Project System Guide](docs/guides/project-system.md) - Project management, building, and deployment
-- [Language Reference](docs/reference/language-reference.md) - Complete syntax and features
-- [Module System](docs/reference/module-system.md) - Using and creating modules
-
-### Module Documentation
-- [Sys Module](docs/modules/sys_module.md) - File I/O and system operations
-- [JSON Module](docs/modules/json_module.md) - JSON parsing, serialization, and file I/O
-- [HTTP Module](docs/modules/http_module.md) - HTTP client and server functionality
-- [Regex Module](docs/modules/regex_module.md) - Regular expressions and pattern matching
-- [Math Module](docs/modules/math_module.md) - Mathematical operations
-- [More modules...](docs/modules/)
-
-## Box Package Manager
-
-> **Native C++ modules for Neutron** - Install, manage, and use high-performance native extensions with zero configuration. Box automatically detects Neutron projects and installs modules locally.
-
-### Installation Example
-
-```bash
-# Install a native module (auto-installs to .box/modules/ in projects)
-box install base64
-```
-
-```js
-// Use it in your code immediately
-use base64;
-
-var encoded = base64.encode("Hello, World!");
-say(encoded);  // SGVsbG8sIFdvcmxkIQ==
-
-var decoded = base64.decode(encoded);
-say(decoded);  // Hello, World!
-```
-
-### Features
-
-<table>
-<tr>
-<td width="50%">
-
-**Auto-Detection**  
-Automatically finds and configures your system's C++ compiler (GCC, Clang, MSVC, MinGW)
-
-**Version Control**  
-Pin specific versions with `box install module@1.2.3`
-
-</td>
-<td width="50%">
-
-**Project-Local**  
-Modules install to `.box/modules/` in your project directory
-
-**Cross-Platform**  
-Works seamlessly on Linux (`.so`), macOS (`.dylib`), and Windows (`.dll`)
-
-**Build Tools**  
-Create your own native modules with `box build`
-
-</td>
-</tr>
-</table>
-
-### Common Commands
-
-| Command | Description |
-|---------|-------------|
-| `box install <module>[@version]` | Install a module from NUR |
-| `box list` | Show all installed modules |
-| `box remove <module>` | Uninstall a module |
-| `box build` | Build a native module from source |
-| `box search <query>` | Search available modules |
-
-> [!NOTE]
-> See [Box Documentation](nt-box/docs/) for creating native modules and the [Box Modules Guide](docs/reference/box-modules.md) for advanced usage.
-
-## Language Syntax
-
-### Variables & Functions
-
-```js
-// Variables with dynamic typing
-var name = "Alice";
-var age = 25;
-var scores = [95, 87, 92];
-
-// Functions
-fun add(a, b) {
-    return a + b;
-}
-
-// Lambdas
-var multiply = fun(a, b) { return a * b; };
-say(multiply(3, 4));  // 12
-```
-
-### Control Flow
-
-```js
-// If-else
-if (age >= 18) {
-    say("Adult");
-} else {
-    say("Minor");
-}
-
-// Loops
-for (var i = 0; i < 10; i = i + 1) {
-    say(i);
-}
-
-while (condition) {
-    // loop body
-}
-
-// Match statement (pattern matching)
-match (value) {
-    case 1 => say("One");
-    case 2 => say("Two");
-    default => say("Other");
-}
-```
-
-### Classes & OOP
-
-```js
-class Animal {
-    init(name) {
-        this.name = name;
-    }
-
-    speak() {
-        return "${this.name} makes a sound";
-    }
-}
-
-class Dog extends Animal {
-    speak() {
-        return "${this.name} barks!";
-    }
-}
-
-var dog = Dog("Buddy");
-say(dog.speak());  // Buddy barks!
-```
-
-### Exception Handling
-
-```js
-try {
-    var data = json.parse(invalid_json);
-} catch (e) {
-    say("Error: ${e}");
-} finally {
-    say("Cleanup code here");
-}
-```
-
-> [!NOTE]
-> For complete language documentation, see the [Language Reference](docs/reference/language-reference.md).
-
-## Contributing
-
-We welcome contributions from the community! Whether it's bug fixes, new features, documentation improvements, or native modules.
-
-### How to Contribute
-
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
-
-### Guidelines
-
-- Follow the existing code style and conventions
-- Write tests for new features
-- Update documentation as needed
-
-### Community
-
-- **Discord:** [Not Available](#) for discussions and support
-- **Issues:** [Report bugs or request features](https://github.com/yasakei/neutron/issues)
-- **Discussions:** Share ideas and get help from the community
-
-## License
-
-Neutron is distributed under the **Neutron Permissive License (NPL) 1.1**.
-
-See [LICENSE](LICENSE) for complete terms and conditions.
-
----
-
-<div align="center">
-
-**Created and maintained by [yasakei](https://github.com/yasakei)**
-
-Star this repo if you find Neutron useful!
-
-</div>

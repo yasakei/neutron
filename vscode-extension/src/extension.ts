@@ -195,7 +195,7 @@ export function activate(context: ExtensionContext) {
           filePath = editor.document.uri.fsPath;
       }
       
-      if (!filePath.endsWith('.nt') && !filePath.endsWith('.ntsc')) {
+      if (!filePath.endsWith('.nt')) {
           window.showErrorMessage('Not a Neutron file');
           return;
       }
@@ -225,7 +225,7 @@ export function activate(context: ExtensionContext) {
           filePath = editor.document.uri.fsPath;
       }
       
-      if (!filePath.endsWith('.nt') && !filePath.endsWith('.ntsc')) {
+      if (!filePath.endsWith('.nt')) {
           window.showErrorMessage('Not a Neutron file');
           return;
       }

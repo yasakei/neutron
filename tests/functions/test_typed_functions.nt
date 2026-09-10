@@ -9,7 +9,7 @@ fun add(int a, int b) -> int {
     return a + b;
 }
 
-var result = add(5, 10);
+var int result = add(5, 10);
 if (result == 15) {
     say("✓ Typed function works: add(5, 10) = " + result);
 } else {
@@ -22,7 +22,7 @@ fun greet(string name, int age) -> string {
     return "Hello " + name + ", you are " + age + " years old!";
 }
 
-var greeting = greet("Alice", 25);
+var string greeting = greet("Alice", 25);
 say("✓ Mixed types: " + greeting);
 
 // Test 3: Function without return type (backward compatibility)
@@ -31,7 +31,7 @@ fun oldStyle(x, y) {
     return x * y;
 }
 
-var product = oldStyle(3, 4);
+var string product = oldStyle(3, 4);
 say("✓ Untyped function: " + product);
 
 // Test 4: Parameter type checking
@@ -45,11 +45,11 @@ try {
 
 // Test 5: All supported parameter types
 say("\n5. All supported parameter types:");
-fun testAllTypes(int i, float f, string s, bool b, array a, object o, any x) -> string {
+fun testAllTypes(int i, float f, string s, bool b, array a, object o, string x) -> string {
     return "All types received successfully!";
 }
 
-var testResult = testAllTypes(42, 3.14, "hello", true, [1, 2, 3], {"key": "value"}, "anything");
+var string testResult = testAllTypes(42, 3.14, "hello", true, [1, 2, 3], {"key": "value"}, "anything");
 say("✓ " + testResult);
 
 // Test 6: Safe block enforcement
@@ -97,7 +97,7 @@ fun quadruple(int n) -> int {
     return double(double(n));
 }
 
-var quad = quadruple(5);
+var int quad = quadruple(5);
 say("✓ Nested typed functions: quadruple(5) = " + quad);
 
 // Test 9: Function with array and object parameters
@@ -106,7 +106,7 @@ fun processData(array numbers, object config) -> string {
     return "Processed " + numbers + " with config " + config;
 }
 
-var processed = processData([1, 2, 3], {"mode": "fast"});
+var string processed = processData([1, 2, 3], {"mode": "fast"});
 say("✓ Complex types: " + processed);
 
 // Test 10: Type mismatch in different parameter positions

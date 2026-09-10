@@ -7,9 +7,9 @@ fun fibonacci(n) {
 }
 
 // Test multiple Fibonacci calculations
-var fib10 = fibonacci(10);
-var fib15 = fibonacci(15);
-var fib20 = fibonacci(20);
+var string fib10 = fibonacci(10);
+var string fib15 = fibonacci(15);
+var string fib20 = fibonacci(20);
 
 if (fib10 == 55 && fib15 == 610 && fib20 == 6765) {
     say("JIT fibonacci test PASSED (fib10=" + fib10 + ", fib15=" + fib15 + ", fib20=" + fib20 + ")");

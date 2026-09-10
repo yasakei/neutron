@@ -1,11 +1,11 @@
 // N-Body Simulation benchmark in Neutron
 
 // Store bodies in parallel arrays
-var body_x = [];
-var body_y = [];
-var body_vx = [];
-var body_vy = [];
-var body_mass = [];
+var array body_x = [];
+var array body_y = [];
+var array body_vx = [];
+var array body_vy = [];
+var array body_mass = [];
 
 fun bodyCreate(x, y, vx, vy, mass) {
     body_x.push(x);
@@ -19,8 +19,8 @@ fun sqrtApprox(x) {
     if (x <= 0) {
         return 0;
     }
-    var guess = x / 2;
-    var i = 0;
+    var int guess = x / 2;
+    var int i = 0;
     while (i < 20) {
         guess = (guess + x / guess) / 2;
         i = i + 1;
@@ -29,25 +29,25 @@ fun sqrtApprox(x) {
 }
 
 fun simulate(dt, steps) {
-    var n = body_x.length;
-    var step = 0;
+    var int n = body_x.length;
+    var int step = 0;
     while (step < steps) {
         // Calculate forces and update velocities
-        var i = 0;
+        var int i = 0;
         while (i < n) {
-            var fx = 0;
-            var fy = 0;
+            var int fx = 0;
+            var int fy = 0;
             
-            var j = 0;
+            var int j = 0;
             while (j < n) {
                 if (i != j) {
-                    var dx = body_x[j] - body_x[i];
-                    var dy = body_y[j] - body_y[i];
-                    var distSq = dx * dx + dy * dy;
-                    var dist = sqrtApprox(distSq);
+                    var int dx = body_x[j] - body_x[i];
+                    var int dy = body_y[j] - body_y[i];
+                    var int distSq = dx * dx + dy * dy;
+                    var int dist = sqrtApprox(distSq);
                     
                     if (dist > 0.1) {
-                        var f = (body_mass[i] * body_mass[j]) / distSq;
+                        var int f = (body_mass[i] * body_mass[j]) / distSq;
                         fx = fx + f * dx / dist;
                         fy = fy + f * dy / dist;
                     }
@@ -61,7 +61,7 @@ fun simulate(dt, steps) {
         }
         
         // Update positions
-        var k = 0;
+        var int k = 0;
         while (k < n) {
             body_x[k] = body_x[k] + body_vx[k] * dt;
             body_y[k] = body_y[k] + body_vy[k] * dt;
@@ -82,8 +82,8 @@ bodyCreate(30, 0, 0, 5, 1.5);
 simulate(0.01, 500);
 
 // Output final energy
-var totalEnergy = 0;
-var i = 0;
+var int totalEnergy = 0;
+var int i = 0;
 while (i < body_x.length) {
     totalEnergy = totalEnergy + body_x[i] * body_x[i] + body_y[i] * body_y[i];
     i = i + 1;

@@ -3,7 +3,7 @@ use regex;
 say("=== Testing Regex Module ===");
 
 // Test 1: regex.test - Full string match
-var text1 = "hello";
+var string text1 = "hello";
 if (regex.test(text1, "hello")) {
     say("✓ regex.test() exact match works");
 } else {
@@ -17,7 +17,7 @@ if (!regex.test(text1, "world")) {
 }
 
 // Test 2: regex.search - Pattern search
-var text2 = "The quick brown fox";
+var string text2 = "The quick brown fox";
 if (regex.search(text2, "quick")) {
     say("✓ regex.search() finds pattern");
 } else {
@@ -31,8 +31,8 @@ if (regex.search(text2, "\\w+")) {
 }
 
 // Test 3: regex.find - Find first match with details
-var text3 = "Email: test@example.com";
-var result = regex.find(text3, "[a-z]+@[a-z]+\\.[a-z]+");
+var string text3 = "Email: test@example.com";
+var int result = regex.find(text3, "[a-z]+@[a-z]+\\.[a-z]+");
 if (result != nil) {
     if (result.matched == "test@example.com") {
         say("✓ regex.find() extracts matched text");
@@ -49,8 +49,8 @@ if (result != nil) {
 }
 
 // Test 4: regex.find with capture groups
-var text4 = "Date: 2025-12-01";
-var dateResult = regex.find(text4, "(\\d+)-(\\d+)-(\\d+)");
+var string text4 = "Date: 2025-12-01";
+var int dateResult = regex.find(text4, "(\\d+)-(\\d+)-(\\d+)");
 if (dateResult != nil) {
     if (dateResult.groups.length == 4) {
         say("✓ regex.find() capture groups work");
@@ -62,8 +62,8 @@ if (dateResult != nil) {
 }
 
 // Test 5: regex.findAll - Find all matches
-var text5 = "Numbers: 123, 456, 789";
-var allMatches = regex.findAll(text5, "\\d+");
+var string text5 = "Numbers: 123, 456, 789";
+var string allMatches = regex.findAll(text5, "\\d+");
 if (allMatches.length == 3) {
     say("✓ regex.findAll() finds all matches");
     if (allMatches[0].matched == "123" and allMatches[1].matched == "456" and allMatches[2].matched == "789") {
@@ -76,16 +76,16 @@ if (allMatches.length == 3) {
 }
 
 // Test 6: regex.replace - Replace matches
-var text6 = "Hello World";
-var replaced = regex.replace(text6, "World", "Neutron");
+var string text6 = "Hello World";
+var int replaced = regex.replace(text6, "World", "Neutron");
 if (replaced == "Hello Neutron") {
     say("✓ regex.replace() simple replacement works");
 } else {
     say("✗ regex.replace() simple replacement failed");
 }
 
-var text7 = "cat bat rat";
-var replaced2 = regex.replace(text7, "[cbr]at", "mat");
+var string text7 = "cat bat rat";
+var int replaced2 = regex.replace(text7, "[cbr]at", "mat");
 if (replaced2 == "mat mat mat") {
     say("✓ regex.replace() pattern replacement works");
 } else {
@@ -93,8 +93,8 @@ if (replaced2 == "mat mat mat") {
 }
 
 // Test 7: regex.split - Split by pattern
-var text8 = "apple,banana;orange|grape";
-var parts = regex.split(text8, "[,;|]");
+var string text8 = "apple,banana;orange|grape";
+var array parts = regex.split(text8, "[,;|]");
 if (parts.length == 4) {
     say("✓ regex.split() splits correctly");
     if (parts[0] == "apple" and parts[1] == "banana" and parts[2] == "orange" and parts[3] == "grape") {
@@ -120,8 +120,8 @@ if (!regex.isValid("[invalid")) {
 }
 
 // Test 9: regex.escape - Escape special characters
-var special = "a.b*c?d+e";
-var escaped = regex.escape(special);
+var string special = "a.b*c?d+e";
+var int escaped = regex.escape(special);
 if (regex.test("a.b*c?d+e", escaped)) {
     say("✓ regex.escape() escapes special characters");
 } else {
@@ -130,7 +130,7 @@ if (regex.test("a.b*c?d+e", escaped)) {
 
 // Test 10: Real-world use cases
 // Email validation
-var email = "user@example.com";
+var string email = "user@example.com";
 if (regex.test(email, "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}")) {
     say("✓ Email validation works");
 } else {
@@ -138,8 +138,8 @@ if (regex.test(email, "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}")) {
 }
 
 // URL extraction
-var htmlText = "Visit https://example.com and http://test.org";
-var urls = regex.findAll(htmlText, "https?://[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
+var string htmlText = "Visit https://example.com and http://test.org";
+var string urls = regex.findAll(htmlText, "https?://[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
 if (urls.length == 2) {
     say("✓ URL extraction works");
 } else {
@@ -147,8 +147,8 @@ if (urls.length == 2) {
 }
 
 // Phone number formatting
-var phone = "1234567890";
-var formatted = regex.replace(phone, "(\\d{3})(\\d{3})(\\d{4})", "($1) $2-$3");
+var string phone = "1234567890";
+var int formatted = regex.replace(phone, "(\\d{3})(\\d{3})(\\d{4})", "($1) $2-$3");
 if (formatted == "(123) 456-7890") {
     say("✓ Phone number formatting works");
 } else {
