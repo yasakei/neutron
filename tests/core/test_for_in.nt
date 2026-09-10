@@ -2,8 +2,8 @@
 say("=== for...in Loop ===");
 
 // Test 1: Iterate object keys
-var obj = {"a": 1, "b": 2, "c": 3};
-var count = 0;
+var object obj = {"a": 1, "b": 2, "c": 3};
+var int count = 0;
 for (var key in obj) {
     count = count + 1;
 }
@@ -14,8 +14,8 @@ if (count == 3) {
 }
 
 // Test 2: Iterate array indices
-var arr = [10, 20, 30, 40];
-var idx_sum = 0;
+var array arr = [10, 20, 30, 40];
+var int idx_sum = 0;
 for (var i in arr) {
     idx_sum = idx_sum + i;
 }
@@ -26,8 +26,8 @@ if (idx_sum == 6) {  // 0+1+2+3
 }
 
 // Test 3: Access values using key inside loop
-var scores = {"alice": 95, "bob": 87, "carol": 92};
-var total = 0;
+var object scores = {"alice": 95, "bob": 87, "carol": 92};
+var int total = 0;
 for (var name in scores) {
     total = total + scores[name];
 }
@@ -38,8 +38,8 @@ if (total == 274) {
 }
 
 // Test 4: Empty object
-var empty = {};
-var empty_count = 0;
+var object empty = {};
+var int empty_count = 0;
 for (var k in empty) {
     empty_count = empty_count + 1;
 }
@@ -48,8 +48,8 @@ if (empty_count == 0) {
 }
 
 // Test 5: Nested for...in
-var matrix = {"row1": [1, 2], "row2": [3, 4]};
-var key_count = 0;
+var object matrix = {"row1": [1, 2], "row2": [3, 4]};
+var int key_count = 0;
 for (var row in matrix) {
     key_count = key_count + 1;
 }

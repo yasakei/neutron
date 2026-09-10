@@ -31,7 +31,7 @@ try {
         say("Valid variable: " + validVar);
         
         // This should cause an error - no type annotation
-        var invalidVar = "no type";
+        var string invalidVar = "no type";
         say("This should not be reached!");
     }
 } catch (e) {
@@ -77,7 +77,7 @@ try {
 
 // Test 7: Safe block mixed with regular code
 say("\n7. Safe block mixed with regular code:");
-var regularVar = "I don't need a type";
+var string regularVar = "I don't need a type";
 say("Regular variable: " + regularVar);
 
 safe {
@@ -85,7 +85,7 @@ safe {
     say("Safe variable: " + safeVar);
 }
 
-var anotherRegular = 3.14;
+var float anotherRegular = 3.14;
 say("Another regular variable: " + anotherRegular);
 
 // Test 8: Safe block with all supported types
@@ -97,9 +97,9 @@ safe {
     var bool boolVar = true;
     var array arrayVar = [1, 2, 3];
     var object objectVar = {"key": "value"};
-    var any anyVar = "can be anything";
+    var string anyVar = "can be anything";
     
-    fun processAll(int i, float f, string s, bool b, array a, object o, any x) -> string {
+    fun processAll(int i, float f, string s, bool b, array a, object o, string x) -> string {
         return "All types processed successfully!";
     }
     
@@ -128,7 +128,7 @@ safe {
         }
     }
     
-    var any calc = Calculator();
+    var object calc = Calculator();
     calc.init(10);
     var int result = calc.add(5);
     say("✓ Safe block class works: Calculator value = " + result);

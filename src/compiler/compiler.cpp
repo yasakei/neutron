@@ -1153,7 +1153,7 @@ bool Compiler::validateType(const std::optional<Token>& typeAnnotation, ValueTyp
         case TokenType::TYPE_ARRAY:
             return actualType == ValueType::ARRAY;
         case TokenType::TYPE_OBJECT:
-            return actualType == ValueType::OBJECT;
+            return actualType == ValueType::OBJECT || actualType == ValueType::INSTANCE;
         case TokenType::TYPE_FIBER:
             return actualType == ValueType::FIBER;
         case TokenType::TYPE_ANY:
@@ -1239,6 +1239,7 @@ ValueType Compiler::getExpressionType(const Expr* expr) {
                 case TokenType::TYPE_ARRAY:
                     return ValueType::ARRAY;
                 case TokenType::TYPE_OBJECT:
+                    // Instances are objects at runtime (may hold class state)
                     return ValueType::OBJECT;
                 default:
                     break;

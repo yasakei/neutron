@@ -3,12 +3,12 @@ use time;
 say("=== String Integration and Performance Tests ===");
 
 // Track test failures
-var failureCount = 0;
+var int failureCount = 0;
 
 // Test 1: Backward compatibility
 say("Test 1: Backward compatibility");
-var compat_str = "Hello World";
-var compat_tests = (
+var string compat_str = "Hello World";
+var int compat_tests = (
     // Original methods still work
     compat_str.length == 11 &&
     compat_str.contains("World") == true &&
@@ -33,7 +33,7 @@ if (compat_tests) {
 
 // Test 2: String method integration
 say("Test 2: String method integration");
-var method_tests = (
+var int method_tests = (
     "hello".upper() == "HELLO" &&
     "HELLO".lower() == "hello" &&
     "hello world".find("world") == 6 &&
@@ -50,7 +50,7 @@ if (method_tests) {
 
 // Test 3: Character classification
 say("Test 3: Character classification");
-var class_tests = (
+var int class_tests = (
     "abc123".isalnum() == true &&
     "abc".isalpha() == true &&
     "123".isdigit() == true &&
@@ -67,7 +67,7 @@ if (class_tests) {
 
 // Test 4: Method chaining
 say("Test 4: Method chaining");
-var chain_result = "  hello world  ".strip().upper();
+var string chain_result = "  hello world  ".strip().upper();
 if (chain_result == "HELLO WORLD") {
     say("✓ Method chaining works");
 } else {
@@ -77,15 +77,15 @@ if (chain_result == "HELLO WORLD") {
 
 // Test 5: Performance validation
 say("Test 5: Performance validation");
-var perf_base = "Hello World! ";
-var perf_str = perf_base * 50;  // Smaller test to avoid issues
+var string perf_base = "Hello World! ";
+var int perf_str = perf_base * 50;  // Smaller test to avoid issues
 
-var start_time = time.now();
-var perf_result = perf_str.upper().lower().strip();
-var end_time = time.now();
-var duration = end_time - start_time;
+var int start_time = time.now();
+var string perf_result = perf_str.upper().lower().strip();
+var int end_time = time.now();
+var int duration = end_time - start_time;
 
-var performance_ok = (
+var int performance_ok = (
     perf_result.length > 500 &&
     perf_result.contains("hello world") &&
     duration < 1000  // Should complete in less than 1 second
@@ -100,7 +100,7 @@ if (performance_ok) {
 
 // Test 6: Unicode and special characters
 say("Test 6: Unicode and special characters");
-var unicode_tests = (
+var int unicode_tests = (
     "café".length == 5 &&
     "café".isunicode() == true &&
     "café".upper() == "CAFÉ"  // Now this should work!

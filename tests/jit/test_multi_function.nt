@@ -10,16 +10,16 @@ fun multiply(a, b) {
 }
 
 fun compute() {
-    var sum = 0;
-    for (var i = 0; i < 100; i = i + 1) {
+    var int sum = 0;
+    for (var int i = 0; i < 100; i = i + 1) {
         sum = add(sum, i);
         sum = multiply(sum, 1);  // Identity multiply to trigger JIT
     }
     return sum;
 }
 
-var result = compute();
-var expected = 4950;  // Sum of 0 to 99
+var string result = compute();
+var int expected = 4950;  // Sum of 0 to 99
 
 if (result == expected) {
     say("JIT multi-function test PASSED (result=" + result + ")");

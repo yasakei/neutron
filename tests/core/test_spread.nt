@@ -5,8 +5,8 @@ say("=== Spread Operator ===");
 fun add3(a, b, c) {
     return a + b + c;
 }
-var nums = [1, 2, 3];
-var result = add3(...nums);
+var array nums = [1, 2, 3];
+var string result = add3(...nums);
 if (result == 6) {
     say("✓ Spread array into function call works");
 } else {
@@ -17,8 +17,8 @@ if (result == 6) {
 fun sum4(a, b, c, d) {
     return a + b + c + d;
 }
-var rest = [3, 4];
-var r2 = sum4(1, 2, ...rest);
+var array rest = [3, 4];
+var string r2 = sum4(1, 2, ...rest);
 if (r2 == 10) {
     say("✓ Spread with leading args works");
 } else {
@@ -29,8 +29,8 @@ if (r2 == 10) {
 fun identity(x) {
     return x;
 }
-var single = [99];
-var r3 = identity(...single);
+var array single = [99];
+var string r3 = identity(...single);
 if (r3 == 99) {
     say("✓ Spread single-element array works");
 } else {
@@ -41,8 +41,8 @@ if (r3 == 99) {
 fun greet(first, last) {
     return first + " " + last;
 }
-var parts = ["Hello", "World"];
-var r4 = greet(...parts);
+var array parts = ["Hello", "World"];
+var string r4 = greet(...parts);
 if (r4 == "Hello World") {
     say("✓ Spread string array works");
 } else {

@@ -4,7 +4,7 @@ use sys;
 say("=== Testing ELIF Statement ===");
 
 // Test 1: Basic elif chain
-var score = 85;
+var int score = 85;
 
 if (score >= 90) {
     say("Grade: A");
@@ -19,7 +19,7 @@ if (score >= 90) {
 }
 
 // Test 2: Only elif branches (no final else)
-var day = 3;
+var int day = 3;
 
 if (day == 1) {
     say("Monday");
@@ -34,7 +34,7 @@ if (day == 1) {
 }
 
 // Test 3: No elif branches, just if/else
-var isRaining = true;
+var bool isRaining = true;
 
 if (isRaining) {
     say("Take an umbrella");
@@ -43,8 +43,8 @@ if (isRaining) {
 }
 
 // Test 4: Complex conditions
-var age = 25;
-var hasLicense = true;
+var int age = 25;
+var bool hasLicense = true;
 
 if (age < 16) {
     say("Too young to drive");
@@ -65,8 +65,8 @@ if (age < 16) {
 }
 
 // Test 5: Nested elif statements
-var x = 10;
-var y = 20;
+var int x = 10;
+var int y = 20;
 
 if (x > 5) {
     if (y > 15) {

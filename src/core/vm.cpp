@@ -569,7 +569,7 @@ bool VM::call(Function* function, int argCount) {
                         isValid = arg.type == ValueType::ARRAY;
                         break;
                     case TokenType::TYPE_OBJECT:
-                        isValid = arg.type == ValueType::OBJECT;
+                        isValid = arg.type == ValueType::OBJECT || arg.type == ValueType::INSTANCE;
                         break;
                     case TokenType::TYPE_ANY:
                         isValid = true;
@@ -610,6 +610,8 @@ bool VM::call(Function* function, int argCount) {
                                                   arg.type == ValueType::OBJ_STRING ? "string" :
                                                   arg.type == ValueType::ARRAY ? "array" :
                                                   arg.type == ValueType::OBJECT ? "object" :
+                                                  arg.type == ValueType::INSTANCE ? "instance" :
+                                                  arg.type == ValueType::FIBER ? "fiber" :
                                                   "callable";
                     
                     runtimeError(this, "Type mismatch in function '" + funcName + "' parameter " + std::to_string(i + 1) + 
@@ -1510,7 +1512,7 @@ void VM::run(size_t minFrameDepth) {
                         isValid = value.type == ValueType::ARRAY;
                         break;
                     case TokenType::TYPE_OBJECT:
-                        isValid = value.type == ValueType::OBJECT;
+                        isValid = value.type == ValueType::OBJECT || value.type == ValueType::INSTANCE;
                         break;
                     case TokenType::TYPE_ANY:
                         isValid = true;
@@ -1553,6 +1555,8 @@ void VM::run(size_t minFrameDepth) {
                                                   value.type == ValueType::OBJ_STRING ? "string" :
                                                   value.type == ValueType::ARRAY ? "array" :
                                                   value.type == ValueType::OBJECT ? "object" :
+                                                  value.type == ValueType::INSTANCE ? "instance" :
+                                                  value.type == ValueType::FIBER ? "fiber" :
                                                   "callable";
                     
                     runtimeError(this, "Type mismatch: Cannot assign value of type '" + actualTypeName + 
@@ -1586,7 +1590,7 @@ void VM::run(size_t minFrameDepth) {
                         isValid = value.type == ValueType::ARRAY;
                         break;
                     case TokenType::TYPE_OBJECT:
-                        isValid = value.type == ValueType::OBJECT;
+                        isValid = value.type == ValueType::OBJECT || value.type == ValueType::INSTANCE;
                         break;
                     case TokenType::TYPE_ANY:
                         isValid = true;
@@ -1629,6 +1633,8 @@ void VM::run(size_t minFrameDepth) {
                                                   value.type == ValueType::OBJ_STRING ? "string" :
                                                   value.type == ValueType::ARRAY ? "array" :
                                                   value.type == ValueType::OBJECT ? "object" :
+                                                  value.type == ValueType::INSTANCE ? "instance" :
+                                                  value.type == ValueType::FIBER ? "fiber" :
                                                   "callable";
                     
                     runtimeError(this, "Type mismatch: Cannot assign value of type '" + actualTypeName + 

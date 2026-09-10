@@ -11,12 +11,12 @@ if (numbers.length == 6) {
     say("✓ Array push works");
 }
 
-var sliced = numbers.slice(0, 3);
+var array sliced = numbers.slice(0, 3);
 if (sliced.length == 3) {
     say("✓ Array slice works");
 }
 
-var idx = numbers.indexOf(4);
+var int idx = numbers.indexOf(4);
 if (idx == 3) {
     say("✓ Array indexOf works");
 }

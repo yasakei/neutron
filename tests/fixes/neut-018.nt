@@ -6,17 +6,17 @@ say("=== NEUT-018: Testing C API Memory Management ===");
 // Test built-in native functions that use C API
 // These should not leak memory when called repeatedly
 
-var i = 0;
+var int i = 0;
 while (i < 100) {
-    var temp = "test string " + i;
+    var string temp = "test string " + i;
     i = i + 1;
 }
 
 say("✓ String concatenation in loop (100 iterations)");
 
 // Test array operations
-var testArray = [];
-var j = 0;
+var array testArray = [];
+var int j = 0;
 while (j < 50) {
     testArray.push(j);
     j = j + 1;
@@ -31,8 +31,8 @@ fun testFunc(x) {
     return x * 2;
 }
 
-var k = 0;
-var sum = 0;
+var int k = 0;
+var int sum = 0;
 while (k < 100) {
     sum = sum + testFunc(k);
     k = k + 1;
@@ -43,9 +43,9 @@ if (sum == 9900) {
 }
 
 // Test object creation
-var l = 0;
+var int l = 0;
 while (l < 50) {
-    var objName = "object" + l;
+    var string objName = "object" + l;
     l = l + 1;
 }
 

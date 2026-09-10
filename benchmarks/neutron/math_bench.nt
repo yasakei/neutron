@@ -1,8 +1,8 @@
 // Math operations benchmark in Neutron
 
 fun power(base, exp) {
-    var result = 1;
-    var i = 0;
+    var int result = 1;
+    var int i = 0;
     while (i < exp) {
         result = result * base;
         i = i + 1;
@@ -18,12 +18,12 @@ fun sqrt(n) {
         return n;
     }
     
-    var guess = n / 2;
-    var epsilon = 0.00001;
-    var iterations = 0;
+    var int guess = n / 2;
+    var float epsilon = 0.00001;
+    var int iterations = 0;
     
     while (iterations < 100) {
-        var newGuess = (guess + n / guess) / 2;
+        var int newGuess = (guess + n / guess) / 2;
         if (guess - newGuess < epsilon and newGuess - guess < epsilon) {
             return newGuess;
         }
@@ -35,7 +35,7 @@ fun sqrt(n) {
 
 fun gcd(a, b) {
     while (b != 0) {
-        var temp = b;
+        var int temp = b;
         b = a % b;
         a = temp;
     }
@@ -43,12 +43,12 @@ fun gcd(a, b) {
 }
 
 // Run math operations
-var pow1 = power(2, 20);
-var pow2 = power(3, 15);
-var sq1 = sqrt(144);
-var sq2 = sqrt(2);
-var gcd1 = gcd(48, 18);
-var gcd2 = gcd(100, 75);
+var int pow1 = power(2, 20);
+var int pow2 = power(3, 15);
+var int sq1 = sqrt(144);
+var int sq2 = sqrt(2);
+var int gcd1 = gcd(48, 18);
+var int gcd2 = gcd(100, 75);
 
 say("Math operations completed");
 say("Results: ${pow1}, ${pow2}, ${gcd1}, ${gcd2}");

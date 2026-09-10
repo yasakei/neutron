@@ -2,7 +2,7 @@
 say("=== Testing Comments ===");
 
 // This is a single line comment
-var x = 10; // Comment after statement
+var int x = 10; // Comment after statement
 
 // Multiple comment lines
 // can be written
@@ -16,7 +16,7 @@ if (x == 10) { // Inline comment
 // Comments can contain quotes: " ' ` 
 // Comments with numbers: 123456789
 
-var y = 20; // var z = 30; This is commented out
+var int y = 20; // var z = 30; This is commented out
 
 if (y == 20) {
     say("✓ Commented code is ignored");
@@ -25,11 +25,11 @@ if (y == 20) {
 // Block comments
 #{ This is a block comment }#
 
-var a = 5;
+var int a = 5;
 #{ 
     This is a
     multi-line block comment
-    var a = 999; // this should be ignored
+    var int a = 999; // this should be ignored
 }#
 
 if (a == 5) {
@@ -39,7 +39,7 @@ if (a == 5) {
 #{ Nested #{ block }# comments work too }#
 say("✓ Nested block comments work");
 
-var b = 1; #{ inline block comment }# var c = 2;
+var int b = 1; #{ inline block comment }# var c = 2;
 if (b == 1 and c == 2) {
     say("✓ Inline block comments work");
 }

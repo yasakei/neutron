@@ -3,13 +3,13 @@ use strings;
 
 say("=== Strings Module Tests ===");
 
-var test_count = 0;
-var pass_count = 0;
+var int test_count = 0;
+var int pass_count = 0;
 
 fun test(desc, fn) {
     test_count = test_count + 1;
     try {
-        var r = fn();
+        var int r = fn();
         if (r) {
             say("✓ " + desc);
             pass_count = pass_count + 1;
@@ -23,22 +23,22 @@ fun test(desc, fn) {
 
 // --- split ---
 test("split by comma", fun() {
-    var parts = strings.split("a,b,c", ",");
+    var string parts = strings.split("a,b,c", ",");
     return parts.length == 3 and parts[0] == "a" and parts[1] == "b" and parts[2] == "c";
 });
 
 test("split by space (default)", fun() {
-    var parts = strings.split("hello world");
+    var string parts = strings.split("hello world");
     return parts.length == 2 and parts[0] == "hello";
 });
 
 test("split into chars", fun() {
-    var parts = strings.split("abc", "");
+    var string parts = strings.split("abc", "");
     return parts.length == 3 and parts[0] == "a";
 });
 
 test("split no match returns whole string", fun() {
-    var parts = strings.split("hello", ",");
+    var string parts = strings.split("hello", ",");
     return parts.length == 1 and parts[0] == "hello";
 });
 

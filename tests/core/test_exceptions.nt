@@ -2,7 +2,7 @@
 say("=== Exception Handling Tests ===");
 
 // Test 1: Basic try-catch
-var caughtException = false;
+var bool caughtException = false;
 try {
     throw "Test exception";
     say("This should not print");
@@ -19,7 +19,7 @@ if (!caughtException) {
 }
 
 // Test 2: Try without exception
-var normalExecution = false;
+var bool normalExecution = false;
 try {
     say("Executing normally");
     normalExecution = true;
@@ -32,7 +32,7 @@ if (normalExecution) {
 }
 
 // Test 3: Finally block always executes
-var finallyExecuted = false;
+var bool finallyExecuted = false;
 try {
     // No exception
 } finally {
@@ -45,7 +45,7 @@ if (finallyExecuted) {
 }
 
 // Test 4: Finally executes with exception
-var finallyWithException = false;
+var bool finallyWithException = false;
 try {
     throw "Exception with finally";
 } finally {
@@ -79,8 +79,8 @@ try {
 }
 
 // Test 6: Nested try-catch
-var outerCaught = false;
-var innerCaught = false;
+var bool outerCaught = false;
+var bool innerCaught = false;
 try {
     try {
         throw "Inner exception";

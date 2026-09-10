@@ -3,21 +3,21 @@ use json;
 say("=== Testing JSON Module ===");
 
 // Test 1: json.stringify basic types
-var strNull = json.stringify(nil);
+var string strNull = json.stringify(nil);
 if (strNull == "null") {
     say("✓ json.stringify(nil) works");
 } else {
     say("✗ json.stringify(nil) failed");
 }
 
-var strBool = json.stringify(true);
+var string strBool = json.stringify(true);
 if (strBool == "true") {
     say("✓ json.stringify(boolean) works");
 } else {
     say("✗ json.stringify(boolean) failed");
 }
 
-var strNum = json.stringify(42);
+var string strNum = json.stringify(42);
 if (strNum == "42") {
     say("✓ json.stringify(number) works");
 } else {
@@ -25,21 +25,21 @@ if (strNum == "42") {
 }
 
 // Test 2: json.parse basic types
-var parsedNull = json.parse("null");
+var object parsedNull = json.parse("null");
 if (parsedNull == nil) {
     say("✓ json.parse(null) works");
 } else {
     say("✗ json.parse(null) failed");
 }
 
-var parsedBool = json.parse("true");
+var object parsedBool = json.parse("true");
 if (parsedBool == true) {
     say("✓ json.parse(boolean) works");
 } else {
     say("✗ json.parse(boolean) failed");
 }
 
-var parsedNum = json.parse("42");
+var object parsedNum = json.parse("42");
 if (parsedNum == 42) {
     say("✓ json.parse(number) works");
 } else {
@@ -47,8 +47,8 @@ if (parsedNum == 42) {
 }
 
 // Test 3: json.get
-var obj = json.parse("{\"name\": \"Alice\", \"age\": 30}");
-var name = json.get(obj, "name");
+var object obj = json.parse("{\"name\": \"Alice\", \"age\": 30}");
+var int name = json.get(obj, "name");
 if (name == "Alice") {
     say("✓ json.get works");
 } else {
@@ -71,7 +71,7 @@ if (obj.city == "NYC") {
 }
 
 // Test 6: json.keys
-var keys = json.keys(obj);
+var string keys = json.keys(obj);
 if (keys.length == 3) {
     say("✓ json.keys works");
 } else {
@@ -79,7 +79,7 @@ if (keys.length == 3) {
 }
 
 // Test 7: json.values
-var values = json.values(obj);
+var array values = json.values(obj);
 if (values.length == 3) {
     say("✓ json.values works");
 } else {
@@ -87,8 +87,8 @@ if (values.length == 3) {
 }
 
 // Test 8: json.merge
-var obj2 = json.parse("{\"country\": \"USA\", \"age\": 31}");
-var merged = json.merge(obj, obj2);
+var object obj2 = json.parse("{\"country\": \"USA\", \"age\": 31}");
+var object merged = json.merge(obj, obj2);
 if (merged.country == "USA" and merged.age == 31) {
     say("✓ json.merge works");
 } else {
@@ -96,7 +96,7 @@ if (merged.country == "USA" and merged.age == 31) {
 }
 
 // Test 9: json.clone
-var cloned = json.clone(obj);
+var object cloned = json.clone(obj);
 json.set(cloned, "name", "Bob");
 if (obj.name == "Alice" and cloned.name == "Bob") {
     say("✓ json.clone works (deep copy)");
@@ -114,7 +114,7 @@ if (!json.has(obj, "city")) {
 
 // Test 11: json.writeFile
 use sys;
-var fileData = json.parse("{\"app\": \"neutron\", \"version\": \"1.0\"}");
+var object fileData = json.parse("{\"app\": \"neutron\", \"version\": \"1.0\"}");
 json.writeFile("test_json.json", fileData);
 if (sys.exists("test_json.json")) {
     say("✓ json.writeFile works");
@@ -123,7 +123,7 @@ if (sys.exists("test_json.json")) {
 }
 
 // Test 12: json.readFile
-var loaded = json.readFile("test_json.json");
+var object loaded = json.readFile("test_json.json");
 if (loaded.app == "neutron" and loaded.version == "1.0") {
     say("✓ json.readFile works");
 } else {
@@ -132,7 +132,7 @@ if (loaded.app == "neutron" and loaded.version == "1.0") {
 
 // Test 13: Pretty formatting
 json.writeFile("test_pretty.json", fileData, true);
-var prettyContent = sys.read("test_pretty.json");
+var string prettyContent = sys.read("test_pretty.json");
 if (prettyContent != "") {
     say("✓ json.writeFile with pretty formatting works");
 } else {

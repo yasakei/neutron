@@ -1,9 +1,9 @@
 // String operations benchmark in Neutron
 
 fun reverseString(s) {
-    var result = "";
-    var len = s.length;
-    var i = 0;
+    var string result = "";
+    var int len = s.length;
+    var int i = 0;
     while (i < len) {
         result = s[i] + result;
         i = i + 1;
@@ -17,10 +17,10 @@ fun countOccurrences(haystack, needle) {
         return 0;
     }
     
-    var count = 0;
-    var hayLen = haystack.length;
-    var needleChar = needle[0];
-    var i = 0;
+    var int count = 0;
+    var int hayLen = haystack.length;
+    var int needleChar = needle[0];
+    var int i = 0;
     while (i < hayLen) {
         if (haystack[i] == needleChar) {
             count = count + 1;
@@ -31,8 +31,8 @@ fun countOccurrences(haystack, needle) {
 }
 
 fun simpleConcatenate(base, addition, times) {
-    var result = base;
-    var i = 0;
+    var int result = base;
+    var int i = 0;
     while (i < times) {
         result = result + addition;
         i = i + 1;
@@ -41,18 +41,18 @@ fun simpleConcatenate(base, addition, times) {
 }
 
 // Create a long string for testing
-var longString = "";
-var j = 0;
-var iterations = 100;  // Reduced from 1000 for better performance
+var string longString = "";
+var int j = 0;
+var int iterations = 100;  // Reduced from 1000 for better performance
 while (j < iterations) {
     longString = longString + "Neutron programming language is fast and efficient. ";
     j = j + 1;
 }
 
 // Perform string operations
-var reversed = reverseString(longString);
-var charCount = countOccurrences(longString, "a");
-var concatenated = simpleConcatenate("", "Hello World from Neutron! ", 50);
+var array reversed = reverseString(longString);
+var int charCount = countOccurrences(longString, "a");
+var int concatenated = simpleConcatenate("", "Hello World from Neutron! ", 50);
 
 // Output result
 say("String ops: len=${longString.length} rev=${reversed.length} count=${charCount}");

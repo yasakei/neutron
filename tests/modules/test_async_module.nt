@@ -13,7 +13,7 @@ say("  After sleep - sleep function works");
 
 // Test 2: async.run
 say("Test 2: async.run");
-var task = async.run(fun() {
+var array task = async.run(fun() {
     say("    Inside async.run function");
     return "async_result";
 });
@@ -21,14 +21,14 @@ say("  Async task created: " + (task != nil));
 
 // Test 3: async.await
 say("Test 3: async.await");
-var result = async.await(task);
+var int result = async.await(task);
 say("  Await result: " + (result != nil));
 
 // Test 4: async.timer
 // Note: Timer runs asynchronously, we need to wait longer on some platforms
 say("Test 4: async.timer");
 say("  Starting timer test");
-var timerRan = false;
+var bool timerRan = false;
 async.timer(fun() {
     say("    Timer callback executed");
     timerRan = true;
@@ -42,17 +42,17 @@ say("  Timer execution verified");
 
 // Test 6: Combined async operations
 say("Test 6: Combined async operations");
-var task1 = async.run(fun() {
+var array task1 = async.run(fun() {
     async.sleep(20);
     return "result1";
 });
-var task2 = async.run(fun() {
+var array task2 = async.run(fun() {
     async.sleep(30);
     return "result2";
 });
 
-var result1 = async.await(task1);
-var result2 = async.await(task2);
+var string result1 = async.await(task1);
+var string result2 = async.await(task2);
 say("  Combined results: " + result1 + ", " + result2);
 
 say("=== All async module tests completed ===");

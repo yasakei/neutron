@@ -11,11 +11,11 @@ fun factorial(n) {
     if (n <= 1) {
         return 1;
     }
-    var sub = factorial(n - 1);
+    var int sub = factorial(n - 1);
     return n * sub;
 }
 
-var fact5 = factorial(5);
+var string fact5 = factorial(5);
 if (fact5 == 120) {
     say("✓ Recursive factorial works: 5! = 120");
 } else {
@@ -30,7 +30,7 @@ fun power(base, exp) {
     return base * power(base, exp - 1);
 }
 
-var pow2_10 = power(2, 10);
+var string pow2_10 = power(2, 10);
 if (pow2_10 == 1024) {
     say("✓ Recursive power works: 2^10 = 1024");
 } else {
@@ -42,12 +42,12 @@ fun fib(n) {
     if (n <= 1) {
         return n;
     }
-    var a = fib(n - 1);
-    var b = fib(n - 2);
+    var int a = fib(n - 1);
+    var int b = fib(n - 2);
     return a + b;
 }
 
-var fib7 = fib(7);
+var string fib7 = fib(7);
 if (fib7 == 13) {
     say("✓ Nested recursion works: fib(7) = 13");
 } else {
@@ -56,32 +56,32 @@ if (fib7 == 13) {
 
 // Test 4: Classes with methods in loops (bound method calls)
 class Counter {
-    var value;
+    var int value;
     
-    fun initialize(v) {
+    fun initialize(int v) -> int {
         this.value = v;
     }
     
-    fun increment() {
+    fun increment() -> int {
         this.value = this.value + 1;
         return this.value;
     }
     
-    fun getValue() {
+    fun getValue() -> int {
         return this.value;
     }
 }
 
-var counters = arrays.new();
-var i = 0;
+var array counters = arrays.new();
+var int i = 0;
 while (i < 5) {
-    var c = Counter(i * 10);
+    var object c = Counter(i * 10);
     arrays.push(counters, c);
     i = i + 1;
 }
 
 // Test that we created 5 counters
-var counterLen = arrays.length(counters);
+var int counterLen = arrays.length(counters);
 if (counterLen == 5) {
     say("✓ Created objects in loop: 5 counters");
 } else {
@@ -89,11 +89,11 @@ if (counterLen == 5) {
 }
 
 // Test 5: Call methods on objects created in loop
-var sum = 0;
-var j = 0;
+var int sum = 0;
+var int j = 0;
 while (j < 5) {
-    var counter = arrays.at(counters, j);
-    var val = counter.getValue();
+    var object counter = arrays.at(counters, j);
+    var int val = counter.getValue();
     sum = sum + val;
     j = j + 1;
 }
@@ -105,17 +105,17 @@ if (sum == 100) {
 }
 
 // Test 6: Modify objects through methods in loop
-var k = 0;
+var int k = 0;
 while (k < 5) {
-    var counter = arrays.at(counters, k);
+    var object counter = arrays.at(counters, k);
     counter.increment();
     k = k + 1;
 }
 
-var newSum = 0;
-var m = 0;
+var int newSum = 0;
+var int m = 0;
 while (m < 5) {
-    var counter = arrays.at(counters, m);
+    var object counter = arrays.at(counters, m);
     newSum = newSum + counter.getValue();
     m = m + 1;
 }

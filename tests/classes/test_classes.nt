@@ -3,26 +3,26 @@ say("=== Testing Classes and OOP ===");
 
 // Test 1: Simple class definition
 class Person {
-    var name;
-    var age;
+    var string name;
+    var int age;
     
-    fun initialize(n, a) {
+    fun initialize(string n, int a) -> int {
         this.name = n;
         this.age = a;
     }
     
-    fun greet() {
+    fun greet() -> int {
         say("Hello, I am " + this.name);
     }
     
-    fun getAge() {
+    fun getAge() -> int {
         return this.age;
     }
 }
 
-var person = Person("Alice", 30);
+var object person = Person("Alice", 30);
 person.greet();
-var age = person.getAge();
+var int age = person.getAge();
 if (age == 30) {
     say("✓ Class definition and methods work");
 } else {
@@ -31,26 +31,26 @@ if (age == 30) {
 
 // Test 2: Class with this keyword
 class Counter {
-    var count;
+    var int count;
     
-    fun initialize() {
+    fun initialize() -> int {
         this.count = 0;
     }
     
-    fun increment() {
+    fun increment() -> int {
         this.count = this.count + 1;
         return this.count;
     }
     
-    fun getValue() {
+    fun getValue() -> int {
         return this.count;
     }
 }
 
-var counter = Counter();
+var object counter = Counter();
 counter.initialize();
-var val1 = counter.increment();
-var val2 = counter.increment();
+var int val1 = counter.increment();
+var int val2 = counter.increment();
 if (val1 == 1 and val2 == 2) {
     say("✓ This keyword and state management work");
 } else {
@@ -58,15 +58,15 @@ if (val1 == 1 and val2 == 2) {
 }
 
 // Test 3: Multiple instances
-var counter1 = Counter();
+var object counter1 = Counter();
 counter1.initialize();
-var counter2 = Counter();
+var object counter2 = Counter();
 counter2.initialize();
 counter1.increment();
 counter1.increment();
 counter2.increment();
-var c1 = counter1.getValue();
-var c2 = counter2.getValue();
+var int c1 = counter1.getValue();
+var int c2 = counter2.getValue();
 if (c1 == 2 and c2 == 1) {
     say("✓ Multiple instances work independently");
 } else {
@@ -75,21 +75,21 @@ if (c1 == 2 and c2 == 1) {
 
 // Test 4: Class with calculations
 class Rectangle {
-    var width;
-    var height;
+    var int width;
+    var int height;
     
-    fun initialize(w, h) {
+    fun initialize(int w, int h) -> int {
         this.width = w;
         this.height = h;
     }
     
-    fun area() {
+    fun area() -> int {
         return this.width * this.height;
     }
 }
 
-var rect = Rectangle(5, 3);
-var area = rect.area();
+var object rect = Rectangle(5, 3);
+var int area = rect.area();
 if (area == 15) {
     say("✓ Class methods with calculations work");
 } else {

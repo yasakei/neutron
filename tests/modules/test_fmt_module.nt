@@ -3,13 +3,13 @@ use fmt;
 
 say("=== Fmt Module Tests ===");
 
-var test_count = 0;
-var pass_count = 0;
+var int test_count = 0;
+var int pass_count = 0;
 
 fun test(desc, fn) {
     test_count = test_count + 1;
     try {
-        var r = fn();
+        var int r = fn();
         if (r) {
             say("✓ " + desc);
             pass_count = pass_count + 1;

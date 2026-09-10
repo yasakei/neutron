@@ -2,15 +2,15 @@
 // This test verifies that the JIT compiles hot loops
 
 fun hotLoop() {
-    var sum = 0;
-    for (var i = 0; i < 500; i = i + 1) {
+    var int sum = 0;
+    for (var int i = 0; i < 500; i = i + 1) {
         sum = sum + i;
     }
     return sum;
 }
 
-var result = hotLoop();
-var expected = 124750;  // Sum of 0 to 499
+var string result = hotLoop();
+var int expected = 124750;  // Sum of 0 to 499
 
 if (result == expected) {
     say("JIT hot loop test PASSED (sum=" + result + ")");

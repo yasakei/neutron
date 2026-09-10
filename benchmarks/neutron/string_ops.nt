@@ -2,8 +2,8 @@
 // Tests string manipulation, concatenation, and searching
 
 // String building with concatenation
-var text = "";
-var i = 0;
+var string text = "";
+var int i = 0;
 while (i < 1000) {
     text = text + "x";
     i = i + 1;
@@ -11,8 +11,8 @@ while (i < 1000) {
 say("Built string of length: " + text.length);
 
 // String operations in loop
-var result = "";
-var j = 0;
+var string result = "";
+var int j = 0;
 while (j < 100) {
     result = "Number " + j + " squared is " + (j * j);
     j = j + 1;
@@ -20,10 +20,10 @@ while (j < 100) {
 say("String operations: " + result);
 
 // String comparison and searching
-var haystack = "The quick brown fox jumps over the lazy dog";
-var found_count = 0;
+var string haystack = "The quick brown fox jumps over the lazy dog";
+var int found_count = 0;
 
-var k = 0;
+var int k = 0;
 while (k < 100) {
     // Check for specific strings
     if (haystack == "The quick brown fox jumps over the lazy dog") {
@@ -34,8 +34,8 @@ while (k < 100) {
 say("String searches completed: " + found_count);
 
 // String repetition
-var repeated = "";
-var m = 0;
+var string repeated = "";
+var int m = 0;
 while (m < 50) {
     repeated = repeated + "abc";
     m = m + 1;
@@ -43,11 +43,11 @@ while (m < 50) {
 say("Repeated string length: " + repeated.length);
 
 // Case operations (simulated)
-var upper_count = 0;
-var lower_count = 0;
-var test_str = "ABCdef123XYZ";
+var int upper_count = 0;
+var int lower_count = 0;
+var string test_str = "ABCdef123XYZ";
 
-var n = 0;
+var int n = 0;
 while (n < 1000) {
     // Simulate case checking
     if (test_str == "ABCdef123XYZ") {

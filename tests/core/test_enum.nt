@@ -40,7 +40,7 @@ if (Priority.LOW == 1 and Priority.MEDIUM == 2 and Priority.HIGH == 3) {
 
 // Test 4: Enum used in match
 enum Color { RED, GREEN, BLUE }
-var c = Color.GREEN;
+var int c = Color.GREEN;
 match (c) {
     case 0 => say("FAIL: should be GREEN not RED");
     case 1 => say("✓ Enum value works in match");
@@ -50,7 +50,7 @@ match (c) {
 
 // Test 5: Enum as object — can access all members
 enum Season { SPRING, SUMMER, AUTUMN, WINTER }
-var count = 0;
+var int count = 0;
 for (var s in Season) {
     count = count + 1;
 }

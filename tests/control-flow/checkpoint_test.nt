@@ -8,8 +8,8 @@
 use sys;
 
 fun main() {
-    var counter = 0;
-    var data = ["start"];
+    var int counter = 0;
+    var array data = ["start"];
     
     say("Phase 1: Initializing...");
     counter = counter + 1;

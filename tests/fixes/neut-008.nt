@@ -13,7 +13,7 @@ use math;
 say("✓ Modules loaded (with caching)");
 
 // Test that modules work after caching
-var arr = arrays.range(1, 5);
+var array arr = arrays.range(1, 5);
 if (arr.length == 5) {
     say("✓ Cached array module works");
 }

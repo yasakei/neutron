@@ -2,9 +2,9 @@ say("=== String Core Methods Tests ===");
 
 // Test 1: Basic string methods
 say("Test 1: Basic string methods");
-var test_str = "Hello World";
+var string test_str = "Hello World";
 
-var basic_tests = (
+var int basic_tests = (
     test_str.length == 11 &&
     test_str.contains("World") == true &&
     test_str.contains("xyz") == false &&
@@ -20,8 +20,8 @@ if (basic_tests) {
 
 // Test 2: String splitting
 say("Test 2: String splitting");
-var split_str = "apple,banana,cherry";
-var parts = split_str.split(",");
+var string split_str = "apple,banana,cherry";
+var array parts = split_str.split(",");
 
 if (parts.length == 3 && parts[0] == "apple" && parts[1] == "banana" && parts[2] == "cherry") {
     say("✓ String splitting works correctly");
@@ -31,7 +31,7 @@ if (parts.length == 3 && parts[0] == "apple" && parts[1] == "banana" && parts[2]
 
 // Test 3: String modification - strip methods
 say("Test 3: String strip methods");
-var strip_tests = (
+var int strip_tests = (
     "  hello  ".strip() == "hello" &&
     "  hello  ".lstrip() == "hello  " &&
     "  hello  ".rstrip() == "  hello" &&
@@ -46,7 +46,7 @@ if (strip_tests) {
 
 // Test 4: String replacement
 say("Test 4: String replacement");
-var replace_tests = (
+var int replace_tests = (
     "hello world".replace("world", "neutron") == "hello neutron" &&
     "hello hello hello".replace("hello", "hi", 2) == "hi hi hello" &&
     "test".replace("", "x") == "xtxexsxtx"
@@ -60,7 +60,7 @@ if (replace_tests) {
 
 // Test 5: Method registry functionality
 say("Test 5: Method registry functionality");
-var registry_tests = (
+var int registry_tests = (
     "test".length == 4 &&
     "TEST".lower() == "test" &&
     "test".upper() == "TEST" &&
@@ -75,9 +75,9 @@ if (registry_tests) {
 
 // Test 6: String interpolation
 say("Test 6: String interpolation");
-var name = "Neutron";
-var version = 2.0;
-var interpolated = "Welcome to ${name} v${version}!";
+var string name = "Neutron";
+var float version = 2.0;
+var string interpolated = "Welcome to ${name} v${version}!";
 
 if (interpolated == "Welcome to Neutron v2!") {
     say("✓ String interpolation works correctly");

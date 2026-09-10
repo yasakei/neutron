@@ -4,8 +4,8 @@
 say("=== NEUT-015: Testing Jump Offset Handling ===");
 
 // Test large if-else chain (creates multiple jumps)
-var value = 5;
-var result = "unknown";
+var int value = 5;
+var string result = "unknown";
 
 if (value == 1) {
     result = "one";
@@ -36,10 +36,10 @@ if (result == "five") {
 }
 
 // Test nested loops (creates loop jumps)
-var sum = 0;
-var i = 0;
+var int sum = 0;
+var int i = 0;
 while (i < 5) {
-    var j = 0;
+    var int j = 0;
     while (j < 5) {
         sum = sum + 1;
         j = j + 1;
@@ -52,8 +52,8 @@ if (sum == 25) {
 }
 
 // Test for loop with breaks (creates multiple jump points)
-var count = 0;
-for (var k = 0; k < 100; k = k + 1) {
+var int count = 0;
+for (var int k = 0; k < 100; k = k + 1) {
     if (k == 10) {
         break;
     }

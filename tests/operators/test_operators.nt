@@ -2,10 +2,10 @@
 say("=== Testing Operators ===");
 
 // Test 1: Arithmetic operators
-var sum = 10 + 5;
-var diff = 20 - 10;
-var product = 5 * 2;
-var quotient = 10 / 2;
+var int sum = 10 + 5;
+var int diff = 20 - 10;
+var int product = 5 * 2;
+var int quotient = 10 / 2;
 if (sum == 15 and diff == 10 and product == 10 and quotient == 5) {
     say("✓ Arithmetic operators work");
 } else {
@@ -13,10 +13,10 @@ if (sum == 15 and diff == 10 and product == 10 and quotient == 5) {
 }
 
 // Test 2: Comparison operators
-var eq = 10 == 10;
-var neq = 10 != 5;
-var lt = 5 < 10;
-var gt = 10 > 5;
+var bool eq = 10 == 10;
+var bool neq = 10 != 5;
+var bool lt = 5 < 10;
+var bool gt = 10 > 5;
 if (eq and neq and lt and gt) {
     say("✓ Comparison operators work");
 } else {
@@ -24,8 +24,8 @@ if (eq and neq and lt and gt) {
 }
 
 // Test 3: Logical operators
-var andResult = true and false;
-var orResult = true or false;
+var bool andResult = true and false;
+var bool orResult = true or false;
 if (andResult == false and orResult == true) {
     say("✓ Logical operators (and, or) work");
 } else {
@@ -33,8 +33,8 @@ if (andResult == false and orResult == true) {
 }
 
 // Test 4: Logical operators with complex expressions and negative numbers
-var x = 10;
-var y = -5;
+var int x = 10;
+var int y = -5;
 
 // Test the specific issue reported: logical operators with negative numbers
 if (x < 1 and x < -1) {
@@ -59,14 +59,14 @@ if (y < 0 or y > 0) {
 }
 
 // Test short-circuit evaluation
-var counter = 0;
+var int counter = 0;
 fun incrementCounterAndReturn(val) {
     counter = counter + 1;
     return val;
 }
 
 counter = 0;
-var result1 = false and incrementCounterAndReturn(true);
+var bool result1 = false and incrementCounterAndReturn(true);
 if (result1 == false and counter == 0) {
     say("✓ Short-circuit AND works (right operand not evaluated when left is false)");
 } else {
@@ -74,7 +74,7 @@ if (result1 == false and counter == 0) {
 }
 
 counter = 0;
-var result2 = true or incrementCounterAndReturn(false);
+var bool result2 = true or incrementCounterAndReturn(false);
 if (result2 == true and counter == 0) {
     say("✓ Short-circuit OR works (right operand not evaluated when left is true)");
 } else {
@@ -82,8 +82,8 @@ if (result2 == true and counter == 0) {
 }
 
 // Test 4: String concatenation
-var greeting = "Hello, " + "world!";
-var withNumber = "Value: " + 42;
+var string greeting = "Hello, " + "world!";
+var string withNumber = "Value: " + 42;
 if (greeting == "Hello, world!") {
     say("✓ String concatenation works");
 } else {
@@ -91,7 +91,7 @@ if (greeting == "Hello, world!") {
 }
 
 // Test 5: Operator precedence
-var result = 2 + 3 * 4;
+var int result = 2 + 3 * 4;
 if (result == 14) {
     say("✓ Operator precedence works");
 } else {
@@ -99,7 +99,7 @@ if (result == 14) {
 }
 
 // Test 6: Parentheses
-var result3 = (2 + 3) * 4;
+var int result3 = (2 + 3) * 4;
 if (result3 == 20) {
     say("✓ Parentheses for precedence work");
 } else {

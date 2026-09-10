@@ -14,9 +14,9 @@ sys.sleep(100); // Sleep 100ms
 
 // Test 1: HTTP GET request
 say("Testing http.get()...");
-var getResponse = http.get("http://localhost:8081/get");
+var int getResponse = http.get("http://localhost:8081/get");
 if (getResponse.status == 200) {
-    var body = json.parse(getResponse.body);
+    var object body = json.parse(getResponse.body);
     if (body["method"] == "GET" and body["path"] == "/get") {
         say("✓ http.get() works and returns correct method/path");
     } else {
@@ -27,7 +27,7 @@ if (getResponse.status == 200) {
 }
 
 // Test 2: Response structure
-var hasBody = getResponse.body == nil;
+var bool hasBody = getResponse.body == nil;
 if (!hasBody) {
     say("✓ Response has body field");
 } else {
@@ -36,10 +36,10 @@ if (!hasBody) {
 
 // Test 3: HTTP POST request
 say("Testing http.post()...");
-var postData = json.stringify({"key": "value"});
-var postResponse = http.post("http://localhost:8081/post", postData);
+var string postData = json.stringify({"key": "value"});
+var int postResponse = http.post("http://localhost:8081/post", postData);
 if (postResponse.status == 200) {
-    var body = json.parse(postResponse.body);
+    var object body = json.parse(postResponse.body);
     if (body["method"] == "POST") {
         say("✓ http.post() works");
     } else {
@@ -51,10 +51,10 @@ if (postResponse.status == 200) {
 
 // Test 4: HTTP PUT request
 say("Testing http.put()...");
-var putData = json.stringify({"update": "data"});
-var putResponse = http.put("http://localhost:8081/put", putData);
+var string putData = json.stringify({"update": "data"});
+var int putResponse = http.put("http://localhost:8081/put", putData);
 if (putResponse.status == 200) {
-    var body = json.parse(putResponse.body);
+    var object body = json.parse(putResponse.body);
     if (body["method"] == "PUT") {
         say("✓ http.put() works");
     } else {
@@ -66,9 +66,9 @@ if (putResponse.status == 200) {
 
 // Test 5: HTTP DELETE request
 say("Testing http.delete()...");
-var deleteResponse = http.delete("http://localhost:8081/delete");
+var int deleteResponse = http.delete("http://localhost:8081/delete");
 if (deleteResponse.status == 200) {
-    var body = json.parse(deleteResponse.body);
+    var object body = json.parse(deleteResponse.body);
     if (body["method"] == "DELETE") {
         say("✓ http.delete() works");
     } else {
@@ -82,7 +82,7 @@ if (deleteResponse.status == 200) {
 say("Testing http.head()...");
 // HEAD requests might not return a body, or curl might not read it.
 // We just check status here.
-var headResponse = http.head("http://localhost:8081/head");
+var int headResponse = http.head("http://localhost:8081/head");
 if (headResponse.status == 200) {
     say("✓ http.head() works");
 } else {
@@ -91,10 +91,10 @@ if (headResponse.status == 200) {
 
 // Test 7: HTTP PATCH request
 say("Testing http.patch()...");
-var patchData = json.stringify({"patch": "value"});
-var patchResponse = http.patch("http://localhost:8081/patch", patchData);
+var string patchData = json.stringify({"patch": "value"});
+var int patchResponse = http.patch("http://localhost:8081/patch", patchData);
 if (patchResponse.status == 200) {
-    var body = json.parse(patchResponse.body);
+    var object body = json.parse(patchResponse.body);
     if (body["method"] == "PATCH") {
         say("✓ http.patch() works");
     } else {
@@ -105,7 +105,7 @@ if (patchResponse.status == 200) {
 }
 
 // Test 8: URL encoding
-var encoded = http.urlEncode("hello world!");
+var int encoded = http.urlEncode("hello world!");
 if (encoded == "hello+world%21") {
     say("✓ http.urlEncode works");
 } else {
@@ -113,7 +113,7 @@ if (encoded == "hello+world%21") {
 }
 
 // Test 9: URL decoding
-var decoded = http.urlDecode("hello+world%21");
+var string decoded = http.urlDecode("hello+world%21");
 if (decoded == "hello world!") {
     say("✓ http.urlDecode works");
 } else {
@@ -121,7 +121,7 @@ if (decoded == "hello world!") {
 }
 
 // Test 10: Parse query string
-var params = http.parseQuery("name=John&age=30");
+var array params = http.parseQuery("name=John&age=30");
 if (params["name"] == "John" and params["age"] == "30") {
     say("✓ http.parseQuery works");
 } else {
@@ -129,7 +129,7 @@ if (params["name"] == "John" and params["age"] == "30") {
 }
 
 // Test 11: Custom request method
-var customResponse = http.request("OPTIONS", "http://localhost:8081/options");
+var int customResponse = http.request("OPTIONS", "http://localhost:8081/options");
 // Note: http.request is a mock function in native.cpp, it doesn't actually send a request
 // But if it did, our server would handle it.
 // The current implementation of http.request in native.cpp returns a mock response directly.
@@ -140,10 +140,10 @@ if (customResponse.status == 200) {
 }
 
 // Test 12: Create server object (just testing object creation)
-var handler = fun(req, res) {
+var object handler = fun(req, res) {
     return "Hello!";
 };
-var server = http.createServer(handler);
+var array server = http.createServer(handler);
 if (server["running"] == false) {
     say("✓ http.createServer works");
 } else {

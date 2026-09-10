@@ -2,13 +2,13 @@
 // Tests AOT comparison operation support
 
 fun testComparisons() {
-    var a = 10;
-    var b = 20;
+    var int a = 10;
+    var int b = 20;
     
-    var less = a < b;      // true
-    var greater = a > b;   // false
-    var equal = a == b;    // false
-    var notEqual = a != b; // true
+    var bool less = a < b;      // true
+    var bool greater = a > b;   // false
+    var bool equal = a == b;    // false
+    var bool notEqual = a != b; // true
     
     if (less && !greater && !equal && notEqual) {
         say("AOT comparisons test PASSED");

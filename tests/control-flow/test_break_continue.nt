@@ -2,8 +2,8 @@
 say("=== Testing Break and Continue ===");
 
 // Test 1: Break in while loop
-var i = 0;
-var result = 0;
+var int i = 0;
+var int result = 0;
 while (i < 10) {
     if (i == 5) {
         break;
@@ -18,8 +18,8 @@ if (i == 5) {
 }
 
 // Test 2: Continue in while loop
-var j = 0;
-var sum = 0;
+var int j = 0;
+var int sum = 0;
 while (j < 5) {
     j = j + 1;
     if (j == 3) {
@@ -34,7 +34,7 @@ if (sum == 12) {
 }
 
 // Test 3: Break with complex condition
-var count = 0;
+var int count = 0;
 while (true) {
     count = count + 1;
     if (count > 7) {
@@ -48,8 +48,8 @@ if (count == 8) {
 }
 
 // Test 4: Continue skipping specific numbers
-var num = 0;
-var oddSum = 0;
+var int num = 0;
+var int oddSum = 0;
 while (num < 10) {
     num = num + 1;
     if (num == 2) {

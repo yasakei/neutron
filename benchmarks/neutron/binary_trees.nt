@@ -2,11 +2,11 @@
 use arrays;
 
 class BinaryTreeNode {
-    var val;
-    var left;
-    var right;
+    var int val;
+    var int left;
+    var int right;
     
-    fun initialize(val) {
+    fun initialize(int val) -> int {
         this.val = val;
         this.left = nil;
         this.right = nil;
@@ -40,8 +40,8 @@ fun btHeight(root) {
     if (root == nil) {
         return 0;
     }
-    var leftH = btHeight(root.left);
-    var rightH = btHeight(root.right);
+    var int leftH = btHeight(root.left);
+    var int rightH = btHeight(root.right);
     if (leftH > rightH) {
         return 1 + leftH;
     } else {
@@ -67,21 +67,21 @@ fun btSum(root) {
 // Use middle-out insertion for a balanced tree without needing random
 fun buildBalanced(arr, lo, hi, root) {
     if (lo > hi) { return root; }
-    var mid = lo + ((hi - lo) / 2);
-    var midInt = mid - (mid % 1); // floor
+    var int mid = lo + ((hi - lo) / 2);
+    var int midInt = mid - (mid % 1); // floor
     root = btInsert(root, arrays.at(arr, midInt));
     root = buildBalanced(arr, lo, midInt - 1, root);
     root = buildBalanced(arr, midInt + 1, hi, root);
     return root;
 }
 
-var sortedOrder = arrays.range(0, 1000);
-var root = nil;
+var array sortedOrder = arrays.range(0, 1000);
+var int root;
 root = buildBalanced(sortedOrder, 0, 999, root);
 
 // Operations
-var foundCount = 0;
-var m = 0;
+var int foundCount = 0;
+var int m = 0;
 while (m < 1000) {
     if (btSearch(root, m) != nil) {
         foundCount = foundCount + 1;
@@ -89,8 +89,8 @@ while (m < 1000) {
     m = m + 10;
 }
 
-var treeHeight = btHeight(root);
-var nodeCount = btCount(root);
-var totalSum = btSum(root);
+var int treeHeight = btHeight(root);
+var int nodeCount = btCount(root);
+var int totalSum = btSum(root);
 
 say("Found: ${foundCount}, Height: ${treeHeight}, Nodes: ${nodeCount}, Sum: ${totalSum}");

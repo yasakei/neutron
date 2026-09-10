@@ -16,7 +16,7 @@ fun power(base, exp) {
 }
 
 // Test factorial (deep recursion)
-var result = factorial(10);
+var string result = factorial(10);
 say("Factorial(10) = " + result);
 
 result = factorial(12);

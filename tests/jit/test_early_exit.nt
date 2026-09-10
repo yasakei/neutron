@@ -2,8 +2,8 @@
 // Tests JIT handling of break-like patterns
 
 fun earlyExit() {
-    var sum = 0;
-    for (var i = 0; i < 1000; i = i + 1) {
+    var int sum = 0;
+    for (var int i = 0; i < 1000; i = i + 1) {
         if (i >= 100) {
             return sum;
         }
@@ -12,8 +12,8 @@ fun earlyExit() {
     return sum;
 }
 
-var result = earlyExit();
-var expected = 4950;  // Sum of 0 to 99
+var string result = earlyExit();
+var int expected = 4950;  // Sum of 0 to 99
 
 if (result == expected) {
     say("JIT early exit test PASSED (sum=" + result + ")");

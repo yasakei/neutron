@@ -2,8 +2,8 @@ say("=== String Error Handling and Edge Cases Tests ===");
 
 // Test 1: Empty string edge cases
 say("Test 1: Empty string edge cases");
-var empty = "";
-var empty_tests = (
+var string empty = "";
+var int empty_tests = (
     empty.length == 0 &&
     empty.upper() == "" &&
     empty.lower() == "" &&
@@ -29,8 +29,8 @@ if (empty_tests) {
 
 // Test 2: Single character edge cases
 say("Test 2: Single character edge cases");
-var single = "a";
-var single_tests = (
+var string single = "a";
+var int single_tests = (
     single.length == 1 &&
     single[0] == "a" &&
     single[-1] == "a" &&
@@ -51,9 +51,9 @@ if (single_tests) {
 
 // Test 3: Large string handling
 say("Test 3: Large string handling");
-var large_base = "test";
-var large_str = large_base * 100;  // 400 characters
-var large_tests = (
+var string large_base = "test";
+var int large_str = large_base * 100;  // 400 characters
+var int large_tests = (
     large_str.length == 400 &&
     large_str.contains("test") &&
     large_str.find("test") == 0 &&
@@ -69,8 +69,8 @@ if (large_tests) {
 
 // Test 4: Boundary conditions
 say("Test 4: Boundary conditions");
-var boundary_str = "hello";
-var boundary_tests = (
+var string boundary_str = "hello";
+var int boundary_tests = (
     boundary_str.slice(0, 0) == "" &&
     boundary_str.slice(5, 5) == "" &&
     boundary_str.slice(0, 10) == "hello" &&
@@ -90,8 +90,8 @@ if (boundary_tests) {
 say("Test 5: Error handling");
 
 // Test valid operations (should work)
-var valid_result = "test".upper().slice(0, 2);
-var error_handling_ok = (valid_result == "TE");
+var string valid_result = "test".upper().slice(0, 2);
+var bool error_handling_ok = (valid_result == "TE");
 
 if (error_handling_ok) {
     say("✓ Error handling works correctly");
@@ -101,9 +101,9 @@ if (error_handling_ok) {
 
 // Test 6: Special characters and whitespace
 say("Test 6: Special characters and whitespace");
-var special_str = "Hello\nWorld\tTest";
-var whitespace_str = "   \t\n\r   ";
-var special_tests = (
+var string special_str = "Hello\nWorld\tTest";
+var string whitespace_str = "   \t\n\r   ";
+var int special_tests = (
     special_str.length == 16 &&
     special_str.contains("\n") &&
     special_str.contains("\t") &&
@@ -119,9 +119,9 @@ if (special_tests) {
 
 // Test 7: Method chaining edge cases
 say("Test 7: Method chaining edge cases");
-var chain_str = "  Hello World  ";
-var chain_result = chain_str.strip().upper().replace("HELLO", "HI").lower();
-var chain_tests = (
+var string chain_str = "  Hello World  ";
+var string chain_result = chain_str.strip().upper().replace("HELLO", "HI").lower();
+var int chain_tests = (
     chain_result == "hi world" &&
     "".strip().upper().lower() == "" &&
     "a".upper().lower().capitalize() == "A"
@@ -135,11 +135,11 @@ if (chain_tests) {
 
 // Test 8: Property-based edge case validation
 say("Test 8: Property validation");
-var empty_mult = "" * 10;
-var single_mult = "x" * 1;
-var neg_index_test = "hello"[0] == "hello"[-5];
+var int empty_mult = "" * 10;
+var int single_mult = "x" * 1;
+var int neg_index_test = "hello"[0] == "hello"[-5];
 
-var prop_tests = (
+var int prop_tests = (
     empty_mult == "" &&
     single_mult == "x" &&
     neg_index_test == true

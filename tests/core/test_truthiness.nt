@@ -2,7 +2,7 @@
 say("=== Testing Truthiness Rules ===");
 
 // Test 1: nil is falsy
-var nilCheck = false;
+var bool nilCheck = false;
 if (nil) {
     nilCheck = true;
 }
@@ -13,7 +13,7 @@ if (nilCheck == false) {
 }
 
 // Test 2: false is falsy
-var falseCheck = false;
+var bool falseCheck = false;
 if (false) {
     falseCheck = true;
 }
@@ -24,7 +24,7 @@ if (falseCheck == false) {
 }
 
 // Test 3: true is truthy
-var trueCheck = false;
+var bool trueCheck = false;
 if (true) {
     trueCheck = true;
 }
@@ -35,7 +35,7 @@ if (trueCheck == true) {
 }
 
 // Test 4: 0 is truthy
-var zeroCheck = false;
+var bool zeroCheck = false;
 if (0) {
     zeroCheck = true;
 }
@@ -46,7 +46,7 @@ if (zeroCheck == true) {
 }
 
 // Test 5: Empty string is truthy
-var emptyCheck = false;
+var bool emptyCheck = false;
 if ("") {
     emptyCheck = true;
 }
@@ -57,7 +57,7 @@ if (emptyCheck == true) {
 }
 
 // Test 6: Non-empty string is truthy
-var stringCheck = false;
+var bool stringCheck = false;
 if ("hello") {
     stringCheck = true;
 }
@@ -68,7 +68,7 @@ if (stringCheck == true) {
 }
 
 // Test 7: Negative numbers are truthy
-var negCheck = false;
+var bool negCheck = false;
 if (-1) {
     negCheck = true;
 }

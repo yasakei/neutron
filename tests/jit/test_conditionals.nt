@@ -2,9 +2,9 @@
 // Tests JIT handling of conditionals
 
 fun conditionalLoop() {
-    var evenSum = 0;
-    var oddSum = 0;
-    for (var i = 0; i < 200; i = i + 1) {
+    var int evenSum = 0;
+    var int oddSum = 0;
+    for (var int i = 0; i < 200; i = i + 1) {
         if (i % 2 == 0) {
             evenSum = evenSum + i;
         } else {
@@ -14,8 +14,8 @@ fun conditionalLoop() {
     return evenSum + oddSum;
 }
 
-var result = conditionalLoop();
-var expected = 19900;  // Sum of 0 to 199
+var string result = conditionalLoop();
+var int expected = 19900;  // Sum of 0 to 199
 
 if (result == expected) {
     say("JIT conditional test PASSED (sum=" + result + ")");

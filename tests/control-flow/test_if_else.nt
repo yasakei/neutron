@@ -2,8 +2,8 @@
 say("=== Testing If-Else-If Chains ===");
 
 // Test 1: Grade system with multiple else-if
-var score = 85;
-var grade = "";
+var int score = 85;
+var string grade = "";
 if (score >= 90) {
     grade = "A";
 } else if (score >= 80) {
@@ -22,8 +22,8 @@ if (grade == "B") {
 }
 
 // Test 2: Multiple conditions
-var score2 = 95;
-var result = "";
+var int score2 = 95;
+var string result = "";
 if (score2 >= 90) {
     result = "Excellent";
 } else if (score2 >= 80) {
@@ -38,8 +38,8 @@ if (result == "Excellent") {
 }
 
 // Test 3: Falling through to else
-var score3 = 55;
-var outcome = "";
+var int score3 = 55;
+var string outcome = "";
 if (score3 >= 90) {
     outcome = "A";
 } else if (score3 >= 80) {
@@ -56,8 +56,8 @@ if (outcome == "F") {
 }
 
 // Test 4: Nested if-else-if
-var x = 15;
-var category = "";
+var int x = 15;
+var string category = "";
 if (x > 20) {
     category = "large";
 } else {
@@ -74,8 +74,8 @@ if (category == "medium") {
 }
 
 // Test 5: Complex condition with else-if
-var age = 25;
-var status = "";
+var int age = 25;
+var string status = "";
 if (age < 13) {
     status = "child";
 } else if (age < 20) {

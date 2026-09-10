@@ -1,7 +1,7 @@
 // AOT Test 3: Increment/Decrement Operations
 // Tests AOT optimization of increment/decrement
 
-var value = 10;
+var int value = 10;
 
 // Inline increment (no function call)
 value = value + 1;

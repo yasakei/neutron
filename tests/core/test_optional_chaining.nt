@@ -2,8 +2,8 @@
 say("=== Optional Chaining ===");
 
 // Test 1: Access existing property
-var user = {"name": "Alice", "age": 30};
-var name = user?.name;
+var object user = {"name": "Alice", "age": 30};
+var string name = user?.name;
 if (name == "Alice") {
     say("✓ Optional chain on existing property works");
 } else {
@@ -11,8 +11,8 @@ if (name == "Alice") {
 }
 
 // Test 2: Access on nil — should return nil, not crash
-var missing = nil;
-var safe = missing?.name;
+var int missing;
+var string safe = missing?.name;
 if (safe == nil) {
     say("✓ Optional chain on nil returns nil");
 } else {
@@ -21,13 +21,13 @@ if (safe == nil) {
 
 // Test 3: Chained access on object instance
 class Config {
-    var host;
-    fun initialize(h) {
+    var string host;
+    fun initialize(string h) -> int {
         this.host = h;
     }
 }
-var cfg = Config("localhost");
-var host = cfg?.host;
+var object cfg = Config("localhost");
+var string host = cfg?.host;
 if (host == "localhost") {
     say("✓ Optional chain on class instance works");
 } else {
@@ -35,15 +35,15 @@ if (host == "localhost") {
 }
 
 // Test 4: Optional chain result used in expression
-var data = {"value": 42};
-var v = data?.value;
+var object data = {"value": 42};
+var int v = data?.value;
 if (v != nil and v == 42) {
     say("✓ Optional chain result usable in expression");
 }
 
 // Test 5: Optional chain on missing key returns nil
-var obj = {"x": 1};
-var y = obj?.y;
+var object obj = {"x": 1};
+var int y = obj?.y;
 if (y == nil) {
     say("✓ Optional chain on missing key returns nil");
 }

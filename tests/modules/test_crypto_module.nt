@@ -3,14 +3,14 @@ use crypto;
 
 say("=== Crypto Module Tests ===");
 
-var test_count = 0;
-var pass_count = 0;
+var int test_count = 0;
+var int pass_count = 0;
 
 // Helper function to run tests
 fun test(description, test_func) {
     test_count = test_count + 1;
     try {
-        var result = test_func();
+        var int result = test_func();
         if (result) {
             say("✓ " + description);
             pass_count = pass_count + 1;
@@ -24,116 +24,116 @@ fun test(description, test_func) {
 
 // Test Base64 encoding/decoding
 test("Base64 encode/decode basic", fun() {
-    var original = "Hello, World!";
-    var encoded = crypto.base64_encode(original);
-    var decoded = crypto.base64_decode(encoded);
+    var string original = "Hello, World!";
+    var int encoded = crypto.base64_encode(original);
+    var int decoded = crypto.base64_decode(encoded);
     return original == decoded and encoded == "SGVsbG8sIFdvcmxkIQ==";
 });
 
 test("Base64 empty string", fun() {
-    var encoded = crypto.base64_encode("");
-    var decoded = crypto.base64_decode(encoded);
+    var int encoded = crypto.base64_encode("");
+    var int decoded = crypto.base64_decode(encoded);
     return decoded == "";
 });
 
 test("Base64 special characters", fun() {
-    var original = "Test with special chars: !@#$%^&*()";
-    var encoded = crypto.base64_encode(original);
-    var decoded = crypto.base64_decode(encoded);
+    var string original = "Test with special chars: !@#$%^&*()";
+    var int encoded = crypto.base64_encode(original);
+    var int decoded = crypto.base64_decode(encoded);
     return original == decoded;
 });
 
 // Test SHA-256 hashing
 test("SHA-256 known hash", fun() {
-    var input = "The quick brown fox jumps over the lazy dog";
-    var hash = crypto.sha256(input);
-    var expected = "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592";
+    var string input = "The quick brown fox jumps over the lazy dog";
+    var int hash = crypto.sha256(input);
+    var string expected = "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592";
     return hash == expected;
 });
 
 test("SHA-256 empty string", fun() {
-    var hash = crypto.sha256("");
-    var expected = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+    var int hash = crypto.sha256("");
+    var string expected = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
     return hash == expected;
 });
 
 test("SHA-256 consistency", fun() {
-    var input = "test string";
-    var hash1 = crypto.sha256(input);
-    var hash2 = crypto.sha256(input);
+    var string input = "test string";
+    var int hash1 = crypto.sha256(input);
+    var int hash2 = crypto.sha256(input);
     return hash1 == hash2;
 });
 
 // Test hex encoding/decoding
 test("Hex encode/decode basic", fun() {
-    var original = "Hello";
-    var encoded = crypto.hex_encode(original);
-    var decoded = crypto.hex_decode(encoded);
+    var string original = "Hello";
+    var int encoded = crypto.hex_encode(original);
+    var int decoded = crypto.hex_decode(encoded);
     return original == decoded && encoded == "48656c6c6f";
 });
 
 test("Hex encode empty string", fun() {
-    var encoded = crypto.hex_encode("");
-    var decoded = crypto.hex_decode(encoded);
+    var int encoded = crypto.hex_encode("");
+    var int decoded = crypto.hex_decode(encoded);
     return decoded == "";
 });
 
 test("Hex case insensitive decode", fun() {
-    var lower = crypto.hex_decode("48656c6c6f");
-    var upper = crypto.hex_decode("48656C6C6F");
+    var int lower = crypto.hex_decode("48656c6c6f");
+    var int upper = crypto.hex_decode("48656C6C6F");
     return lower == upper && lower == "Hello";
 });
 
 // Test random generation
 test("Random bytes length", fun() {
-    var bytes8 = crypto.random_bytes(8);
-    var bytes16 = crypto.random_bytes(16);
+    var array bytes8 = crypto.random_bytes(8);
+    var array bytes16 = crypto.random_bytes(16);
     return bytes8.length == 16 and bytes16.length == 32; // hex encoded
 });
 
 test("Random bytes uniqueness", fun() {
-    var rand1 = crypto.random_bytes(16);
-    var rand2 = crypto.random_bytes(16);
+    var int rand1 = crypto.random_bytes(16);
+    var int rand2 = crypto.random_bytes(16);
     return rand1 != rand2;
 });
 
 test("Random string length", fun() {
-    var str10 = crypto.random_string(10);
-    var str20 = crypto.random_string(20);
+    var array str10 = crypto.random_string(10);
+    var array str20 = crypto.random_string(20);
     return str10.length == 10 and str20.length == 20;
 });
 
 test("Random string uniqueness", fun() {
-    var str1 = crypto.random_string(16);
-    var str2 = crypto.random_string(16);
+    var int str1 = crypto.random_string(16);
+    var int str2 = crypto.random_string(16);
     return str1 != str2;
 });
 
 test("Random string custom charset", fun() {
-    var str = crypto.random_string(10, "ABC123");
+    var array str = crypto.random_string(10, "ABC123");
     return str.length == 10;
 });
 
 // Test XOR cipher
 test("XOR cipher basic", fun() {
-    var plaintext = "Hello, World!";
-    var key = "secret";
-    var encrypted = crypto.xor_cipher(plaintext, key);
-    var decrypted = crypto.xor_cipher(encrypted, key);
+    var string plaintext = "Hello, World!";
+    var string key = "secret";
+    var int encrypted = crypto.xor_cipher(plaintext, key);
+    var int decrypted = crypto.xor_cipher(encrypted, key);
     return plaintext == decrypted;
 });
 
 test("XOR cipher empty string", fun() {
-    var encrypted = crypto.xor_cipher("", "key");
-    var decrypted = crypto.xor_cipher(encrypted, "key");
+    var int encrypted = crypto.xor_cipher("", "key");
+    var int decrypted = crypto.xor_cipher(encrypted, "key");
     return decrypted == "";
 });
 
 test("XOR cipher mathematical property", fun() {
-    var data = "Test data";
-    var key = "testkey";
-    var step1 = crypto.xor_cipher(data, key);
-    var step2 = crypto.xor_cipher(step1, key);
+    var string data = "Test data";
+    var string key = "testkey";
+    var int step1 = crypto.xor_cipher(data, key);
+    var int step2 = crypto.xor_cipher(step1, key);
     return data == step2;
 });
 

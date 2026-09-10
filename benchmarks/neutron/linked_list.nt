@@ -1,13 +1,13 @@
 // Linked List benchmark in Neutron
 
 // Simple linked list using arrays with O(1) tail append
-var list_data = [];
-var list_next = [];
-var list_head = -1;
-var list_tail = -1;
+var array list_data = [];
+var array list_next = [];
+var int list_head = -1;
+var int list_tail = -1;
 
 fun listAppend(data) {
-    var idx = list_data.length;
+    var int idx = list_data.length;
     list_data.push(data);
     list_next.push(-1);
     
@@ -22,7 +22,7 @@ fun listAppend(data) {
 }
 
 fun listFind(data) {
-    var current = list_head;
+    var int current = list_head;
     while (current != -1) {
         if (list_data[current] == data) {
             return current;
@@ -40,9 +40,9 @@ fun listDelete(data) {
         list_head = list_next[list_head];
         return;
     }
-    var current = list_head;
+    var int current = list_head;
     while (list_next[current] != -1) {
-        var nextIdx = list_next[current];
+        var int nextIdx = list_next[current];
         if (list_data[nextIdx] == data) {
             list_next[current] = list_next[nextIdx];
             return;
@@ -52,8 +52,8 @@ fun listDelete(data) {
 }
 
 fun listLength() {
-    var count = 0;
-    var current = list_head;
+    var int count = 0;
+    var int current = list_head;
     while (current != -1) {
         count = count + 1;
         current = list_next[current];
@@ -62,15 +62,15 @@ fun listLength() {
 }
 
 // Create and manipulate linked list
-var i = 0;
+var int i = 0;
 while (i < 1000) {
     listAppend(i);
     i = i + 1;
 }
 
 // Find elements
-var count = 0;
-var j = 0;
+var int count = 0;
+var int j = 0;
 while (j < 1000) {
     if (listFind(j) >= 0) {
         count = count + 1;
@@ -79,12 +79,12 @@ while (j < 1000) {
 }
 
 // Delete some elements
-var k = 0;
+var int k = 0;
 while (k < 500) {
     listDelete(k);
     k = k + 10;
 }
 
-var len = listLength();
+var int len = listLength();
 say("List length: ${len}, Found: ${count}");
 

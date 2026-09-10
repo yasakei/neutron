@@ -1,10 +1,10 @@
 // Mandelbrot Set benchmark in Neutron
 
 fun mandelbrot(cx, cy, maxIter) {
-    var zx = 0;
-    var zy = 0;
-    var n = 0;
-    var tmp;
+    var int zx = 0;
+    var int zy = 0;
+    var int n = 0;
+    var int tmp;
 
     while (zx * zx + zy * zy <= 4 and n < maxIter) {
         tmp = zx * zx - zy * zy + cx;
@@ -16,12 +16,12 @@ fun mandelbrot(cx, cy, maxIter) {
 }
 
 fun linspace(start, stop, num) {
-    var result = [];
-    var step = 0;
+    var array result = [];
+    var int step = 0;
     if (num > 1) {
         step = (stop - start) / (num - 1);
     }
-    var i = 0;
+    var int i = 0;
     while (i < num) {
         result.push(start + step * i);
         i = i + 1;
@@ -30,16 +30,16 @@ fun linspace(start, stop, num) {
 }
 
 fun mandelbrotSet(xmin, xmax, ymin, ymax, width, height, maxIter) {
-    var r1 = linspace(xmin, xmax, width);
-    var r2 = linspace(ymin, ymax, height);
-    var count = 0;
+    var array r1 = linspace(xmin, xmax, width);
+    var array r2 = linspace(ymin, ymax, height);
+    var int count = 0;
     
-    var i = 0;
+    var int i = 0;
     while (i < width) {
-        var x = r1[i];
-        var j = 0;
+        var int x = r1[i];
+        var int j = 0;
         while (j < height) {
-            var c = mandelbrot(x, r2[j], maxIter);
+            var int c = mandelbrot(x, r2[j], maxIter);
             if (c == maxIter) {
                 count = count + 1;
             }
@@ -51,13 +51,13 @@ fun mandelbrotSet(xmin, xmax, ymin, ymax, width, height, maxIter) {
 }
 
 // Calculate mandelbrot set
-var width = 200;
-var height = 200;
-var xmin = -2.0;
-var xmax = 1.0;
-var ymin = -1.5;
-var ymax = 1.5;
-var maxIter = 100;
+var int width = 200;
+var int height = 200;
+var float xmin = -2.0;
+var float xmax = 1.0;
+var float ymin = -1.5;
+var float ymax = 1.5;
+var int maxIter = 100;
 
-var count = mandelbrotSet(xmin, xmax, ymin, ymax, width, height, maxIter);
+var int count = mandelbrotSet(xmin, xmax, ymin, ymax, width, height, maxIter);
 say("Mandelbrot points: ${count}");

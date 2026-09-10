@@ -1,15 +1,15 @@
 // Nested loops benchmark
 // Tests deeply nested iteration performance
 
-var total = 0;
-var iterations = 0;
+var int total = 0;
+var int iterations = 0;
 
 // Triple nested loop
-var i = 0;
+var int i = 0;
 while (i < 50) {
-    var j = 0;
+    var int j = 0;
     while (j < 50) {
-        var k = 0;
+        var int k = 0;
         while (k < 50) {
             total = total + (i + j + k);
             iterations = iterations + 1;
@@ -25,10 +25,10 @@ say("Iterations: " + iterations);
 say("Total sum: " + total);
 
 // Nested loop with conditionals
-var count = 0;
-var x = 0;
+var int count = 0;
+var int x = 0;
 while (x < 100) {
-    var y = 0;
+    var int y = 0;
     while (y < 100) {
         if (x % 2 == 0) {
             if (y % 3 == 0) {
@@ -42,10 +42,10 @@ while (x < 100) {
 say("Conditional nested loop count: " + count);
 
 // Nested loop with break
-var found = 0;
-var a = 0;
+var int found = 0;
+var int a = 0;
 while (a < 100) {
-    var b = 0;
+    var int b = 0;
     while (b < 100) {
         if (a * b == 2500) {
             found = found + 1;

@@ -1,19 +1,19 @@
 say("=== Test Class Init Syntax ===");
 
 class Person {
-    var name;
+    var string name;
     
     // New syntax: init without fun
-    init(n) {
+    fun init(string n) -> int {
         this.name = n;
     }
     
-    fun greet() {
+    fun greet() -> string {
         return "Hello, " + this.name;
     }
 }
 
-var p = Person();
+var object p = Person();
 p.init("Neutron");
 
 if (p.greet() == "Hello, Neutron") {
@@ -23,15 +23,15 @@ if (p.greet() == "Hello, Neutron") {
 }
 
 class OldStyle {
-    var val;
+    var int val;
     
     // Standard syntax: fun init
-    fun init(v) {
+    fun init(int v) -> int {
         this.val = v;
     }
 }
 
-var o = OldStyle();
+var object o = OldStyle();
 o.init(42);
 if (o.val == 42) {
     say("✓ Class fun init() passed");
